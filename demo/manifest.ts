@@ -7,11 +7,13 @@ import { lighting } from './scenarios/lighting';
 import { fslrFunc } from './scenarios/fslrFunc';
 import { gpuCompositing } from './scenarios/gpuCompositing';
 import { curvature } from './scenarios/curvature';
+import { clipping } from './scenarios/clipping';
 
 export const scenarios: Scenario[] = [
   quickstart,
   multilayer,
   curvature,
+  clipping,
   lighting,
   hemispheres,
   fslrFunc,

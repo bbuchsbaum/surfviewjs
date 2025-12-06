@@ -23,6 +23,7 @@ import { OutlineLayer } from './OutlineLayer';
 import { CurvatureLayer } from './layers/CurvatureLayer';
 import { GPULayerCompositor } from './GPULayerCompositor';
 import { computeMeanCurvature, normalizeCurvature, curvatureToGrayscale } from './utils/curvature';
+import { ClipPlane, ClipPlaneSet } from './utils/ClipPlane';
 import { debugLog, setDebug } from './debug';
 import ColorMap from './ColorMap';
 import * as loaders from './loaders';
@@ -78,6 +79,8 @@ export {
   computeMeanCurvature,
   normalizeCurvature,
   curvatureToGrayscale,
+  ClipPlane,
+  ClipPlaneSet,
   ColorMap,
   EventEmitter,
   LaplacianSmoothing,
@@ -125,6 +128,8 @@ if (typeof window !== 'undefined') {
     computeMeanCurvature,
     normalizeCurvature,
     curvatureToGrayscale,
+    ClipPlane,
+    ClipPlaneSet,
     ColorMap,
     EventEmitter,
     THREE,

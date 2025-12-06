@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { NeuroSurface, SurfaceGeometry, SurfaceConfig } from './classes';
 import { LayerStack, BaseLayer, RGBALayer, DataLayer, LabelLayer, Layer } from './layers';
 import { CurvatureLayer, CurvatureConfig } from './layers/CurvatureLayer';
+import { ClipPlaneSet, ClipPlane, ClipAxis } from './utils/ClipPlane';
 import { debugLog } from './debug';
 import ColorMap from './ColorMap';
 import { GPULayerCompositor } from './GPULayerCompositor';
@@ -114,6 +115,9 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
   private outlineResolution: THREE.Vector2 | null = null;
   private useWideLines: boolean;
 
+  /** Clip plane set for surface clipping */
+  readonly clipPlanes: ClipPlaneSet;
+
   constructor(geometry: SurfaceGeometry, config: MultiLayerSurfaceConfig = {}) {
     // Initialize with empty data
     const vertexCount = geometry.vertices.length / 3;
@@ -132,6 +136,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     this._updatePending = false; // For throttling updates
     this.useGPUCompositing = config.useGPUCompositing ?? false; // Default to CPU for compatibility
     this.useWideLines = config.useWideLines ?? true;
+    this.clipPlanes = new ClipPlaneSet();
     
     // Initialize GPU compositor if requested
     if (this.useGPUCompositing && this.supportsWebGL2()) {
@@ -537,6 +542,95 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     if (layer) {
       layer.setVisible(visible);
       this.requestColorUpdate();
+    }
+  }
+
+  // ============================================================
+  // Clip Plane Methods
+  // ============================================================
+
+  /**
+   * Set a clip plane by axis.
+   *
+   * @param axis - Which axis to clip ('x', 'y', or 'z')
+   * @param distance - Distance from origin along axis
+   * @param enabled - Whether to enable (default: true)
+   * @param flip - Flip clipping direction (default: false)
+   *
+   * @example
+   * // Clip at x=0 (midline sagittal cut)
+   * surface.setClipPlane('x', 0);
+   *
+   * // Clip right hemisphere only
+   * surface.setClipPlane('x', 0, true, true);
+   */
+  setClipPlane(
+    axis: ClipAxis,
+    distance: number,
+    enabled = true,
+    flip = false
+  ): void {
+    this.clipPlanes.setClipPlane(axis, distance, enabled, flip);
+    this._syncClipPlanes();
+    this.requestColorUpdate();
+  }
+
+  /**
+   * Enable a clip plane.
+   */
+  enableClipPlane(axis: ClipAxis): void {
+    this.clipPlanes.enableClipPlane(axis);
+    this._syncClipPlanes();
+    this.requestColorUpdate();
+  }
+
+  /**
+   * Disable a clip plane.
+   */
+  disableClipPlane(axis: ClipAxis): void {
+    this.clipPlanes.disableClipPlane(axis);
+    this._syncClipPlanes();
+    this.requestColorUpdate();
+  }
+
+  /**
+   * Clear all clip planes (disable all).
+   */
+  clearClipPlanes(): void {
+    this.clipPlanes.clearClipPlanes();
+    this._syncClipPlanes();
+    this.requestColorUpdate();
+  }
+
+  /**
+   * Get a clip plane by axis.
+   */
+  getClipPlane(axis: ClipAxis): ClipPlane {
+    return this.clipPlanes.getClipPlane(axis);
+  }
+
+  /**
+   * Sync clip planes to both CPU and GPU materials.
+   */
+  private _syncClipPlanes(): void {
+    // Sync to GPU compositor
+    if (this.gpuCompositor) {
+      this.gpuCompositor.setClipPlanes(this.clipPlanes);
+    }
+
+    // Sync to CPU material
+    if (this.mesh && this.mesh.material) {
+      const material = this.mesh.material as THREE.Material;
+      if ('clippingPlanes' in material) {
+        const threePlanes = this.clipPlanes.getThreePlanes();
+        (material as any).clippingPlanes = threePlanes.length > 0 ? threePlanes : null;
+        material.needsUpdate = true;
+      }
+    }
+
+    // Enable clipping on the renderer if we have any planes
+    if (this.viewer?.renderer) {
+      this.viewer.renderer.localClippingEnabled = this.clipPlanes.hasEnabledPlanes();
     }
   }
 

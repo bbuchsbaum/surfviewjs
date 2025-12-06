@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Layer, DataLayer, RGBALayer } from './layers';
+import { ClipPlaneSet, ClipPlane } from './utils/ClipPlane';
 import { debugLog } from './debug';
 
 /**
@@ -53,6 +54,7 @@ export class GPULayerCompositor {
       attribute float vertexIndex;
       varying vec3 vNormal;
       varying vec3 vViewPosition;
+      varying vec3 vWorldPosition;
       varying vec4 vLayerColor;
 
       uniform sampler2D layer0;
@@ -117,6 +119,9 @@ export class GPULayerCompositor {
         }
         vLayerColor = finalColor;
 
+        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+        vWorldPosition = worldPosition.xyz;
+
         vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
         vViewPosition = -mvPosition.xyz;
         gl_Position = projectionMatrix * mvPosition;
@@ -130,11 +135,34 @@ export class GPULayerCompositor {
       uniform vec3 lightDirection;
       uniform float shininess;
 
+      // Clip plane uniforms (up to 3 planes: X, Y, Z)
+      uniform vec3 clipPlaneNormalX;
+      uniform vec3 clipPlanePointX;
+      uniform bool clipPlaneEnabledX;
+      uniform vec3 clipPlaneNormalY;
+      uniform vec3 clipPlanePointY;
+      uniform bool clipPlaneEnabledY;
+      uniform vec3 clipPlaneNormalZ;
+      uniform vec3 clipPlanePointZ;
+      uniform bool clipPlaneEnabledZ;
+
       varying vec3 vNormal;
       varying vec3 vViewPosition;
+      varying vec3 vWorldPosition;
       varying vec4 vLayerColor;
 
       void main() {
+        // Apply clip planes - discard fragments on the clipped side
+        if (clipPlaneEnabledX && dot(vWorldPosition - clipPlanePointX, clipPlaneNormalX) > 0.0) {
+          discard;
+        }
+        if (clipPlaneEnabledY && dot(vWorldPosition - clipPlanePointY, clipPlaneNormalY) > 0.0) {
+          discard;
+        }
+        if (clipPlaneEnabledZ && dot(vWorldPosition - clipPlanePointZ, clipPlaneNormalZ) > 0.0) {
+          discard;
+        }
+
         // Use pre-computed color from vertex shader (avoids interpolation issues)
         vec4 finalColor = vLayerColor;
 
@@ -170,7 +198,17 @@ export class GPULayerCompositor {
       ambientLight: { value: new THREE.Color(0x404040) },
       directionalLight: { value: new THREE.Color(0xffffff) },
       lightDirection: { value: new THREE.Vector3(0.5, 0.5, 1).normalize() },
-      shininess: { value: 30.0 }
+      shininess: { value: 30.0 },
+      // Clip plane uniforms
+      clipPlaneNormalX: { value: new THREE.Vector3(1, 0, 0) },
+      clipPlanePointX: { value: new THREE.Vector3(0, 0, 0) },
+      clipPlaneEnabledX: { value: false },
+      clipPlaneNormalY: { value: new THREE.Vector3(0, 1, 0) },
+      clipPlanePointY: { value: new THREE.Vector3(0, 0, 0) },
+      clipPlaneEnabledY: { value: false },
+      clipPlaneNormalZ: { value: new THREE.Vector3(0, 0, 1) },
+      clipPlanePointZ: { value: new THREE.Vector3(0, 0, 0) },
+      clipPlaneEnabledZ: { value: false }
     };
 
     // Add layer texture uniforms
@@ -292,6 +330,59 @@ export class GPULayerCompositor {
     if (this.material) {
       this.material.uniforms.baseColor.value = new THREE.Color(color);
     }
+  }
+
+  /**
+   * Update clip planes from a ClipPlaneSet
+   */
+  public setClipPlanes(clipPlanes: ClipPlaneSet): void {
+    if (!this.material) return;
+
+    const uniforms = this.material.uniforms;
+
+    // X plane
+    const xPlane = clipPlanes.x;
+    uniforms.clipPlaneNormalX.value.copy(xPlane.normal);
+    uniforms.clipPlanePointX.value.copy(xPlane.point);
+    uniforms.clipPlaneEnabledX.value = xPlane.enabled;
+
+    // Y plane
+    const yPlane = clipPlanes.y;
+    uniforms.clipPlaneNormalY.value.copy(yPlane.normal);
+    uniforms.clipPlanePointY.value.copy(yPlane.point);
+    uniforms.clipPlaneEnabledY.value = yPlane.enabled;
+
+    // Z plane
+    const zPlane = clipPlanes.z;
+    uniforms.clipPlaneNormalZ.value.copy(zPlane.normal);
+    uniforms.clipPlanePointZ.value.copy(zPlane.point);
+    uniforms.clipPlaneEnabledZ.value = zPlane.enabled;
+  }
+
+  /**
+   * Update a single clip plane
+   */
+  public setClipPlane(axis: 'x' | 'y' | 'z', plane: ClipPlane): void {
+    if (!this.material) return;
+
+    const uniforms = this.material.uniforms;
+    const suffix = axis.toUpperCase();
+
+    uniforms[`clipPlaneNormal${suffix}`].value.copy(plane.normal);
+    uniforms[`clipPlanePoint${suffix}`].value.copy(plane.point);
+    uniforms[`clipPlaneEnabled${suffix}`].value = plane.enabled;
+  }
+
+  /**
+   * Clear all clip planes (disable them)
+   */
+  public clearClipPlanes(): void {
+    if (!this.material) return;
+
+    const uniforms = this.material.uniforms;
+    uniforms.clipPlaneEnabledX.value = false;
+    uniforms.clipPlaneEnabledY.value = false;
+    uniforms.clipPlaneEnabledZ.value = false;
   }
 
   /**
