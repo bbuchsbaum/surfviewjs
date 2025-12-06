@@ -39,3 +39,10 @@ claude-instance-*/
 
 # Cruft folder (legacy/archived files)
 cruft/
+
+# VitePress build output
+docs/.vitepress/dist/
+docs/.vitepress/cache/
+
+# TypeDoc generated API docs (regenerated on build)
+docs/api/

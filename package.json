@@ -50,7 +50,11 @@
     "test:playwright": "start-server-and-test dev:ci http://localhost:4173/tests/test-gifti.html playwright:test",
     "size": "size-limit",
     "test:browser": "vite preview --open tests/test-gifti.html",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "docs:api": "typedoc",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "npm run docs:api && vitepress build docs",
+    "docs:preview": "vitepress preview docs"
   },
   "keywords": [
     "neuroscience",
@@ -87,8 +91,11 @@
     "rollup-plugin-terser": "^7.0.2",
     "size-limit": "^11.2.0",
     "start-server-and-test": "^2.1.3",
+    "typedoc": "^0.28.15",
+    "typedoc-plugin-markdown": "^4.9.0",
     "typescript": "^5.9.2",
     "vite": "^5.0.0",
+    "vitepress": "^1.6.4",
     "webpack-cli": "^6.0.1"
   },
   "dependencies": {
