@@ -51,25 +51,10 @@ export class GPULayerCompositor {
     // Vertex shader - passes through vertex colors and UVs with lighting support
     const vertexShader = `
       attribute float vertexIndex;
-      varying vec3 vColor;
-      varying vec2 vUv;
-      varying float vVertexIndex;
       varying vec3 vNormal;
       varying vec3 vViewPosition;
+      varying vec4 vLayerColor;
 
-      void main() {
-        vUv = uv;
-        vNormal = normalize(normalMatrix * normal);
-        // Use custom vertexIndex attribute instead of gl_VertexID for better compatibility
-        vVertexIndex = vertexIndex;
-        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-        vViewPosition = -mvPosition.xyz;
-        gl_Position = projectionMatrix * mvPosition;
-      }
-    `;
-
-    // Fragment shader - performs layer compositing with lighting
-    const fragmentShader = `
       uniform sampler2D layer0;
       uniform sampler2D layer1;
       uniform sampler2D layer2;
@@ -78,22 +63,11 @@ export class GPULayerCompositor {
       uniform sampler2D layer5;
       uniform sampler2D layer6;
       uniform sampler2D layer7;
-
       uniform float layerOpacity[8];
       uniform int layerBlendMode[8];
       uniform int layerCount;
       uniform float textureSize;
       uniform vec3 baseColor;
-      uniform vec3 ambientLight;
-      uniform vec3 directionalLight;
-      uniform vec3 lightDirection;
-      uniform float shininess;
-
-      varying vec3 vColor;
-      varying vec2 vUv;
-      varying float vVertexIndex;
-      varying vec3 vNormal;
-      varying vec3 vViewPosition;
 
       vec4 getLayerColor(int layerIndex, vec2 texCoord) {
         if (layerIndex == 0) return texture2D(layer0, texCoord);
@@ -109,7 +83,6 @@ export class GPULayerCompositor {
 
       vec4 blendColors(vec4 base, vec4 overlay, int blendMode, float opacity) {
         vec4 result = base;
-
         if (blendMode == 0) { // Normal
           result = mix(base, overlay, overlay.a * opacity);
         } else if (blendMode == 1) { // Additive
@@ -121,28 +94,49 @@ export class GPULayerCompositor {
           vec4 screen = vec4(1.0) - (vec4(1.0) - base) * (vec4(1.0) - overlay);
           result = mix(base, screen, overlay.a * opacity);
         }
-
         return result;
       }
 
       void main() {
-        // Calculate texture coordinates from vertex index
-        float x = mod(vVertexIndex, textureSize);
-        float y = floor(vVertexIndex / textureSize);
+        vNormal = normalize(normalMatrix * normal);
+
+        // Calculate texture coordinates from vertex index in vertex shader
+        // This ensures we get the exact vertex color, not interpolated
+        float x = mod(vertexIndex, textureSize);
+        float y = floor(vertexIndex / textureSize);
         vec2 texCoord = vec2(x + 0.5, y + 0.5) / textureSize;
 
-        // Start with base color
+        // Composite layers in vertex shader to avoid interpolation issues
         vec4 finalColor = vec4(baseColor, 1.0);
-
-        // Composite each layer
         for (int i = 0; i < 8; i++) {
           if (i >= layerCount) break;
-
           vec4 layerColor = getLayerColor(i, texCoord);
           if (layerColor.a > 0.0) {
             finalColor = blendColors(finalColor, layerColor, layerBlendMode[i], layerOpacity[i]);
           }
         }
+        vLayerColor = finalColor;
+
+        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+        vViewPosition = -mvPosition.xyz;
+        gl_Position = projectionMatrix * mvPosition;
+      }
+    `;
+
+    // Fragment shader - applies lighting to pre-computed vertex colors
+    const fragmentShader = `
+      uniform vec3 ambientLight;
+      uniform vec3 directionalLight;
+      uniform vec3 lightDirection;
+      uniform float shininess;
+
+      varying vec3 vNormal;
+      varying vec3 vViewPosition;
+      varying vec4 vLayerColor;
+
+      void main() {
+        // Use pre-computed color from vertex shader (avoids interpolation issues)
+        vec4 finalColor = vLayerColor;
 
         // Apply lighting
         vec3 normal = normalize(vNormal);
