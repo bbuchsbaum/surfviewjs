@@ -164,7 +164,7 @@ Curvature data can come from:
 
 ---
 
-## Priority 4: Surface Morphing
+## Priority 4: Surface Morphing ✅ DONE
 
 **Goal**: Smooth animated transitions between surface representations.
 
@@ -172,35 +172,42 @@ Curvature data can come from:
 
 ### Implementation Plan
 
-1. **Morph Targets**
-   - [ ] Store multiple vertex position sets per surface
-   - [ ] `geometry.addMorphTarget(name, vertices)`
-   - [ ] Common targets: 'pial', 'inflated', 'flat', 'sphere'
+1. **MorphableSurface Class** (`src/MorphableSurface.ts`) ✅ DONE
+   - [x] New surface class extending MultiLayerNeuroSurface
+   - [x] Uses Three.js morphTargets for GPU-accelerated morphing
+   - [x] `addMorphTarget(name, positions, curvature?)` - add morph targets
+   - [x] `MorphableSurface.fromSurfaceSet()` - create from SurfaceSet
+   - [x] Supports arbitrary number of morph targets
 
-2. **Morph Animation**
-   - [ ] `surface.setMorphWeight(targetName, weight)` - 0 to 1
-   - [ ] `surface.animateMorph(targetName, duration)` - tween to target
-   - [ ] Use Three.js morphTargets or manual vertex interpolation
+2. **Morph Animation** ✅ DONE
+   - [x] `surface.setMorphWeight(name, weight)` - direct weight control
+   - [x] `surface.setMorphWeights(weights)` - set multiple weights
+   - [x] `surface.morphTo(name, options)` - animate to target
+   - [x] `surface.morphToBase(options)` - animate back to base
+   - [x] `surface.morphToWeights(weights, options)` - animate to blend
+   - [x] Easing functions: linear, easeIn, easeOut, easeInOut, cubic variants
 
-3. **Shader Support**
-   - [ ] Pass morph weights as uniforms
-   - [ ] Blend positions in vertex shader (already done by Three.js morphTargets)
-   - [ ] Blend normals for correct lighting
+3. **Shader Support** ✅ DONE (via Three.js)
+   - [x] Three.js morphTargets handle GPU interpolation automatically
+   - [x] Normals are interpolated by the GPU during morphing
+   - [x] `material.morphTargets = true` and `material.morphNormals = true`
 
-4. **Viewer Integration**
-   - [ ] `viewer.setMorph(weight)` - 0=folded, 1=inflated, 2=flat
-   - [ ] Tweakpane slider for morph weight
-   - [ ] Optional: play/pause morph animation
+4. **Slider-Based Morphing** ✅ DONE
+   - [x] `surface.setMorphValue(value)` - 0=base, 1=first, 2=second, etc.
+   - [x] `surface.getMorphValue()` - get current position
+   - [x] Sequential morphing through all targets with single slider
 
-5. **Tests**
-   - [ ] Test: morph between two known geometries
-   - [ ] Test: normals update correctly during morph
-   - [ ] Demo scenario: animated inflation
+5. **Demo Scenario** ✅ DONE
+   - [x] Interactive demo with bumpy sphere → inflated → flat → exaggerated
+   - [x] Target buttons with animated transitions
+   - [x] Morph slider for sequential control
+   - [x] Individual weight sliders for blending
+   - [x] Configurable duration and easing
 
-### Breaking Change Risk: MEDIUM
-- Requires SurfaceGeometry changes (morph target storage)
-- Shader changes for normal blending
-- Existing surfaces work unchanged (no morph targets = no morphing)
+### Breaking Change Risk: LOW (achieved)
+- New MorphableSurface class, existing surfaces unchanged
+- No modifications to base SurfaceGeometry class needed
+- Uses Three.js built-in morphTarget system
 
 ---
 

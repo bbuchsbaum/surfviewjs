@@ -15,6 +15,7 @@ import { SurfaceControls } from './SurfaceControls';
 import { SurfaceGeometry, NeuroSurface, ColorMappedNeuroSurface, VertexColoredNeuroSurface } from './classes';
 import { MultiLayerNeuroSurface } from './MultiLayerNeuroSurface';
 import { VariantSurface } from './VariantSurface';
+import { MorphableSurface, Easing } from './MorphableSurface';
 import { SurfaceSet } from './SurfaceSet';
 import { LabeledNeuroSurface } from './LabeledNeuroSurface';
 import { SurfaceFactory } from './SurfaceFactory';
@@ -66,6 +67,8 @@ export {
   VertexColoredNeuroSurface,
   MultiLayerNeuroSurface,
   VariantSurface,
+  MorphableSurface,
+  Easing,
   SurfaceSet,
   LabeledNeuroSurface,
   Layer,
@@ -118,6 +121,8 @@ if (typeof window !== 'undefined') {
     VertexColoredNeuroSurface,
     MultiLayerNeuroSurface,
     VariantSurface,
+    MorphableSurface,
+    Easing,
     SurfaceSet,
     LabeledNeuroSurface,
     Layer,

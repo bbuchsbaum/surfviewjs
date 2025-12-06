@@ -9,6 +9,7 @@ import { gpuCompositing } from './scenarios/gpuCompositing';
 import { curvature } from './scenarios/curvature';
 import { clipping } from './scenarios/clipping';
 import { colormap2d } from './scenarios/colormap2d';
+import { morphing } from './scenarios/morphing';
 
 export const scenarios: Scenario[] = [
   quickstart,
@@ -16,6 +17,7 @@ export const scenarios: Scenario[] = [
   curvature,
   clipping,
   colormap2d,
+  morphing,
   lighting,
   hemispheres,
   fslrFunc,
