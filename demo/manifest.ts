@@ -10,6 +10,7 @@ import { curvature } from './scenarios/curvature';
 import { clipping } from './scenarios/clipping';
 import { colormap2d } from './scenarios/colormap2d';
 import { morphing } from './scenarios/morphing';
+import { gpupicking } from './scenarios/gpupicking';
 
 export const scenarios: Scenario[] = [
   quickstart,
@@ -18,6 +19,7 @@ export const scenarios: Scenario[] = [
   clipping,
   colormap2d,
   morphing,
+  gpupicking,
   lighting,
   hemispheres,
   fslrFunc,

@@ -35,6 +35,7 @@ import { BoundingBoxHelper } from './utils/BoundingBox';
 import { AnnotationManager } from './annotations';
 import { embedStyles, applyEmbedStyles } from './embedStyles';
 import { computePickInfo } from './utils/Picking';
+import { GPUPicker } from './utils/GPUPicker';
 import { detectCapabilities } from './utils/capabilities';
 import { NoopNeuroSurfaceViewer, hasDOM } from './NoopNeuroSurfaceViewer';
 
@@ -101,7 +102,8 @@ export {
   computePickInfo,
   SurfaceFactory,
   NoopNeuroSurfaceViewer,
-  hasDOM
+  hasDOM,
+  GPUPicker
 };
 
 // Export loaders
@@ -152,7 +154,8 @@ if (typeof window !== 'undefined') {
     applyEmbedStyles,
     computePickInfo,
     SurfaceFactory,
-    detectCapabilities
+    detectCapabilities,
+    GPUPicker
   };
 }
 debugLog('Neurosurface module initialized');

@@ -16,6 +16,7 @@ import { EventEmitter } from './EventEmitter';
 import { BoundingBoxHelper } from './utils/BoundingBox';
 import { detectCapabilities, ViewerCapabilities } from './utils/capabilities';
 import { AnnotationManager, AnnotationRecord } from './annotations';
+import { GPUPicker, GPUPickResult } from './utils/GPUPicker';
 
 export interface NeuroSurfaceViewerConfig {
   ambientLightColor?: number;
@@ -40,6 +41,8 @@ export interface NeuroSurfaceViewerConfig {
   hoverCrosshairSize?: number;
   clickToAddAnnotation?: boolean;
   allowCDNFallback?: boolean;
+  /** Use GPU-based picking for faster vertex selection on large meshes */
+  useGPUPicking?: boolean;
 }
 
 type Viewpoint = 'lateral' | 'medial' | 'ventral' | 'posterior' | 'anterior' | 'unknown_lateral';
@@ -118,6 +121,8 @@ export class NeuroSurfaceViewer extends EventEmitter {
   selectedLayerId: string | null = null;
   selectedSurfaceId: string | null = null;
   onSurfaceClick?: (event: any) => void;
+  /** GPU-based picker for fast vertex selection */
+  gpuPicker: GPUPicker | null = null;
   crosshairGroup: THREE.Group | null = null;
   crosshairMaterial: THREE.LineBasicMaterial | null = null;
   crosshairSize = 1.5;
@@ -183,6 +188,7 @@ export class NeuroSurfaceViewer extends EventEmitter {
       hoverCrosshairColor: 0x66ccff,
       hoverCrosshairSize: 1.2,
       clickToAddAnnotation: false,
+      useGPUPicking: false,
       ...config
     };
     this.viewpoint = viewpoint;
@@ -1393,6 +1399,11 @@ export class NeuroSurfaceViewer extends EventEmitter {
         }
       }
 
+      // Register with GPU picker if enabled
+      if (this.gpuPicker && surface.mesh) {
+        this.gpuPicker.addSurface(id, surface.mesh);
+      }
+
       this.requestRender();
     } catch (error) {
       console.error('Error adding surface:', error);
@@ -1484,14 +1495,19 @@ export class NeuroSurfaceViewer extends EventEmitter {
     if (surface && surface.mesh) {
       // Clean up event listeners
       surface.removeAllListeners();
-      
+
+      // Unregister from GPU picker
+      if (this.gpuPicker) {
+        this.gpuPicker.removeSurface(id);
+      }
+
       this.scene.remove(surface.mesh);
       surface.dispose();
       this.surfaces.delete(id);
-      
+
       // Emit viewer event
       this.emit('surface:removed', { surface, id });
-      
+
       this.requestRender();
     }
   }
@@ -1627,7 +1643,13 @@ export class NeuroSurfaceViewer extends EventEmitter {
     // Create render target for picking
     this.pickingTexture = new THREE.WebGLRenderTarget(1, 1);
     this.pickingPixelBuffer = new Uint8Array(4);
-    
+
+    // Initialize GPU picker if enabled and supported
+    if (this.config.useGPUPicking && GPUPicker.isSupported(this.renderer)) {
+      this.gpuPicker = new GPUPicker(this.renderer);
+      debugLog('GPU picking enabled');
+    }
+
     // Mouse event handlers
     this.renderer.domElement.addEventListener('mousemove', (event) => {
       const rect = this.renderer.domElement.getBoundingClientRect();
@@ -1690,12 +1712,23 @@ export class NeuroSurfaceViewer extends EventEmitter {
     }
   }
 
-  pick(options: { x?: number; y?: number; opacityThreshold?: number } = {}): { surfaceId: string | null; vertexIndex: number | null; point: THREE.Vector3 | null } {
+  pick(options: { x?: number; y?: number; opacityThreshold?: number; useGPU?: boolean } = {}): { surfaceId: string | null; vertexIndex: number | null; point: THREE.Vector3 | null } {
     // Allow callers to override the last mouse position with screen coordinates
     if (options.x !== undefined && options.y !== undefined) {
       const rect = this.renderer.domElement.getBoundingClientRect();
       this.mouse.x = ((options.x - rect.left) / rect.width) * 2 - 1;
       this.mouse.y = -((options.y - rect.top) / rect.height) * 2 + 1;
+    }
+
+    // Use GPU picking if enabled and available
+    const useGPU = options.useGPU ?? true;
+    if (useGPU && this.gpuPicker && options.x !== undefined && options.y !== undefined) {
+      const result = this.gpuPicker.pick(options.x, options.y, this.camera);
+      return {
+        surfaceId: result.surfaceId,
+        vertexIndex: result.vertexIndex,
+        point: result.point
+      };
     }
 
     const opacityThreshold = options.opacityThreshold ?? 0.1;
@@ -1770,6 +1803,53 @@ export class NeuroSurfaceViewer extends EventEmitter {
 
   getOption<T = any>(key: string, fallback?: T): T | undefined {
     return (this.options.has(key) ? this.options.get(key) : fallback) as T | undefined;
+  }
+
+  /**
+   * Enable GPU-based picking for faster vertex selection.
+   * Automatically registers all existing surfaces with the GPU picker.
+   */
+  enableGPUPicking(): boolean {
+    if (this.gpuPicker) {
+      this.gpuPicker.setEnabled(true);
+      return true;
+    }
+    if (!GPUPicker.isSupported(this.renderer)) {
+      console.warn('GPU picking not supported on this device');
+      return false;
+    }
+    this.gpuPicker = new GPUPicker(this.renderer);
+    // Register all existing surfaces
+    this.surfaces.forEach((surface, id) => {
+      if (surface.mesh) {
+        this.gpuPicker!.addSurface(id, surface.mesh);
+      }
+    });
+    debugLog('GPU picking enabled');
+    return true;
+  }
+
+  /**
+   * Disable GPU-based picking. Falls back to raycasting.
+   */
+  disableGPUPicking(): void {
+    if (this.gpuPicker) {
+      this.gpuPicker.setEnabled(false);
+    }
+  }
+
+  /**
+   * Check if GPU picking is currently enabled and available.
+   */
+  isGPUPickingEnabled(): boolean {
+    return this.gpuPicker !== null && this.gpuPicker.isEnabled();
+  }
+
+  /**
+   * Get the GPU picker instance (for advanced usage).
+   */
+  getGPUPicker(): GPUPicker | null {
+    return this.gpuPicker;
   }
 
   addAnnotation(surfaceId: string, vertexIndex: number, data?: any, options?: { radius?: number; colorOn?: number; colorOff?: number; active?: boolean }): string | null {
@@ -2092,7 +2172,13 @@ export class NeuroSurfaceViewer extends EventEmitter {
     if (this.pickingTexture) {
       this.pickingTexture.dispose();
     }
-    
+
+    // Dispose of GPU picker
+    if (this.gpuPicker) {
+      this.gpuPicker.dispose();
+      this.gpuPicker = null;
+    }
+
     // Dispose of environment map
     if (this.environmentMap) {
       this.environmentMap.dispose();
