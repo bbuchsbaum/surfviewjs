@@ -7,7 +7,7 @@ const demoRoot = resolve(__dirname, 'demo');
 
 export default defineConfig({
   root: demoRoot,
-  base: process.env.GITHUB_ACTIONS ? '/surfviewjs/' : '/',
+  base: process.env.GITHUB_ACTIONS ? '/surfviewjs/demo/' : '/',
   resolve: {
     alias: {
       '@src': resolve(__dirname, 'src')
