@@ -31,6 +31,8 @@ export const quickstart: Scenario = {
 
     const { viewer, cleanup } = createViewer(mount, {
       showControls: true,
+      useControls: true,
+      allowCDNFallback: true,
       backgroundColor: 0x050912
     });
 
