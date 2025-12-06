@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Base Layer Test</title>
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; }
+    #viewer-container { width: 100vw; height: 100vh; }
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 15px;
+      border-radius: 5px;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div id="viewer-container"></div>
+  <div id="info">Loading...</div>
+  
+  <script type="module">
+    import { 
+      NeuroSurfaceViewer, 
+      MultiLayerNeuroSurface,
+      loadSurface,
+      setDebug
+    } from './src/index.js';
+    
+    // Enable debug
+    setDebug(true);
+    
+    const infoEl = document.getElementById('info');
+    
+    async function test() {
+      try {
+        // Initialize viewer with white background to see the surface
+        const container = document.getElementById('viewer-container');
+        const viewer = new NeuroSurfaceViewer(
+          container,
+          window.innerWidth,
+          window.innerHeight,
+          {
+            showControls: true,
+            ambientLightColor: 0x808080,  // Brighter ambient
+            directionalLightIntensity: 1.0,
+            backgroundColor: 0xffffff  // White background
+          }
+        );
+        
+        // Start render loop
+        viewer.startRenderLoop();
+        
+        // Load GIFTI surface
+        const geometry = await loadSurface('./tests/data/ascii.surf.gii', 'gifti', 'left');
+        console.log('Geometry loaded:', geometry);
+        
+        // Create surface with a bright color
+        const surface = new MultiLayerNeuroSurface(geometry, {
+          baseColor: 0xff0000,  // Bright red
+          metalness: 0.1,
+          roughness: 0.8,
+          alpha: 1.0
+        });
+        
+        // Check if mesh exists
+        if (surface.mesh) {
+          console.log('Mesh created successfully');
+          console.log('Mesh material:', surface.mesh.material);
+          console.log('Mesh geometry:', surface.mesh.geometry);
+          
+          // Check color attribute
+          const colorAttr = surface.mesh.geometry.getAttribute('color');
+          if (colorAttr) {
+            console.log('Color attribute exists, count:', colorAttr.count);
+            // Check first few color values
+            console.log('First color:', colorAttr.array[0], colorAttr.array[1], colorAttr.array[2], colorAttr.array[3]);
+          }
+        }
+        
+        // Add to viewer
+        viewer.addSurface(surface, 'brain');
+        viewer.centerCamera();
+        
+        // Force a render
+        viewer.requestRender();
+        
+        // Update info
+        const vertexCount = geometry.vertices.length / 3;
+        const faceCount = geometry.faces.length / 3;
+        infoEl.innerHTML = `
+          <strong>Base Layer Test</strong><br>
+          Vertices: ${vertexCount.toLocaleString()}<br>
+          Faces: ${faceCount.toLocaleString()}<br>
+          Base Color: Red (0xff0000)<br>
+          Background: White<br>
+          <br>
+          If you see a red brain surface, the base layer is working correctly.
+        `;
+        
+      } catch (error) {
+        console.error('Error:', error);
+        infoEl.innerHTML = `Error: ${error.message}`;
+      }
+    }
+    
+    test();
+  </script>
+</body>
+</html>

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simple Surface Test</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+    }
+    #viewer-container {
+      width: 100vw;
+      height: 100vh;
+    }
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 10px;
+      border-radius: 5px;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div id="viewer-container"></div>
+  <div id="info">Loading...</div>
+  
+  <script type="module">
+    import { 
+      NeuroSurfaceViewer, 
+      MultiLayerNeuroSurface,
+      loadSurface,
+      setDebug
+    } from './src/index.js';
+    
+    const info = document.getElementById('info');
+    
+    // Enable debug
+    setDebug(true);
+    
+    async function init() {
+      try {
+        info.textContent = 'Initializing viewer...';
+        
+        // Initialize viewer with dark background
+        const container = document.getElementById('viewer-container');
+        const viewer = new NeuroSurfaceViewer(
+          container,
+          window.innerWidth,
+          window.innerHeight,
+          {
+            showControls: true,
+            ambientLightColor: 0x808080,
+            directionalLightIntensity: 1.0,
+            backgroundColor: 0x222222,
+            controlType: 'surface' // Test new controls
+          }
+        );
+        
+        info.textContent = 'Starting render loop...';
+        
+        // Start render loop
+        viewer.startRenderLoop();
+        
+        info.textContent = 'Loading GIFTI surface...';
+        
+        // Load GIFTI surface
+        const geometry = await loadSurface('./tests/data/ascii.surf.gii', 'gifti', 'left');
+        console.log('Geometry loaded:', geometry);
+        
+        info.textContent = 'Creating surface...';
+        
+        // Create surface with bright color
+        const surface = new MultiLayerNeuroSurface(geometry, {
+          baseColor: 0xff4444,  // Bright red
+          metalness: 0.1,
+          roughness: 0.8
+        });
+        
+        console.log('Surface created:', surface);
+        console.log('Surface mesh:', surface.mesh);
+        
+        info.textContent = 'Adding surface to viewer...';
+        
+        // Add to viewer
+        viewer.addSurface(surface, 'brain');
+        viewer.centerCamera();
+        
+        // Check scene
+        console.log('Scene children:', viewer.scene.children.length);
+        viewer.scene.traverse((child) => {
+          if (child.isMesh) {
+            console.log('Found mesh:', child);
+          }
+        });
+        
+        info.innerHTML = `
+          <strong>Surface Controls Test</strong><br>
+          Using: Natural Surface Controls<br>
+          Vertices: ${(geometry.vertices.length / 3).toLocaleString()}<br>
+          Faces: ${(geometry.faces.length / 3).toLocaleString()}<br>
+          <br>
+          Controls:<br>
+          • Left mouse: Natural rotation<br>
+          • Right mouse: Pan<br>
+          • Scroll: Zoom
+        `;
+        
+      } catch (error) {
+        console.error('Error:', error);
+        info.textContent = 'Error: ' + error.message;
+      }
+    }
+    
+    init();
+  </script>
+</body>
+</html>

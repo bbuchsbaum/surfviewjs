@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE GIFTI SYSTEM "http://www.nitrc.org/frs/download.php/115/gifti.dtd">
+<GIFTI xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:noNamespaceSchemaLocation="http://www.nitrc.org/frs/download.php/115/gifti.xsd">
+  <MetaData>
+    <MD>
+      <Name><![CDATA[Description]]></Name>
+      <Value><![CDATA[Simple tetrahedron encoded with GZipBase64Binary for testing]]></Value>
+    </MD>
+  </MetaData>
+  
+  <DataArray Intent="NIFTI_INTENT_POINTSET"
+             DataType="NIFTI_TYPE_FLOAT32"
+             ArrayIndexingOrder="RowMajorOrder"
+             Dimensionality="2"
+             Dim0="4"
+             Dim1="3"
+             Encoding="GZipBase64Binary"
+             Endian="LittleEndian">
+    <MetaData/>
+    <Data>H4sIAAAAAAAAE2NgQAYN9kgce91NsTC+/fnvk+0SngbYAwB9prnIMAAAAA==</Data>
+  </DataArray>
+  
+  <DataArray Intent="NIFTI_INTENT_TRIANGLE"
+             DataType="NIFTI_TYPE_INT32"
+             ArrayIndexingOrder="RowMajorOrder"
+             Dimensionality="2"
+             Dim0="4"
+             Dim1="3"
+             Encoding="GZipBase64Binary"
+             Endian="LittleEndian">
+    <MetaData/>
+    <Data>H4sIAAAAAAAAE2NgYGBgBGImBggA0cxQNjNUjhHKBskBAFb8odkwAAAA</Data>
+  </DataArray>
+</GIFTI>

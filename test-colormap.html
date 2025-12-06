@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ColorMap Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #f0f0f0;
+    }
+    .colormap-preview {
+      margin: 10px 0;
+      padding: 10px;
+      background: white;
+      border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .colorbar {
+      height: 30px;
+      margin: 10px 0;
+      border: 1px solid #ccc;
+      background: linear-gradient(to right, black, red, yellow, white);
+    }
+    .status {
+      margin: 20px 0;
+      padding: 15px;
+      border-radius: 5px;
+    }
+    .success {
+      background: #e8f5e9;
+      color: #388e3c;
+    }
+    .error {
+      background: #ffebee;
+      color: #d32f2f;
+    }
+  </style>
+</head>
+<body>
+  <h1>ColorMap Test</h1>
+  <div id="status" class="status">Testing colormaps...</div>
+  <div id="results"></div>
+  
+  <script type="module">
+    import { ColorMap } from './src/index.js';
+    
+    const statusEl = document.getElementById('status');
+    const resultsEl = document.getElementById('results');
+    
+    try {
+      // Test getting available colormaps
+      const availableMaps = ColorMap.getAvailableMaps();
+      console.log('Available colormaps:', availableMaps);
+      
+      // Test creating hot colormap
+      const hotMap = ColorMap.fromPreset('hot', {
+        range: [0, 10],
+        threshold: [2, 8]
+      });
+      
+      // Test getting colors
+      const testValues = [0, 2.5, 5, 7.5, 10];
+      const colors = testValues.map(v => hotMap.getColor(v));
+      
+      statusEl.className = 'status success';
+      statusEl.textContent = `Success! Found ${availableMaps.length} colormaps including 'hot'`;
+      
+      // Display results
+      resultsEl.innerHTML = `
+        <div class="colormap-preview">
+          <h3>Hot Colormap Test</h3>
+          <p>Available colormaps: ${availableMaps.join(', ')}</p>
+          <div class="colorbar"></div>
+          <p>Test values and colors:</p>
+          <ul>
+            ${testValues.map((v, i) => {
+              const c = colors[i];
+              const rgb = `rgb(${Math.round(c[0]*255)}, ${Math.round(c[1]*255)}, ${Math.round(c[2]*255)})`;
+              return `<li>Value ${v}: <span style="background: ${rgb}; padding: 2px 10px; color: white;">${rgb}</span></li>`;
+            }).join('')}
+          </ul>
+        </div>
+      `;
+      
+    } catch (error) {
+      statusEl.className = 'status error';
+      statusEl.textContent = `Error: ${error.message}`;
+      console.error('Error:', error);
+    }
+  </script>
+</body>
+</html>

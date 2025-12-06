@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NeuroSurface Viewer Demo</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      background-color: #f0f0f0;
+    }
+    #viewer-container {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+    .controls {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 10px;
+      border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+    button {
+      padding: 5px 10px;
+      margin: 5px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="viewer-container"></div>
+  <div class="controls">
+    <button id="toggle-controls">Toggle UI Controls</button>
+    <button id="load-demo">Load Demo Surface</button>
+    <button id="load-tetrahedron">Load Tetrahedron (GIFTI)</button>
+  </div>
+  
+  <script type="module">
+    import { 
+      NeuroSurfaceViewer, 
+      SurfaceGeometry, 
+      ColorMappedNeuroSurface, 
+      THREE,
+      loadSurface
+    } from './src/index.js';
+    
+    // Create viewer with controls disabled by default
+    const container = document.getElementById('viewer-container');
+    const viewer = new NeuroSurfaceViewer(
+      container,
+      window.innerWidth,
+      window.innerHeight,
+      {
+        showControls: false // Start with controls hidden
+      }
+    );
+    
+    // Start render loop
+    viewer.startRenderLoop();
+    
+    // Toggle controls button
+    document.getElementById('toggle-controls').addEventListener('click', () => {
+      viewer.toggleControls();
+    });
+    
+    // Load demo surface button
+    document.getElementById('load-demo').addEventListener('click', () => {
+      // Create a simple demo surface (sphere)
+      const geometry = new THREE.SphereGeometry(50, 32, 32);
+      const vertices = new Float32Array(geometry.attributes.position.array);
+      const indices = new Uint32Array(geometry.index.array);
+      
+      // Create demo data (random values)
+      const data = new Float32Array(vertices.length / 3);
+      for (let i = 0; i < data.length; i++) {
+        data[i] = Math.random() * 100;
+      }
+      
+      // Create surface geometry
+      const surfaceGeom = new SurfaceGeometry(vertices, indices, 'demo');
+      
+      // Create color mapped surface
+      const surface = new ColorMappedNeuroSurface(
+        surfaceGeom,
+        Array.from({length: data.length}, (_, i) => i),
+        data,
+        'jet',
+        {
+          alpha: 0.8
+        }
+      );
+      
+      viewer.addSurface(surface, 'demo-surface');
+      viewer.centerCamera();
+    });
+    
+    // Load tetrahedron GIFTI file
+    document.getElementById('load-tetrahedron').addEventListener('click', async () => {
+      try {
+        console.log('Loading tetrahedron.gii...');
+        
+        // Load the GIFTI surface with auto-scaling
+        const surfaceGeom = await loadSurface(
+          './tests/data/tetrahedron.gii',
+          'gifti',
+          'unknown',
+          30000,  // timeout
+          true,   // autoScale - automatically scale small surfaces
+          50      // targetSize - scale to ~50 units
+        );
+        
+        console.log('Loaded surface:', surfaceGeom);
+        console.log('Vertices:', surfaceGeom.vertices.length / 3);
+        console.log('Faces:', surfaceGeom.faces.length / 3);
+        
+        // Clear existing surfaces
+        viewer.getSurfaceIds().forEach(id => {
+          viewer.removeSurface(id);
+        });
+        
+        // Create some dummy data for visualization (one value per vertex)
+        const vertexCount = surfaceGeom.vertices.length / 3;
+        const data = new Float32Array(vertexCount);
+        for (let i = 0; i < vertexCount; i++) {
+          // Color based on vertex height (z-coordinate)
+          data[i] = surfaceGeom.vertices[i * 3 + 2] * 100;
+        }
+        
+        // Create color mapped surface
+        const surface = new ColorMappedNeuroSurface(
+          surfaceGeom,
+          Array.from({length: vertexCount}, (_, i) => i),
+          data,
+          'viridis',
+          {
+            alpha: 1.0,
+            flatShading: true // Use flat shading to see faces clearly
+          }
+        );
+        
+        viewer.addSurface(surface, 'tetrahedron');
+        viewer.centerCamera();
+        
+        console.log('Tetrahedron loaded and displayed successfully!');
+      } catch (error) {
+        console.error('Error loading tetrahedron:', error);
+        alert('Failed to load tetrahedron.gii: ' + error.message);
+      }
+    });
+    
+    // Handle window resize
+    window.addEventListener('resize', () => {
+      viewer.resize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>

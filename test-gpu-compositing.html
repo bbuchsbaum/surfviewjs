@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPU vs CPU Compositing Performance Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+            overflow: hidden;
+        }
+        #container {
+            width: 100vw;
+            height: 100vh;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 14px;
+            z-index: 100;
+        }
+        #info h3 {
+            margin: 0 0 10px 0;
+            color: #4CAF50;
+        }
+        #info .stat {
+            margin: 5px 0;
+        }
+        #info .mode {
+            font-weight: bold;
+            color: #FFC107;
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 5px;
+            display: flex;
+            gap: 10px;
+            z-index: 100;
+        }
+        button {
+            padding: 10px 20px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button.active {
+            background: #2196F3;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    <div id="info">
+        <h3>Performance Test</h3>
+        <div class="stat">Mode: <span class="mode" id="mode">CPU</span></div>
+        <div class="stat">Vertices: <span id="vertices">0</span></div>
+        <div class="stat">Layers: <span id="layers">0</span></div>
+        <div class="stat">FPS: <span id="fps">0</span></div>
+        <div class="stat">Frame Time: <span id="frametime">0</span>ms</div>
+    </div>
+    <div id="controls">
+        <button id="toggleMode">Switch to GPU</button>
+        <button id="addLayer">Add Layer</button>
+        <button id="removeLayer">Remove Layer</button>
+        <button id="animateLayers">Animate Layers</button>
+        <button id="increaseMesh">Increase Mesh Density</button>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { NeuroSurfaceViewer } from './dist/neurosurface.es.js';
+        import { MultiLayerNeuroSurface } from './dist/neurosurface.es.js';
+        import { SurfaceGeometry } from './dist/neurosurface.es.js';
+        import { DataLayer } from './dist/neurosurface.es.js';
+        import { setDebug } from './dist/neurosurface.es.js';
+
+        // Enable debug logging
+        setDebug(true);
+
+        // Performance tracking
+        let frameCount = 0;
+        let lastTime = performance.now();
+        let lastFrameTime = performance.now();
+        let currentFPS = 0;
+        let currentFrameTime = 0;
+        let isAnimating = false;
+        let currentMode = 'CPU';
+
+        // Create viewer (new API signature: container, width, height, options)
+        const containerEl = document.getElementById('container');
+        const viewer = new NeuroSurfaceViewer(
+            containerEl,
+            containerEl.clientWidth,
+            containerEl.clientHeight,
+            {
+                showControls: true,
+                backgroundColor: 0x1a1a1a,
+                ambientLightColor: 0x404040,
+                directionalLightIntensity: 0.5
+            }
+        );
+
+        // Create a test surface with configurable complexity
+        function createTestSurface(subdivisions = 50, useGPU = false) {
+            // Create a sphere as test geometry
+            const sphereGeometry = new THREE.SphereGeometry(50, subdivisions, subdivisions);
+            const vertices = new Float32Array(sphereGeometry.attributes.position.array);
+            const indices = new Uint32Array(sphereGeometry.index.array);
+            
+            // Create surface geometry
+            const surfaceGeometry = new SurfaceGeometry(vertices, indices, 'test');
+            
+            // Create multi-layer surface
+            const surface = new MultiLayerNeuroSurface(surfaceGeometry, {
+                baseColor: 0x808080,
+                useGPUCompositing: useGPU
+            });
+            
+            return surface;
+        }
+
+        // Initialize with a test surface
+        let currentSurface = createTestSurface(50, false);
+        viewer.addSurface(currentSurface);
+        viewer.centerCamera();
+
+        // Layer management
+        let layerCount = 1; // Base layer
+        let nextLayerId = 1;
+
+        function addDataLayer() {
+            const vertexCount = currentSurface.vertexCount;
+            const data = new Float32Array(vertexCount);
+            
+            // Create interesting data pattern
+            for (let i = 0; i < vertexCount; i++) {
+                data[i] = Math.sin(i * 0.1 + performance.now() * 0.001) * 5 + Math.random() * 2;
+            }
+            
+            const colorMapName = ['jet', 'hot', 'cool', 'viridis'][layerCount % 4];
+            const layer = new DataLayer(
+                `layer-${nextLayerId++}`,
+                data,
+                new Uint32Array(vertexCount).map((_, i) => i),
+                colorMapName,
+                {
+                    range: [-5, 10],
+                    threshold: [0, 0],
+                    opacity: 0.7,
+                    blendMode: 'normal'
+                }
+            );
+            
+            currentSurface.addLayer(layer);
+            layerCount++;
+            updateInfo();
+        }
+
+        function removeDataLayer() {
+            const layers = currentSurface.layerStack.getAllLayers();
+            if (layers.length > 1) { // Keep base layer
+                const lastLayer = layers[layers.length - 1];
+                currentSurface.removeLayer(lastLayer.id);
+                layerCount--;
+                updateInfo();
+            }
+        }
+
+        // Animation
+        function animateLayers() {
+            if (!isAnimating) return;
+            
+            const layers = currentSurface.layerStack.getLayers();
+            const time = performance.now() * 0.001;
+            
+            layers.forEach((layer, index) => {
+                if (layer.type === 'data') {
+                    // Inline script is pure JS; avoid TS-style casts.
+                    const dataLayer = layer;
+                    const data = new Float32Array(currentSurface.vertexCount);
+                    
+                    // Animate data
+                    for (let i = 0; i < data.length; i++) {
+                        data[i] = Math.sin(i * 0.05 + time * (index + 1)) * 5 + 
+                                 Math.cos(i * 0.03 - time * 0.5) * 3;
+                    }
+                    
+                    dataLayer.setData(data);
+                }
+            });
+            
+            currentSurface.updateColors();
+        }
+
+        // Performance monitoring
+        function updatePerformance() {
+            const now = performance.now();
+            frameCount++;
+            
+            // Update FPS every second
+            if (now - lastTime >= 1000) {
+                currentFPS = frameCount;
+                frameCount = 0;
+                lastTime = now;
+                document.getElementById('fps').textContent = currentFPS;
+            }
+            
+            // Update frame time
+            currentFrameTime = now - lastFrameTime;
+            lastFrameTime = now;
+            document.getElementById('frametime').textContent = currentFrameTime.toFixed(2);
+            
+            // Animate if enabled
+            if (isAnimating) {
+                animateLayers();
+            }
+            
+            requestAnimationFrame(updatePerformance);
+        }
+
+        function updateInfo() {
+            document.getElementById('vertices').textContent = currentSurface.vertexCount;
+            document.getElementById('layers').textContent = layerCount;
+            document.getElementById('mode').textContent = currentMode;
+        }
+
+        // UI Controls
+        document.getElementById('toggleMode').addEventListener('click', () => {
+            currentMode = currentMode === 'CPU' ? 'GPU' : 'CPU';
+            currentSurface.setCompositingMode(currentMode === 'GPU');
+            document.getElementById('toggleMode').textContent = `Switch to ${currentMode === 'CPU' ? 'GPU' : 'CPU'}`;
+            updateInfo();
+        });
+
+        document.getElementById('addLayer').addEventListener('click', () => {
+            addDataLayer();
+        });
+
+        document.getElementById('removeLayer').addEventListener('click', () => {
+            removeDataLayer();
+        });
+
+        document.getElementById('animateLayers').addEventListener('click', (e) => {
+            isAnimating = !isAnimating;
+            e.target.classList.toggle('active');
+            e.target.textContent = isAnimating ? 'Stop Animation' : 'Animate Layers';
+        });
+
+        document.getElementById('increaseMesh').addEventListener('click', () => {
+            // Increase subdivision
+            const currentSubdivisions = Math.sqrt(currentSurface.vertexCount / 2);
+            const newSubdivisions = Math.min(currentSubdivisions + 10, 200);
+            
+            // Remove old surface
+            viewer.removeSurface(currentSurface);
+            
+            // Create new surface with higher density
+            currentSurface = createTestSurface(newSubdivisions, currentMode === 'GPU');
+            
+            // Re-add layers
+            for (let i = 1; i < layerCount; i++) {
+                addDataLayer();
+            }
+            
+            viewer.addSurface(currentSurface);
+            viewer.centerCamera();
+            updateInfo();
+        });
+
+        // Start performance monitoring
+        updatePerformance();
+        updateInfo();
+
+        // Add initial layers for testing
+        for (let i = 0; i < 3; i++) {
+            addDataLayer();
+        }
+    </script>
+</body>
+</html>

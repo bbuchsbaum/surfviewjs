@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simple GIFTI Viewer</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+    }
+    #viewer-container {
+      width: 100vw;
+      height: 100vh;
+    }
+    #loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 20px;
+      border-radius: 5px;
+      font-size: 18px;
+    }
+    #error {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      right: 10px;
+      background: #f44336;
+      color: white;
+      padding: 15px;
+      border-radius: 5px;
+      display: none;
+    }
+    #info {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 10px;
+      border-radius: 5px;
+      font-size: 12px;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <div id="viewer-container"></div>
+  <div id="loading">Loading GIFTI surface...</div>
+  <div id="error"></div>
+  <div id="info" style="display: none;"></div>
+  
+  <script type="module">
+    import { 
+      NeuroSurfaceViewer, 
+      MultiLayerNeuroSurface,
+      DataLayer,
+      loadSurface,
+      ColorMap
+    } from './src/index.js';
+    
+    let viewer;
+    
+    async function init() {
+      const loadingEl = document.getElementById('loading');
+      const errorEl = document.getElementById('error');
+      const infoEl = document.getElementById('info');
+      
+      try {
+        // Log available colormaps
+        console.log('Available colormaps:', ColorMap.getAvailableMaps());
+        
+        // Initialize viewer
+        const container = document.getElementById('viewer-container');
+        viewer = new NeuroSurfaceViewer(
+          container,
+          window.innerWidth,
+          window.innerHeight,
+          {
+            showControls: true,
+            ambientLightColor: 0x404040,
+            directionalLightIntensity: 0.8,
+            rotationSpeed: 4.0  // Doubled from default 2.0 for faster rotation
+          }
+        );
+        
+        // Start render loop
+        viewer.startRenderLoop();
+        
+        // Load GIFTI surface
+        console.log('Loading GIFTI surface...');
+        const geometry = await loadSurface('./tests/data/ascii.surf.gii', 'gifti', 'left');
+        console.log('GIFTI loaded:', geometry);
+        
+        // Create surface
+        const surface = new MultiLayerNeuroSurface(geometry, {
+          baseColor: 0xcccccc,
+          metalness: 0.3,
+          roughness: 0.7
+        });
+        
+        // Add to viewer
+        viewer.addSurface(surface, 'brain');
+        viewer.centerCamera();
+        
+        // Create some test activation data
+        const vertexCount = geometry.vertices.length / 3;
+        const activationData = new Float32Array(vertexCount);
+        
+        // Create a simple activation pattern
+        for (let i = 0; i < vertexCount; i++) {
+          const x = geometry.vertices[i * 3];
+          const y = geometry.vertices[i * 3 + 1];
+          const z = geometry.vertices[i * 3 + 2];
+          
+          // Create activation based on position
+          const dist = Math.sqrt(x*x + y*y);
+          activationData[i] = Math.sin(dist * 0.1) * 5 + Math.random() * 2;
+        }
+        
+        // Add activation layer with hot colormap
+        const activationLayer = new DataLayer(
+          'activation',
+          activationData,
+          null,
+          'hot',  // Use the hot colormap
+          {
+            range: [-5, 5],
+            threshold: [-3, 3],
+            opacity: 0.8,
+            blendMode: 'normal'
+          }
+        );
+        
+        viewer.addLayer('brain', activationLayer);
+        
+        // Hide loading, show info
+        loadingEl.style.display = 'none';
+        infoEl.style.display = 'block';
+        infoEl.innerHTML = `
+          Vertices: ${vertexCount.toLocaleString()}<br>
+          Faces: ${(geometry.faces.length / 3).toLocaleString()}<br>
+          Colormap: hot<br>
+          Controls: Tweakpane UI
+        `;
+        
+      } catch (error) {
+        console.error('Error:', error);
+        loadingEl.style.display = 'none';
+        errorEl.style.display = 'block';
+        errorEl.textContent = `Error: ${error.message}`;
+      }
+    }
+    
+    // Handle resize
+    window.addEventListener('resize', () => {
+      if (viewer) {
+        viewer.resize(window.innerWidth, window.innerHeight);
+      }
+    });
+    
+    // Initialize
+    init();
+  </script>
+</body>
+</html>

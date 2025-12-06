@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Natural Surface Controls Test</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+    }
+    #viewer-container {
+      width: 100vw;
+      height: 100vh;
+    }
+    .controls-info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 15px;
+      border-radius: 5px;
+      font-size: 12px;
+      max-width: 300px;
+    }
+    .controls-info h3 {
+      margin: 0 0 10px 0;
+      color: #4CAF50;
+    }
+    .toggle-controls {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      display: flex;
+      gap: 10px;
+    }
+    button {
+      padding: 10px 15px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button:hover {
+      background: #45a049;
+    }
+    button.active {
+      background: #2196F3;
+    }
+    .comparison {
+      display: flex;
+      width: 100%;
+      height: 100vh;
+    }
+    .viewer-half {
+      width: 50%;
+      height: 100%;
+      position: relative;
+    }
+    .divider {
+      width: 2px;
+      background: #333;
+    }
+    .label {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 5px 15px;
+      border-radius: 3px;
+      font-size: 14px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="comparison">
+    <div class="viewer-half" id="viewer1-container">
+      <div class="label">Traditional Controls</div>
+    </div>
+    <div class="divider"></div>
+    <div class="viewer-half" id="viewer2-container">
+      <div class="label">Natural Surface Controls</div>
+    </div>
+  </div>
+  
+  <div class="controls-info">
+    <h3>Controls Comparison</h3>
+    <strong>Left (Traditional):</strong><br>
+    • Orbits around center point<br>
+    • Fixed rotation axis<br>
+    <br>
+    <strong>Right (Natural):</strong><br>
+    • Rotates where you grab<br>
+    • Feels like manipulating object<br>
+    <br>
+    <strong>Mouse Controls:</strong><br>
+    • Left button: Rotate<br>
+    • Right button: Pan<br>
+    • Scroll: Zoom
+  </div>
+  
+  <script type="module">
+    import { 
+      NeuroSurfaceViewer, 
+      MultiLayerNeuroSurface,
+      loadSurface,
+      setDebug
+    } from './src/index.js';
+    
+    // Disable debug for cleaner output
+    setDebug(false);
+    
+    async function createViewer(container, controlType, title) {
+      // Initialize viewer
+      const viewer = new NeuroSurfaceViewer(
+        container,
+        container.clientWidth,
+        container.clientHeight,
+        {
+          showControls: false,
+          ambientLightColor: 0x606060,
+          directionalLightIntensity: 0.8,
+          backgroundColor: 0x1a1a1a,
+          controlType: controlType // 'trackball' or 'surface'
+        }
+      );
+      
+      // Start render loop
+      viewer.startRenderLoop();
+      
+      // Load GIFTI surface
+      const geometry = await loadSurface('./tests/data/ascii.surf.gii', 'gifti', 'left');
+      
+      // Create surface with distinct color
+      const surface = new MultiLayerNeuroSurface(geometry, {
+        baseColor: controlType === 'trackball' ? 0x4CAF50 : 0x2196F3,
+        metalness: 0.2,
+        roughness: 0.7
+      });
+      
+      // Add to viewer
+      viewer.addSurface(surface, 'brain');
+      viewer.centerCamera();
+      
+      return viewer;
+    }
+    
+    async function init() {
+      try {
+        // Create two viewers side by side
+        const container1 = document.getElementById('viewer1-container');
+        const container2 = document.getElementById('viewer2-container');
+        
+        // Traditional controls (left)
+        const viewer1 = await createViewer(container1, 'trackball', 'Traditional Controls');
+        
+        // Natural controls (right)
+        const viewer2 = await createViewer(container2, 'surface', 'Natural Surface Controls');
+        
+        // Handle resize
+        window.addEventListener('resize', () => {
+          viewer1.resize(container1.clientWidth, container1.clientHeight);
+          viewer2.resize(container2.clientWidth, container2.clientHeight);
+        });
+        
+      } catch (error) {
+        console.error('Error:', error);
+      }
+    }
+    
+    init();
+  </script>
+</body>
+</html>

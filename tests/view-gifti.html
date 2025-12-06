@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GIFTI Brain Surface Viewer</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+      background: #1a1a1a;
+    }
+    #viewer-container {
+      width: 100vw;
+      height: 100vh;
+    }
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 15px;
+      border-radius: 5px;
+      font-family: monospace;
+      font-size: 12px;
+      max-width: 300px;
+    }
+    #info h3 {
+      margin: 0 0 10px 0;
+      color: #4CAF50;
+    }
+    .controls {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+    }
+    button {
+      padding: 10px 20px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button:hover {
+      background: #45a049;
+    }
+    #loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      font-size: 18px;
+    }
+  </style>
+</head>
+<body>
+  <div id="viewer-container"></div>
+  <div id="loading">Loading brain surface...</div>
+  <div id="info" style="display: none;">
+    <h3>Brain Surface Viewer</h3>
+    <div id="stats"></div>
+    <br>
+    <strong>Controls:</strong><br>
+    • Left mouse: Rotate<br>
+    • Right mouse: Pan<br>
+    • Scroll: Zoom
+  </div>
+  
+  <div class="controls" style="display: none;">
+    <button onclick="toggleData()">Toggle Activation</button>
+    <button onclick="toggleControls()">Toggle UI Controls</button>
+    <button onclick="resetView()">Reset View</button>
+  </div>
+  
+  <script type="module">
+    import { 
+      NeuroSurfaceViewer, 
+      MultiLayerNeuroSurface,
+      DataLayer,
+      loadSurface,
+      setDebug
+    } from '../dist/neurosurface.es.js';
+    
+    // Disable debug logging for cleaner output
+    setDebug(false);
+    
+    let viewer;
+    let currentSurface = null;
+    let activationLayer = null;
+    let geometry = null;
+    
+    async function init() {
+      try {
+        // Initialize viewer
+        const container = document.getElementById('viewer-container');
+        viewer = new NeuroSurfaceViewer(
+          container,
+          window.innerWidth,
+          window.innerHeight,
+          {
+            showControls: false,
+            ambientLightColor: 0x404040,
+            directionalLightIntensity: 0.8,
+            directionalLightColor: 0xffffff
+          }
+        );
+        
+        // Start render loop
+        viewer.startRenderLoop();
+        
+        // Load GIFTI surface
+        geometry = await loadSurface('../tests/data/ascii.surf.gii', 'gifti');
+        
+        // Create surface
+        const surface = new MultiLayerNeuroSurface(geometry, {
+          baseColor: 0xcccccc,
+          metalness: 0.3,
+          roughness: 0.7
+        });
+        
+        // Add to viewer
+        currentSurface = 'brain';
+        viewer.addSurface(surface, currentSurface);
+        viewer.centerCamera();
+        
+        // Create activation data
+        const vertexCount = geometry.vertices.length / 3;
+        const data = new Float32Array(vertexCount);
+        
+        // Create realistic activation pattern
+        for (let i = 0; i < vertexCount; i++) {
+          const x = geometry.vertices[i * 3];
+          const y = geometry.vertices[i * 3 + 1];
+          const z = geometry.vertices[i * 3 + 2];
+          
+          // Multiple activation regions
+          let activation = 0;
+          
+          // Frontal activation
+          const frontalDist = Math.sqrt((x - 40) ** 2 + (y + 20) ** 2 + z ** 2);
+          activation += Math.exp(-(frontalDist ** 2) / 400) * 8;
+          
+          // Parietal activation
+          const parietalDist = Math.sqrt((x + 30) ** 2 + (y - 40) ** 2 + z ** 2);
+          activation += Math.exp(-(parietalDist ** 2) / 600) * 6;
+          
+          // Add some noise
+          activation += (Math.random() - 0.5) * 0.5;
+          
+          data[i] = activation;
+        }
+        
+        // Add activation layer
+        activationLayer = new DataLayer(
+          'activation',
+          data,
+          null,
+          'hot',
+          {
+            range: [0, 8],
+            threshold: [1.5, 7],
+            opacity: 0.8,
+            blendMode: 'normal'
+          }
+        );
+        
+        viewer.addLayer(currentSurface, activationLayer);
+        
+        // Show info
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('info').style.display = 'block';
+        document.querySelector('.controls').style.display = 'flex';
+        
+        // Update stats
+        document.getElementById('stats').innerHTML = `
+          Vertices: ${(vertexCount).toLocaleString()}<br>
+          Faces: ${(geometry.faces.length / 3).toLocaleString()}<br>
+          Surface Type: GIFTI
+        `;
+        
+      } catch (error) {
+        console.error('Error:', error);
+        document.getElementById('loading').textContent = 'Error: ' + error.message;
+      }
+    }
+    
+    // Global functions for buttons
+    window.toggleData = function() {
+      if (activationLayer) {
+        activationLayer.setVisible(!activationLayer.visible);
+        viewer.requestRender();
+      }
+    };
+    
+    window.toggleControls = function() {
+      viewer.toggleControls();
+    };
+    
+    window.resetView = function() {
+      viewer.resetCamera();
+    };
+    
+    // Handle resize
+    window.addEventListener('resize', () => {
+      if (viewer) {
+        viewer.resize(window.innerWidth, window.innerHeight);
+      }
+    });
+    
+    // Initialize
+    init();
+  </script>
+</body>
+</html>

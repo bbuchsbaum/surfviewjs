@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NeuroSurface Demo Hub</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div id="app">
+    <aside class="nav">
+      <div class="brand">
+        <div class="mark"></div>
+        <div>
+          <div class="label">NeuroSurface</div>
+          <div class="sub">Demo Tour</div>
+        </div>
+      </div>
+      <div class="nav-search">
+        <input id="scenario-search" type="search" placeholder="Search scenarios" />
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title">Scenarios</div>
+        <div id="scenario-list" class="scenario-list"></div>
+      </div>
+      <div class="nav-section nav-hint">
+        <div class="nav-section-title">What this covers</div>
+        <ul>
+          <li>Core rendering & controls</li>
+          <li>Multi-layer compositing</li>
+          <li>Lighting / materials</li>
+          <li>Hemisphere + set handling</li>
+          <li>File and sample loading</li>
+        </ul>
+      </div>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <div class="crumb" id="active-title">Pick a scenario</div>
+          <div class="subtitle" id="active-desc">Load a scenario from the left menu to spin up a viewer.</div>
+        </div>
+        <div class="top-actions">
+          <span class="tag" id="active-tags"></span>
+          <button id="reset-btn" class="ghost" disabled>Reset</button>
+        </div>
+      </header>
+      <section class="workspace">
+        <div id="viewer-frame">
+          <div id="viewer-slot"></div>
+          <div id="status-block">
+            <div id="status-text">Idle</div>
+            <div id="perf-text"></div>
+          </div>
+        </div>
+        <div id="panel">
+          <div class="panel-empty">Scenario controls will appear here.</div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

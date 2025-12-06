@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Debug Surface View</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      background: #000;
+      color: #fff;
+    }
+    #viewer-container {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+    #debug-info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.8);
+      padding: 15px;
+      border-radius: 5px;
+      font-size: 12px;
+      max-width: 400px;
+    }
+    #debug-info h3 {
+      margin-top: 0;
+      color: #4CAF50;
+    }
+    .debug-item {
+      margin: 5px 0;
+    }
+    .debug-value {
+      color: #FFC107;
+    }
+    button {
+      margin: 5px;
+      padding: 8px 15px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #45a049;
+    }
+  </style>
+</head>
+<body>
+  <div id="viewer-container"></div>
+  <div id="debug-info">
+    <h3>Debug Info</h3>
+    <div class="debug-item">FPS: <span class="debug-value" id="fps">0</span></div>
+    <div class="debug-item">Render Loop: <span class="debug-value" id="render-status">Not Started</span></div>
+    <div class="debug-item">Surface Visible: <span class="debug-value" id="surface-visible">false</span></div>
+    <div class="debug-item">Material Type: <span class="debug-value" id="material-type">-</span></div>
+    <div class="debug-item">Vertex Colors: <span class="debug-value" id="vertex-colors">-</span></div>
+    <div class="debug-item">Camera Distance: <span class="debug-value" id="camera-distance">-</span></div>
+    <div class="debug-item">Scene Children: <span class="debug-value" id="scene-children">0</span></div>
+    <br>
+    <button id="start-render">Start Render Loop</button>
+    <button id="center-camera">Center Camera</button>
+    <button id="toggle-wireframe">Toggle Wireframe</button>
+    <button id="change-color">Change Color</button>
+    <button id="log-state">Log State</button>
+  </div>
+
+  <script type="module">
+    import { 
+      NeuroSurfaceViewer, 
+      SurfaceGeometry, 
+      ColorMappedNeuroSurface,
+      setDebug,
+      loadSurface
+    } from './src/index.js';
+    
+    // Enable debug
+    setDebug(true);
+    
+    // Create viewer
+    const container = document.getElementById('viewer-container');
+    const viewer = new NeuroSurfaceViewer(
+      container,
+      window.innerWidth,
+      window.innerHeight,
+      {
+        showControls: true,
+        backgroundColor: 0x222222
+      }
+    );
+    
+    // Debug tracking
+    let frameCount = 0;
+    let lastTime = performance.now();
+    let isRendering = false;
+    
+    // Create a test surface similar to your data
+    async function createTestSurface() {
+      console.log('Creating test surface...');
+      
+      // Create vertices for a simple cube (scaled to match your data size)
+      const vertices = new Float32Array([
+        // Front face
+        -50, -50,  50,
+         50, -50,  50,
+         50,  50,  50,
+        -50,  50,  50,
+        // Back face
+        -50, -50, -50,
+        -50,  50, -50,
+         50,  50, -50,
+         50, -50, -50,
+      ]);
+      
+      // Create faces
+      const faces = new Uint32Array([
+        0, 1, 2,  0, 2, 3,  // front
+        4, 5, 6,  4, 6, 7,  // back
+        0, 4, 7,  0, 7, 1,  // bottom
+        2, 3, 5,  2, 5, 6,  // top
+        0, 3, 5,  0, 5, 4,  // left
+        1, 7, 6,  1, 6, 2   // right
+      ]);
+      
+      // Create data for coloring
+      const data = new Float32Array(8);
+      for (let i = 0; i < 8; i++) {
+        data[i] = i * 12.5; // 0 to 87.5
+      }
+      
+      // Create surface geometry
+      const surfaceGeom = new SurfaceGeometry(vertices, faces, 'test');
+      
+      // Create color mapped surface
+      const surface = new ColorMappedNeuroSurface(
+        surfaceGeom,
+        Array.from({length: 8}, (_, i) => i),
+        data,
+        'viridis', // Use viridis instead of gray
+        {
+          alpha: 1.0,
+          flatShading: true
+        }
+      );
+      
+      console.log('Surface created:', surface);
+      console.log('Surface mesh:', surface.mesh);
+      
+      // Add to viewer
+      viewer.addSurface(surface, 'test-surface');
+      
+      console.log('Surface added to viewer');
+      
+      // Center camera
+      viewer.centerCamera();
+      
+      console.log('Camera centered');
+      
+      // Force a render
+      viewer.render();
+      
+      console.log('Initial render complete');
+      
+      return surface;
+    }
+    
+    // Update debug info
+    function updateDebugInfo() {
+      const now = performance.now();
+      frameCount++;
+      
+      if (now - lastTime >= 1000) {
+        document.getElementById('fps').textContent = frameCount;
+        frameCount = 0;
+        lastTime = now;
+      }
+      
+      document.getElementById('render-status').textContent = isRendering ? 'Running' : 'Stopped';
+      
+      // Check if surface exists
+      const surface = viewer.getSurface('test-surface');
+      if (surface && surface.mesh) {
+        document.getElementById('surface-visible').textContent = surface.mesh.visible;
+        document.getElementById('material-type').textContent = surface.mesh.material.type;
+        
+        const geometry = surface.mesh.geometry;
+        const hasColors = geometry.attributes.color ? 'Yes' : 'No';
+        document.getElementById('vertex-colors').textContent = hasColors;
+      }
+      
+      // Camera distance
+      const distance = viewer.camera.position.length();
+      document.getElementById('camera-distance').textContent = distance.toFixed(1);
+      
+      // Scene children
+      document.getElementById('scene-children').textContent = viewer.scene.children.length;
+      
+      if (isRendering) {
+        requestAnimationFrame(updateDebugInfo);
+      }
+    }
+    
+    // Button handlers
+    document.getElementById('start-render').addEventListener('click', () => {
+      if (!isRendering) {
+        viewer.startRenderLoop();
+        isRendering = true;
+        updateDebugInfo();
+        console.log('Render loop started');
+      }
+    });
+    
+    document.getElementById('center-camera').addEventListener('click', () => {
+      viewer.centerCamera();
+      viewer.render();
+      console.log('Camera centered');
+    });
+    
+    document.getElementById('toggle-wireframe').addEventListener('click', () => {
+      const surface = viewer.getSurface('test-surface');
+      if (surface && surface.mesh && surface.mesh.material) {
+        surface.mesh.material.wireframe = !surface.mesh.material.wireframe;
+        viewer.render();
+        console.log('Wireframe toggled');
+      }
+    });
+    
+    document.getElementById('change-color').addEventListener('click', () => {
+      const surface = viewer.getSurface('test-surface');
+      if (surface && surface.mesh && surface.mesh.material) {
+        const colors = ['red', 'green', 'blue', 'yellow', 'cyan', 'magenta'];
+        const randomColor = colors[Math.floor(Math.random() * colors.length)];
+        surface.mesh.material.color.set(randomColor);
+        viewer.render();
+        console.log('Color changed to:', randomColor);
+      }
+    });
+    
+    document.getElementById('log-state').addEventListener('click', () => {
+      console.log('=== Viewer State ===');
+      console.log('Camera:', viewer.camera);
+      console.log('Scene:', viewer.scene);
+      console.log('Surfaces:', viewer.surfaces);
+      console.log('Renderer:', viewer.renderer);
+      console.log('Controls:', viewer.controls);
+      
+      const surface = viewer.getSurface('test-surface');
+      if (surface) {
+        console.log('=== Surface State ===');
+        console.log('Surface:', surface);
+        console.log('Mesh:', surface.mesh);
+        console.log('Geometry:', surface.mesh?.geometry);
+        console.log('Material:', surface.mesh?.material);
+      }
+    });
+    
+    // Initialize
+    createTestSurface().then(() => {
+      console.log('Test surface loaded');
+      
+      // Auto-start render loop
+      viewer.startRenderLoop();
+      isRendering = true;
+      updateDebugInfo();
+    });
+    
+    // Handle resize
+    window.addEventListener('resize', () => {
+      viewer.resize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>

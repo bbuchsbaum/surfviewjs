@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Debug Surface Test</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+    }
+    #viewer-container {
+      width: 100vw;
+      height: 100vh;
+    }
+    #debug {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0, 0, 0, 0.9);
+      color: #0f0;
+      padding: 10px;
+      border-radius: 5px;
+      font-size: 11px;
+      font-family: monospace;
+      max-width: 400px;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .debug-line {
+      margin: 2px 0;
+    }
+    .error { color: #f00; }
+    .success { color: #0f0; }
+    .info { color: #0ff; }
+  </style>
+</head>
+<body>
+  <div id="viewer-container"></div>
+  <div id="debug"></div>
+  
+  <script type="module">
+    import { 
+      NeuroSurfaceViewer, 
+      MultiLayerNeuroSurface,
+      loadSurface,
+      setDebug,
+      THREE
+    } from './src/index.js';
+    
+    const debugEl = document.getElementById('debug');
+    let logCount = 0;
+    
+    function log(msg, type = '') {
+      const line = document.createElement('div');
+      line.className = `debug-line ${type}`;
+      line.textContent = `${++logCount}. ${msg}`;
+      debugEl.appendChild(line);
+      console.log(msg);
+    }
+    
+    // Enable debug
+    setDebug(true);
+    
+    async function debug() {
+      try {
+        log('Starting debug test...');
+        
+        // Initialize viewer
+        const container = document.getElementById('viewer-container');
+        log('Container size: ' + container.clientWidth + 'x' + container.clientHeight);
+        
+        const viewer = new NeuroSurfaceViewer(
+          container,
+          window.innerWidth,
+          window.innerHeight,
+          {
+            showControls: false,
+            ambientLightColor: 0x808080,
+            directionalLightIntensity: 1.0,
+            backgroundColor: 0x000000, // Black background
+            controlType: 'surface'
+          }
+        );
+        
+        log('Viewer created', 'success');
+        const clearColor = new THREE.Color();
+        viewer.renderer.getClearColor(clearColor);
+        log('Renderer clear color: 0x' + clearColor.getHexString());
+        log('Camera position: ' + JSON.stringify(viewer.camera.position));
+        
+        // Start render loop
+        viewer.startRenderLoop();
+        log('Render loop started', 'success');
+        
+        // Load GIFTI
+        log('Loading GIFTI...');
+        const geometry = await loadSurface('./tests/data/ascii.surf.gii', 'gifti', 'left');
+        log('GIFTI loaded: ' + geometry.vertices.length + ' values, ' + geometry.faces.length + ' indices', 'success');
+        
+        // Create surface
+        log('Creating MultiLayerNeuroSurface...');
+        const surface = new MultiLayerNeuroSurface(geometry, {
+          baseColor: 0xff0000,  // Red
+          metalness: 0.1,
+          roughness: 0.8
+        });
+        
+        log('Surface created', 'success');
+        
+        // Check mesh
+        if (!surface.mesh) {
+          log('ERROR: No mesh created!', 'error');
+          return;
+        }
+        
+        log('Mesh exists: ' + surface.mesh.type, 'success');
+        log('Mesh visible: ' + surface.mesh.visible);
+        log('Mesh position: ' + JSON.stringify(surface.mesh.position));
+        
+        // Check geometry
+        const meshGeom = surface.mesh.geometry;
+        if (meshGeom) {
+          log('Geometry exists', 'success');
+          
+          const posAttr = meshGeom.getAttribute('position');
+          log('Position attribute: ' + (posAttr ? posAttr.count + ' vertices' : 'MISSING'), posAttr ? 'success' : 'error');
+          
+          const colorAttr = meshGeom.getAttribute('color');
+          log('Color attribute: ' + (colorAttr ? colorAttr.count + ' colors' : 'MISSING'), colorAttr ? 'success' : 'error');
+          
+          if (colorAttr && colorAttr.array) {
+            // Check first color
+            const r = colorAttr.array[0];
+            const g = colorAttr.array[1];
+            const b = colorAttr.array[2];
+            const a = colorAttr.array[3];
+            log('First color: rgba(' + r.toFixed(2) + ', ' + g.toFixed(2) + ', ' + b.toFixed(2) + ', ' + a.toFixed(2) + ')', 'info');
+          }
+          
+          // Check bounds
+          meshGeom.computeBoundingBox();
+          const box = meshGeom.boundingBox;
+          if (box) {
+            log('Bounds: ' + JSON.stringify({
+              min: [box.min.x.toFixed(1), box.min.y.toFixed(1), box.min.z.toFixed(1)],
+              max: [box.max.x.toFixed(1), box.max.y.toFixed(1), box.max.z.toFixed(1)]
+            }), 'info');
+          }
+        }
+        
+        // Check material
+        const mat = surface.mesh.material;
+        log('Material type: ' + mat.type);
+        log('Material vertexColors: ' + mat.vertexColors);
+        log('Material transparent: ' + mat.transparent);
+        log('Material visible: ' + mat.visible);
+        log('Material side: ' + (mat.side === 2 ? 'DoubleSide' : mat.side));
+        
+        // Add to viewer
+        log('Adding surface to viewer...');
+        viewer.addSurface(surface, 'brain');
+        log('Surface added', 'success');
+        
+        // Check scene
+        log('Scene children: ' + viewer.scene.children.length);
+        let meshFound = false;
+        viewer.scene.traverse((child) => {
+          if (child.isMesh) {
+            meshFound = true;
+            log('Found mesh in scene: ' + child.uuid, 'success');
+          }
+        });
+        if (!meshFound) {
+          log('ERROR: No mesh found in scene!', 'error');
+        }
+        
+        // Center camera
+        log('Centering camera...');
+        viewer.centerCamera();
+        log('Camera position after center: ' + JSON.stringify(viewer.camera.position));
+        const target = viewer.controls.target || viewer.controls.getTarget?.() || {x:0, y:0, z:0};
+        log('Camera looking at: ' + JSON.stringify(target));
+        
+        // Force render
+        viewer.requestRender();
+        
+        // Try manual render
+        setTimeout(() => {
+          log('Forcing manual render...');
+          viewer.renderer.render(viewer.scene, viewer.camera);
+        }, 1000);
+        
+        log('Debug complete!', 'success');
+        
+      } catch (error) {
+        log('ERROR: ' + error.message, 'error');
+        console.error(error);
+      }
+    }
+    
+    debug();
+  </script>
+</body>
+</html>

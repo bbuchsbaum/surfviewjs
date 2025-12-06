@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Surface Set Demo (Variants + Layers)</title>
+  <style>
+    :root {
+      --bg: #0c0f14;
+      --panel: rgba(255, 255, 255, 0.9);
+      --accent: #00a0ff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Inter", "Helvetica Neue", Arial, sans-serif;
+      background: radial-gradient(circle at 20% 20%, #111622 0%, #0c0f14 55%, #06080c 100%);
+      color: #e7ecf5;
+    }
+    #viewer-container {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+      overflow: hidden;
+    }
+    .floating-panel {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      max-width: 320px;
+      background: var(--panel);
+      color: #0c0f14;
+      padding: 14px 16px;
+      border-radius: 10px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.35);
+      backdrop-filter: blur(6px);
+    }
+    h1 {
+      margin: 0 0 6px 0;
+      font-size: 17px;
+      letter-spacing: 0.2px;
+    }
+    p { margin: 0 0 10px 0; font-size: 13px; line-height: 1.4; }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    button {
+      border: none;
+      border-radius: 6px;
+      padding: 8px 12px;
+      cursor: pointer;
+      background: #101522;
+      color: #e7ecf5;
+      border: 1px solid rgba(255,255,255,0.12);
+      transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+    }
+    button:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(0,0,0,0.2); }
+    button.active { background: var(--accent); color: #001222; border-color: #0073c8; }
+    .badge { display: inline-block; background: #0f172a; color: #7ae0ff; padding: 2px 8px; border-radius: 999px; font-size: 11px; margin-left: 6px; }
+    .tip { font-size: 12px; opacity: 0.7; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <div id="viewer-container"></div>
+  <div class="floating-panel">
+    <h1>Surface Set Variants <span class="badge">beta</span></h1>
+    <p>Same topology, different embeddings. Toggle variants and keep all layers intact.</p>
+    <div class="btn-row" id="variant-buttons"></div>
+    <p class="tip">Tweakpane (top-right) also exposes the variant dropdown.</p>
+  </div>
+
+  <script type="module">
+    import {
+      NeuroSurfaceViewer,
+      VariantSurface,
+      SurfaceSet,
+      DataLayer,
+      ColorMap,
+      THREE
+    } from './src/index.js';
+
+    const container = document.getElementById('viewer-container');
+    const viewer = new NeuroSurfaceViewer(container, window.innerWidth, window.innerHeight, {
+      backgroundColor: 0x05070b,
+      showControls: true,
+      useControls: true,
+      preset: 'presentation',
+      rimStrength: 0.15
+    });
+
+    // Generate a simple surface set from an icosphere with scaled variants
+    function buildSurfaceSet() {
+      const baseGeo = new THREE.IcosahedronGeometry(1, 3);
+      const faces = new Uint32Array(baseGeo.index.array);
+      const basePos = new Float32Array(baseGeo.attributes.position.array);
+
+      const makeScaled = (factor) => {
+        const out = new Float32Array(basePos.length);
+        for (let i = 0; i < basePos.length; i += 3) {
+          const x = basePos[i], y = basePos[i + 1], z = basePos[i + 2];
+          const len = Math.max(1e-6, Math.hypot(x, y, z));
+          out[i] = (x / len) * factor;
+          out[i + 1] = (y / len) * factor;
+          out[i + 2] = (z / len) * factor;
+        }
+        return out;
+      };
+
+      const variants = {
+        pial: basePos,
+        white: makeScaled(0.85),
+        inflated: makeScaled(1.35),
+        sphere: makeScaled(1.0) // normalized sphere
+      };
+
+      return new SurfaceSet({
+        faces,
+        hemi: 'lh',
+        defaultVariant: 'pial',
+        variants
+      });
+    }
+
+    function createDataLayer(vertexCount) {
+      const data = new Float32Array(vertexCount);
+      for (let i = 0; i < vertexCount; i++) {
+        const t = i / vertexCount;
+        data[i] = Math.sin(t * Math.PI * 8) + Math.cos(t * Math.PI * 3) * 0.6;
+      }
+      return new DataLayer('activation', data, null, ColorMap.fromPreset('jet'), {
+        opacity: 0.9,
+        blendMode: 'additive'
+      });
+    }
+
+    const surfaceSet = buildSurfaceSet();
+    const variantSurface = new VariantSurface(surfaceSet, {
+      baseColor: 0xb0b3c0,
+      metalness: 0.1,
+      roughness: 0.65,
+      useGPUCompositing: false
+    });
+
+    // Add a data layer to prove layers persist across variants
+    const layer = createDataLayer(surfaceSet.vertexCount);
+    variantSurface.addLayer(layer);
+
+    viewer.addSurface(variantSurface, 'lh');
+
+    // Build variant buttons
+    const btnRow = document.getElementById('variant-buttons');
+    const variants = surfaceSet.getVariantNames();
+    variants.forEach((name) => {
+      const btn = document.createElement('button');
+      btn.textContent = name;
+      if (name === surfaceSet.defaultVariant) btn.classList.add('active');
+      btn.addEventListener('click', () => {
+        viewer.setSurfaceVariant('lh', name, { animate: true, duration: 450 });
+        document.querySelectorAll('#variant-buttons button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+      btnRow.appendChild(btn);
+    });
+
+    // Handle resize
+    window.addEventListener('resize', () => {
+      viewer.resize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>

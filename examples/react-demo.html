@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NeuroSurface React Demo</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Load the neurosurface UMD build (includes THREE.js) -->
+  <script src="../dist/neurosurface.umd.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    .control-panel {
+      padding: 10px;
+      background: #f0f0f0;
+      border-bottom: 1px solid #ccc;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    button {
+      padding: 8px 16px;
+      border: none;
+      background: #007bff;
+      color: white;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <script type="text/babel">
+    // The scripts should be loaded by the time Babel processes this
+    // Since React components use JSX and hooks, we'll define them inline
+    // to avoid module import issues with the in-browser Babel transformer
+    
+    const { useState, useRef, useCallback, useEffect, forwardRef, useImperativeHandle } = React;
+    
+    // Load the main library from the UMD global
+    const { NeuroSurfaceViewer, MultiLayerNeuroSurface, DataLayer, ColorMap, THREE, setDebug } = window.neurosurface;
+    
+    // Enable debug logging
+    setDebug(true);
+    
+    // Define the React wrapper component
+    const NeuroSurfaceViewerReact = forwardRef(({ width, height, config, onReady }, ref) => {
+        const containerRef = useRef(null);
+        const viewerRef = useRef(null);
+        
+        useEffect(() => {
+          if (!containerRef.current) return;
+          
+          const viewer = new NeuroSurfaceViewer(
+            containerRef.current,
+            width || window.innerWidth,
+            height || window.innerHeight,
+            config
+          );
+          
+          viewerRef.current = viewer;
+          
+          if (onReady) {
+            onReady(viewer);
+          }
+          
+          return () => {
+            viewer.dispose();
+          };
+        }, []);
+        
+        useEffect(() => {
+          if (viewerRef.current) {
+            viewerRef.current.resize(width, height);
+          }
+        }, [width, height]);
+        
+        useImperativeHandle(ref, () => ({
+          centerCamera: () => viewerRef.current?.centerCamera(),
+          toggleControls: () => {
+            if (viewerRef.current && viewerRef.current.pane) {
+              viewerRef.current.pane.hidden = !viewerRef.current.pane.hidden;
+            }
+          },
+          getViewer: () => viewerRef.current
+        }));
+        
+        return <div ref={containerRef} style={{ width, height }} />;
+    });
+    
+    // Simple hook for managing surfaces
+    const useNeuroSurface = (viewerRef) => {
+        const [surfaces] = useState(new Map());
+      
+        const addSurface = useCallback((config) => {
+          const viewer = viewerRef.current?.getViewer();
+          if (!viewer) return null;
+          
+          const id = `surface-${Date.now()}`;
+          const geometry = new THREE.SphereGeometry(50, 32, 32);
+          const surface = new MultiLayerNeuroSurface(
+            {
+              vertices: geometry.attributes.position.array,
+              faces: geometry.index.array
+            },
+            config.config
+          );
+          
+          viewer.addSurface(surface, id);
+          surfaces.set(id, { surface, layers: new Map() });
+          return id;
+        }, [surfaces]);
+        
+        const addLayer = useCallback((surfaceId, layerConfig) => {
+          const viewer = viewerRef.current?.getViewer();
+          if (!viewer) return;
+          
+          const surface = viewer.getSurface(surfaceId);
+          if (surface && surface.addLayer) {
+            // Create a DataLayer instance
+            const colormap = ColorMap.fromPreset(layerConfig.colorMap || 'jet');
+            const layerId = `layer-${Date.now()}`;
+            const layer = new DataLayer(
+              layerId,
+              layerConfig.data,
+              null, // indices parameter - null for auto-mapping
+              colormap,
+              {
+                range: layerConfig.config?.range || [0, 12],
+                threshold: layerConfig.config?.threshold || [3, 10],
+                opacity: layerConfig.config?.opacity || 0.8
+              }
+            );
+            
+            // Add the layer to the surface
+            surface.addLayer(layer);
+            viewer.requestRender();
+            
+            // Update our local state
+            const surfaceData = surfaces.get(surfaceId);
+            if (surfaceData) {
+              surfaceData.layers.set(layer.id, {
+                id: layer.id,
+                type: 'data',
+                opacity: layer.opacity
+              });
+            }
+          }
+        }, [surfaces]);
+        
+        const updateLayer = useCallback((surfaceId, layerId, updates) => {
+          // This would need to be implemented based on the layer API
+          console.log('Updating layer', layerId, 'on', surfaceId, updates);
+        }, []);
+        
+      return { surfaces, addSurface, addLayer, updateLayer };
+    };
+    
+    function App() {
+      const viewerRef = useRef();
+      const [ready, setReady] = useState(false);
+      const [surfaceId, setSurfaceId] = useState(null);
+      const { surfaces, addSurface, addLayer, updateLayer } = useNeuroSurface(viewerRef);
+      
+      const loadDemoSurface = useCallback(() => {
+        // Create a demo sphere surface
+        if (!THREE) {
+          console.error('THREE.js not available');
+          return;
+        }
+        const geometry = new THREE.SphereGeometry(50, 32, 32);
+        const vertices = new Float32Array(geometry.attributes.position.array);
+        const indices = new Uint32Array(geometry.index.array);
+        
+        const id = addSurface({
+          type: 'multi-layer',
+          vertices: vertices,
+          faces: indices,
+          hemisphere: 'demo',
+          config: {
+            baseColor: 0xdddddd
+          }
+        });
+        
+        setSurfaceId(id);
+        viewerRef.current?.centerCamera();
+      }, [addSurface]);
+      
+      const addActivationLayer = useCallback(() => {
+        if (!surfaceId) return;
+        
+        // Generate demo activation data
+        const vertexCount = 32 * 32 * 3; // Approximate vertex count
+        const data = new Float32Array(vertexCount);
+        
+        for (let i = 0; i < vertexCount; i++) {
+          data[i] = Math.sin(i * 0.1) * 10 + Math.random() * 2;
+        }
+        
+        addLayer(surfaceId, {
+          type: 'data',
+          data: data,
+          colorMap: 'jet',
+          config: {
+            range: [0, 12],
+            threshold: [3, 10],
+            opacity: 0.8,
+            blendMode: 'normal'
+          }
+        });
+      }, [surfaceId, addLayer]);
+      
+      const toggleControls = useCallback(() => {
+        viewerRef.current?.toggleControls();
+      }, []);
+      
+      return (
+        <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column' }}>
+          <div className="control-panel">
+            <button onClick={loadDemoSurface} disabled={!ready}>
+              Load Demo Surface
+            </button>
+            <button onClick={addActivationLayer} disabled={!surfaceId}>
+              Add Activation Layer
+            </button>
+            <button onClick={toggleControls} disabled={!ready}>
+              Toggle Controls
+            </button>
+            <span style={{ marginLeft: 'auto', color: '#666' }}>
+              {ready ? 'Viewer Ready' : 'Initializing...'}
+              {surfaceId && ` | Layers: ${surfaces.get(surfaceId)?.layers.size || 0}`}
+            </span>
+          </div>
+          
+          <div style={{ flex: 1 }}>
+            <NeuroSurfaceViewerReact
+              ref={viewerRef}
+              width={window.innerWidth}
+              height={window.innerHeight - 50}
+              config={{
+                showControls: true
+              }}
+              onReady={(viewer) => {
+                console.log('Viewer ready:', viewer);
+                setReady(true);
+              }}
+            />
+          </div>
+          
+          {/* Layer list */}
+          {surfaceId && surfaces.get(surfaceId)?.layers.size > 0 && (
+            <div style={{
+              position: 'absolute',
+              top: '60px',
+              right: '10px',
+              background: 'rgba(255,255,255,0.95)',
+              padding: '15px',
+              borderRadius: '5px',
+              boxShadow: '0 2px 10px rgba(0,0,0,0.2)'
+            }}>
+              <h4 style={{ margin: '0 0 10px 0' }}>Layers</h4>
+              {Array.from(surfaces.get(surfaceId).layers.values()).map(layer => (
+                <div key={layer.id} style={{ marginBottom: '10px' }}>
+                  <div>{layer.id} ({layer.type})</div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={layer.opacity * 100}
+                    onChange={(e) => updateLayer(surfaceId, layer.id, {
+                      opacity: e.target.value / 100
+                    })}
+                    style={{ width: '100%' }}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+    
+    const { createRoot } = ReactDOM;
+    const root = createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>

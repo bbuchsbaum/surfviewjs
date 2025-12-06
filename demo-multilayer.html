@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Multi-Layer NeuroSurface Demo</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      background-color: #f0f0f0;
+    }
+    #viewer-container {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+    .controls {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 15px;
+      border-radius: 5px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      max-width: 300px;
+    }
+    .control-group {
+      margin-bottom: 15px;
+    }
+    .control-group h3 {
+      margin: 0 0 10px 0;
+      font-size: 14px;
+      color: #333;
+    }
+    button {
+      padding: 8px 12px;
+      margin: 2px;
+      cursor: pointer;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 3px;
+    }
+    button:hover {
+      background: #45a049;
+    }
+    button.secondary {
+      background: #2196F3;
+    }
+    button.secondary:hover {
+      background: #1976D2;
+    }
+    .layer-control {
+      margin: 5px 0;
+      padding: 5px;
+      background: #f5f5f5;
+      border-radius: 3px;
+    }
+    input[type="range"] {
+      width: 100%;
+    }
+    .info {
+      font-size: 12px;
+      color: #666;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div id="viewer-container"></div>
+  <div class="controls">
+    <div class="control-group">
+      <h3>Surface Controls</h3>
+      <button id="toggle-ui">Toggle UI</button>
+      <button id="load-demo">Load Demo Surface</button>
+    </div>
+    
+    <div class="control-group">
+      <h3>Layer Demos</h3>
+      <button id="demo-rgba" class="secondary">Add RGBA Layer</button>
+      <button id="demo-data" class="secondary">Add Data Layer</button>
+      <button id="demo-mixed" class="secondary">Mixed Layers Demo</button>
+    </div>
+    
+    <div id="layer-controls" class="control-group" style="display: none;">
+      <h3>Active Layers</h3>
+      <div id="layer-list"></div>
+    </div>
+    
+    <div class="info">
+      Multi-layer brain surface visualization demo. Load a surface first, then add layers.
+    </div>
+  </div>
+  
+  <script type="module">
+    import { 
+      NeuroSurfaceViewer, 
+      SurfaceGeometry, 
+      MultiLayerNeuroSurface,
+      RGBALayer,
+      DataLayer,
+      THREE 
+    } from './src/index.js';
+    
+    // Global variables
+    let viewer;
+    let currentSurface = null;
+    let layerCount = 0;
+    
+    // Initialize viewer
+    function initViewer() {
+      const container = document.getElementById('viewer-container');
+      viewer = new NeuroSurfaceViewer(
+        container,
+        window.innerWidth,
+        window.innerHeight,
+        {
+          showControls: false
+        }
+      );
+      viewer.startRenderLoop();
+    }
+    
+    // Create demo sphere surface
+    function createDemoSurface() {
+      const geometry = new THREE.SphereGeometry(50, 64, 64);
+      const vertices = new Float32Array(geometry.attributes.position.array);
+      const indices = new Uint32Array(geometry.index.array);
+      
+      const surfaceGeom = new SurfaceGeometry(vertices, indices, 'left');
+      const surface = new MultiLayerNeuroSurface(surfaceGeom, {
+        baseColor: 0xdddddd
+      });
+      
+      viewer.addSurface(surface, 'main-surface');
+      viewer.centerCamera();
+      currentSurface = 'main-surface';
+      
+      document.getElementById('layer-controls').style.display = 'block';
+      updateLayerList();
+    }
+    
+    // Add RGBA layer (pre-computed colors)
+    function addRGBALayer() {
+      if (!currentSurface) {
+        alert('Please load a surface first');
+        return;
+      }
+      
+      const surface = viewer.surfaces.get(currentSurface);
+      const vertexCount = surface.vertexCount;
+      
+      // Create random RGBA data
+      const rgbaData = new Float32Array(vertexCount * 4);
+      for (let i = 0; i < vertexCount; i++) {
+        const offset = i * 4;
+        // Create a gradient based on vertex position
+        rgbaData[offset] = Math.random();     // R
+        rgbaData[offset + 1] = 0.2;           // G
+        rgbaData[offset + 2] = 1 - Math.random(); // B
+        rgbaData[offset + 3] = 0.6;           // A
+      }
+      
+      const layer = new RGBALayer(`rgba-layer-${layerCount++}`, rgbaData, {
+        opacity: 0.8,
+        blendMode: 'normal'
+      });
+      
+      viewer.addLayer(currentSurface, layer);
+      updateLayerList();
+    }
+    
+    // Add data layer with colormap
+    function addDataLayer() {
+      if (!currentSurface) {
+        alert('Please load a surface first');
+        return;
+      }
+      
+      const surface = viewer.surfaces.get(currentSurface);
+      const vertexCount = surface.vertexCount;
+      
+      // Create synthetic activation data (simulate fMRI activation)
+      const data = new Float32Array(vertexCount);
+      const centerX = 25, centerY = 0, centerZ = 0;
+      const radius = 30;
+      
+      // Get vertex positions
+      const positions = surface.geometry.vertices;
+      for (let i = 0; i < vertexCount; i++) {
+        const x = positions[i * 3];
+        const y = positions[i * 3 + 1];
+        const z = positions[i * 3 + 2];
+        
+        // Distance from activation center
+        const dist = Math.sqrt(
+          (x - centerX) ** 2 + 
+          (y - centerY) ** 2 + 
+          (z - centerZ) ** 2
+        );
+        
+        // Gaussian activation pattern
+        data[i] = Math.exp(-(dist ** 2) / (2 * radius ** 2)) * 10;
+        
+        // Add some noise
+        data[i] += (Math.random() - 0.5) * 2;
+      }
+      
+      const layer = new DataLayer(
+        `data-layer-${layerCount++}`, 
+        data, 
+        null, // Use default 1:1 indices
+        'jet', // Colormap
+        {
+          range: [0, 10],
+          threshold: [2, 8], // Only show values between 2 and 8
+          opacity: 0.9,
+          blendMode: 'normal'
+        }
+      );
+      
+      viewer.addLayer(currentSurface, layer);
+      updateLayerList();
+    }
+    
+    // Mixed layers demo
+    function mixedLayersDemo() {
+      if (!currentSurface) {
+        alert('Please load a surface first');
+        return;
+      }
+      
+      // Clear existing layers (except base)
+      const surface = viewer.surfaces.get(currentSurface);
+      const layers = Array.from(surface.layerStack.layers.keys()).filter(id => id !== 'base');
+      layers.forEach(id => viewer.removeLayer(currentSurface, id));
+      
+      // Add multiple layers with different blend modes
+      const vertexCount = surface.vertexCount;
+      const positions = surface.geometry.vertices;
+      
+      // Layer 1: Blue gradient (RGBA)
+      const blueGradient = new Float32Array(vertexCount * 4);
+      for (let i = 0; i < vertexCount; i++) {
+        const y = positions[i * 3 + 1];
+        const normalized = (y + 50) / 100; // Normalize Y position
+        blueGradient[i * 4] = 0;
+        blueGradient[i * 4 + 1] = 0;
+        blueGradient[i * 4 + 2] = normalized;
+        blueGradient[i * 4 + 3] = 0.3;
+      }
+      viewer.addLayer(currentSurface, new RGBALayer('blue-gradient', blueGradient, {
+        blendMode: 'normal'
+      }));
+      
+      // Layer 2: Activation hotspot (Data layer)
+      const activation = new Float32Array(vertexCount);
+      for (let i = 0; i < vertexCount; i++) {
+        const x = positions[i * 3];
+        const y = positions[i * 3 + 1];
+        const z = positions[i * 3 + 2];
+        
+        // Two activation centers
+        const dist1 = Math.sqrt((x - 30) ** 2 + y ** 2 + z ** 2);
+        const dist2 = Math.sqrt((x + 30) ** 2 + y ** 2 + z ** 2);
+        
+        activation[i] = Math.max(
+          Math.exp(-(dist1 ** 2) / 200) * 10,
+          Math.exp(-(dist2 ** 2) / 200) * 10
+        );
+      }
+      
+      viewer.addLayer(currentSurface, new DataLayer('activation', activation, null, 'hot', {
+        range: [0, 10],
+        threshold: [3, 10],
+        opacity: 0.8,
+        blendMode: 'additive' // Additive for glow effect
+      }));
+      
+      updateLayerList();
+    }
+    
+    // Update layer controls UI
+    function updateLayerList() {
+      const surface = viewer.surfaces.get(currentSurface);
+      if (!surface) return;
+      
+      const layerList = document.getElementById('layer-list');
+      layerList.innerHTML = '';
+      
+      surface.layerStack.layerOrder.forEach(layerId => {
+        const layer = surface.layerStack.getLayer(layerId);
+        if (layerId === 'base') return; // Skip base layer
+        
+        const control = document.createElement('div');
+        control.className = 'layer-control';
+        control.innerHTML = `
+          <div><strong>${layerId}</strong></div>
+          <div>
+            Opacity: <input type="range" min="0" max="100" value="${layer.opacity * 100}" 
+              onchange="updateLayerOpacity('${layerId}', this.value / 100)">
+          </div>
+          <div>
+            <button onclick="toggleLayer('${layerId}')">${layer.visible ? 'Hide' : 'Show'}</button>
+            <button onclick="removeLayerById('${layerId}')">Remove</button>
+          </div>
+        `;
+        layerList.appendChild(control);
+      });
+    }
+    
+    // Global functions for UI
+    window.updateLayerOpacity = (layerId, opacity) => {
+      viewer.updateLayer(currentSurface, layerId, { opacity });
+    };
+    
+    window.toggleLayer = (layerId) => {
+      const surface = viewer.surfaces.get(currentSurface);
+      const layer = surface.layerStack.getLayer(layerId);
+      viewer.updateLayer(currentSurface, layerId, { visible: !layer.visible });
+      updateLayerList();
+    };
+    
+    window.removeLayerById = (layerId) => {
+      viewer.removeLayer(currentSurface, layerId);
+      updateLayerList();
+    };
+    
+    // Event listeners
+    document.getElementById('toggle-ui').addEventListener('click', () => {
+      viewer.toggleControls();
+    });
+    
+    document.getElementById('load-demo').addEventListener('click', createDemoSurface);
+    document.getElementById('demo-rgba').addEventListener('click', addRGBALayer);
+    document.getElementById('demo-data').addEventListener('click', addDataLayer);
+    document.getElementById('demo-mixed').addEventListener('click', mixedLayersDemo);
+    
+    // Handle window resize
+    window.addEventListener('resize', () => {
+      viewer.resize(window.innerWidth, window.innerHeight);
+    });
+    
+    // Initialize
+    initViewer();
+  </script>
+</body>
+</html>

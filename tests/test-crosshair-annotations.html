@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NeuroSurface – Crosshair & Annotations Demo</title>
+  <style>
+    body { margin: 0; background: #111; color: #ddd; font-family: system-ui, sans-serif; }
+    #app { display: grid; grid-template-columns: 1fr 320px; height: 100vh; }
+    #viewer { width: 100%; height: 100%; }
+    #panel { padding: 12px; overflow: auto; border-left: 1px solid #333; background: #181818; }
+    button { margin: 4px 0; width: 100%; padding: 8px; background: #2d2d2d; color: #ddd; border: 1px solid #444; cursor: pointer; }
+    button:hover { background: #3a3a3a; }
+    pre { background: #0f0f0f; padding: 8px; border: 1px solid #222; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="viewer"></div>
+    <div id="panel">
+      <h3>Controls</h3>
+      <button id="btn-hover">Toggle Hover Crosshair</button>
+      <button id="btn-click-annot">Toggle Click-to-Annotate</button>
+      <button id="btn-clear-annots">Clear Annotations</button>
+      <button id="btn-hide-crosshair">Hide Crosshair</button>
+      <pre id="status">Click on the surface to place a crosshair and annotation.</pre>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { NeuroSurfaceViewer, SurfaceHelpers } from '../src/index.react.js';
+
+    const viewerEl = document.getElementById('viewer');
+    const statusEl = document.getElementById('status');
+
+    // Simple sphere geometry for demo
+    function createSphere(radius = 50, widthSegments = 80, heightSegments = 80) {
+      const geom = new THREE.SphereGeometry(radius, widthSegments, heightSegments);
+      const verts = new Float32Array(geom.attributes.position.array);
+      const faces = new Uint32Array(geom.index.array);
+      return { verts, faces };
+    }
+
+    const { verts, faces } = createSphere();
+
+    const viewer = new NeuroSurfaceViewer(
+      viewerEl,
+      viewerEl.clientWidth || window.innerWidth,
+      viewerEl.clientHeight || window.innerHeight,
+      {
+        showControls: false,
+        hoverCrosshair: true,
+        clickToAddAnnotation: true,
+        hoverCrosshairColor: 0x66ccff,
+        hoverCrosshairSize: 1.2
+      },
+      'lateral'
+    );
+
+    const geometry = SurfaceHelpers.createGeometry(verts, faces, 'both');
+    const surface = SurfaceHelpers.createMultiLayerSurface(geometry, { baseColor: 0x999999 });
+    viewer.addSurface(surface, 'brain');
+    viewer.startRenderLoop();
+
+    // Handle surface clicks
+    viewer.onSurfaceClick = (evt) => {
+      const { surfaceId, vertexIndex } = evt;
+      if (!surfaceId || vertexIndex == null) return;
+      statusEl.textContent = `Clicked: surface=${surfaceId}, vertex=${vertexIndex}`;
+      viewer.showCrosshair(surfaceId, vertexIndex, { size: 2.0, color: 0xffcc00, mode: 'selection' });
+      // If clickToAddAnnotation is off, drop an annotation manually
+      if (!viewer.config.clickToAddAnnotation) {
+        const id = viewer.addAnnotation(surfaceId, vertexIndex, { note: 'manual' });
+        if (id) viewer.activateAnnotation(id, { exclusive: true });
+      }
+    };
+
+    // Wire buttons
+    document.getElementById('btn-hover').onclick = () => {
+      viewer.config.hoverCrosshair = !viewer.config.hoverCrosshair;
+      statusEl.textContent = `Hover crosshair: ${viewer.config.hoverCrosshair ? 'on' : 'off'}`;
+    };
+    document.getElementById('btn-click-annot').onclick = () => {
+      viewer.config.clickToAddAnnotation = !viewer.config.clickToAddAnnotation;
+      statusEl.textContent = `Click-to-annotate: ${viewer.config.clickToAddAnnotation ? 'on' : 'off'}`;
+    };
+    document.getElementById('btn-clear-annots').onclick = () => {
+      viewer.removeAnnotations('brain');
+      statusEl.textContent = 'Annotations cleared';
+    };
+    document.getElementById('btn-hide-crosshair').onclick = () => {
+      viewer.hideCrosshair();
+      statusEl.textContent = 'Crosshair hidden';
+    };
+
+    window.addEventListener('resize', () => {
+      viewer.resize(viewerEl.clientWidth || window.innerWidth, viewerEl.clientHeight || window.innerHeight);
+    });
+  </script>
+</body>
+</html>

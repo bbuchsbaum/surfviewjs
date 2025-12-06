@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NeuroSurface Viewer - Test Suite</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    h1 {
+      color: #333;
+    }
+    .test-section {
+      background: white;
+      padding: 20px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .test-link {
+      display: inline-block;
+      padding: 10px 20px;
+      margin: 5px;
+      background: #2196F3;
+      color: white;
+      text-decoration: none;
+      border-radius: 4px;
+      transition: background 0.3s;
+    }
+    .test-link:hover {
+      background: #1976D2;
+    }
+    .description {
+      color: #666;
+      margin: 10px 0;
+    }
+    .data-info {
+      background: #e3f2fd;
+      padding: 15px;
+      border-radius: 4px;
+      margin-top: 20px;
+    }
+    code {
+      background: #f5f5f5;
+      padding: 2px 4px;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body>
+  <h1>NeuroSurface Viewer - Test Suite</h1>
+  
+  <div class="test-section">
+    <h2>GIFTI Surface Tests</h2>
+    <p class="description">
+      Test the GIFTI parser with real brain surface data from the GIFTI-Reader-JS repository.
+    </p>
+    
+    <a href="simple-gifti-viewer.html" class="test-link">Simple GIFTI Viewer</a>
+    <a href="test-gifti.html" class="test-link">Interactive GIFTI Test</a>
+    
+    <div class="data-info">
+      <h3>Test Data Available:</h3>
+      <ul>
+        <li><code>tests/data/ascii.surf.gii</code> - ASCII-encoded brain surface (5,124 vertices, 10,240 faces)</li>
+        <li><code>tests/data/base64.surf.gii</code> - Base64-encoded brain surface</li>
+      </ul>
+    </div>
+  </div>
+  
+  <div class="test-section">
+    <h2>General Examples</h2>
+    <p class="description">
+      Examples demonstrating various features of the NeuroSurface viewer.
+    </p>
+    
+    <a href="../index.html" class="test-link">Basic Demo</a>
+    <a href="../demo-multilayer.html" class="test-link">Multi-Layer Demo</a>
+    <a href="../examples/file-loading.html" class="test-link">File Loading Example</a>
+    <a href="../examples/react-demo.html" class="test-link">React Integration</a>
+  </div>
+  
+  <div class="test-section">
+    <h2>Running Tests</h2>
+    <p class="description">
+      To run the automated tests:
+    </p>
+    <pre><code># Parser tests
+npm test
+
+# Development server
+npm run dev
+
+# Build project
+npm run build</code></pre>
+  </div>
+  
+  <div class="test-section">
+    <h2>About</h2>
+    <p class="description">
+      NeuroSurface is a Three.js-based brain surface visualization library designed for 
+      displaying multi-layer fMRI activation data. It supports multiple surface formats 
+      including GIFTI, FreeSurfer, and PLY.
+    </p>
+    <p class="description">
+      The test data includes brain surfaces from the GIFTI-Reader-JS project, which are 
+      real neuroimaging surfaces suitable for testing visualization features.
+    </p>
+  </div>
+</body>
+</html>

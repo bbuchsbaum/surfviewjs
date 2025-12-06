@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simple GIFTI Viewer</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+    }
+    #viewer-container {
+      width: 100vw;
+      height: 100vh;
+    }
+    #status {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 10px;
+      border-radius: 5px;
+      font-family: monospace;
+      font-size: 12px;
+    }
+    #error {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #ff5252;
+      color: white;
+      padding: 20px;
+      border-radius: 5px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="viewer-container"></div>
+  <div id="status">Initializing...</div>
+  <div id="error"></div>
+  
+  <script type="module">
+    import { 
+      NeuroSurfaceViewer, 
+      MultiLayerNeuroSurface,
+      DataLayer,
+      loadSurface
+    } from '../src/index.js';
+    
+    async function init() {
+      const statusEl = document.getElementById('status');
+      const errorEl = document.getElementById('error');
+      
+      try {
+        // Initialize viewer
+        statusEl.textContent = 'Creating viewer...';
+        const container = document.getElementById('viewer-container');
+        const viewer = new NeuroSurfaceViewer(
+          container,
+          window.innerWidth,
+          window.innerHeight,
+          {
+            showControls: false,
+            ambientLightColor: 0x404040,
+            directionalLightIntensity: 0.8,
+            directionalLightColor: 0xffffff
+          }
+        );
+        
+        // Start render loop
+        viewer.startRenderLoop();
+        
+        // Load GIFTI surface
+        statusEl.textContent = 'Loading GIFTI surface...';
+        const geometry = await loadSurface('../tests/data/ascii.surf.gii', 'gifti');
+        
+        // Get surface info
+        const vertexCount = geometry.vertices.length / 3;
+        const faceCount = geometry.faces.length / 3;
+        
+        // Create surface with a nice brain-like color
+        statusEl.textContent = 'Creating surface mesh...';
+        const surface = new MultiLayerNeuroSurface(geometry, {
+          baseColor: 0xdddddd,
+          metalness: 0.3,
+          roughness: 0.7
+        });
+        
+        // Add surface to viewer
+        viewer.addSurface(surface, 'brain-surface');
+        viewer.centerCamera();
+        
+        // Create some example activation data
+        statusEl.textContent = 'Adding activation layer...';
+        const data = new Float32Array(vertexCount);
+        
+        // Create a simple activation pattern
+        for (let i = 0; i < vertexCount; i++) {
+          const x = geometry.vertices[i * 3];
+          const y = geometry.vertices[i * 3 + 1];
+          const z = geometry.vertices[i * 3 + 2];
+          
+          // Create activation "blob" in frontal area
+          const dist = Math.sqrt((x - 30) ** 2 + (y - 20) ** 2 + z ** 2);
+          data[i] = Math.exp(-(dist ** 2) / 500) * 10;
+          
+          // Add some noise
+          data[i] += (Math.random() - 0.5) * 0.5;
+        }
+        
+        // Add data layer
+        const layer = new DataLayer(
+          'activation',
+          data,
+          null,
+          'hot',
+          {
+            range: [0, 10],
+            threshold: [2, 8],
+            opacity: 0.7,
+            blendMode: 'normal'
+          }
+        );
+        
+        viewer.addLayer('brain-surface', layer);
+        
+        // Update status with info
+        statusEl.innerHTML = `
+          <strong>GIFTI Surface Loaded</strong><br>
+          Vertices: ${vertexCount.toLocaleString()}<br>
+          Faces: ${faceCount.toLocaleString()}<br>
+          <br>
+          <strong>Controls:</strong><br>
+          • Left mouse: Rotate<br>
+          • Right mouse: Pan<br>
+          • Scroll: Zoom
+        `;
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+          viewer.resize(window.innerWidth, window.innerHeight);
+        });
+        
+      } catch (error) {
+        console.error('Error:', error);
+        errorEl.style.display = 'block';
+        errorEl.textContent = `Error: ${error.message}`;
+        statusEl.style.display = 'none';
+      }
+    }
+    
+    // Start the application
+    init();
+  </script>
+</body>
+</html>
