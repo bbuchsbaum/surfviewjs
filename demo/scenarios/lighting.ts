@@ -92,18 +92,22 @@ export const lighting: Scenario = {
 
     const updateMaterial = () => {
       const usePbr = pbrInput?.checked || false;
+      const specBoost = specInput ? parseFloat(specInput.value) : 1;
+      // Scale specular color by boost value (0 = black/no specular, 1 = full white)
+      const specValue = Math.round(specBoost * 255);
+      const specularColor = (specValue << 16) | (specValue << 8) | specValue;
       surface.updateConfig({
         materialType: usePbr ? 'physical' : 'phong',
         metalness: usePbr ? 0.25 : undefined,
         roughness: usePbr ? 0.55 : undefined,
         shininess: usePbr ? undefined : (shinyInput ? parseFloat(shinyInput.value) : 70),
-        specularColor: usePbr ? undefined : 0xffffff,
+        specularColor: usePbr ? undefined : specularColor,
         flatShading: flatInput?.checked || false
       });
       viewer.requestRender();
       const label = usePbr
         ? `PBR mode | metalness ${surface.config.metalness?.toFixed(2)} roughness ${surface.config.roughness?.toFixed(2)}`
-        : `Phong | shininess ${surface.config.shininess}`;
+        : `Phong | shininess ${surface.config.shininess} specular ${specBoost.toFixed(2)}`;
       ctx.perf(label);
     };
 
