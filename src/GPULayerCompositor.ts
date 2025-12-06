@@ -48,23 +48,27 @@ export class GPULayerCompositor {
   private createShaderMaterial(): void {
     const textureSize = Math.ceil(Math.sqrt(this.vertexCount));
 
-    // Vertex shader - passes through vertex colors and UVs
+    // Vertex shader - passes through vertex colors and UVs with lighting support
     const vertexShader = `
-      attribute vec3 color;
+      attribute float vertexIndex;
       varying vec3 vColor;
       varying vec2 vUv;
       varying float vVertexIndex;
-      
+      varying vec3 vNormal;
+      varying vec3 vViewPosition;
+
       void main() {
-        vColor = color;
         vUv = uv;
-        // Calculate vertex index for texture lookup
-        vVertexIndex = float(gl_VertexID);
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        vNormal = normalize(normalMatrix * normal);
+        // Use custom vertexIndex attribute instead of gl_VertexID for better compatibility
+        vVertexIndex = vertexIndex;
+        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+        vViewPosition = -mvPosition.xyz;
+        gl_Position = projectionMatrix * mvPosition;
       }
     `;
 
-    // Fragment shader - performs layer compositing
+    // Fragment shader - performs layer compositing with lighting
     const fragmentShader = `
       uniform sampler2D layer0;
       uniform sampler2D layer1;
@@ -74,17 +78,23 @@ export class GPULayerCompositor {
       uniform sampler2D layer5;
       uniform sampler2D layer6;
       uniform sampler2D layer7;
-      
+
       uniform float layerOpacity[8];
       uniform int layerBlendMode[8];
       uniform int layerCount;
       uniform float textureSize;
       uniform vec3 baseColor;
-      
+      uniform vec3 ambientLight;
+      uniform vec3 directionalLight;
+      uniform vec3 lightDirection;
+      uniform float shininess;
+
       varying vec3 vColor;
       varying vec2 vUv;
       varying float vVertexIndex;
-      
+      varying vec3 vNormal;
+      varying vec3 vViewPosition;
+
       vec4 getLayerColor(int layerIndex, vec2 texCoord) {
         if (layerIndex == 0) return texture2D(layer0, texCoord);
         if (layerIndex == 1) return texture2D(layer1, texCoord);
@@ -96,10 +106,10 @@ export class GPULayerCompositor {
         if (layerIndex == 7) return texture2D(layer7, texCoord);
         return vec4(0.0);
       }
-      
+
       vec4 blendColors(vec4 base, vec4 overlay, int blendMode, float opacity) {
         vec4 result = base;
-        
+
         if (blendMode == 0) { // Normal
           result = mix(base, overlay, overlay.a * opacity);
         } else if (blendMode == 1) { // Additive
@@ -111,30 +121,47 @@ export class GPULayerCompositor {
           vec4 screen = vec4(1.0) - (vec4(1.0) - base) * (vec4(1.0) - overlay);
           result = mix(base, screen, overlay.a * opacity);
         }
-        
+
         return result;
       }
-      
+
       void main() {
         // Calculate texture coordinates from vertex index
         float x = mod(vVertexIndex, textureSize);
         float y = floor(vVertexIndex / textureSize);
         vec2 texCoord = vec2(x + 0.5, y + 0.5) / textureSize;
-        
+
         // Start with base color
         vec4 finalColor = vec4(baseColor, 1.0);
-        
+
         // Composite each layer
         for (int i = 0; i < 8; i++) {
           if (i >= layerCount) break;
-          
+
           vec4 layerColor = getLayerColor(i, texCoord);
           if (layerColor.a > 0.0) {
             finalColor = blendColors(finalColor, layerColor, layerBlendMode[i], layerOpacity[i]);
           }
         }
-        
-        gl_FragColor = finalColor;
+
+        // Apply lighting
+        vec3 normal = normalize(vNormal);
+        vec3 viewDir = normalize(vViewPosition);
+
+        // Ambient
+        vec3 ambient = ambientLight * finalColor.rgb;
+
+        // Diffuse (Lambertian)
+        float diff = max(dot(normal, lightDirection), 0.0);
+        vec3 diffuse = directionalLight * diff * finalColor.rgb;
+
+        // Specular (Blinn-Phong)
+        vec3 halfDir = normalize(lightDirection + viewDir);
+        float spec = pow(max(dot(normal, halfDir), 0.0), shininess);
+        vec3 specular = directionalLight * spec * 0.3;
+
+        vec3 litColor = ambient + diffuse + specular;
+        gl_FragColor = vec4(litColor, finalColor.a);
       }
     `;
 
@@ -144,7 +171,12 @@ export class GPULayerCompositor {
       textureSize: { value: textureSize },
       layerCount: { value: 0 },
       layerOpacity: { value: new Float32Array(8).fill(1.0) },
-      layerBlendMode: { value: new Int32Array(8).fill(0) }
+      layerBlendMode: { value: new Int32Array(8).fill(0) },
+      // Lighting uniforms
+      ambientLight: { value: new THREE.Color(0x404040) },
+      directionalLight: { value: new THREE.Color(0xffffff) },
+      lightDirection: { value: new THREE.Vector3(0.5, 0.5, 1).normalize() },
+      shininess: { value: 30.0 }
     };
 
     // Add layer texture uniforms

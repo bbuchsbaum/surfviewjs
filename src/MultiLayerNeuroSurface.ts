@@ -833,9 +833,16 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(this.geometry.vertices, 3));
     geometry.setIndex(new THREE.Uint32BufferAttribute(this.geometry.faces, 1));
-    
+
+    // Add vertexIndex attribute for GPU compositing shader
+    const vertexIndices = new Float32Array(this.vertexCount);
+    for (let i = 0; i < this.vertexCount; i++) {
+      vertexIndices[i] = i;
+    }
+    geometry.setAttribute('vertexIndex', new THREE.Float32BufferAttribute(vertexIndices, 1));
+
     let material: THREE.Material;
-    
+
     if (this.useGPUCompositing && this.gpuCompositor) {
       // Use GPU shader material for compositing
       material = this.gpuCompositor.getMaterial() || this.createFallbackMaterial();
