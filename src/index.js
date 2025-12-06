@@ -18,7 +18,8 @@ import { VariantSurface } from './VariantSurface';
 import { SurfaceSet } from './SurfaceSet';
 import { LabeledNeuroSurface } from './LabeledNeuroSurface';
 import { SurfaceFactory } from './SurfaceFactory';
-import { Layer, RGBALayer, DataLayer, BaseLayer, LabelLayer, LayerStack } from './layers';
+import { Layer, RGBALayer, DataLayer, TwoDataLayer, BaseLayer, LabelLayer, LayerStack } from './layers';
+import ColorMap2D from './ColorMap2D';
 import { OutlineLayer } from './OutlineLayer';
 import { CurvatureLayer } from './layers/CurvatureLayer';
 import { GPULayerCompositor } from './GPULayerCompositor';
@@ -70,9 +71,11 @@ export {
   Layer,
   RGBALayer,
   DataLayer,
+  TwoDataLayer,
   BaseLayer,
   LabelLayer,
   LayerStack,
+  ColorMap2D,
   OutlineLayer,
   CurvatureLayer,
   GPULayerCompositor,
@@ -120,9 +123,11 @@ if (typeof window !== 'undefined') {
     Layer,
     RGBALayer,
     DataLayer,
+    TwoDataLayer,
     BaseLayer,
     LabelLayer,
     LayerStack,
+    ColorMap2D,
     OutlineLayer,
     CurvatureLayer,
     computeMeanCurvature,

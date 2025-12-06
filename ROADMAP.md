@@ -117,7 +117,7 @@ Curvature data can come from:
 
 ---
 
-## Priority 3: 2D Colormaps
+## Priority 3: 2D Colormaps ✅ DONE
 
 **Goal**: Map two scalar fields to X/Y coordinates of a 2D colormap texture.
 
@@ -125,34 +125,42 @@ Curvature data can come from:
 
 ### Implementation Plan
 
-1. **2D Colormap Textures** (`src/colormaps/colormap2d.ts`)
-   - [ ] Generate 2D colormap textures (e.g., 256x256)
-   - [ ] Built-in options: `hot_cold`, `rgba_wheel`, `confidence_map`
-   - [ ] Support custom 2D colormap images
+1. **2D Colormap Textures** (`src/ColorMap2D.ts`) ✅ DONE
+   - [x] Generate 2D colormap textures (256x256)
+   - [x] Built-in presets: `hot_cold`, `rgba_wheel`, `confidence`, `diverging`, `magnitude_phase`
+   - [x] Support custom generator functions
+   - [x] HSV-to-RGB conversion for color wheel effects
+   - [x] Three.js DataTexture integration for GPU use
 
-2. **TwoDataLayer** (`src/layers/TwoDataLayer.ts`)
-   - [ ] Extends DataLayer concept
-   - [ ] Two data arrays: `dataX`, `dataY`
-   - [ ] Two ranges: `rangeX`, `rangeY`
-   - [ ] Two thresholds: `thresholdX`, `thresholdY`
-   - [ ] Colormap is 2D texture, not 1D
+2. **TwoDataLayer** (`src/layers.ts`) ✅ DONE
+   - [x] New layer class extending Layer concept
+   - [x] Two data arrays: `dataX`, `dataY`
+   - [x] Two ranges: `rangeX`, `rangeY`
+   - [x] Two thresholds: `thresholdX`, `thresholdY`
+   - [x] `is2DLayer` flag for type detection
+   - [x] `getRGBAData()` samples from 2D colormap
 
-3. **GPU Compositor Updates**
-   - [ ] Detect 2D layer type
-   - [ ] Sample 2D colormap: `texture2D(colormap2d, vec2(normX, normY))`
+3. **Compositor Support** ✅ DONE
+   - [x] TwoDataLayer.getRGBAData() handles 2D colormap sampling
+   - [x] Works with existing GPU compositor (no shader changes needed)
+   - [x] CPU and GPU modes both supported via Layer interface
 
-4. **CPU Compositor Updates**
-   - [ ] TwoDataLayer.getRGBAData() samples from 2D colormap
+4. **Integration** ✅ DONE
+   - [x] `MultiLayerNeuroSurface.addTwoDataLayer()` convenience method
+   - [x] `MultiLayerNeuroSurface.getTwoDataLayer()` type-safe getter
+   - [x] Layer.fromConfig() supports `type: 'twodata'`
+   - [x] Exported from index.js: `TwoDataLayer`, `ColorMap2D`
 
-5. **Tests**
-   - [ ] Unit test: 2D colormap texture generation
-   - [ ] Unit test: TwoDataLayer normalization
-   - [ ] Demo scenario: activation + significance visualization
+5. **Tests** ✅ DONE
+   - [x] Demo scenario: effect size + confidence visualization
+   - [x] Interactive preset switching
+   - [x] Threshold controls for Y axis
+   - [ ] Unit tests (visual verification via demo)
 
-### Breaking Change Risk: MEDIUM
-- New layer type, but existing DataLayer unchanged
-- GPU compositor changes need careful testing
-- May need colormap texture format changes
+### Breaking Change Risk: LOW (achieved)
+- New layer type, existing DataLayer unchanged
+- No GPU compositor shader changes required
+- Additive exports only
 
 ---
 

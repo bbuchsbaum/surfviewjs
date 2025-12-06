@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { NeuroSurface, SurfaceGeometry, SurfaceConfig } from './classes';
-import { LayerStack, BaseLayer, RGBALayer, DataLayer, LabelLayer, Layer } from './layers';
+import { LayerStack, BaseLayer, RGBALayer, DataLayer, TwoDataLayer, LabelLayer, Layer, TwoDataLayerConfig } from './layers';
+import ColorMap2D, { ColorMap2DPreset } from './ColorMap2D';
 import { CurvatureLayer, CurvatureConfig } from './layers/CurvatureLayer';
 import { ClipPlaneSet, ClipPlane, ClipAxis } from './utils/ClipPlane';
 import { debugLog } from './debug';
@@ -434,6 +435,53 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     } else {
       this.requestColorUpdate();
     }
+  }
+
+  /**
+   * Add a 2D data layer that maps two scalar fields to a 2D colormap.
+   *
+   * This is a convenience method for creating TwoDataLayer instances.
+   *
+   * @param id - Layer identifier
+   * @param dataX - First scalar field (X axis of colormap)
+   * @param dataY - Second scalar field (Y axis of colormap)
+   * @param colorMap - 2D colormap preset name or ColorMap2D instance
+   * @param config - Layer configuration options
+   *
+   * @example
+   * ```typescript
+   * // Visualize effect size vs. confidence
+   * surface.addTwoDataLayer(
+   *   'effect-confidence',
+   *   effectSizeData,
+   *   confidenceData,
+   *   'confidence',
+   *   {
+   *     rangeX: [-2, 2],
+   *     rangeY: [0, 1],
+   *     thresholdY: [0, 0.05]  // Hide low-confidence values
+   *   }
+   * );
+   * ```
+   */
+  addTwoDataLayer(
+    id: string,
+    dataX: Float32Array | number[],
+    dataY: Float32Array | number[],
+    colorMap: ColorMap2D | ColorMap2DPreset = 'confidence',
+    config: TwoDataLayerConfig = {}
+  ): TwoDataLayer {
+    const layer = new TwoDataLayer(id, dataX, dataY, null, colorMap, config);
+    this.addLayer(layer);
+    return layer;
+  }
+
+  /**
+   * Get a TwoDataLayer by ID (type-safe convenience method)
+   */
+  getTwoDataLayer(id: string): TwoDataLayer | undefined {
+    const layer = this.layerStack.getLayer(id);
+    return layer instanceof TwoDataLayer ? layer : undefined;
   }
 
   /**

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import ColorMap, { ColorMapOptions, Color, ColorArray } from './ColorMap';
+import ColorMap2D, { ColorMap2DPreset, ColorMap2DOptions } from './ColorMap2D';
 import { debugLog } from './debug';
 
 export type BlendMode = 'normal' | 'additive' | 'multiply';
@@ -14,6 +15,13 @@ export interface LayerConfig {
 export interface DataLayerConfig extends LayerConfig {
   range?: [number, number];
   threshold?: [number, number];
+}
+
+export interface TwoDataLayerConfig extends LayerConfig {
+  rangeX?: [number, number];
+  rangeY?: [number, number];
+  thresholdX?: [number, number];
+  thresholdY?: [number, number];
 }
 
 export interface LayerUpdateData {
@@ -33,6 +41,17 @@ export interface DataLayerUpdateData extends LayerUpdateData {
   colorMap?: ColorMap | string | Color[];
   range?: [number, number];
   threshold?: [number, number];
+}
+
+export interface TwoDataLayerUpdateData extends LayerUpdateData {
+  dataX?: Float32Array | number[];
+  dataY?: Float32Array | number[];
+  indices?: Uint32Array | number[];
+  colorMap?: ColorMap2D | ColorMap2DPreset;
+  rangeX?: [number, number];
+  rangeY?: [number, number];
+  thresholdX?: [number, number];
+  thresholdY?: [number, number];
 }
 
 export interface BaseLayerUpdateData extends LayerUpdateData {
@@ -179,6 +198,24 @@ export abstract class Layer {
           blendMode: commonConfig.blendMode,
           order: commonConfig.order
         });
+      case 'twodata':
+        if (!config.dataX || !config.dataY) {
+          throw new Error('TwoDataLayer requires dataX and dataY');
+        }
+        return new TwoDataLayer(
+          id,
+          config.dataX,
+          config.dataY,
+          config.indices ?? null,
+          config.cmap ?? config.colorMap ?? 'confidence',
+          {
+            ...commonConfig,
+            rangeX: config.rangeX,
+            rangeY: config.rangeY,
+            thresholdX: config.thresholdX,
+            thresholdY: config.thresholdY
+          }
+        );
       default:
         throw new Error(`Unsupported layer type: ${type}`);
     }
@@ -464,6 +501,268 @@ export class DataLayer extends Layer {
     this.indices = null;
     this.colorMap = null;
     this._cachedRGBABuffer = null;
+  }
+}
+
+/**
+ * Layer with two data values mapped to a 2D colormap.
+ *
+ * Maps two scalar fields (X and Y) to colors using a 2D colormap texture.
+ * Useful for visualizing relationships between variables, such as:
+ * - Effect size (X) vs. statistical confidence (Y)
+ * - Activation magnitude (X) vs. significance (Y)
+ * - Any two correlated or independent scalar fields
+ *
+ * @example
+ * ```typescript
+ * const layer = new TwoDataLayer(
+ *   'effect-confidence',
+ *   effectSizeData,    // X values
+ *   confidenceData,    // Y values
+ *   indices,
+ *   'confidence',      // 2D colormap preset
+ *   {
+ *     rangeX: [-2, 2],
+ *     rangeY: [0, 1],
+ *     thresholdY: [0, 0.05]  // Hide low-confidence values
+ *   }
+ * );
+ * ```
+ */
+export class TwoDataLayer extends Layer {
+  private dataX: Float32Array | null = null;
+  private dataY: Float32Array | null = null;
+  private indices: Uint32Array | null = null;
+  private colorMap: ColorMap2D | null = null;
+  private colorMapName: ColorMap2DPreset | 'custom' = 'confidence';
+  private rangeX: [number, number];
+  private rangeY: [number, number];
+  private thresholdX: [number, number];
+  private thresholdY: [number, number];
+
+  /** Flag to identify this as a 2D data layer for GPU compositor */
+  readonly is2DLayer: boolean = true;
+
+  constructor(
+    id: string,
+    dataX: Float32Array | number[],
+    dataY: Float32Array | number[],
+    indices: Uint32Array | number[] | null,
+    colorMap: ColorMap2D | ColorMap2DPreset,
+    config: TwoDataLayerConfig = {}
+  ) {
+    super(id, config);
+    this.rangeX = config.rangeX || [0, 1];
+    this.rangeY = config.rangeY || [0, 1];
+    this.thresholdX = config.thresholdX || [0, 0];
+    this.thresholdY = config.thresholdY || [0, 0];
+
+    // Initialize data
+    this.setData(dataX, dataY, indices);
+    this.setColorMap(colorMap);
+  }
+
+  setData(
+    dataX: Float32Array | number[],
+    dataY: Float32Array | number[],
+    indices?: Uint32Array | number[] | null
+  ): void {
+    if (!dataX || !dataY) {
+      throw new Error('Both dataX and dataY are required');
+    }
+
+    this.dataX = dataX instanceof Float32Array ? dataX : new Float32Array(dataX);
+    this.dataY = dataY instanceof Float32Array ? dataY : new Float32Array(dataY);
+
+    if (this.dataX.length !== this.dataY.length) {
+      throw new Error('dataX and dataY must have the same length');
+    }
+
+    if (indices) {
+      this.indices = indices instanceof Uint32Array
+        ? indices
+        : new Uint32Array(indices);
+    } else {
+      // If no indices provided, assume 1:1 mapping
+      this.indices = new Uint32Array(this.dataX.length);
+      for (let i = 0; i < this.dataX.length; i++) {
+        this.indices[i] = i;
+      }
+    }
+
+    this.needsUpdate = true;
+    debugLog(`TwoDataLayer ${this.id}: Set data with ${this.dataX.length} values`);
+  }
+
+  getDataX(): Float32Array | null {
+    return this.dataX;
+  }
+
+  getDataY(): Float32Array | null {
+    return this.dataY;
+  }
+
+  setColorMap(colorMap: ColorMap2D | ColorMap2DPreset): void {
+    if (!colorMap) {
+      throw new Error('ColorMap is required');
+    }
+
+    if (colorMap instanceof ColorMap2D) {
+      this.colorMap = colorMap;
+      this.colorMapName = 'custom';
+    } else {
+      // It's a preset name
+      this.colorMap = ColorMap2D.fromPreset(colorMap, 256, {
+        rangeX: this.rangeX,
+        rangeY: this.rangeY,
+        thresholdX: this.thresholdX,
+        thresholdY: this.thresholdY
+      });
+      this.colorMapName = colorMap;
+    }
+
+    // Apply current ranges and thresholds
+    this.colorMap.setRangeX(this.rangeX);
+    this.colorMap.setRangeY(this.rangeY);
+    this.colorMap.setThresholdX(this.thresholdX);
+    this.colorMap.setThresholdY(this.thresholdY);
+
+    this.needsUpdate = true;
+    debugLog(`TwoDataLayer ${this.id}: ColorMap set to ${this.colorMapName}`);
+  }
+
+  getColorMap(): ColorMap2D | null {
+    return this.colorMap;
+  }
+
+  setRangeX(range: [number, number]): void {
+    this.rangeX = range;
+    if (this.colorMap) {
+      this.colorMap.setRangeX(range);
+      this.needsUpdate = true;
+    }
+  }
+
+  setRangeY(range: [number, number]): void {
+    this.rangeY = range;
+    if (this.colorMap) {
+      this.colorMap.setRangeY(range);
+      this.needsUpdate = true;
+    }
+  }
+
+  setThresholdX(threshold: [number, number]): void {
+    this.thresholdX = threshold;
+    if (this.colorMap) {
+      this.colorMap.setThresholdX(threshold);
+      this.needsUpdate = true;
+    }
+  }
+
+  setThresholdY(threshold: [number, number]): void {
+    this.thresholdY = threshold;
+    if (this.colorMap) {
+      this.colorMap.setThresholdY(threshold);
+      this.needsUpdate = true;
+    }
+  }
+
+  getRangeX(): [number, number] { return [...this.rangeX] as [number, number]; }
+  getRangeY(): [number, number] { return [...this.rangeY] as [number, number]; }
+  getThresholdX(): [number, number] { return [...this.thresholdX] as [number, number]; }
+  getThresholdY(): [number, number] { return [...this.thresholdY] as [number, number]; }
+  getColorMapName(): string { return this.colorMapName; }
+
+  getRGBAData(vertexCount: number): Float32Array {
+    if (!this.dataX || !this.dataY || !this.colorMap || !this.indices) {
+      throw new Error('Data, indices and colorMap must be set');
+    }
+
+    debugLog(`TwoDataLayer ${this.id}: getRGBAData called for ${vertexCount} vertices`);
+
+    const rgbaData = new Float32Array(vertexCount * 4);
+    rgbaData.fill(0); // Initialize with transparent black
+
+    let nonTransparentCount = 0;
+
+    // Fill in colors for vertices with data
+    // Local references for type narrowing
+    const indices = this.indices;
+    const dataX = this.dataX;
+    const dataY = this.dataY;
+    const colorMap = this.colorMap;
+
+    for (let i = 0; i < indices.length && i < dataX.length; i++) {
+      const vertexIndex = indices[i];
+      const valueX = dataX[i];
+      const valueY = dataY[i];
+
+      if (vertexIndex >= 0 && vertexIndex < vertexCount) {
+        const color = colorMap.getColor(valueX, valueY);
+        const offset = vertexIndex * 4;
+
+        rgbaData[offset] = color[0];
+        rgbaData[offset + 1] = color[1];
+        rgbaData[offset + 2] = color[2];
+        rgbaData[offset + 3] = color[3] * this.opacity;
+
+        if (rgbaData[offset + 3] > 0) {
+          nonTransparentCount++;
+        }
+      }
+    }
+
+    debugLog(`TwoDataLayer ${this.id}: Generated colors - ${nonTransparentCount} visible`);
+    return rgbaData;
+  }
+
+  update(updates: TwoDataLayerUpdateData): void {
+    if (updates.dataX !== undefined || updates.dataY !== undefined) {
+      const newDataX = updates.dataX !== undefined
+        ? (updates.dataX instanceof Float32Array ? updates.dataX : new Float32Array(updates.dataX))
+        : this.dataX;
+      const newDataY = updates.dataY !== undefined
+        ? (updates.dataY instanceof Float32Array ? updates.dataY : new Float32Array(updates.dataY))
+        : this.dataY;
+
+      if (newDataX && newDataY) {
+        this.setData(newDataX, newDataY, updates.indices);
+      }
+    }
+    if (updates.colorMap !== undefined) {
+      this.setColorMap(updates.colorMap);
+    }
+    if (updates.rangeX !== undefined) {
+      this.setRangeX(updates.rangeX);
+    }
+    if (updates.rangeY !== undefined) {
+      this.setRangeY(updates.rangeY);
+    }
+    if (updates.thresholdX !== undefined) {
+      this.setThresholdX(updates.thresholdX);
+    }
+    if (updates.thresholdY !== undefined) {
+      this.setThresholdY(updates.thresholdY);
+    }
+    if (updates.opacity !== undefined) {
+      this.setOpacity(updates.opacity);
+    }
+    if (updates.visible !== undefined) {
+      this.setVisible(updates.visible);
+    }
+    if (updates.blendMode !== undefined) {
+      this.setBlendMode(updates.blendMode);
+    }
+  }
+
+  dispose(): void {
+    this.dataX = null;
+    this.dataY = null;
+    this.indices = null;
+    if (this.colorMap) {
+      this.colorMap.dispose();
+      this.colorMap = null;
+    }
   }
 }
 
