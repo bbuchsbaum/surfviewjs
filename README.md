@@ -1,34 +1,34 @@
-# NeuroSurface
+# SurfView.js
 
 A modular Three.js-based brain surface visualization library for neuroimaging applications.
 
 ## Features
 
-- 🧠 High-performance 3D brain surface rendering
-- 🎨 Multiple layer support with blending modes
-- 🌈 Customizable colormaps for data visualization
-- ⚛️ React component support
-- 🎮 Interactive controls with Tweakpane UI
-- 📊 Support for GIFTI format
-- 🔧 TypeScript support
+- High-performance 3D brain surface rendering
+- Multiple layer support with blending modes
+- Customizable colormaps for data visualization
+- React component support
+- Interactive controls with Tweakpane UI
+- Support for GIFTI format
+- TypeScript support
 
 ## Installation
 
 ```bash
-npm install neurosurface
+npm install surfview
 ```
 
 Or with yarn:
 
 ```bash
-yarn add neurosurface
+yarn add surfview
 ```
 
 ## Quick Start
 
 ### Basic Usage (Vanilla JS)
 ```javascript
-import { NeuroSurfaceViewer, ColorMappedNeuroSurface } from 'neurosurface';
+import { NeuroSurfaceViewer, ColorMappedNeuroSurface } from 'surfview';
 
 const container = document.getElementById('viewer-container');
 const viewer = new NeuroSurfaceViewer(container, 800, 600, { showControls: true });
@@ -58,7 +58,7 @@ This starts a Vite-powered demo app under `demo/` with scenarios for quick-start
 
 ```jsx
 import React, { useRef } from 'react';
-import { NeuroSurfaceViewer, useNeuroSurface } from 'neurosurface/react';
+import { NeuroSurfaceViewer, useNeuroSurface } from 'surfview/react';
 
 function BrainViewer() {
   const viewerRef = useRef();
@@ -144,7 +144,7 @@ The library includes many standard scientific colormaps:
 ### GIFTI Format
 
 ```javascript
-import { loadGiftiSurface } from 'neurosurface';
+import { loadGiftiSurface } from 'surfview';
 
 const surface = await loadGiftiSurface('path/to/surface.gii');
 viewer.addSurface(surface);
@@ -210,7 +210,7 @@ if (hit.surfaceId && hit.vertexIndex !== null) {
 
 #### Creating Custom Colormaps
 ```javascript
-import { ColorMap } from 'neurosurface';
+import { ColorMap } from 'surfview';
 
 const customColormap = new ColorMap([
   [0, 0, 1],    // blue
@@ -245,14 +245,14 @@ Requires WebGL 2.0 support.
 - For SSR/Node environments, only construct `NeuroSurfaceViewer` in the browser (e.g., inside a `useEffect` in React).
 - If you must import on the server, use the provided `NoopNeuroSurfaceViewer` and `hasDOM` helpers to avoid touching the DOM/GL.
   ```ts
-  import { hasDOM, NoopNeuroSurfaceViewer, NeuroSurfaceViewer } from 'neurosurface';
+  import { hasDOM, NoopNeuroSurfaceViewer, NeuroSurfaceViewer } from 'surfview';
   const Viewer = hasDOM() ? NeuroSurfaceViewer : NoopNeuroSurfaceViewer;
   const viewer = new Viewer(container, 800, 600);
   ```
 - Next.js/Remix SSR guard for React:
   ```jsx
   import dynamic from 'next/dynamic';
-  const SSRSafeViewer = dynamic(() => import('neurosurface/react').then(m => m.NeuroSurfaceViewerReact), { ssr: false });
+  const SSRSafeViewer = dynamic(() => import('surfview/react').then(m => m.NeuroSurfaceViewerReact), { ssr: false });
   ```
 
 ### Events you can listen for
