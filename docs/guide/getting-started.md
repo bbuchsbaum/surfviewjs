@@ -7,26 +7,20 @@ SurfView.js is a modular Three.js-based brain surface visualization library for 
 ::: code-group
 
 ```bash [npm]
-npm install surfview
+npm install surfview three
 ```
 
 ```bash [yarn]
-yarn add surfview
+yarn add surfview three
 ```
 
 ```bash [pnpm]
-pnpm add surfview
+pnpm add surfview three
 ```
 
 :::
 
 ## Peer Dependencies
-
-SurfView.js requires Three.js as a peer dependency:
-
-```bash
-npm install three
-```
 
 Optional peer dependencies for enhanced features:
 
@@ -48,7 +42,8 @@ const container = document.getElementById('viewer-container');
 
 // Initialize the viewer
 const viewer = new NeuroSurfaceViewer(container, 800, 600, {
-  showControls: true,
+  showControls: false,
+  useControls: false, // set true + install tweakpane to enable built-in UI
   backgroundColor: 0x1a1a1a
 });
 
@@ -63,6 +58,7 @@ import { loadSurface, MultiLayerNeuroSurface } from 'surfview';
 
 // Load a GIFTI surface file
 const geometry = await loadSurface('brain.surf.gii', 'gifti');
+// Node/SSR: install jsdom or pass a DOMParser to parseGIfTISurface if no DOM is available.
 
 // Create a surface with the geometry
 const surface = new MultiLayerNeuroSurface(geometry, {

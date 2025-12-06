@@ -95,6 +95,7 @@ console.log(geometry.faces);
 import { loadSurface } from 'surfview';
 
 const geometry = await loadSurface('brain.surf.gii', 'gifti', 'left');
+// Node/SSR: install jsdom or pass a DOMParser to parseGIfTISurface if no DOM is available.
 ```
 
 ### From Custom Data

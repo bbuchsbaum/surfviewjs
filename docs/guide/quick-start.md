@@ -30,7 +30,7 @@ Get a brain surface rendering in under 5 minutes.
     const viewer = new NeuroSurfaceViewer(container,
       window.innerWidth,
       window.innerHeight,
-      { showControls: true }
+      { showControls: false, useControls: false }
     );
 
     // Create a simple sphere as demo geometry
@@ -90,6 +90,7 @@ import { loadSurface } from 'surfview';
 
 // Load GIFTI format surface
 const geometry = await loadSurface('lh.pial.gii', 'gifti');
+// Node/SSR: install jsdom or pass a DOMParser to parseGIfTISurface if no DOM is available.
 
 const surface = new MultiLayerNeuroSurface(geometry, {
   baseColor: 0xdddddd,

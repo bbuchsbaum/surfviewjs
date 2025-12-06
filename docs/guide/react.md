@@ -5,14 +5,14 @@ SurfView.js provides React components and hooks for seamless integration with Re
 ## Installation
 
 ```bash
-npm install surfview react react-dom
+npm install surfview three react react-dom
 ```
 
 ## Basic Usage
 
 ```jsx
 import React, { useRef, useEffect } from 'react';
-import { NeuroSurfaceViewer, useNeuroSurface } from 'surfview/react';
+import NeuroSurfaceViewerReact, { useNeuroSurface } from 'surfview/react';
 
 function BrainViewer() {
   const viewerRef = useRef();
@@ -35,12 +35,13 @@ function BrainViewer() {
   };
 
   return (
-    <NeuroSurfaceViewer
+    <NeuroSurfaceViewerReact
       ref={viewerRef}
       width={800}
       height={600}
       config={{
         showControls: true,
+        useControls: true, // requires tweakpane peer
         backgroundColor: 0x1a1a1a
       }}
     />
@@ -64,12 +65,13 @@ function BrainViewer() {
 ### Example with Full Props
 
 ```jsx
-<NeuroSurfaceViewer
+<NeuroSurfaceViewerReact
   ref={viewerRef}
   width={window.innerWidth}
   height={window.innerHeight}
   config={{
     showControls: true,
+    useControls: true,
     backgroundColor: 0x1a1a1a,
     ambientLightColor: 0x404040,
     directionalLightIntensity: 0.8
@@ -139,7 +141,7 @@ For server-side rendering (Next.js, Remix), import dynamically:
 import dynamic from 'next/dynamic';
 
 const BrainViewer = dynamic(
-  () => import('surfview/react').then(m => m.NeuroSurfaceViewer),
+  () => import('surfview/react').then(m => m.default),
   { ssr: false }
 );
 ```
@@ -157,7 +159,7 @@ const Viewer = hasDOM() ? NeuroSurfaceViewer : NoopNeuroSurfaceViewer;
 Full TypeScript support is included:
 
 ```tsx
-import { NeuroSurfaceViewer } from 'surfview/react';
+import NeuroSurfaceViewerReact from 'surfview/react';
 import type { ViewerConfig, SurfaceClickEvent } from 'surfview';
 
 const config: ViewerConfig = {
@@ -174,7 +176,7 @@ const handleClick = (event: SurfaceClickEvent) => {
 
 ```jsx
 import React, { useRef, useEffect, useState } from 'react';
-import { NeuroSurfaceViewer, useNeuroSurface } from 'surfview/react';
+import NeuroSurfaceViewerReact, { useNeuroSurface } from 'surfview/react';
 import { loadSurface } from 'surfview';
 
 function App() {
@@ -218,12 +220,12 @@ function App() {
 
   return (
     <div>
-      <NeuroSurfaceViewer
-        ref={viewerRef}
-        width={800}
-        height={600}
-        config={{ showControls: true }}
-      />
+<NeuroSurfaceViewerReact
+  ref={viewerRef}
+  width={800}
+  height={600}
+  config={{ showControls: true, useControls: true }}
+/>
       <input
         type="range"
         min="0"
