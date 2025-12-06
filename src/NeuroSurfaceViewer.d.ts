@@ -9,6 +9,7 @@ import { AnnotationManager, AnnotationRecord, AnnotationOptions } from './annota
 export interface ViewerConfig {
   showControls?: boolean;
   useControls?: boolean;
+  allowCDNFallback?: boolean;
   ambientLightColor?: number;
   directionalLightColor?: number;
   directionalLightIntensity?: number;
@@ -20,7 +21,6 @@ export interface ViewerConfig {
   metalness?: number;
   roughness?: number;
   useShaders?: boolean;
-  useControls?: boolean;
   backgroundColor?: number;
   preset?: 'default' | 'presentation';
   linkHemispheres?: boolean;

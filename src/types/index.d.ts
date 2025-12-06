@@ -15,6 +15,7 @@ export type ColorMapName = 'jet' | 'hot' | 'cool' | 'spring' | 'summer' | 'autum
 export interface ViewerConfig {
   showControls?: boolean;
   useControls?: boolean;
+  allowCDNFallback?: boolean;
   ambientLightColor?: number;
   directionalLightColor?: number;
   directionalLightIntensity?: number;
@@ -654,19 +655,25 @@ export interface ParsedSurfaceData {
 }
 
 export declare function parseFreeSurferSurface(buffer: ArrayBuffer): ParsedSurfaceData;
-export declare function parseGIfTISurface(xmlString: string): ParsedSurfaceData;
+export declare function getDomParser(domParser?: typeof DOMParser): Promise<typeof DOMParser>;
+export declare function parseGIfTISurface(xmlString: string, domParser?: typeof DOMParser): ParsedSurfaceData;
 export declare function parsePLY(data: string | ArrayBuffer): ParsedSurfaceData;
 
 export declare function loadSurface(
   url: string, 
   format?: SurfaceFormat, 
-  hemisphere?: Hemisphere
+  hemisphere?: Hemisphere,
+  timeoutMs?: number,
+  autoScale?: boolean,
+  targetSize?: number
 ): Promise<SurfaceGeometry>;
 
 export declare function loadSurfaceFromFile(
   file: File, 
   format?: SurfaceFormat, 
-  hemisphere?: Hemisphere
+  hemisphere?: Hemisphere,
+  autoScale?: boolean,
+  targetSize?: number
 ): Promise<SurfaceGeometry>;
 
 export declare function parseFreeSurferCurvature(data: string | ArrayBuffer): Float32Array;

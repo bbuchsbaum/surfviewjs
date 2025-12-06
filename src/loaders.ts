@@ -14,6 +14,30 @@ export interface ParsedSurfaceData {
   faces: Uint32Array;
 }
 
+export async function getDomParser(domParser?: typeof DOMParser): Promise<typeof DOMParser> {
+  if (domParser) return domParser;
+  if (typeof DOMParser !== 'undefined') return DOMParser;
+
+  // Attempt a lazy jsdom import only in Node; keep dynamic to avoid bundler resolution.
+  const isNode = typeof globalThis !== 'undefined' && !!(globalThis as any).process?.versions?.node;
+  if (isNode) {
+    try {
+      const moduleName = 'jsdom';
+      const mod: any = await import(moduleName);
+      if (mod?.JSDOM) {
+        return new mod.JSDOM().window.DOMParser as typeof DOMParser;
+      }
+      if (mod?.DOMParser) {
+        return mod.DOMParser as typeof DOMParser;
+      }
+    } catch (err) {
+      throw new Error('DOMParser not available; install jsdom or pass a DOMParser to parseGIfTISurface. ' + (err as Error).message);
+    }
+  }
+
+  throw new Error('DOMParser not available; supply one (e.g., from jsdom) to parse GIFTI.');
+}
+
 /**
  * Parse FreeSurfer surface format
  */
@@ -86,13 +110,18 @@ export function parseFreeSurferSurface(buffer: ArrayBuffer): ParsedSurfaceData {
 /**
  * Parse GIfTI surface format (.gii)
  */
-export function parseGIfTISurface(xmlString: string): ParsedSurfaceData {
+export function parseGIfTISurface(xmlString: string, domParser?: typeof DOMParser): ParsedSurfaceData {
   // Basic validation
   if (!xmlString || xmlString.length < 20) {
     throw new Error('Invalid GIFTI surface: empty or too small');
   }
-  
-  const parser = new DOMParser();
+
+  const DOMParserImpl = domParser || (typeof DOMParser !== 'undefined' ? DOMParser : null);
+  if (!DOMParserImpl) {
+    throw new Error('GIFTI parsing requires DOMParser; provide one (e.g., from jsdom) when running outside the browser.');
+  }
+
+  const parser = new DOMParserImpl();
   const doc = parser.parseFromString(xmlString, 'application/xml');
   
   // Check for parse errors
@@ -448,7 +477,7 @@ export async function loadSurface(
         
       case 'gifti':
         const giiText = await response.text();
-        parsedData = parseGIfTISurface(giiText);
+        parsedData = parseGIfTISurface(giiText, await getDomParser());
         break;
         
       case 'ply':
@@ -536,7 +565,7 @@ export async function loadSurfaceFromFile(
       
     case 'gifti':
       const giiText = await file.text();
-      parsedData = parseGIfTISurface(giiText);
+      parsedData = parseGIfTISurface(giiText, await getDomParser());
       break;
       
     case 'ply':

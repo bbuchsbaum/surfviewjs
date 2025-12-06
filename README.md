@@ -160,6 +160,10 @@ import { loadSurface, ColorMappedNeuroSurface } from 'surfview';
 const geometry = await loadSurface('path/to/surface.gii', 'gifti', 'left');
 const surface = new ColorMappedNeuroSurface(geometry, null, dataArray, 'coolwarm');
 viewer.addSurface(surface, 'lh-brain');
+
+// Node/SSR: loadSurface will auto-use jsdom if present; otherwise supply a DOMParser:
+// const domParser = new (await import('jsdom')).JSDOM().window.DOMParser;
+// const geometry = parseGIfTISurface(giftiXml, domParser);
 ```
 
 ### Custom Data Format
@@ -184,6 +188,7 @@ const surfaceData = {
 interface ViewerConfig {
   showControls?: boolean;
   useControls?: boolean;       // leave false to tree-shake Tweakpane
+  allowCDNFallback?: boolean;  // opt-in CDN fetch if tweakpane peer is missing
   backgroundColor?: number;
   ambientLightColor?: number;
   directionalLightColor?: number;
@@ -239,6 +244,7 @@ if (hit.surfaceId && hit.vertexIndex !== null) {
 - Set `config.hoverCrosshair = true` to show a lightweight hover crosshair (throttled).
 - Set `config.clickToAddAnnotation = true` to drop an annotation + activate it on click.
 - `onSurfaceClick` is now fired from the core viewer after a successful pick.
+- Controls are opt-in: set `config.useControls = true`/`showControls = true` (and optionally `allowCDNFallback = true`) and install the `tweakpane` peer if you want the built-in UI.
 
 ### ColorMap
 

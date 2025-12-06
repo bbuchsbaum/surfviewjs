@@ -6,7 +6,7 @@
   "main": "./dist/surfview.umd.js",
   "module": "./dist/surfview.es.js",
   "types": "./dist/types/index.d.ts",
-  "sideEffects": false,
+  "sideEffects": true,
   "exports": {
     ".": {
       "import": "./dist/surfview.es.js",
@@ -16,13 +16,13 @@
     "./react": {
       "import": "./src/index.react.js",
       "require": "./src/index.react.js",
-      "types": "./dist/types/index.d.ts"
+      "types": "./dist/types/index.react.d.ts"
     }
   },
   "typesVersions": {
     "*": {
       "react": [
-        "./dist/types/index.d.ts"
+        "./dist/types/index.react.d.ts"
       ],
       "react/*": [
         "./dist/types/*"
@@ -38,13 +38,14 @@
     "demo": "vite --config vite.demo.config.ts --open",
     "build": "npm run clean && vite build && npm run build:types",
     "demo:build": "vite build --config vite.demo.config.ts",
-    "build:types": "tsc --emitDeclarationOnly",
+    "build:types": "tsc --emitDeclarationOnly && npm run copy:react-dts",
+    "copy:react-dts": "mkdir -p dist/types/react && cp src/index.react.d.ts dist/types/index.react.d.ts && cp src/react/*.d.ts dist/types/react/",
     "clean": "rm -rf dist",
     "preview": "vite preview",
     "preview:ci": "vite preview --host 0.0.0.0 --port 4173",
     "build:legacy": "gulp",
     "type-check": "tsc --noEmit",
-    "test": "npm run build && node tests/test-parser.js && node tests/test-nonindexed-geometry.js",
+    "test": "npm run build && node tests/test-parser.js && node tests/test-nonindexed-geometry.js && node tests/test-colormap.js && node tests/test-layerstack.js",
     "playwright:test": "playwright test",
     "dev:ci": "vite dev --host 0.0.0.0 --port 4173",
     "test:playwright": "start-server-and-test dev:ci http://localhost:4173/tests/test-gifti.html playwright:test",

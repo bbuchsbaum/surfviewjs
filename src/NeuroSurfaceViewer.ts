@@ -39,6 +39,7 @@ export interface NeuroSurfaceViewerConfig {
   hoverCrosshairColor?: number;
   hoverCrosshairSize?: number;
   clickToAddAnnotation?: boolean;
+  allowCDNFallback?: boolean;
 }
 
 type Viewpoint = 'lateral' | 'medial' | 'ventral' | 'posterior' | 'anterior' | 'unknown_lateral';
@@ -171,8 +172,9 @@ export class NeuroSurfaceViewer extends EventEmitter {
       metalness: 0.1,
       roughness: 0.6,
       useShaders: false,
-      showControls: true, // New option to enable/disable Tweakpane
-      useControls: true, // allow tree-shaking tweakpane
+      showControls: false, // default off to avoid unexpected peer/CDN fetches
+      useControls: false, // leave disabled unless consumer opts in
+      allowCDNFallback: false,
       backgroundColor: 0x000000,
       controlType: 'trackball', // 'trackball' or 'surface' - new natural controls
       preset: 'default',
@@ -589,11 +591,14 @@ export class NeuroSurfaceViewer extends EventEmitter {
       debugLog('loadTweakpane: bare import failed, trying CDN fallback', err);
     }
 
-    // 3) CDN fallback
-    const cdnUrl = 'https://cdn.jsdelivr.net/npm/tweakpane@4.0.3/dist/tweakpane.min.js';
-    const mod = await import(/* webpackIgnore: true */ cdnUrl);
-    const Pane = (mod as any).Pane || (mod as any).default || (mod as any);
-    return { Pane, essentials: null };
+    if (this.config.allowCDNFallback) {
+      const cdnUrl = 'https://cdn.jsdelivr.net/npm/tweakpane@4.0.3/dist/tweakpane.min.js';
+      const mod = await import(/* webpackIgnore: true */ cdnUrl);
+      const Pane = (mod as any).Pane || (mod as any).default || (mod as any);
+      return { Pane, essentials: null };
+    }
+
+    throw new Error('Tweakpane not available; install it as a peer or provide a global Pane/Tweakpane.');
   }
 
   private async buildTweakPane(Pane: any, EssentialsPlugin: any | null, IntervalPlugin: any | null): Promise<void> {
