@@ -18,5 +18,6 @@
   "exclude": ["**/node_modules/**"],
   "excludeExternals": true,
   "excludeReferences": true,
-  "externalPattern": ["**/node_modules/**", "**/three/**"]
+  "externalPattern": ["**/node_modules/**", "**/three/**"],
+  "suppressCommentWarningsInDeclarationFiles": true
 }
