@@ -167,8 +167,13 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     }
 
     // Add base layer
+    // If curvature is shown, the base layer should be hidden (curvature acts as underlay)
+    const hasCurvature = config.curvature && config.showCurvature !== false;
     const baseColor = config.baseColor || 0xcccccc;
-    const baseLayer = new BaseLayer(typeof baseColor === 'number' ? baseColor : new THREE.Color(baseColor).getHex(), { opacity: 1 });
+    const baseLayer = new BaseLayer(typeof baseColor === 'number' ? baseColor : new THREE.Color(baseColor).getHex(), {
+      opacity: 1,
+      visible: !hasCurvature  // Hide base layer when curvature is visible
+    });
     this.layerStack.addLayer(baseLayer);
 
     // Create the mesh
@@ -583,14 +588,25 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
   }
 
   /**
-   * Toggle curvature visibility
+   * Toggle curvature visibility.
+   * When curvature is shown, the base layer is hidden (curvature acts as the underlay).
+   * When curvature is hidden, the base layer is shown.
    */
   showCurvature(visible: boolean): void {
-    const layer = this.getCurvatureLayer();
-    if (layer) {
-      layer.setVisible(visible);
-      this.requestColorUpdate();
+    const curvLayer = this.getCurvatureLayer();
+    const baseLayer = this.layerStack.getLayer('base');
+
+    if (curvLayer) {
+      curvLayer.setVisible(visible);
     }
+
+    // Base layer visibility is inverse of curvature visibility
+    // When curvature is shown, it acts as the underlay instead of the base color
+    if (baseLayer) {
+      baseLayer.setVisible(!visible);
+    }
+
+    this.requestColorUpdate();
   }
 
   // ============================================================
