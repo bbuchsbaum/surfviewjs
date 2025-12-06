@@ -2,6 +2,8 @@
 
 A modular Three.js-based brain surface visualization library for neuroimaging applications.
 
+**[Live Demo](https://bbuchsbaum.github.io/surfviewjs/demo/)** | **[Documentation](https://bbuchsbaum.github.io/surfviewjs/)**
+
 ## Features
 
 - High-performance 3D brain surface rendering
