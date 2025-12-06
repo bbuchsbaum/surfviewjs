@@ -14,5 +14,9 @@
   "classPropertiesFormat": "table",
   "enumMembersFormat": "table",
   "typeDeclarationFormat": "table",
-  "propertyMembersFormat": "table"
+  "propertyMembersFormat": "table",
+  "exclude": ["**/node_modules/**"],
+  "excludeExternals": true,
+  "excludeReferences": true,
+  "externalPattern": ["**/node_modules/**", "**/three/**"]
 }

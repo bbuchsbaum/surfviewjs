@@ -14,34 +14,41 @@ A modular Three.js-based brain surface visualization library for neuroimaging ap
 
 ## Installation
 
-```bash
-npm install surfview
-```
-
-Or with yarn:
+Install the library with its peer dependencies (Three.js + Tweakpane). React bindings need React 18+.
 
 ```bash
-yarn add surfview
+npm install surfview three tweakpane
+# React apps
+npm install react react-dom
+# Optional Tweakpane extras
+npm install @tweakpane/plugin-essentials
 ```
 
 ## Quick Start
 
 ### Basic Usage (Vanilla JS)
 ```javascript
-import { NeuroSurfaceViewer, ColorMappedNeuroSurface } from 'surfview';
+import { NeuroSurfaceViewer, SurfaceGeometry, ColorMappedNeuroSurface } from 'surfview';
 
 const container = document.getElementById('viewer-container');
 const viewer = new NeuroSurfaceViewer(container, 800, 600, { showControls: true });
 
-// Minimal typed geometry (BufferGeometry also works)
-const geometry = {
-  vertices: myVerticesFloat32Array,
-  indices: myFacesUint32Array,
-  normals: myNormalsFloat32Array
-};
+// Typed arrays for vertices (xyz) and faces (triangle indices)
+const geometry = new SurfaceGeometry(
+  myVerticesFloat32Array,
+  myFacesUint32Array,
+  'left' // hemisphere tag
+);
 
-const surface = new ColorMappedNeuroSurface(geometry, null, myData, 'viridis');
+const surface = new ColorMappedNeuroSurface(
+  geometry,
+  null,
+  myActivationDataFloat32Array,
+  'viridis'
+);
+
 viewer.addSurface(surface, 'brain');
+viewer.startRenderLoop();
 ```
 
 ## Demo Hub
@@ -58,25 +65,24 @@ This starts a Vite-powered demo app under `demo/` with scenarios for quick-start
 
 ```jsx
 import React, { useRef } from 'react';
-import { NeuroSurfaceViewer, useNeuroSurface } from 'surfview/react';
+import NeuroSurfaceViewerReact, { useNeuroSurface } from 'surfview/react';
 
 function BrainViewer() {
   const viewerRef = useRef();
-  const { surfaces, addSurface, updateLayer } = useNeuroSurface(viewerRef);
+  const { addSurface } = useNeuroSurface(viewerRef);
 
-  const loadSurface = async () => {
-    const surfaceId = addSurface({
+  const handleReady = () => {
+    addSurface({
       type: 'multi-layer',
       vertices: vertexData,
       faces: faceData,
-      config: {
-        baseColor: 0xdddddd
-      }
+      hemisphere: 'left',
+      config: { baseColor: 0xdddddd }
     });
   };
 
   return (
-    <NeuroSurfaceViewer
+    <NeuroSurfaceViewerReact
       ref={viewerRef}
       width={window.innerWidth}
       height={window.innerHeight}
@@ -85,6 +91,7 @@ function BrainViewer() {
         ambientLightColor: 0x404040
       }}
       viewpoint="lateral"
+      onReady={handleReady}
     />
   );
 }
@@ -109,6 +116,8 @@ Layers allow you to overlay multiple data visualizations on the same surface:
 - **BaseLayer**: The foundational surface layer
 - **DataLayer**: Scalar data with colormap
 - **RGBALayer**: Pre-computed RGBA colors per vertex
+- **OutlineLayer**: ROI boundary outlines
+- **LabelLayer**: Discrete region labels
 
 ```javascript
 // Add a data layer to existing surface
@@ -144,10 +153,11 @@ The library includes many standard scientific colormaps:
 ### GIFTI Format
 
 ```javascript
-import { loadGiftiSurface } from 'surfview';
+import { loadSurface, ColorMappedNeuroSurface } from 'surfview';
 
-const surface = await loadGiftiSurface('path/to/surface.gii');
-viewer.addSurface(surface);
+const geometry = await loadSurface('path/to/surface.gii', 'gifti', 'left');
+const surface = new ColorMappedNeuroSurface(geometry, null, dataArray, 'coolwarm');
+viewer.addSurface(surface, 'lh-brain');
 ```
 
 ### Custom Data Format
@@ -164,28 +174,50 @@ const surfaceData = {
 
 ### NeuroSurfaceViewer
 
-#### Constructor Options
+#### Constructor
+`new NeuroSurfaceViewer(container: HTMLElement, width: number, height: number, config?: ViewerConfig, viewpoint?: Viewpoint)`
+
+#### Config Options
 ```typescript
 interface ViewerConfig {
-  container?: HTMLElement;
-  width?: number;
-  height?: number;
   showControls?: boolean;
+  useControls?: boolean;       // leave false to tree-shake Tweakpane
   backgroundColor?: number;
   ambientLightColor?: number;
+  directionalLightColor?: number;
   directionalLightIntensity?: number;
-  cameraPosition?: [number, number, number];
-  viewpoint?: 'lateral' | 'medial' | 'dorsal' | 'ventral' | 'anterior' | 'posterior';
+  rotationSpeed?: number;
+  initialZoom?: number;
+  ssaoRadius?: number;
+  ssaoKernelSize?: number;
+  rimStrength?: number;
+  metalness?: number;
+  roughness?: number;
+  useShaders?: boolean;
+  controlType?: 'trackball' | 'surface';
+  preset?: 'default' | 'presentation';
+  linkHemispheres?: boolean;
+  hoverCrosshair?: boolean;
+  hoverCrosshairColor?: number;
+  hoverCrosshairSize?: number;
+  clickToAddAnnotation?: boolean;
 }
+
+type Viewpoint = 'lateral' | 'medial' | 'ventral' | 'posterior' | 'anterior' | 'unknown_lateral';
 ```
 
 #### Methods
-- `addSurface(surface)`: Add a surface to the scene
-- `removeSurface(surface)`: Remove a surface
+- `addSurface(surface, id?)`: Add a surface to the scene
+- `removeSurface(id)`: Remove a surface
+- `clearSurfaces()`: Remove all surfaces
 - `centerCamera()`: Center camera on all surfaces
+- `resetCamera()`: Reset camera distance/up
 - `setViewpoint(viewpoint)`: Set camera viewpoint
-- `toggleControls()`: Show/hide Tweakpane UI
-- `render()`: Force render update
+- `startRenderLoop()`: Begin the animation/render loop
+- `resize(width, height)`: Resize renderer + controls
+- `toggleControls(show?)`: Show/hide Tweakpane UI
+- `addLayer(surfaceId, layer)`, `updateLayer(surfaceId, layerId, updates)`, `removeLayer(surfaceId, layerId)`, `clearLayers(surfaceId, { includeBase? })`
+- `pick({ x, y })`: Ray-pick a surface/vertex under screen coordinates
 - `dispose()`: Clean up resources
 - `showCrosshair(surfaceId, vertexIndex, { size?, color? })`: Draw a 3-axis crosshair on a vertex
 - `hideCrosshair()`: Remove the crosshair
