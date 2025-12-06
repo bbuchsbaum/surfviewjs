@@ -20,7 +20,9 @@ import { LabeledNeuroSurface } from './LabeledNeuroSurface';
 import { SurfaceFactory } from './SurfaceFactory';
 import { Layer, RGBALayer, DataLayer, BaseLayer, LabelLayer, LayerStack } from './layers';
 import { OutlineLayer } from './OutlineLayer';
+import { CurvatureLayer } from './layers/CurvatureLayer';
 import { GPULayerCompositor } from './GPULayerCompositor';
+import { computeMeanCurvature, normalizeCurvature, curvatureToGrayscale } from './utils/curvature';
 import { debugLog, setDebug } from './debug';
 import ColorMap from './ColorMap';
 import * as loaders from './loaders';
@@ -71,7 +73,11 @@ export {
   LabelLayer,
   LayerStack,
   OutlineLayer,
+  CurvatureLayer,
   GPULayerCompositor,
+  computeMeanCurvature,
+  normalizeCurvature,
+  curvatureToGrayscale,
   ColorMap,
   EventEmitter,
   LaplacianSmoothing,
@@ -115,6 +121,10 @@ if (typeof window !== 'undefined') {
     LabelLayer,
     LayerStack,
     OutlineLayer,
+    CurvatureLayer,
+    computeMeanCurvature,
+    normalizeCurvature,
+    curvatureToGrayscale,
     ColorMap,
     EventEmitter,
     THREE,

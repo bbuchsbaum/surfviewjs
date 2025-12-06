@@ -6,10 +6,12 @@ import { fileLoading } from './scenarios/fileLoading';
 import { lighting } from './scenarios/lighting';
 import { fslrFunc } from './scenarios/fslrFunc';
 import { gpuCompositing } from './scenarios/gpuCompositing';
+import { curvature } from './scenarios/curvature';
 
 export const scenarios: Scenario[] = [
   quickstart,
   multilayer,
+  curvature,
   lighting,
   hemispheres,
   fslrFunc,

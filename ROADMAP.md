@@ -38,35 +38,35 @@ Curvature data can come from:
    - [ ] `loadGIFTICurvature(url): Promise<Float32Array>` - extract from GIFTI file
    - [ ] Auto-detect format from file extension
 
-2. **Curvature Computation** (`src/utils/curvature.ts`)
-   - [ ] `computeMeanCurvature(geometry: SurfaceGeometry): Float32Array`
-   - [ ] Algorithm: discrete Laplace-Beltrami operator
-   - [ ] Cache results on SurfaceGeometry (compute once)
-   - [ ] Note: Only meaningful on folded surfaces, not inflated/flat
+2. **Curvature Computation** (`src/utils/curvature.ts`) ✅ DONE
+   - [x] `computeMeanCurvature(geometry: SurfaceGeometry): Float32Array`
+   - [x] Algorithm: discrete Laplace-Beltrami operator (umbrella operator approximation)
+   - [x] `normalizeCurvature()` for percentile-based normalization
+   - [x] `curvatureToGrayscale()` for display conversion
+   - Note: Only meaningful on folded surfaces, not inflated/flat
 
-3. **CurvatureLayer** (`src/layers/CurvatureLayer.ts`)
-   - [ ] New layer type extending BaseLayer
-   - [ ] Properties: `brightness`, `contrast`, `smoothness`
-   - [ ] Converts curvature values to grayscale RGBA:
+3. **CurvatureLayer** (`src/layers/CurvatureLayer.ts`) ✅ DONE
+   - [x] New layer type extending Layer
+   - [x] Properties: `brightness`, `contrast`, `smoothness`
+   - [x] Converts curvature values to grayscale RGBA:
      ```
      gray = clamp(curvature / smoothness, -0.5, 0.5) * contrast + brightness
      ```
-   - [ ] Always renders at bottom of layer stack (order: -1)
+   - [x] Renders below base layer (order: -2)
 
-4. **Integration**
-   - [ ] Add `curvature?: Float32Array` field to SurfaceGeometry
-   - [ ] `MultiLayerNeuroSurface` config options:
+4. **Integration** ✅ DONE
+   - [x] `MultiLayerNeuroSurface` config options:
      - `curvature?: Float32Array` - pre-loaded curvature data
-     - `curvatureUrl?: string` - URL to load curvature from
-     - `computeCurvature?: boolean` - compute from geometry (only useful for folded surfaces)
      - `showCurvature?: boolean` - display as underlay (default: true if curvature provided)
-   - [ ] Add Tweakpane controls for brightness/contrast/smoothness
+     - `curvatureOptions?: { brightness, contrast, smoothness }`
+   - [x] Convenience methods: `setCurvature()`, `getCurvatureLayer()`, `showCurvature()`
+   - [x] Demo scenario with slider controls for brightness/contrast/smoothness
 
 5. **Tests**
    - [ ] Unit test: FreeSurfer curvature file parsing
    - [ ] Unit test: curvature computation on icosahedron (known values)
    - [ ] Unit test: CurvatureLayer RGBA output
-   - [ ] Demo scenario: load brain + curvature, overlay data
+   - [x] Demo scenario: load brain + curvature, overlay data
 
 ### Breaking Change Risk: LOW
 - New files only, no modifications to existing layer logic

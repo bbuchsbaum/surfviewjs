@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { NeuroSurface, SurfaceGeometry, SurfaceConfig } from './classes';
 import { LayerStack, BaseLayer, RGBALayer, DataLayer, LabelLayer, Layer } from './layers';
+import { CurvatureLayer, CurvatureConfig } from './layers/CurvatureLayer';
 import { debugLog } from './debug';
 import ColorMap from './ColorMap';
 import { GPULayerCompositor } from './GPULayerCompositor';
@@ -15,6 +16,17 @@ export interface MultiLayerSurfaceConfig extends SurfaceConfig {
   roughness?: number;
   useGPUCompositing?: boolean; // Enable GPU-accelerated compositing
   useWideLines?: boolean; // Use Line2 wide segments for outlines
+
+  /** Pre-computed curvature data to display as underlay */
+  curvature?: Float32Array | number[];
+  /** Show curvature underlay (default: true if curvature provided) */
+  showCurvature?: boolean;
+  /** Curvature display options */
+  curvatureOptions?: {
+    brightness?: number;  // Base gray level (0-1), default 0.5
+    contrast?: number;    // Curvature influence (0-1), default 0.5
+    smoothness?: number;  // Curvature scaling factor, default 1
+  };
 }
 
 type EdgeList = Array<[number, number]>;
@@ -55,7 +67,7 @@ function computeBoundaryEdges(
 
 export interface LayerUpdate {
   id: string;
-  type?: 'base' | 'rgba' | 'data' | 'outline' | 'label';
+  type?: 'base' | 'rgba' | 'data' | 'outline' | 'label' | 'curvature';
   data?: Float32Array;
   indices?: Uint32Array;
   colormap?: ColorMap | string;
@@ -75,6 +87,11 @@ export interface LayerUpdate {
   labels?: Uint32Array | Int32Array | number[];
   labelDefs?: Array<{ id: number; color: THREE.ColorRepresentation; name?: string }>;
   defaultColor?: THREE.ColorRepresentation;
+  // Curvature layer properties
+  curvature?: Float32Array | number[];
+  brightness?: number;
+  contrast?: number;
+  smoothness?: number;
 }
 
 export interface ClearLayersOptions {
@@ -130,11 +147,24 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
       this.useGPUCompositing = false;
     }
     
+    // Add curvature layer if provided (renders below base layer)
+    if (config.curvature && config.showCurvature !== false) {
+      const curvOpts = config.curvatureOptions || {};
+      const curvLayer = new CurvatureLayer('curvature', config.curvature, {
+        brightness: curvOpts.brightness,
+        contrast: curvOpts.contrast,
+        smoothness: curvOpts.smoothness,
+        order: -2 // Below base layer
+      });
+      this.layerStack.addLayer(curvLayer);
+      debugLog(`CurvatureLayer added with ${(config.curvature as any).length} vertices`);
+    }
+
     // Add base layer
     const baseColor = config.baseColor || 0xcccccc;
     const baseLayer = new BaseLayer(typeof baseColor === 'number' ? baseColor : new THREE.Color(baseColor).getHex(), { opacity: 1 });
     this.layerStack.addLayer(baseLayer);
-    
+
     // Create the mesh
     this.createMesh();
     
@@ -463,6 +493,54 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
   }
 
   /**
+   * Set curvature data for display as underlay.
+   * Creates curvature layer if it doesn't exist.
+   *
+   * @param curvature - Curvature values per vertex
+   * @param options - Display options (brightness, contrast, smoothness)
+   */
+  setCurvature(
+    curvature: Float32Array | number[],
+    options?: { brightness?: number; contrast?: number; smoothness?: number }
+  ): void {
+    const existing = this.layerStack.getLayer('curvature');
+    if (existing && existing instanceof CurvatureLayer) {
+      existing.setCurvature(curvature);
+      if (options?.brightness !== undefined) existing.setBrightness(options.brightness);
+      if (options?.contrast !== undefined) existing.setContrast(options.contrast);
+      if (options?.smoothness !== undefined) existing.setSmoothness(options.smoothness);
+    } else {
+      const layer = new CurvatureLayer('curvature', curvature, {
+        brightness: options?.brightness,
+        contrast: options?.contrast,
+        smoothness: options?.smoothness,
+        order: -2
+      });
+      this.layerStack.addLayer(layer);
+    }
+    this.requestColorUpdate();
+  }
+
+  /**
+   * Get the curvature layer if it exists
+   */
+  getCurvatureLayer(): CurvatureLayer | undefined {
+    const layer = this.layerStack.getLayer('curvature');
+    return layer instanceof CurvatureLayer ? layer : undefined;
+  }
+
+  /**
+   * Toggle curvature visibility
+   */
+  showCurvature(visible: boolean): void {
+    const layer = this.getCurvatureLayer();
+    if (layer) {
+      layer.setVisible(visible);
+      this.requestColorUpdate();
+    }
+  }
+
+  /**
    * Set the order of layers (bottom to top)
    */
   setLayerOrder(ids: string[]): void {
@@ -526,6 +604,19 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
                 visible: props.visible,
                 blendMode: props.blendMode,
                 order: props.order
+              });
+            }
+            break;
+          case 'curvature':
+            if (props.curvature) {
+              layer = new CurvatureLayer(id, props.curvature, {
+                brightness: props.brightness,
+                contrast: props.contrast,
+                smoothness: props.smoothness,
+                visible: props.visible,
+                opacity: props.opacity,
+                blendMode: props.blendMode,
+                order: props.order ?? -2
               });
             }
             break;
