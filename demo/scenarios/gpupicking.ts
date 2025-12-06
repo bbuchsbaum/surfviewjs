@@ -34,6 +34,7 @@ export const gpupicking: Scenario = {
     viewer.addSurface(surface, 'sphere');
     viewer.setViewpoint('lateral');
     viewer.enableGPUPicking();
+    viewer.getGPUPicker()?.setThrottleMs(0);
 
     ctx.panel.innerHTML = `
       <div class="panel-section">
@@ -82,6 +83,8 @@ export const gpupicking: Scenario = {
     }
 
     const canvas = viewer.renderer.domElement;
+    let lastHit: number | null = null;
+
     canvas.addEventListener('mousemove', (event: MouseEvent) => {
       const start = performance.now();
       const result = viewer.pick({
@@ -97,9 +100,10 @@ export const gpupicking: Scenario = {
       if (result.vertexIndex != null) {
         if (lastVertexEl) lastVertexEl.textContent = `Last vertex: ${result.vertexIndex}`;
         if (lastValueEl) lastValueEl.textContent = `Data value: ${data[result.vertexIndex].toFixed(3)}`;
-        viewer.showCrosshair('sphere', result.vertexIndex, { size: 4, color: 0xffcc00, mode: 'hover' });
-      } else {
-        viewer.hideCrosshair();
+        viewer.showCrosshair('sphere', result.vertexIndex, { size: 8, color: 0xffcc00, mode: 'hover' });
+        lastHit = result.vertexIndex;
+      } else if (lastHit != null) {
+        viewer.showCrosshair('sphere', lastHit, { size: 8, color: 0xffcc00, mode: 'hover' });
       }
     });
 

@@ -2244,7 +2244,12 @@ export class NeuroSurfaceViewer extends EventEmitter {
     const group = new THREE.Group();
     group.name = 'neurosurface-crosshair';
     const half = size / 2;
-    const material = new THREE.LineBasicMaterial({ color, depthWrite: false });
+    const material = new THREE.LineBasicMaterial({
+      color,
+      depthWrite: false,
+      depthTest: false,
+      transparent: true
+    });
 
     const makeLine = (from: THREE.Vector3, to: THREE.Vector3) => {
       const geometry = new THREE.BufferGeometry().setFromPoints([from, to]);
