@@ -1,16 +1,16 @@
 {
-  "name": "neurosurface",
+  "name": "surfview",
   "version": "2.1.0",
   "description": "A modular Three.js-based brain surface visualization library",
   "type": "module",
-  "main": "./dist/neurosurface.umd.js",
-  "module": "./dist/neurosurface.es.js",
+  "main": "./dist/surfview.umd.js",
+  "module": "./dist/surfview.es.js",
   "types": "./dist/types/index.d.ts",
   "sideEffects": false,
   "exports": {
     ".": {
-      "import": "./dist/neurosurface.es.js",
-      "require": "./dist/neurosurface.umd.js",
+      "import": "./dist/surfview.es.js",
+      "require": "./dist/surfview.umd.js",
       "types": "./dist/types/index.d.ts"
     },
     "./react": {
@@ -119,7 +119,7 @@
   "size-limit": [
     {
       "name": "ESM bundle",
-      "path": "dist/neurosurface.es.js",
+      "path": "dist/surfview.es.js",
       "limit": "320 KB"
     }
   ]

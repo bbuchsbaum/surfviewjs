@@ -36,3 +36,6 @@ npm-debug.log*
 *.tmp
 *.temp
 claude-instance-*/
+
+# Cruft folder (legacy/archived files)
+cruft/

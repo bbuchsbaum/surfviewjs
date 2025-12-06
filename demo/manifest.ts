@@ -5,6 +5,7 @@ import { hemispheres } from './scenarios/hemispheres';
 import { fileLoading } from './scenarios/fileLoading';
 import { lighting } from './scenarios/lighting';
 import { fslrFunc } from './scenarios/fslrFunc';
+import { gpuCompositing } from './scenarios/gpuCompositing';
 
 export const scenarios: Scenario[] = [
   quickstart,
@@ -12,5 +13,6 @@ export const scenarios: Scenario[] = [
   lighting,
   hemispheres,
   fslrFunc,
+  gpuCompositing,
   fileLoading
 ];
