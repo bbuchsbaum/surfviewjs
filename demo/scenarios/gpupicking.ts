@@ -17,9 +17,7 @@ export const gpupicking: Scenario = {
     const { viewer, cleanup } = createViewer(mount, {
       showControls: true,
       useControls: false,
-      hoverCrosshair: true,
-      hoverCrosshairColor: 0x00ff00,
-      hoverCrosshairSize: 1.5,
+      hoverCrosshair: false, // we drive crosshair manually for clarity
       backgroundColor: 0x0b1020
     });
 
@@ -99,6 +97,9 @@ export const gpupicking: Scenario = {
       if (result.vertexIndex != null) {
         if (lastVertexEl) lastVertexEl.textContent = `Last vertex: ${result.vertexIndex}`;
         if (lastValueEl) lastValueEl.textContent = `Data value: ${data[result.vertexIndex].toFixed(3)}`;
+        viewer.showCrosshair('sphere', result.vertexIndex, { size: 4, color: 0xffcc00, mode: 'hover' });
+      } else {
+        viewer.hideCrosshair();
       }
     });
 
