@@ -8,30 +8,65 @@ Features inspired by pycortex shader library, adapted for surface-only visualiza
 
 **Why**: Provides anatomical context (sulci/gyri visibility) that's standard in neuroimaging viewers.
 
+### Background: What is Curvature?
+
+Curvature is a **purely geometric property** of the mesh - it measures how much the surface bends at each vertex:
+- **Sulci** (folds): negative curvature (concave)
+- **Gyri** (crowns): positive curvature (convex)
+- **Flat regions**: zero curvature
+
+**Key insight**: Curvature is typically computed on the **folded (pial) surface** and then stored as a per-vertex attribute. This allows it to be displayed even on inflated or flat surface representations - showing "where the folds were" for anatomical reference.
+
+### Data Sources
+
+Curvature data can come from:
+
+1. **Pre-computed files** (most common)
+   - FreeSurfer: `lh.curv`, `rh.curv` (binary format)
+   - GIFTI: `*.curv.gii` or as a DataArray in surface file
+   - Plain arrays: Float32Array from any source
+
+2. **Computed from mesh geometry**
+   - Useful for non-brain meshes or when files unavailable
+   - Mean curvature via discrete Laplacian or angle deficit
+   - Note: On already-inflated surfaces, computed curvature will be near-zero (not useful)
+
 ### Implementation Plan
 
-1. **Curvature Computation** (`src/utils/curvature.ts`)
-   - [ ] Compute mean curvature per-vertex from mesh geometry
-   - [ ] Algorithm: average angle deficit or discrete Laplacian method
-   - [ ] Cache results on SurfaceGeometry (compute once)
-   - [ ] Export as `computeCurvature(geometry: SurfaceGeometry): Float32Array`
+1. **Curvature File Loading** (`src/loaders/curvature.ts`)
+   - [ ] `loadFreeSurferCurvature(url): Promise<Float32Array>` - parse FreeSurfer binary format
+   - [ ] `loadGIFTICurvature(url): Promise<Float32Array>` - extract from GIFTI file
+   - [ ] Auto-detect format from file extension
 
-2. **CurvatureLayer** (`src/layers/CurvatureLayer.ts`)
+2. **Curvature Computation** (`src/utils/curvature.ts`)
+   - [ ] `computeMeanCurvature(geometry: SurfaceGeometry): Float32Array`
+   - [ ] Algorithm: discrete Laplace-Beltrami operator
+   - [ ] Cache results on SurfaceGeometry (compute once)
+   - [ ] Note: Only meaningful on folded surfaces, not inflated/flat
+
+3. **CurvatureLayer** (`src/layers/CurvatureLayer.ts`)
    - [ ] New layer type extending BaseLayer
    - [ ] Properties: `brightness`, `contrast`, `smoothness`
-   - [ ] Converts curvature values to grayscale RGBA
+   - [ ] Converts curvature values to grayscale RGBA:
+     ```
+     gray = clamp(curvature / smoothness, -0.5, 0.5) * contrast + brightness
+     ```
    - [ ] Always renders at bottom of layer stack (order: -1)
 
-3. **Integration**
+4. **Integration**
    - [ ] Add `curvature?: Float32Array` field to SurfaceGeometry
-   - [ ] Auto-compute if not provided but requested
-   - [ ] Add `showCurvature` option to MultiLayerNeuroSurface config
+   - [ ] `MultiLayerNeuroSurface` config options:
+     - `curvature?: Float32Array` - pre-loaded curvature data
+     - `curvatureUrl?: string` - URL to load curvature from
+     - `computeCurvature?: boolean` - compute from geometry (only useful for folded surfaces)
+     - `showCurvature?: boolean` - display as underlay (default: true if curvature provided)
    - [ ] Add Tweakpane controls for brightness/contrast/smoothness
 
-4. **Tests**
+5. **Tests**
+   - [ ] Unit test: FreeSurfer curvature file parsing
    - [ ] Unit test: curvature computation on icosahedron (known values)
    - [ ] Unit test: CurvatureLayer RGBA output
-   - [ ] Demo scenario: curvature underlay with data overlay
+   - [ ] Demo scenario: load brain + curvature, overlay data
 
 ### Breaking Change Risk: LOW
 - New files only, no modifications to existing layer logic
