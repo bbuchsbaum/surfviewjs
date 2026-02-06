@@ -6,11 +6,13 @@ import { fileLoading } from './scenarios/fileLoading';
 import { lighting } from './scenarios/lighting';
 import { fslrFunc } from './scenarios/fslrFunc';
 import { gpuCompositing } from './scenarios/gpuCompositing';
+import { volumeProjection } from './scenarios/volumeProjection';
 import { curvature } from './scenarios/curvature';
 import { clipping } from './scenarios/clipping';
 import { colormap2d } from './scenarios/colormap2d';
 import { morphing } from './scenarios/morphing';
 import { gpupicking } from './scenarios/gpupicking';
+import { temporalPlayback } from './scenarios/temporalPlayback';
 
 export const scenarios: Scenario[] = [
   quickstart,
@@ -20,9 +22,11 @@ export const scenarios: Scenario[] = [
   colormap2d,
   morphing,
   gpupicking,
+  temporalPlayback,
   lighting,
   hemispheres,
   fslrFunc,
   gpuCompositing,
+  volumeProjection,
   fileLoading
 ];

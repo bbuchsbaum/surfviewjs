@@ -21,6 +21,8 @@ features:
     details: GPU-accelerated 3D rendering with Three.js for smooth visualization of complex brain surfaces.
   - title: Multi-Layer Support
     details: Overlay multiple data visualizations with configurable blending modes and opacity.
+  - title: Temporal Playback
+    details: Animate time-series data with smooth frame interpolation, playback controls, and hover sparkline tooltips.
   - title: Rich Colormaps
     details: Scientific colormaps including viridis, plasma, hot, cool, and many more.
   - title: React Ready

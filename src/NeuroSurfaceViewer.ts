@@ -4,8 +4,7 @@ import { SurfaceControls } from './SurfaceControls';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { SSAOPass } from 'three/examples/jsm/postprocessing/SSAOPass.js';
-import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
-import { NeuroSurface, ColorMappedNeuroSurface, VertexColoredNeuroSurface } from './classes';
+import { NeuroSurface, ColorMappedNeuroSurface, VertexColoredNeuroSurface, SurfaceGeometry } from './classes';
 import { MultiLayerNeuroSurface, ClearLayersOptions } from './MultiLayerNeuroSurface';
 import { VariantSurface } from './VariantSurface';
 import { RGBALayer, DataLayer } from './layers';
@@ -17,6 +16,8 @@ import { BoundingBoxHelper } from './utils/BoundingBox';
 import { detectCapabilities, ViewerCapabilities } from './utils/capabilities';
 import { AnnotationManager, AnnotationRecord } from './annotations';
 import { GPUPicker, GPUPickResult } from './utils/GPUPicker';
+import { VolumeProjectedSurface } from './surfaces/VolumeProjectedSurface';
+import { CrosshairManager, CrosshairOptions } from './CrosshairManager';
 
 export interface NeuroSurfaceViewerConfig {
   ambientLightColor?: number;
@@ -104,8 +105,6 @@ export class NeuroSurfaceViewer extends EventEmitter {
   paneDragState!: { dragging: boolean; offsetX: number; offsetY: number; pointerId: number | null; minimized: boolean };
   resetCameraButton: any;
   fpsGraph: any;
-  pickingTexture!: THREE.WebGLRenderTarget;
-  pickingPixelBuffer!: Uint8Array;
   viewpoints!: Record<string, ViewpointConfig>;
   viewpointState!: ViewpointState | null;
   currentViewpointKey!: string;
@@ -123,18 +122,11 @@ export class NeuroSurfaceViewer extends EventEmitter {
   onSurfaceClick?: (event: any) => void;
   /** GPU-based picker for fast vertex selection */
   gpuPicker: GPUPicker | null = null;
-  crosshairGroup: THREE.Group | null = null;
-  crosshairMaterial: THREE.LineBasicMaterial | null = null;
-  crosshairSize = 1.5;
-  crosshairColor = 0xffcc00;
-  crosshairParent: THREE.Object3D | null = null;
-  crosshairSurfaceId: string | null = null;
-  crosshairVertexIndex: number | null = null;
-  crosshairVisible = false;
-  crosshairMode: 'selection' | 'hover' | null = null;
-  hoverCrosshairThrottleMs = 80;
-  lastHoverCrosshairUpdate = 0;
+  crosshair!: CrosshairManager;
   handleSurfaceClick!: (event: MouseEvent) => void;
+  private handleMouseMove?: (event: MouseEvent) => void;
+  private handlePanePointerMove?: (event: PointerEvent) => void;
+  private handlePanePointerUp?: (event: PointerEvent) => void;
 
   constructor(
     container: HTMLElement, 
@@ -210,12 +202,13 @@ export class NeuroSurfaceViewer extends EventEmitter {
     this.camera = new THREE.PerspectiveCamera(35, this.width / this.height, 0.1, 1000);
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.annotations = new AnnotationManager(this);
+    this.crosshair = new CrosshairManager(() => this.requestRender());
 
     this.setupRenderer();
+    this.setupContextLossHandling();
     this.capabilities = detectCapabilities(this.renderer);
     this.setupCamera();
     this.setupLighting();
-    this.setupEnvironment();
     this.setupControls();
     this.setupPicking();
     this.setupSurfaceClick();
@@ -276,6 +269,7 @@ export class NeuroSurfaceViewer extends EventEmitter {
   }
 
   setupRenderer(): void {
+    this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setSize(this.width, this.height);
     this.renderer.setClearColor(this.config.backgroundColor);
     const rendererAny = this.renderer as any;
@@ -287,6 +281,31 @@ export class NeuroSurfaceViewer extends EventEmitter {
     this.renderer.shadowMap.enabled = false;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.container.appendChild(this.renderer.domElement);
+  }
+
+  /**
+   * Handle WebGL context loss and restoration.
+   * Context loss can happen due to GPU driver resets, resource pressure, or tab throttling.
+   */
+  private setupContextLossHandling(): void {
+    const canvas = this.renderer.domElement;
+
+    canvas.addEventListener('webglcontextlost', (event) => {
+      event.preventDefault();
+      console.warn('surfviewjs: WebGL context lost. Rendering paused.');
+      if (this.animationId !== null) {
+        cancelAnimationFrame(this.animationId);
+        this.animationId = null;
+      }
+      this.emit('context:lost');
+    });
+
+    canvas.addEventListener('webglcontextrestored', () => {
+      console.info('surfviewjs: WebGL context restored. Resuming rendering.');
+      this.needsRender = true;
+      this.animate();
+      this.emit('context:restored');
+    });
   }
 
   setupCamera(): void {
@@ -314,28 +333,6 @@ export class NeuroSurfaceViewer extends EventEmitter {
     const fillLight = new THREE.DirectionalLight(0xffffff, 0.8);
     fillLight.position.set(-1, -0.5, -1);
     this.scene.add(fillLight);
-  }
-
-  setupEnvironment(): void {
-    // Comment out HDR environment map loading
-    /*
-    const rgbeLoader = new RGBELoader();
-    rgbeLoader.load(
-      'assets/environment.hdr',
-      (tex) => {
-        tex.mapping = THREE.EquirectangularReflectionMapping;
-        this.environmentMap = tex;
-        this.scene.environment = tex;
-        this.scene.background = new THREE.Color(0xf0f0f0);
-        this.updateMaterials();
-      },
-      undefined,
-      (error) => {
-        console.error('Error loading environment map:', error);
-        debugLog('Failed to load environment map:', error);
-      }
-    );
-    */
   }
 
   setupControls(): void {
@@ -1137,6 +1134,8 @@ export class NeuroSurfaceViewer extends EventEmitter {
       handle.style.cursor = 'grab';
     };
 
+    this.handlePanePointerMove = onPointerMove;
+    this.handlePanePointerUp = onPointerUp;
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', onPointerUp);
     window.addEventListener('pointercancel', onPointerUp);
@@ -1413,6 +1412,63 @@ export class NeuroSurfaceViewer extends EventEmitter {
     }
   }
 
+  /**
+   * Add a surface whose overlay values are sampled from a 3D volume texture on the GPU.
+   *
+   * Requires WebGL2 (sampler3D). Returns null when unsupported so callers can fall back
+   * to a CPU-projected DataLayer path.
+   */
+  addVolumeProjectedSurface(
+    geometry: SurfaceGeometry,
+    handle: string,
+    volumeConfig: {
+      data: Float32Array | ArrayLike<number>;
+      dims: [number, number, number];
+      affineMatrix?: THREE.Matrix4 | ArrayLike<number>;
+      worldToIJK?: THREE.Matrix4 | ArrayLike<number>;
+      voxelSize?: [number, number, number];
+      volumeOrigin?: [number, number, number];
+      useHalfFloat?: boolean;
+      fillValue?: number;
+    },
+    displayConfig: {
+      colormap?: string;
+      range?: [number, number];
+      threshold?: [number, number];
+      opacity?: number;
+      baseColor?: THREE.ColorRepresentation;
+    } = {}
+  ): VolumeProjectedSurface | null {
+    const supported = VolumeProjectedSurface.isSupported(this.renderer, {
+      requireLinearFiltering: true,
+      useHalfFloat: volumeConfig.useHalfFloat
+    });
+
+    if (!supported) {
+      console.warn('GPU volume projection not supported (need WebGL2 + float linear filtering).');
+      return null;
+    }
+
+    const surface = new VolumeProjectedSurface(geometry, {
+      volumeData: volumeConfig.data,
+      volumeDims: volumeConfig.dims,
+      affineMatrix: volumeConfig.affineMatrix,
+      worldToIJK: volumeConfig.worldToIJK,
+      voxelSize: volumeConfig.voxelSize,
+      volumeOrigin: volumeConfig.volumeOrigin,
+      useHalfFloat: volumeConfig.useHalfFloat,
+      fillValue: volumeConfig.fillValue ?? 0.0,
+      colormap: displayConfig.colormap ?? 'viridis',
+      intensityRange: displayConfig.range ?? [0, 1],
+      threshold: displayConfig.threshold ?? [0, 0],
+      overlayOpacity: displayConfig.opacity ?? 1.0,
+      baseColor: displayConfig.baseColor ?? 0x888888
+    });
+
+    this.addSurface(surface, handle);
+    return surface;
+  }
+
   setSurfaceVariant(surfaceId: string, variantName: string, options?: { animate?: boolean; duration?: number; ease?: (t: number) => number }): void {
     const surface = this.surfaces.get(surfaceId);
     if (!surface) {
@@ -1572,7 +1628,7 @@ export class NeuroSurfaceViewer extends EventEmitter {
 
   clearSurfaces(): void {
     // Detach any crosshair before surfaces are removed
-    if (this.crosshairVisible) {
+    if (this.crosshair.visible) {
       this.hideCrosshair();
     }
     this.surfaces.forEach((surface, id) => {
@@ -1640,10 +1696,6 @@ export class NeuroSurfaceViewer extends EventEmitter {
   }
 
   setupPicking(): void {
-    // Create render target for picking
-    this.pickingTexture = new THREE.WebGLRenderTarget(1, 1);
-    this.pickingPixelBuffer = new Uint8Array(4);
-
     // Initialize GPU picker if enabled and supported
     if (this.config.useGPUPicking && GPUPicker.isSupported(this.renderer)) {
       this.gpuPicker = new GPUPicker(this.renderer);
@@ -1651,15 +1703,16 @@ export class NeuroSurfaceViewer extends EventEmitter {
     }
 
     // Mouse event handlers
-    this.renderer.domElement.addEventListener('mousemove', (event) => {
+    this.handleMouseMove = (event: MouseEvent) => {
       const rect = this.renderer.domElement.getBoundingClientRect();
       this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
-      if (this.config.hoverCrosshair && this.crosshairMode !== 'selection') {
+      if (this.config.hoverCrosshair && this.crosshair.mode !== 'selection') {
         this.updateHoverCrosshair(event);
       }
-    });
+    };
+    this.renderer.domElement.addEventListener('mousemove', this.handleMouseMove);
   }
 
   private setupSurfaceClick(): void {
@@ -1688,13 +1741,11 @@ export class NeuroSurfaceViewer extends EventEmitter {
     }
 
     // Always show selection crosshair on click
-    this.showCrosshair(hit.surfaceId, hit.vertexIndex, { size: this.crosshairSize, color: this.crosshairColor, mode: 'selection' });
+    this.showCrosshair(hit.surfaceId, hit.vertexIndex, { size: this.crosshair.size, color: this.crosshair.color, mode: 'selection' });
   }
 
   private updateHoverCrosshair(event?: MouseEvent): void {
-    const now = performance.now();
-    if (now - this.lastHoverCrosshairUpdate < this.hoverCrosshairThrottleMs) return;
-    this.lastHoverCrosshairUpdate = now;
+    if (!this.crosshair.canHoverUpdate()) return;
 
     const rect = this.renderer.domElement.getBoundingClientRect();
     const x = event ? event.clientX : (rect.left + rect.width / 2);
@@ -1707,8 +1758,20 @@ export class NeuroSurfaceViewer extends EventEmitter {
         color: this.config.hoverCrosshairColor ?? 0x66ccff,
         mode: 'hover'
       });
-    } else if (this.crosshairMode === 'hover') {
+      this.emit('vertex:hover', {
+        surfaceId: hit.surfaceId,
+        vertexIndex: hit.vertexIndex,
+        screenX: x,
+        screenY: y
+      });
+    } else if (this.crosshair.mode === 'hover') {
       this.hideCrosshair();
+      this.emit('vertex:hover', {
+        surfaceId: null,
+        vertexIndex: null,
+        screenX: x,
+        screenY: y
+      });
     }
   }
 
@@ -1884,73 +1947,23 @@ export class NeuroSurfaceViewer extends EventEmitter {
     return this.annotations.get(id);
   }
 
-  showCrosshair(surfaceId: string, vertexIndex: number, options?: { size?: number; color?: number; mode?: 'selection' | 'hover' }): void {
+  showCrosshair(surfaceId: string, vertexIndex: number, options?: CrosshairOptions): void {
     const surface = this.surfaces.get(surfaceId);
     if (!surface || !surface.mesh) {
       console.warn(`Crosshair: surface ${surfaceId} not found or missing mesh`);
       return;
     }
-
-    const positionAttr = (surface.mesh.geometry as THREE.BufferGeometry).getAttribute('position') as THREE.BufferAttribute | undefined;
-    if (!positionAttr || vertexIndex < 0 || vertexIndex >= positionAttr.count) {
-      console.warn(`Crosshair: invalid vertex index ${vertexIndex}`);
-      return;
-    }
-
-    const crosshair = this.ensureCrosshair(options?.size, options?.color);
-
-    if (this.crosshairParent && this.crosshairParent !== surface.mesh && this.crosshairGroup) {
-      this.crosshairParent.remove(this.crosshairGroup);
-    }
-
-    if (this.crosshairGroup && this.crosshairGroup.parent !== surface.mesh) {
-      surface.mesh.add(this.crosshairGroup);
-    }
-
-    if (this.crosshairGroup) {
-      this.crosshairGroup.position.set(
-        positionAttr.getX(vertexIndex),
-        positionAttr.getY(vertexIndex),
-        positionAttr.getZ(vertexIndex)
-      );
-      this.crosshairGroup.visible = true;
-    }
-
-    this.crosshairParent = surface.mesh;
-    this.crosshairSurfaceId = surfaceId;
-    this.crosshairVertexIndex = vertexIndex;
-    this.crosshairVisible = true;
-    this.crosshairMode = options?.mode ?? 'selection';
-    this.requestRender();
+    this.crosshair.show(surface.mesh, surfaceId, vertexIndex, options);
   }
 
   hideCrosshair(): void {
-    if (this.crosshairGroup && this.crosshairParent) {
-      this.crosshairParent.remove(this.crosshairGroup);
-    }
-    if (this.crosshairGroup) {
-      this.crosshairGroup.visible = false;
-    }
-    this.crosshairVisible = false;
-    this.crosshairSurfaceId = null;
-    this.crosshairVertexIndex = null;
-    this.crosshairParent = null;
-    this.crosshairMode = null;
-    this.requestRender();
+    this.crosshair.hide();
   }
 
-  toggleCrosshair(surfaceId?: string, vertexIndex?: number, options?: { size?: number; color?: number }): void {
-    if (this.crosshairVisible) {
-      this.hideCrosshair();
-      return;
-    }
-
-    const targetSurface = surfaceId ?? this.crosshairSurfaceId;
-    const targetVertex = vertexIndex ?? this.crosshairVertexIndex;
-
-    if (targetSurface && targetVertex !== null) {
-      this.showCrosshair(targetSurface, targetVertex, options);
-    }
+  toggleCrosshair(surfaceId?: string, vertexIndex?: number, options?: CrosshairOptions): void {
+    const targetSurface = surfaceId ?? this.crosshair.surfaceId;
+    const mesh = targetSurface ? this.surfaces.get(targetSurface)?.mesh ?? null : null;
+    this.crosshair.toggle(mesh, surfaceId, vertexIndex, options);
   }
 
   requestRender(): void {
@@ -2168,11 +2181,6 @@ export class NeuroSurfaceViewer extends EventEmitter {
       this.composer.dispose();
     }
 
-    // Dispose of picking texture
-    if (this.pickingTexture) {
-      this.pickingTexture.dispose();
-    }
-
     // Dispose of GPU picker
     if (this.gpuPicker) {
       this.gpuPicker.dispose();
@@ -2186,9 +2194,19 @@ export class NeuroSurfaceViewer extends EventEmitter {
 
     // Detach listeners
     this.renderer.domElement.removeEventListener('click', this.handleSurfaceClick);
+    if (this.handleMouseMove) {
+      this.renderer.domElement.removeEventListener('mousemove', this.handleMouseMove);
+    }
+    if (this.handlePanePointerMove) {
+      window.removeEventListener('pointermove', this.handlePanePointerMove);
+    }
+    if (this.handlePanePointerUp) {
+      window.removeEventListener('pointerup', this.handlePanePointerUp);
+      window.removeEventListener('pointercancel', this.handlePanePointerUp);
+    }
 
     // Dispose of crosshair resources
-    this.disposeCrosshairResources();
+    this.crosshair.dispose();
 
     // Dispose annotations
     if (this.annotations) {
@@ -2214,70 +2232,6 @@ export class NeuroSurfaceViewer extends EventEmitter {
 
   private hasDOM(): boolean {
     return typeof window !== 'undefined' && typeof document !== 'undefined' && !!document.createElement;
-  }
-
-  private ensureCrosshair(size?: number, color?: number): THREE.Group {
-    const desiredSize = size ?? this.crosshairSize;
-    const desiredColor = color ?? this.crosshairColor;
-    const sizeChanged = desiredSize !== this.crosshairSize;
-    const colorChanged = desiredColor !== this.crosshairColor;
-
-    if (!this.crosshairGroup || sizeChanged) {
-      if (this.crosshairGroup && this.crosshairParent) {
-        this.crosshairParent.remove(this.crosshairGroup);
-      }
-      this.disposeCrosshairResources();
-      this.crosshairGroup = this.buildCrosshair(desiredSize, desiredColor);
-      // All lines share the same material
-      const firstLine = this.crosshairGroup.children[0] as THREE.Line;
-      this.crosshairMaterial = firstLine.material as THREE.LineBasicMaterial;
-    } else if (colorChanged && this.crosshairMaterial) {
-      this.crosshairMaterial.color.setHex(desiredColor);
-    }
-
-    this.crosshairSize = desiredSize;
-    this.crosshairColor = desiredColor;
-    return this.crosshairGroup!;
-  }
-
-  private buildCrosshair(size: number, color: number): THREE.Group {
-    const group = new THREE.Group();
-    group.name = 'neurosurface-crosshair';
-    const half = size / 2;
-    const material = new THREE.LineBasicMaterial({
-      color,
-      depthWrite: false,
-      depthTest: false,
-      transparent: true
-    });
-
-    const makeLine = (from: THREE.Vector3, to: THREE.Vector3) => {
-      const geometry = new THREE.BufferGeometry().setFromPoints([from, to]);
-      return new THREE.Line(geometry, material);
-    };
-
-    group.add(makeLine(new THREE.Vector3(-half, 0, 0), new THREE.Vector3(half, 0, 0)));
-    group.add(makeLine(new THREE.Vector3(0, -half, 0), new THREE.Vector3(0, half, 0)));
-    group.add(makeLine(new THREE.Vector3(0, 0, -half), new THREE.Vector3(0, 0, half)));
-    group.renderOrder = 999;
-    return group;
-  }
-
-  private disposeCrosshairResources(): void {
-    if (this.crosshairGroup) {
-      if (this.crosshairGroup.parent) {
-        this.crosshairGroup.parent.remove(this.crosshairGroup);
-      }
-      this.crosshairGroup.children.forEach(child => {
-        const line = child as THREE.Line;
-        line.geometry.dispose();
-      });
-      this.crosshairGroup = null;
-    }
-    if (this.crosshairMaterial) {
-      this.crosshairMaterial.dispose();
-      this.crosshairMaterial = null;
-    }
   }
 
   private isWebGLAvailable(): boolean {

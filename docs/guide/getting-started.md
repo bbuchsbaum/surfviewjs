@@ -75,4 +75,5 @@ viewer.centerCamera();
 - Learn about [surface types](/guide/surfaces)
 - Explore [layer system](/guide/layers) for data visualization
 - Check out [colormaps](/guide/colormaps) for data mapping
+- Try [temporal playback](/guide/temporal) for time-series animation
 - See [React integration](/guide/react) for React apps

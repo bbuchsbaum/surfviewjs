@@ -101,6 +101,11 @@ export class GPUPicker {
   private static readonly NO_HIT_COLOR = new THREE.Color(1, 1, 1);
   private static readonly NO_HIT_ID = 0xFFFFFF; // 16777215
 
+  /** Reusable objects to avoid per-pick allocations */
+  private readonly savedClearColor = new THREE.Color();
+  private readonly pickWorldPos = new THREE.Vector3();
+  private pickCamera: THREE.PerspectiveCamera | THREE.OrthographicCamera | null = null;
+
   constructor(renderer: THREE.WebGLRenderer) {
     this.renderer = renderer;
 
@@ -257,8 +262,13 @@ export class GPUPicker {
     const width = context.drawingBufferWidth;
     const height = context.drawingBufferHeight;
 
-    // Clone camera to avoid modifying the original
-    const pickCamera = camera.clone() as THREE.PerspectiveCamera | THREE.OrthographicCamera;
+    // Reuse pick camera to avoid per-pick allocation
+    if (!this.pickCamera || this.pickCamera.type !== camera.type) {
+      this.pickCamera = camera.clone() as THREE.PerspectiveCamera | THREE.OrthographicCamera;
+    } else {
+      this.pickCamera.copy(camera as any);
+    }
+    const pickCamera = this.pickCamera;
 
     if ('setViewOffset' in pickCamera) {
       pickCamera.setViewOffset(
@@ -273,8 +283,7 @@ export class GPUPicker {
 
     // Store current state
     const currentRenderTarget = this.renderer.getRenderTarget();
-    const currentClearColor = new THREE.Color();
-    this.renderer.getClearColor(currentClearColor);
+    this.renderer.getClearColor(this.savedClearColor);
     const currentClearAlpha = this.renderer.getClearAlpha();
 
     // Render pick scene to 1x1 texture
@@ -295,7 +304,7 @@ export class GPUPicker {
 
     // Restore state
     this.renderer.setRenderTarget(currentRenderTarget);
-    this.renderer.setClearColor(currentClearColor, currentClearAlpha);
+    this.renderer.setClearColor(this.savedClearColor, currentClearAlpha);
 
     // Decode vertex index from RGB
     const r = this.pixelBuffer[0];
@@ -314,13 +323,13 @@ export class GPUPicker {
       const positionAttr = geometry.getAttribute('position');
 
       if (vertexIndex < positionAttr.count) {
-        // Get world position of the vertex
-        const localPos = new THREE.Vector3(
+        // Get world position of the vertex (reuse vector)
+        this.pickWorldPos.set(
           positionAttr.getX(vertexIndex),
           positionAttr.getY(vertexIndex),
           positionAttr.getZ(vertexIndex)
         );
-        const worldPos = localPos.applyMatrix4(surface.mesh.matrixWorld);
+        const worldPos = this.pickWorldPos.applyMatrix4(surface.mesh.matrixWorld);
 
         // Find face index (optional - requires searching)
         const faceIndex = this.findFaceContainingVertex(geometry, vertexIndex);
@@ -381,7 +390,7 @@ export class GPUPicker {
    */
   static isSupported(renderer: THREE.WebGLRenderer): boolean {
     const gl = renderer.getContext();
-    return gl !== null && gl instanceof WebGLRenderingContext || gl instanceof WebGL2RenderingContext;
+    return gl !== null && (gl instanceof WebGLRenderingContext || gl instanceof WebGL2RenderingContext);
   }
 
   /**

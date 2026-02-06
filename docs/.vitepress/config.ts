@@ -39,6 +39,7 @@ export default defineConfig({
         {
           text: 'Advanced',
           items: [
+            { text: 'Temporal Playback', link: '/guide/temporal' },
             { text: 'React Integration', link: '/guide/react' },
             { text: 'Events', link: '/guide/events' },
             { text: 'Performance', link: '/guide/performance' }

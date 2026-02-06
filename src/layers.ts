@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import ColorMap, { ColorMapOptions, Color, ColorArray } from './ColorMap';
 import ColorMap2D, { ColorMap2DPreset, ColorMap2DOptions } from './ColorMap2D';
 import { debugLog } from './debug';
+import { VolumeTexture3D } from './textures/VolumeTexture3D';
+import { createColormapTexture } from './textures/createColormapTexture';
 
 export type BlendMode = 'normal' | 'additive' | 'multiply';
 
@@ -15,6 +17,23 @@ export interface LayerConfig {
 export interface DataLayerConfig extends LayerConfig {
   range?: [number, number];
   threshold?: [number, number];
+}
+
+export interface VolumeProjectionLayerConfig extends DataLayerConfig {
+  /** Voxel-to-world affine matrix (column-major) or Matrix4; used to derive world->voxel. */
+  affineMatrix?: THREE.Matrix4 | ArrayLike<number>;
+  /** Direct world->voxel transform (column-major) or Matrix4; overrides affineMatrix if provided. */
+  worldToIJK?: THREE.Matrix4 | ArrayLike<number>;
+  /** Simple voxel-to-world fallback when no affine is provided. */
+  voxelSize?: [number, number, number];
+  /** Simple voxel-to-world fallback when no affine is provided. */
+  volumeOrigin?: [number, number, number];
+  /** Colormap preset name (GPU path uses a 256x1 colormap texture). */
+  colormap?: string;
+  /** Use HalfFloatType on the GPU (saves memory, costs CPU conversion). */
+  useHalfFloat?: boolean;
+  /** Treat values equal to fillValue as transparent (alpha=0). */
+  fillValue?: number;
 }
 
 export interface TwoDataLayerConfig extends LayerConfig {
@@ -41,6 +60,19 @@ export interface DataLayerUpdateData extends LayerUpdateData {
   colorMap?: ColorMap | string | Color[];
   range?: [number, number];
   threshold?: [number, number];
+}
+
+export interface VolumeProjectionLayerUpdateData extends LayerUpdateData {
+  volumeData?: Float32Array | number[];
+  colormap?: string;
+  range?: [number, number];
+  threshold?: [number, number];
+  worldToIJK?: THREE.Matrix4 | ArrayLike<number>;
+  affineMatrix?: THREE.Matrix4 | ArrayLike<number>;
+  voxelSize?: [number, number, number];
+  volumeOrigin?: [number, number, number];
+  useHalfFloat?: boolean;
+  fillValue?: number;
 }
 
 export interface TwoDataLayerUpdateData extends LayerUpdateData {
@@ -75,6 +107,7 @@ export abstract class Layer {
   order: number;
   needsUpdate: boolean;
   private static _outlineCtor: any;
+  private static _temporalCtor: any;
 
   constructor(id: string, config: LayerConfig = {}) {
     this.id = id;
@@ -126,6 +159,10 @@ export abstract class Layer {
 
   static registerOutlineLayer(ctor: any): void {
     Layer._outlineCtor = ctor;
+  }
+
+  static registerTemporalLayer(ctor: any): void {
+    Layer._temporalCtor = ctor;
   }
 
   private static get outlineCtor(): any {
@@ -214,6 +251,46 @@ export abstract class Layer {
             rangeY: config.rangeY,
             thresholdX: config.thresholdX,
             thresholdY: config.thresholdY
+          }
+        );
+      case 'temporal':
+        if (!config.frames || !config.times) {
+          throw new Error('TemporalDataLayer requires frames and times');
+        }
+        if (!Layer._temporalCtor) {
+          throw new Error('TemporalDataLayer constructor not registered');
+        }
+        return new Layer._temporalCtor(
+          id,
+          config.frames,
+          config.times,
+          config.cmap ?? config.colorMap ?? 'jet',
+          {
+            ...commonConfig,
+            range: config.range,
+            threshold: config.threshold,
+            factor: config.factor
+          }
+        );
+      case 'volume':
+        if (!config.volumeData || !config.dims) {
+          throw new Error('VolumeProjectionLayer requires volumeData and dims');
+        }
+        return new VolumeProjectionLayer(
+          id,
+          config.volumeData,
+          config.dims,
+          {
+            ...commonConfig,
+            colormap: config.colormap ?? config.cmap ?? 'viridis',
+            range: config.range,
+            threshold: config.threshold,
+            worldToIJK: config.worldToIJK,
+            affineMatrix: config.affineMatrix ?? config.affine,
+            voxelSize: config.voxelSize,
+            volumeOrigin: config.volumeOrigin,
+            useHalfFloat: config.useHalfFloat,
+            fillValue: config.fillValue
           }
         );
       default:
@@ -424,9 +501,11 @@ export class DataLayer extends Layer {
     debugLog(`DataLayer ${this.id}: threshold=[${this.threshold[0].toFixed(4)}, ${this.threshold[1].toFixed(4)}]`);
     debugLog(`DataLayer ${this.id}: colormap=${this.colorMapName}, opacity=${this.opacity}`);
 
-    // Always regenerate colors when colormap changes
-    // Don't use cache for now to ensure updates work
-    const rgbaData = new Float32Array(vertexCount * 4);
+    // Reuse cached buffer if size matches to avoid GC pressure
+    if (!this._cachedRGBABuffer || this._cachedRGBABuffer.length !== vertexCount * 4) {
+      this._cachedRGBABuffer = new Float32Array(vertexCount * 4);
+    }
+    const rgbaData = this._cachedRGBABuffer;
 
     // Initialize with transparent black
     rgbaData.fill(0);
@@ -440,8 +519,8 @@ export class DataLayer extends Layer {
       const vertexIndex: number = this.indices[i];
       const value = this.data[i];
 
-      // Add bounds check for safety
-      if (vertexIndex >= 0 && vertexIndex < vertexCount) {
+      // Add bounds and NaN check for safety
+      if (vertexIndex >= 0 && vertexIndex < vertexCount && isFinite(value)) {
         const color = this.colorMap.getColor(value);
         const offset = vertexIndex * 4;
 
@@ -501,6 +580,320 @@ export class DataLayer extends Layer {
     this.indices = null;
     this.colorMap = null;
     this._cachedRGBABuffer = null;
+  }
+}
+
+/**
+ * GPU volume-to-surface projection layer.
+ *
+ * In GPU compositing mode, this layer is evaluated in the vertex shader by sampling a
+ * 3D texture (WebGL2 required). In CPU mode, this layer falls back to a per-vertex
+ * lookup and colormap on the CPU.
+ */
+export class VolumeProjectionLayer extends Layer {
+  private volumeData: Float32Array;
+  private readonly dims: [number, number, number];
+  private volumeTexture: VolumeTexture3D;
+  private worldToIJK: THREE.Matrix4;
+  private colorMapName: string;
+  private colorMap: ColorMap;
+  private colormapTexture: THREE.DataTexture;
+  private range: [number, number];
+  private threshold: [number, number];
+  private fillValue: number;
+  private attachedSurface: { geometry: { vertices: Float32Array }; mesh?: THREE.Mesh } | null = null;
+  private rgbaBuffer: Float32Array | null = null;
+
+  constructor(
+    id: string,
+    volumeData: Float32Array | number[],
+    dims: [number, number, number],
+    config: VolumeProjectionLayerConfig = {}
+  ) {
+    super(id, config);
+
+    this.dims = dims;
+    this.range = config.range || [0, 1];
+    this.threshold = config.threshold || [0, 0];
+    this.fillValue = config.fillValue ?? 0.0;
+
+    this.volumeData = volumeData instanceof Float32Array ? volumeData : new Float32Array(volumeData);
+    this.volumeTexture = new VolumeTexture3D(this.volumeData, dims[0], dims[1], dims[2], {
+      useHalfFloat: config.useHalfFloat
+    });
+
+    this.worldToIJK = this.computeWorldToIJK(config);
+
+    this.colorMapName = config.colormap ?? 'viridis';
+    try {
+      this.colorMap = ColorMap.fromPreset(this.colorMapName);
+    } catch (err) {
+      const presets = ColorMap.getAvailableMaps();
+      const fallback = presets.includes('jet') ? 'jet' : (presets[0] || 'jet');
+      console.warn(`VolumeProjectionLayer ${this.id}: preset "${this.colorMapName}" unavailable, falling back to "${fallback}"`, err);
+      this.colorMapName = fallback;
+      this.colorMap = ColorMap.fromPreset(fallback);
+    }
+
+    this.colorMap.setRange(this.range);
+    this.colorMap.setThreshold(this.threshold);
+
+    this.colormapTexture = createColormapTexture(this.colorMapName);
+  }
+
+  /**
+   * Attach to a surface to enable CPU fallback sampling.
+   * Called by MultiLayerNeuroSurface when the layer is added.
+   */
+  attach(surface: { geometry: { vertices: Float32Array }; mesh?: THREE.Mesh }): void {
+    this.attachedSurface = surface;
+    this.needsUpdate = true;
+  }
+
+  detach(): void {
+    this.attachedSurface = null;
+  }
+
+  getVolumeTexture(): VolumeTexture3D {
+    return this.volumeTexture;
+  }
+
+  getColormapTexture(): THREE.DataTexture {
+    return this.colormapTexture;
+  }
+
+  getWorldToIJK(): THREE.Matrix4 {
+    return this.worldToIJK;
+  }
+
+  getVolumeDims(): THREE.Vector3 {
+    return this.volumeTexture.dims;
+  }
+
+  getRange(): [number, number] {
+    return [...this.range] as [number, number];
+  }
+
+  getThreshold(): [number, number] {
+    return [...this.threshold] as [number, number];
+  }
+
+  getFillValue(): number {
+    return this.fillValue;
+  }
+
+  setRange(range: [number, number]): void {
+    this.range = range;
+    this.colorMap.setRange(range);
+    this.needsUpdate = true;
+  }
+
+  setThreshold(threshold: [number, number]): void {
+    this.threshold = threshold;
+    this.colorMap.setThreshold(threshold);
+    this.needsUpdate = true;
+  }
+
+  setFillValue(fillValue: number): void {
+    this.fillValue = fillValue;
+    this.needsUpdate = true;
+  }
+
+  setColormap(name: string): void {
+    this.colorMapName = name;
+    try {
+      this.colorMap = ColorMap.fromPreset(name);
+    } catch (err) {
+      const presets = ColorMap.getAvailableMaps();
+      const fallback = presets.includes('jet') ? 'jet' : (presets[0] || 'jet');
+      console.warn(`VolumeProjectionLayer ${this.id}: preset "${name}" unavailable, falling back to "${fallback}"`, err);
+      this.colorMapName = fallback;
+      this.colorMap = ColorMap.fromPreset(fallback);
+    }
+
+    this.colorMap.setRange(this.range);
+    this.colorMap.setThreshold(this.threshold);
+
+    if (this.colormapTexture) {
+      this.colormapTexture.dispose();
+    }
+    this.colormapTexture = createColormapTexture(this.colorMapName);
+    this.needsUpdate = true;
+  }
+
+  setWorldToIJK(matrix: THREE.Matrix4 | ArrayLike<number>): void {
+    this.worldToIJK = matrix instanceof THREE.Matrix4
+      ? matrix.clone()
+      : new THREE.Matrix4().fromArray(Array.from(matrix));
+    this.needsUpdate = true;
+  }
+
+  updateVolumeData(data: Float32Array | number[]): void {
+    this.volumeData = data instanceof Float32Array ? data : new Float32Array(data);
+    this.volumeTexture.updateData(this.volumeData);
+    this.needsUpdate = true;
+  }
+
+  getRGBAData(vertexCount: number): Float32Array {
+    if (!this.attachedSurface) {
+      throw new Error('VolumeProjectionLayer.getRGBAData requires attachment to a surface');
+    }
+
+    const vertices = this.attachedSurface.geometry.vertices;
+    if (vertices.length / 3 !== vertexCount) {
+      console.warn(`VolumeProjectionLayer ${this.id}: vertexCount mismatch; expected ${vertices.length / 3}, got ${vertexCount}`);
+    }
+
+    if (!this.rgbaBuffer || this.rgbaBuffer.length !== vertexCount * 4) {
+      this.rgbaBuffer = new Float32Array(vertexCount * 4);
+    }
+
+    const rgba = this.rgbaBuffer;
+    rgba.fill(0);
+
+    const mesh = this.attachedSurface.mesh;
+    if (mesh && typeof mesh.updateMatrixWorld === 'function') {
+      mesh.updateMatrixWorld(true);
+    }
+
+    const worldMatrix = mesh ? mesh.matrixWorld : new THREE.Matrix4();
+    const we = worldMatrix.elements;
+    const me = this.worldToIJK.elements;
+
+    const nx = this.dims[0];
+    const ny = this.dims[1];
+    const nz = this.dims[2];
+    const data = this.volumeData;
+
+    for (let vi = 0; vi < vertexCount; vi++) {
+      const base = vi * 3;
+      const x = vertices[base];
+      const y = vertices[base + 1];
+      const z = vertices[base + 2];
+
+      // Local -> world
+      const wx = we[0] * x + we[4] * y + we[8] * z + we[12];
+      const wy = we[1] * x + we[5] * y + we[9] * z + we[13];
+      const wz = we[2] * x + we[6] * y + we[10] * z + we[14];
+
+      // World -> IJK
+      const ijkX = me[0] * wx + me[4] * wy + me[8] * wz + me[12];
+      const ijkY = me[1] * wx + me[5] * wy + me[9] * wz + me[13];
+      const ijkZ = me[2] * wx + me[6] * wy + me[10] * wz + me[14];
+
+      // Bounds check in normalized texture coordinates (matches shader behavior)
+      const uvwX = (ijkX + 0.5) / nx;
+      const uvwY = (ijkY + 0.5) / ny;
+      const uvwZ = (ijkZ + 0.5) / nz;
+
+      if (
+        uvwX < 0 || uvwX > 1 ||
+        uvwY < 0 || uvwY > 1 ||
+        uvwZ < 0 || uvwZ > 1
+      ) {
+        continue;
+      }
+
+      // Nearest-neighbor sample with clamp-to-edge behavior.
+      const i = Math.min(nx - 1, Math.max(0, Math.floor(ijkX + 0.5)));
+      const j = Math.min(ny - 1, Math.max(0, Math.floor(ijkY + 0.5)));
+      const k = Math.min(nz - 1, Math.max(0, Math.floor(ijkZ + 0.5)));
+      const idx = i + nx * j + nx * ny * k;
+      const value = data[idx];
+
+      if (!isFinite(value)) continue;
+      if (Math.abs(value - this.fillValue) < 1e-6) continue;
+
+      const color = this.colorMap.getColor(value);
+      const offset = vi * 4;
+      rgba[offset] = color[0];
+      rgba[offset + 1] = color[1];
+      rgba[offset + 2] = color[2];
+      rgba[offset + 3] = (color.length === 4 ? (color[3] as number) : 1);
+    }
+
+    this.needsUpdate = false;
+    return rgba;
+  }
+
+  update(updates: VolumeProjectionLayerUpdateData): void {
+    if (updates.volumeData !== undefined) {
+      this.updateVolumeData(updates.volumeData);
+    }
+    if (updates.colormap !== undefined) {
+      this.setColormap(updates.colormap);
+    }
+    if (updates.range !== undefined) {
+      this.setRange(updates.range);
+    }
+    if (updates.threshold !== undefined) {
+      this.setThreshold(updates.threshold);
+    }
+    if (updates.worldToIJK !== undefined) {
+      this.setWorldToIJK(updates.worldToIJK);
+    } else if (updates.affineMatrix !== undefined || updates.voxelSize !== undefined || updates.volumeOrigin !== undefined) {
+      this.worldToIJK = this.computeWorldToIJK({
+        ...updates,
+        range: this.range,
+        threshold: this.threshold,
+        colormap: this.colorMapName
+      });
+      this.needsUpdate = true;
+    }
+    if (updates.fillValue !== undefined) {
+      this.setFillValue(updates.fillValue);
+    }
+    if (updates.opacity !== undefined) {
+      this.setOpacity(updates.opacity);
+    }
+    if (updates.visible !== undefined) {
+      this.setVisible(updates.visible);
+    }
+    if (updates.blendMode !== undefined) {
+      this.setBlendMode(updates.blendMode);
+    }
+  }
+
+  dispose(): void {
+    this.detach();
+    if (this.colormapTexture) {
+      this.colormapTexture.dispose();
+    }
+    if (this.volumeTexture) {
+      this.volumeTexture.dispose();
+    }
+    this.rgbaBuffer = null;
+  }
+
+  private computeWorldToIJK(config: VolumeProjectionLayerConfig | VolumeProjectionLayerUpdateData): THREE.Matrix4 {
+    if (config.worldToIJK) {
+      return config.worldToIJK instanceof THREE.Matrix4
+        ? config.worldToIJK.clone()
+        : new THREE.Matrix4().fromArray(Array.from(config.worldToIJK));
+    }
+
+    let voxelToWorld: THREE.Matrix4;
+    if (config.affineMatrix) {
+      voxelToWorld = config.affineMatrix instanceof THREE.Matrix4
+        ? config.affineMatrix.clone()
+        : new THREE.Matrix4().fromArray(Array.from(config.affineMatrix));
+    } else {
+      const voxelSize = config.voxelSize ?? [1, 1, 1];
+      const origin = config.volumeOrigin ?? [0, 0, 0];
+      voxelToWorld = new THREE.Matrix4().set(
+        voxelSize[0], 0, 0, origin[0],
+        0, voxelSize[1], 0, origin[1],
+        0, 0, voxelSize[2], origin[2],
+        0, 0, 0, 1
+      );
+    }
+
+    const worldToVoxel = voxelToWorld.clone();
+    const det = worldToVoxel.determinant();
+    if (Math.abs(det) < 1e-10) {
+      throw new Error('VolumeProjectionLayer: voxel-to-world matrix is singular (determinant ≈ 0). Check voxelSize and affineMatrix.');
+    }
+    return worldToVoxel.invert();
   }
 }
 

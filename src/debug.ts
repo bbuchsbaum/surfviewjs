@@ -1,4 +1,4 @@
-export let DEBUG = true; // Enable for debugging surface overlay issues
+export let DEBUG = false;
 
 export function setDebug(value: boolean): void {
   DEBUG = value;

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Layer, DataLayer, RGBALayer } from './layers';
+import { Layer, VolumeProjectionLayer } from './layers';
 import { ClipPlaneSet, ClipPlane } from './utils/ClipPlane';
 import { debugLog } from './debug';
 
@@ -10,11 +10,14 @@ import { debugLog } from './debug';
 export class GPULayerCompositor {
   private vertexCount: number;
   private maxLayers: number;
-  private layerTextures: THREE.DataTexture[] = [];
+  private layerTextureSize!: number;
+  private layerTexture!: THREE.DataArrayTexture;
+  private volumeColormapsTexture!: THREE.DataArrayTexture;
   private material: THREE.ShaderMaterial | null = null;
-  private layerDataCache: Map<string, Float32Array> = new Map();
-
   constructor(vertexCount: number, maxLayers: number = 8) {
+    if (vertexCount <= 0) {
+      throw new Error(`GPULayerCompositor: vertexCount must be positive, got ${vertexCount}`);
+    }
     this.vertexCount = vertexCount;
     this.maxLayers = maxLayers;
     this.initializeTextures();
@@ -27,60 +30,140 @@ export class GPULayerCompositor {
    */
   private initializeTextures(): void {
     // Calculate texture dimensions (make it roughly square)
-    const textureSize = Math.ceil(Math.sqrt(this.vertexCount));
-    
-    for (let i = 0; i < this.maxLayers; i++) {
-      const data = new Float32Array(textureSize * textureSize * 4);
-      const texture = new THREE.DataTexture(
-        data,
-        textureSize,
-        textureSize,
-        THREE.RGBAFormat,
-        THREE.FloatType
-      );
-      texture.needsUpdate = true;
-      this.layerTextures.push(texture);
-    }
+    this.layerTextureSize = Math.ceil(Math.sqrt(this.vertexCount));
+
+    // Store all per-layer RGBA buffers in a single 2D array texture to keep vertex shader
+    // sampler count under MAX_VERTEX_TEXTURE_IMAGE_UNITS.
+    const layerSliceSize = this.layerTextureSize * this.layerTextureSize * 4;
+    const layerData = new Float32Array(layerSliceSize * this.maxLayers);
+    this.layerTexture = new THREE.DataArrayTexture(layerData, this.layerTextureSize, this.layerTextureSize, this.maxLayers);
+    this.layerTexture.format = THREE.RGBAFormat;
+    this.layerTexture.type = THREE.FloatType;
+    this.layerTexture.minFilter = THREE.NearestFilter;
+    this.layerTexture.magFilter = THREE.NearestFilter;
+    this.layerTexture.wrapS = THREE.ClampToEdgeWrapping;
+    this.layerTexture.wrapT = THREE.ClampToEdgeWrapping;
+    this.layerTexture.generateMipmaps = false;
+    this.layerTexture.flipY = false;
+    this.layerTexture.needsUpdate = true;
+
+    // Store per-volume-layer colormaps in a 2D array texture (256x1 RGBA).
+    const cmapWidth = 256;
+    const cmapHeight = 1;
+    const cmapSliceSize = cmapWidth * cmapHeight * 4;
+    const cmapData = new Uint8Array(cmapSliceSize * this.maxLayers);
+    this.volumeColormapsTexture = new THREE.DataArrayTexture(cmapData, cmapWidth, cmapHeight, this.maxLayers);
+    this.volumeColormapsTexture.format = THREE.RGBAFormat;
+    this.volumeColormapsTexture.type = THREE.UnsignedByteType;
+    this.volumeColormapsTexture.minFilter = THREE.LinearFilter;
+    this.volumeColormapsTexture.magFilter = THREE.LinearFilter;
+    this.volumeColormapsTexture.wrapS = THREE.ClampToEdgeWrapping;
+    this.volumeColormapsTexture.wrapT = THREE.ClampToEdgeWrapping;
+    this.volumeColormapsTexture.generateMipmaps = false;
+    this.volumeColormapsTexture.flipY = false;
+    this.volumeColormapsTexture.needsUpdate = true;
   }
 
   /**
    * Create custom shader material for layer compositing
    */
   private createShaderMaterial(): void {
-    const textureSize = Math.ceil(Math.sqrt(this.vertexCount));
+    const textureSize = this.layerTextureSize;
 
     // Vertex shader - passes through vertex colors and UVs with lighting support
     const vertexShader = `
-      attribute float vertexIndex;
-      varying vec3 vNormal;
-      varying vec3 vViewPosition;
-      varying vec3 vWorldPosition;
-      varying vec4 vLayerColor;
+      precision highp float;
+      precision highp sampler3D;
 
-      uniform sampler2D layer0;
-      uniform sampler2D layer1;
-      uniform sampler2D layer2;
-      uniform sampler2D layer3;
-      uniform sampler2D layer4;
-      uniform sampler2D layer5;
-      uniform sampler2D layer6;
-      uniform sampler2D layer7;
+      in float vertexIndex;
+
+      out vec3 vNormal;
+      out vec3 vViewPosition;
+      out vec3 vWorldPosition;
+      out vec4 vLayerColor;
+
+      uniform sampler2DArray layerTextures;
+
+      // Layer kind per slot: 0 = precomputed RGBA texture, 1 = volume projection.
+      uniform int layerKind[8];
+
+      // Volume projection resources per slot (only used when layerKind[i] == 1).
+      uniform sampler3D volume0;
+      uniform sampler3D volume1;
+      uniform sampler3D volume2;
+      uniform sampler3D volume3;
+      uniform sampler3D volume4;
+      uniform sampler3D volume5;
+      uniform sampler3D volume6;
+      uniform sampler3D volume7;
+
+      uniform sampler2DArray volumeColormaps;
+
+      uniform mat4 volumeWorldToIJK[8];
+      uniform vec3 volumeDims[8];
+      uniform vec2 volumeIntensityRange[8];
+      uniform vec2 volumeThreshold[8];
+      uniform float volumeFillValue[8];
+
       uniform float layerOpacity[8];
       uniform int layerBlendMode[8];
       uniform int layerCount;
       uniform float textureSize;
       uniform vec3 baseColor;
 
-      vec4 getLayerColor(int layerIndex, vec2 texCoord) {
-        if (layerIndex == 0) return texture2D(layer0, texCoord);
-        if (layerIndex == 1) return texture2D(layer1, texCoord);
-        if (layerIndex == 2) return texture2D(layer2, texCoord);
-        if (layerIndex == 3) return texture2D(layer3, texCoord);
-        if (layerIndex == 4) return texture2D(layer4, texCoord);
-        if (layerIndex == 5) return texture2D(layer5, texCoord);
-        if (layerIndex == 6) return texture2D(layer6, texCoord);
-        if (layerIndex == 7) return texture2D(layer7, texCoord);
-        return vec4(0.0);
+      vec4 sampleLayerTexture(int layerIndex, vec2 texCoord) {
+        return texture(layerTextures, vec3(texCoord, float(layerIndex)));
+      }
+
+      float sampleVolumeValue(int layerIndex, vec3 uvw) {
+        if (layerIndex == 0) return texture(volume0, uvw).r;
+        if (layerIndex == 1) return texture(volume1, uvw).r;
+        if (layerIndex == 2) return texture(volume2, uvw).r;
+        if (layerIndex == 3) return texture(volume3, uvw).r;
+        if (layerIndex == 4) return texture(volume4, uvw).r;
+        if (layerIndex == 5) return texture(volume5, uvw).r;
+        if (layerIndex == 6) return texture(volume6, uvw).r;
+        if (layerIndex == 7) return texture(volume7, uvw).r;
+        return 0.0;
+      }
+
+      vec4 sampleVolumeColormap(int layerIndex, float t) {
+        return texture(volumeColormaps, vec3(t, 0.5, float(layerIndex)));
+      }
+
+      bool inBounds(vec3 uvw) {
+        return all(greaterThanEqual(uvw, vec3(0.0))) && all(lessThanEqual(uvw, vec3(1.0)));
+      }
+
+      vec4 sampleVolumeLayer(int layerIndex, vec3 worldPos) {
+        vec3 dims = volumeDims[layerIndex];
+        if (dims.x <= 0.0 || dims.y <= 0.0 || dims.z <= 0.0) return vec4(0.0);
+
+        vec3 ijk = (volumeWorldToIJK[layerIndex] * vec4(worldPos, 1.0)).xyz;
+        vec3 uvw = (ijk + vec3(0.5)) / dims;
+
+        if (!inBounds(uvw)) return vec4(0.0);
+
+        float v = sampleVolumeValue(layerIndex, uvw);
+
+        if (abs(v - volumeFillValue[layerIndex]) < 1e-6) return vec4(0.0);
+
+        vec2 thresh = volumeThreshold[layerIndex];
+        bool thresholdActive = abs(thresh.x - thresh.y) > 1e-10;
+        if (thresholdActive && v >= thresh.x && v <= thresh.y) return vec4(0.0);
+
+        vec2 ir = volumeIntensityRange[layerIndex];
+        float denom = max(ir.y - ir.x, 1e-10);
+        float t = clamp((v - ir.x) / denom, 0.0, 1.0);
+
+        return sampleVolumeColormap(layerIndex, t);
+      }
+
+      vec4 getLayerColor(int layerIndex, vec2 texCoord, vec3 worldPos) {
+        if (layerKind[layerIndex] == 1) {
+          return sampleVolumeLayer(layerIndex, worldPos);
+        }
+        return sampleLayerTexture(layerIndex, texCoord);
       }
 
       vec4 blendColors(vec4 base, vec4 overlay, int blendMode, float opacity) {
@@ -101,6 +184,8 @@ export class GPULayerCompositor {
 
       void main() {
         vNormal = normalize(normalMatrix * normal);
+        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+        vWorldPosition = worldPosition.xyz;
 
         // Calculate texture coordinates from vertex index in vertex shader
         // This ensures we get the exact vertex color, not interpolated
@@ -112,24 +197,24 @@ export class GPULayerCompositor {
         vec4 finalColor = vec4(baseColor, 1.0);
         for (int i = 0; i < 8; i++) {
           if (i >= layerCount) break;
-          vec4 layerColor = getLayerColor(i, texCoord);
+          vec4 layerColor = getLayerColor(i, texCoord, vWorldPosition);
           if (layerColor.a > 0.0) {
             finalColor = blendColors(finalColor, layerColor, layerBlendMode[i], layerOpacity[i]);
           }
         }
         vLayerColor = finalColor;
 
-        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-        vWorldPosition = worldPosition.xyz;
-
         vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
         vViewPosition = -mvPosition.xyz;
         gl_Position = projectionMatrix * mvPosition;
+        gl_PointSize = 1.0;
       }
     `;
 
     // Fragment shader - applies lighting to pre-computed vertex colors
     const fragmentShader = `
+      precision highp float;
+
       uniform vec3 ambientLight;
       uniform vec3 directionalLight;
       uniform vec3 lightDirection;
@@ -146,10 +231,12 @@ export class GPULayerCompositor {
       uniform vec3 clipPlanePointZ;
       uniform bool clipPlaneEnabledZ;
 
-      varying vec3 vNormal;
-      varying vec3 vViewPosition;
-      varying vec3 vWorldPosition;
-      varying vec4 vLayerColor;
+      in vec3 vNormal;
+      in vec3 vViewPosition;
+      in vec3 vWorldPosition;
+      in vec4 vLayerColor;
+
+      out vec4 outColor;
 
       void main() {
         // Apply clip planes - discard fragments on the clipped side
@@ -183,7 +270,7 @@ export class GPULayerCompositor {
         vec3 specular = directionalLight * spec * 0.3;
 
         vec3 litColor = ambient + diffuse + specular;
-        gl_FragColor = vec4(litColor, finalColor.a);
+        outColor = vec4(litColor, finalColor.a);
       }
     `;
 
@@ -194,6 +281,14 @@ export class GPULayerCompositor {
       layerCount: { value: 0 },
       layerOpacity: { value: new Float32Array(8).fill(1.0) },
       layerBlendMode: { value: new Int32Array(8).fill(0) },
+      layerKind: { value: new Int32Array(8).fill(0) },
+      layerTextures: { value: this.layerTexture },
+      volumeWorldToIJK: { value: Array.from({ length: 8 }, () => new THREE.Matrix4()) },
+      volumeDims: { value: Array.from({ length: 8 }, () => new THREE.Vector3(1, 1, 1)) },
+      volumeIntensityRange: { value: Array.from({ length: 8 }, () => new THREE.Vector2(0, 1)) },
+      volumeThreshold: { value: Array.from({ length: 8 }, () => new THREE.Vector2(0, 0)) },
+      volumeFillValue: { value: new Float32Array(8).fill(0.0) },
+      volumeColormaps: { value: this.volumeColormapsTexture },
       // Lighting uniforms
       ambientLight: { value: new THREE.Color(0x404040) },
       directionalLight: { value: new THREE.Color(0xffffff) },
@@ -211,15 +306,16 @@ export class GPULayerCompositor {
       clipPlaneEnabledZ: { value: false }
     };
 
-    // Add layer texture uniforms
+    // Add volume texture uniforms (sampler3D is not array-indexable in WebGL2 reliably across drivers).
     for (let i = 0; i < this.maxLayers; i++) {
-      uniforms[`layer${i}`] = { value: this.layerTextures[i] };
+      uniforms[`volume${i}`] = { value: null };
     }
 
     this.material = new THREE.ShaderMaterial({
       uniforms,
       vertexShader,
       fragmentShader,
+      glslVersion: THREE.GLSL3,
       vertexColors: true,
       transparent: true,
       side: THREE.DoubleSide
@@ -247,14 +343,21 @@ export class GPULayerCompositor {
       // Update layer properties
       this.material.uniforms.layerOpacity.value[i] = layer.opacity;
       this.material.uniforms.layerBlendMode.value[i] = this.getBlendModeIndex(layer.blendMode);
-      
-      // Update layer data texture
-      this.updateLayerTexture(i, layer);
+
+      if (layer instanceof VolumeProjectionLayer) {
+        this.material.uniforms.layerKind.value[i] = 1;
+        this.updateVolumeLayerUniforms(i, layer);
+      } else {
+        this.material.uniforms.layerKind.value[i] = 0;
+        this.updateLayerTexture(i, layer);
+      }
     }
 
     // Clear unused layer textures
     for (let i = layerCount; i < this.maxLayers; i++) {
+      this.material.uniforms.layerKind.value[i] = 0;
       this.clearLayerTexture(i);
+      this.material.uniforms[`volume${i}`].value = null;
     }
   }
 
@@ -262,45 +365,78 @@ export class GPULayerCompositor {
    * Update a single layer's texture data
    */
   private updateLayerTexture(textureIndex: number, layer: Layer): void {
-    const texture = this.layerTextures[textureIndex];
-    if (!texture) return;
-
     // Get RGBA data from layer
     const layerData = layer.getRGBAData(this.vertexCount);
     
     // Copy to texture data (need to pad to texture size)
-    const textureSize = Math.ceil(Math.sqrt(this.vertexCount));
-    const textureData = texture.image.data as unknown as Float32Array;
+    const textureSize = this.layerTextureSize;
+    const textureData = this.layerTexture.image.data as unknown as Float32Array;
+    const sliceSize = textureSize * textureSize * 4;
+    const sliceOffset = textureIndex * sliceSize;
     
-    // Copy vertex data to texture
-    for (let i = 0; i < this.vertexCount; i++) {
-      const srcOffset = i * 4;
-      const dstOffset = i * 4; // Direct mapping for now
-      
-      textureData[dstOffset] = layerData[srcOffset];
-      textureData[dstOffset + 1] = layerData[srcOffset + 1];
-      textureData[dstOffset + 2] = layerData[srcOffset + 2];
-      textureData[dstOffset + 3] = layerData[srcOffset + 3];
-    }
+    // Copy vertex data to texture using bulk TypedArray copy
+    textureData.set(layerData.subarray(0, this.vertexCount * 4), sliceOffset);
     
     // Clear any padding
-    for (let i = this.vertexCount * 4; i < textureData.length; i++) {
+    const paddingStart = sliceOffset + this.vertexCount * 4;
+    for (let i = paddingStart; i < sliceOffset + sliceSize; i++) {
       textureData[i] = 0;
     }
     
-    texture.needsUpdate = true;
+    this.layerTexture.needsUpdate = true;
+  }
+
+  private updateVolumeLayerUniforms(textureIndex: number, layer: VolumeProjectionLayer): void {
+    if (!this.material) return;
+    const uniforms = this.material.uniforms as any;
+
+    uniforms[`volume${textureIndex}`].value = layer.getVolumeTexture().texture;
+    this.updateVolumeColormapSlice(textureIndex, layer.getColormapTexture());
+
+    uniforms.volumeWorldToIJK.value[textureIndex].copy(layer.getWorldToIJK());
+    uniforms.volumeDims.value[textureIndex].copy(layer.getVolumeDims());
+
+    const range = layer.getRange();
+    uniforms.volumeIntensityRange.value[textureIndex].set(range[0], range[1]);
+
+    const threshold = layer.getThreshold();
+    uniforms.volumeThreshold.value[textureIndex].set(threshold[0], threshold[1]);
+
+    uniforms.volumeFillValue.value[textureIndex] = layer.getFillValue();
+  }
+
+  private updateVolumeColormapSlice(textureIndex: number, texture: THREE.DataTexture): void {
+    const image: any = texture.image;
+    const src = image?.data as Uint8Array | undefined;
+    if (!src) return;
+
+    const cmapImage: any = this.volumeColormapsTexture.image;
+    const dst = cmapImage.data as Uint8Array;
+    const sliceSize = cmapImage.width * cmapImage.height * 4;
+    const offset = textureIndex * sliceSize;
+
+    if (src.length === sliceSize) {
+      dst.set(src, offset);
+    } else {
+      // Best-effort copy for unexpected sizes.
+      const n = Math.min(src.length, sliceSize);
+      for (let i = 0; i < n; i++) dst[offset + i] = src[i];
+      for (let i = n; i < sliceSize; i++) dst[offset + i] = 0;
+    }
+
+    this.volumeColormapsTexture.needsUpdate = true;
   }
 
   /**
    * Clear a layer texture
    */
   private clearLayerTexture(textureIndex: number): void {
-    const texture = this.layerTextures[textureIndex];
-    if (!texture) return;
-    
-    const textureData = texture.image.data as unknown as Float32Array;
-    textureData.fill(0);
-    texture.needsUpdate = true;
+    const textureSize = this.layerTextureSize;
+    const sliceSize = textureSize * textureSize * 4;
+    const sliceOffset = textureIndex * sliceSize;
+    const textureData = this.layerTexture.image.data as unknown as Float32Array;
+    textureData.fill(0, sliceOffset, sliceOffset + sliceSize);
+    this.layerTexture.needsUpdate = true;
   }
 
   /**
@@ -389,11 +525,12 @@ export class GPULayerCompositor {
    * Dispose of GPU resources
    */
   public dispose(): void {
-    // Dispose textures
-    for (const texture of this.layerTextures) {
-      texture.dispose();
+    if (this.layerTexture) {
+      this.layerTexture.dispose();
     }
-    this.layerTextures = [];
+    if (this.volumeColormapsTexture) {
+      this.volumeColormapsTexture.dispose();
+    }
 
     // Dispose material
     if (this.material) {
@@ -401,7 +538,5 @@ export class GPULayerCompositor {
       this.material = null;
     }
 
-    // Clear cache
-    this.layerDataCache.clear();
   }
 }

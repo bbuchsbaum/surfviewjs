@@ -64,6 +64,22 @@ viewer.on('surface:click', (hit) => {
 });
 ```
 
+### Hover Events
+
+Emitted when the mouse hovers over a surface vertex (requires `enableHoverCrosshair: true` in viewer config).
+
+```javascript
+viewer.on('vertex:hover', ({ surfaceId, vertexIndex, screenX, screenY }) => {
+  if (surfaceId && vertexIndex !== null) {
+    console.log(`Hovering ${surfaceId} vertex ${vertexIndex} at (${screenX}, ${screenY})`);
+  } else {
+    console.log('Hover left surface');
+  }
+});
+```
+
+This event is useful for wiring up sparkline tooltips with `SparklineOverlay`. See the [Temporal Playback](/guide/temporal) guide.
+
 ### Annotation Events
 
 ```javascript

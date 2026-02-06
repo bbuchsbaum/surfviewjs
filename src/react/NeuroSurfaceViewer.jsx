@@ -9,7 +9,7 @@ import {
   RGBALayer,
   DataLayer,
   BaseLayer
-} from '../index.js';
+} from '../index';
 
 /**
  * React wrapper for NeuroSurfaceViewer

@@ -1,11 +1,11 @@
 /**
  * SurfViewJS - Neuroimaging Surface Visualization Library
- * 
+ *
  * A comprehensive Three.js-based library for visualizing brain surfaces
  * with support for multiple data layers, colormaps, and interactive controls.
- * 
+ *
  * @module surfviewjs
- * @see {@link https://github.com/yourusername/surfviewjs} for documentation
+ * @see {@link https://github.com/bbuchsbaum/surfviewjs} for documentation
  * @license MIT
  */
 
@@ -19,7 +19,7 @@ import { MorphableSurface, Easing } from './MorphableSurface';
 import { SurfaceSet } from './SurfaceSet';
 import { LabeledNeuroSurface } from './LabeledNeuroSurface';
 import { SurfaceFactory } from './SurfaceFactory';
-import { Layer, RGBALayer, DataLayer, TwoDataLayer, BaseLayer, LabelLayer, LayerStack } from './layers';
+import { Layer, RGBALayer, DataLayer, TwoDataLayer, BaseLayer, LabelLayer, LayerStack, VolumeProjectionLayer } from './layers';
 import ColorMap2D from './ColorMap2D';
 import { OutlineLayer } from './OutlineLayer';
 import { CurvatureLayer } from './layers/CurvatureLayer';
@@ -28,7 +28,6 @@ import { computeMeanCurvature, normalizeCurvature, curvatureToGrayscale } from '
 import { ClipPlane, ClipPlaneSet } from './utils/ClipPlane';
 import { debugLog, setDebug } from './debug';
 import ColorMap from './ColorMap';
-import * as loaders from './loaders';
 import { EventEmitter } from './EventEmitter';
 import { LaplacianSmoothing } from './utils/LaplacianSmoothing';
 import { BoundingBoxHelper } from './utils/BoundingBox';
@@ -36,29 +35,18 @@ import { AnnotationManager } from './annotations';
 import { embedStyles, applyEmbedStyles } from './embedStyles';
 import { computePickInfo } from './utils/Picking';
 import { GPUPicker } from './utils/GPUPicker';
+import { CrosshairManager } from './CrosshairManager';
+import { TemporalDataLayer, TimelineController, SparklineOverlay } from './temporal';
 import { detectCapabilities } from './utils/capabilities';
-import { NoopNeuroSurfaceViewer, hasDOM } from './NoopNeuroSurfaceViewer';
 
-/**
- * Core exports for surface visualization
- * 
- * @example
- * ```javascript
- * import { 
- *   NeuroSurfaceViewer, 
- *   ColorMappedNeuroSurface, 
- *   loadSurface 
- * } from 'surfviewjs';
- * 
- * // Create viewer
- * const viewer = new NeuroSurfaceViewer(container);
- * 
- * // Load and display surface
- * const geometry = await loadSurface('brain.gii', 'gifti');
- * const surface = new ColorMappedNeuroSurface(geometry, null, data, 'viridis');
- * viewer.addSurface(surface, 'brain');
- * ```
- */
+// Register TemporalDataLayer with Layer factory to avoid circular dependency
+Layer.registerTemporalLayer(TemporalDataLayer);
+import { NoopNeuroSurfaceViewer, hasDOM } from './NoopNeuroSurfaceViewer';
+import { VolumeTexture3D } from './textures/VolumeTexture3D';
+import { VolumeProjectionMaterial } from './materials/VolumeProjectionMaterial';
+import { VolumeProjectedSurface } from './surfaces/VolumeProjectedSurface';
+import { createColormapTexture } from './textures/createColormapTexture';
+
 export {
   NeuroSurfaceViewer,
   SurfaceControls,
@@ -79,6 +67,7 @@ export {
   BaseLayer,
   LabelLayer,
   LayerStack,
+  VolumeProjectionLayer,
   ColorMap2D,
   OutlineLayer,
   CurvatureLayer,
@@ -103,59 +92,29 @@ export {
   SurfaceFactory,
   NoopNeuroSurfaceViewer,
   hasDOM,
-  GPUPicker
+  GPUPicker,
+  CrosshairManager,
+  TemporalDataLayer,
+  TimelineController,
+  SparklineOverlay,
+  VolumeTexture3D,
+  VolumeProjectionMaterial,
+  VolumeProjectedSurface,
+  createColormapTexture
 };
+
+// Export temporal types for TypeScript consumers
+export type {
+  TemporalDataConfig,
+  FactorDescriptor,
+  TimelineState,
+  TimelineEvent,
+  LoopMode,
+  SparklineOptions
+} from './temporal';
 
 // Export loaders
 export * from './loaders';
 
-// Export React components conditionally - don't break if React isn't available
-// These will be handled by a separate entry point for React users
-
-// Optionally, you can also attach these to the global window object
-// This can be useful if you need to access these classes directly in the browser
-if (typeof window !== 'undefined') {
-  window.neurosurface = {
-    NeuroSurfaceViewer,
-    SurfaceGeometry,
-    NeuroSurface,
-    ColorMappedNeuroSurface,
-    VertexColoredNeuroSurface,
-    MultiLayerNeuroSurface,
-    VariantSurface,
-    MorphableSurface,
-    Easing,
-    SurfaceSet,
-    LabeledNeuroSurface,
-    Layer,
-    RGBALayer,
-    DataLayer,
-    TwoDataLayer,
-    BaseLayer,
-    LabelLayer,
-    LayerStack,
-    ColorMap2D,
-    OutlineLayer,
-    CurvatureLayer,
-    computeMeanCurvature,
-    normalizeCurvature,
-    curvatureToGrayscale,
-    ClipPlane,
-    ClipPlaneSet,
-    ColorMap,
-    EventEmitter,
-    THREE,
-    debugLog,
-    setDebug,
-    loaders,
-    BoundingBoxHelper,
-    AnnotationManager,
-    embedStyles,
-    applyEmbedStyles,
-    computePickInfo,
-    SurfaceFactory,
-    detectCapabilities,
-    GPUPicker
-  };
-}
-debugLog('Neurosurface module initialized');
+// Export event types
+export * from './events';

@@ -52,6 +52,22 @@ const surface = new MultiLayerNeuroSurface(geometry, {
 - Infrequent updates
 - Maximum compatibility
 
+### GPU Volume Projection
+
+`VolumeProjectionLayer` can sample a 3D volume texture at each vertex position during GPU compositing (WebGL2). This keeps volume-to-surface projection off the CPU.
+
+**What’s fast**
+- Range/threshold/colormap/opacity changes are uniform/texture updates in the compositor (no CPU reprojection).
+- Per-frame cost is typically dominated by the draw call (sampling happens in the vertex shader).
+
+**What’s expensive**
+- Updating `volumeData` uploads a full 3D texture to the GPU; large volumes can take tens of milliseconds per update.
+- CPU compositing uses nearest-neighbor sampling (no trilinear interpolation).
+
+**Memory**
+- Float32 volume texture ≈ `nx * ny * nz * 4` bytes.
+- Half-float (`useHalfFloat: true`) halves that, but requires CPU conversion and may need `OES_texture_half_float_linear` for smooth filtering.
+
 ### Batch Layer Updates
 
 ```javascript

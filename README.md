@@ -8,8 +8,10 @@ A modular Three.js-based brain surface visualization library for neuroimaging ap
 
 - High-performance 3D brain surface rendering
 - Multiple layer support with blending modes
+- GPU volume-to-surface projection (WebGL2) via `VolumeProjectionLayer`
 - Customizable colormaps for data visualization
 - React component support
+- Temporal playback with frame interpolation and sparkline tooltips
 - Interactive controls with Tweakpane UI
 - Support for GIFTI format
 - TypeScript support
@@ -118,6 +120,8 @@ Layers allow you to overlay multiple data visualizations on the same surface:
 - **BaseLayer**: The foundational surface layer
 - **DataLayer**: Scalar data with colormap
 - **RGBALayer**: Pre-computed RGBA colors per vertex
+- **VolumeProjectionLayer**: Sample a 3D volume texture at each vertex (GPU compositing)
+- **TemporalDataLayer**: Time-varying scalar data with frame interpolation
 - **OutlineLayer**: ROI boundary outlines
 - **LabelLayer**: Discrete region labels
 
@@ -135,12 +139,89 @@ surface.addLayer(new DataLayer(
 ));
 ```
 
+```javascript
+// GPU volume-to-surface overlay (WebGL2 + GPU compositing)
+import { VolumeProjectionLayer } from 'surfview';
+
+surface.setCompositingMode(true);
+surface.addLayer(new VolumeProjectionLayer('volume', volumeData, [nx, ny, nz], {
+  affineMatrix,           // voxel->world (column-major)
+  colormap: 'hot',
+  range: [-3, 3],
+  threshold: [-1.96, 1.96],
+  opacity: 0.85
+}));
+surface.updateColors();
+```
+
 #### Layer management quick hits
-- Add: `surface.addLayer(layer)` where `layer` is `BaseLayer`, `DataLayer`, `RGBALayer`, `OutlineLayer`, or `LabelLayer`.
+- Add: `surface.addLayer(layer)` where `layer` is `BaseLayer`, `DataLayer`, `RGBALayer`, `VolumeProjectionLayer`, `OutlineLayer`, or `LabelLayer`.
 - Update: `surface.updateLayer(id, updates)` for single-layer tweaks or `surface.updateLayers([{ id, ...updates }])` for batches (no `type` required when updating).
 - Order: `surface.setLayerOrder(['base', 'activation', 'roi'])`.
 - Clear: `surface.clearLayers()` removes all non-base layers; pass `{ includeBase: true }` to drop the base too.
 - CPU vs GPU compositing: pass `useGPUCompositing: true` in `MultiLayerNeuroSurface` config to enable WebGL2-based blending; call `surface.setWideLines(false)` if your platform dislikes wide-line outlines.
+
+## Temporal Playback
+
+Animate time-series data on a brain surface with smooth frame interpolation, playback controls, and hover sparkline tooltips.
+
+```javascript
+import {
+  MultiLayerNeuroSurface, TemporalDataLayer,
+  TimelineController, SparklineOverlay
+} from 'surfview';
+
+// frames: array of Float32Arrays (one per timepoint, each of length vertexCount)
+// times: sorted array of time values (same length as frames)
+const temporalLayer = new TemporalDataLayer('activation', frames, times, 'hot', {
+  range: [0, 1],
+  threshold: [0.15, 0],
+  opacity: 0.85
+});
+
+surface.addLayer(temporalLayer);
+
+// Timeline controller drives playback (decoupled from rendering)
+const timeline = new TimelineController(times, { speed: 0.5, loop: 'loop' });
+
+timeline.on('timechange', (e) => {
+  temporalLayer.setTime(e.frameA, e.frameB, e.alpha);
+  surface.requestColorUpdate();
+});
+
+timeline.play();
+```
+
+### Sparkline Tooltips
+
+Show a per-vertex time-series sparkline on hover with a playback position marker:
+
+```javascript
+const sparkline = new SparklineOverlay(container, {
+  width: 220, height: 90,
+  lineColor: '#ff8800', timeMarkerColor: '#ff2222'
+});
+
+viewer.on('vertex:hover', (e) => {
+  if (e.vertexIndex !== null) {
+    const series = temporalLayer.getTimeSeries(e.vertexIndex);
+    sparkline.show(series, times, timeline.getState().currentTime, e.screenX, e.screenY);
+  } else {
+    sparkline.hide();
+  }
+});
+
+timeline.on('timechange', (e) => sparkline.updateTimeMarker(e.time));
+```
+
+### TimelineController API
+
+- `play()`, `pause()`, `stop()`, `toggle()` -- playback control
+- `seek(time)` -- jump to a specific time
+- `setSpeed(multiplier)` -- e.g. `0.5` for half speed, `2` for double
+- `setLoop('none' | 'loop' | 'bounce')` -- loop mode
+- `getState()` -- returns `{ currentTime, playing, speed, loopMode, frameA, frameB, alpha }`
+- Events: `'timechange'`, `'play'`, `'pause'`, `'stop'`
 
 ## Available Colormaps
 
@@ -298,7 +379,8 @@ Requires WebGL 2.0 support.
 ### Events you can listen for
 - `surface:added|surface:removed|surface:variant`
 - `layer:added|layer:removed|layer:updated|layer:colormap|layer:intensity|layer:threshold|layer:opacity`
-- `surface:click` (pick result), `render:before|render:after`, `render:needed`
+- `surface:click` (pick result), `vertex:hover` (hover with surfaceId, vertexIndex, screenX, screenY)
+- `render:before|render:after`, `render:needed`
 - `annotation:added|annotation:moved|annotation:removed|annotation:reset|annotation:activated`
 - `viewpoint:changed`, `controls:changed|controls:error`
 

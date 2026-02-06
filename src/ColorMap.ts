@@ -122,7 +122,6 @@ export class ColorMap extends EventEmitter {
     if (thresholdActive) {
       // Value is IN the hide zone (between min and max) → make transparent
       if (value >= threshMin && value <= threshMax) {
-        debugLog(`ColorMap: value ${value} hidden by threshold [${threshMin}, ${threshMax}]`);
         return this.hasAlpha() ? [0, 0, 0, 0] : [0, 0, 0];
       }
     }
@@ -146,14 +145,12 @@ export class ColorMap extends EventEmitter {
       return this.hasAlpha() ? [0.5, 0.5, 0.5, 1] : [0.5, 0.5, 0.5];
     }
 
-    const color = [...rawColor] as ColorArray;
-
-    // Apply alpha if needed
-    if (this._hasAlpha && color.length === 4) {
-      color[3] = color[3] * this.alpha;
+    // Apply alpha if needed — only copy when mutation is required
+    if (this._hasAlpha && rawColor.length === 4 && this.alpha !== 1) {
+      return [rawColor[0], rawColor[1], rawColor[2], rawColor[3] * this.alpha] as ColorArray;
     }
 
-    return color;
+    return rawColor as ColorArray;
   }
 
   hasAlpha(): boolean {

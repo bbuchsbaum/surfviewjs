@@ -27,6 +27,88 @@ const layer = new DataLayer(
 surface.addLayer(layer);
 ```
 
+### VolumeProjectionLayer (GPU Volume Projection)
+
+Sample a 3D volume at each surface vertex and map it through a 1D colormap.
+
+- **GPU path**: when `MultiLayerNeuroSurface` is in GPU compositing mode, sampling happens in the vertex shader (WebGL2 required).
+- **CPU fallback**: in CPU compositing mode, SurfView falls back to a per-vertex nearest-neighbor lookup + colormap on the CPU.
+
+```javascript
+import { MultiLayerNeuroSurface, VolumeProjectionLayer } from 'surfview';
+
+const surface = new MultiLayerNeuroSurface(geometry, { useGPUCompositing: true });
+viewer.addSurface(surface, 'brain');
+surface.setCompositingMode(true); // stays CPU if WebGL2 is unavailable
+
+const volumeLayer = new VolumeProjectionLayer(
+  'volume',
+  volumeData,          // Float32Array length = nx*ny*nz
+  [nx, ny, nz],
+  {
+    // Provide ONE of:
+    affineMatrix,      // voxel->world (column-major); inverted internally
+    // worldToIJK,      // optional: direct world->voxel (column-major)
+    // voxelSize, volumeOrigin, // optional: simple affine builder
+
+    colormap: 'hot',
+    range: [-3, 3],
+    threshold: [-1.96, 1.96], // hide values inside [low, high]
+    opacity: 0.85,
+    fillValue: 0
+  }
+);
+
+surface.addLayer(volumeLayer);
+surface.updateColors();
+```
+
+**Updates**
+
+```javascript
+// Update display without reprojecting on the CPU
+surface.updateLayer('volume', {
+  colormap: 'viridis',
+  range: [-5, 5],
+  threshold: [-2.58, 2.58],
+  opacity: 0.7
+});
+
+// 4D/timepoint update (uploads a new 3D texture on the GPU)
+surface.updateLayer('volume', { volumeData: nextVolumeData });
+```
+
+**Notes**
+- `affineMatrix` / `worldToIJK` arrays are interpreted as Three.js `Matrix4` layout (column-major).
+- Values equal to `fillValue` (and out-of-bounds samples) are treated as transparent.
+- GPU compositing currently supports up to 8 total layers (including the base layer); volume layers count toward this limit.
+
+### TemporalDataLayer
+
+For time-varying scalar data with frame interpolation. Extends `DataLayer` with multiple temporal frames. See the full [Temporal Playback](/guide/temporal) guide for details.
+
+```javascript
+import { TemporalDataLayer, TimelineController } from 'surfview';
+
+// frames: T Float32Arrays (one per timepoint), each of length V
+// times: sorted number[] of length T
+const layer = new TemporalDataLayer('activation', frames, times, 'hot', {
+  range: [0, 1],
+  threshold: [0.15, 0],
+  opacity: 0.85
+});
+
+surface.addLayer(layer);
+
+// Drive with a TimelineController
+const timeline = new TimelineController(times, { speed: 0.5, loop: 'loop' });
+timeline.on('timechange', (e) => {
+  layer.setTime(e.frameA, e.frameB, e.alpha);
+  surface.requestColorUpdate();
+});
+timeline.play();
+```
+
 ### RGBALayer
 
 For pre-computed RGBA colors.

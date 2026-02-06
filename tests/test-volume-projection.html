@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GPU Volume Projection Test</title>
+  <style>
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: #111; color: #eee; }
+    #viewer { width: 100vw; height: 100vh; }
+    .hud {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      background: rgba(0, 0, 0, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      padding: 10px 12px;
+      border-radius: 8px;
+      max-width: 520px;
+      font-size: 13px;
+      line-height: 1.35;
+    }
+    .hud code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+    .error { color: #ffb4b4; }
+  </style>
+</head>
+<body>
+  <div id="viewer"></div>
+  <div class="hud" id="hud">
+    <div><strong>GPU Volume-to-Surface Projection</strong></div>
+    <div id="status">Initializing…</div>
+    <div style="margin-top: 6px;">
+      Uses <code>VolumeProjectedSurface</code> sampling a synthetic 3D Gaussian volume onto an icosphere.
+    </div>
+  </div>
+
+  <script type="module">
+    import { NeuroSurfaceViewer, SurfaceGeometry, THREE } from '../src/index.js';
+
+    function makeIcosphere(radius = 12, subdivisions = 5) {
+      const g = new THREE.IcosahedronGeometry(radius, subdivisions);
+      const pos = g.getAttribute('position');
+      const vertices = new Float32Array(pos.array);
+      const faces = g.index
+        ? new Uint32Array(g.index.array)
+        : new Uint32Array(Array.from({ length: pos.count }, (_, i) => i));
+      g.dispose();
+      return new SurfaceGeometry(vertices, faces, 'both');
+    }
+
+    function makeGaussianVolume(nx, ny, nz) {
+      const data = new Float32Array(nx * ny * nz);
+      const cx = (nx - 1) / 2;
+      const cy = (ny - 1) / 2;
+      const cz = (nz - 1) / 2;
+      const sx = nx / 4;
+      const sy = ny / 4;
+      const sz = nz / 4;
+      let idx = 0;
+
+      for (let k = 0; k < nz; k++) {
+        const dz = (k - cz) / sz;
+        for (let j = 0; j < ny; j++) {
+          const dy = (j - cy) / sy;
+          for (let i = 0; i < nx; i++) {
+            const dx = (i - cx) / sx;
+            const r2 = dx * dx + dy * dy + dz * dz;
+            data[idx++] = Math.exp(-0.5 * r2);
+          }
+        }
+      }
+      return data;
+    }
+
+    const statusEl = document.getElementById('status');
+    const container = document.getElementById('viewer');
+
+    const viewer = new NeuroSurfaceViewer(container, window.innerWidth, window.innerHeight, {
+      showControls: false,
+      useControls: true,
+      ambientLightColor: 0x4a4a4a,
+      directionalLightIntensity: 1.0
+    });
+    viewer.startRenderLoop();
+
+    window.addEventListener('resize', () => {
+      viewer.resize(window.innerWidth, window.innerHeight);
+    });
+
+    const geometry = makeIcosphere(12, 5);
+
+    const dims = [48, 48, 48];
+    const volumeData = makeGaussianVolume(dims[0], dims[1], dims[2]);
+    const voxelSize = [1, 1, 1];
+    const volumeOrigin = [-dims[0] / 2, -dims[1] / 2, -dims[2] / 2];
+
+    const surface = viewer.addVolumeProjectedSurface(
+      geometry,
+      'icosphere',
+      { data: volumeData, dims, voxelSize, volumeOrigin },
+      { colormap: 'viridis', range: [0, 1], threshold: [0, 0], opacity: 1.0, baseColor: 0x2b2b2b }
+    );
+
+    if (!surface) {
+      statusEl.className = 'error';
+      statusEl.textContent = 'Unsupported: requires WebGL2 + float linear filtering for 3D textures.';
+    } else {
+      statusEl.textContent = 'OK: WebGL2 3D texture sampling active.';
+    }
+  </script>
+</body>
+</html>
+

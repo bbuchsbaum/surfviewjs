@@ -33,7 +33,7 @@ export class SurfaceFactory {
     const geometry = new SurfaceGeometry(
       def.vertices,
       def.faces,
-      def.hemisphere || def.hemisphere || 'unknown',
+      def.hemisphere || 'unknown',
       def.vertexCurv ?? null
     );
 

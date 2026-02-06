@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { NeuroSurface, SurfaceGeometry, SurfaceConfig } from './classes';
-import { LayerStack, BaseLayer, RGBALayer, DataLayer, TwoDataLayer, LabelLayer, Layer, TwoDataLayerConfig } from './layers';
+import { LayerStack, BaseLayer, RGBALayer, DataLayer, TwoDataLayer, LabelLayer, Layer, TwoDataLayerConfig, VolumeProjectionLayer } from './layers';
 import ColorMap2D, { ColorMap2DPreset } from './ColorMap2D';
 import { CurvatureLayer, CurvatureConfig } from './layers/CurvatureLayer';
 import { ClipPlaneSet, ClipPlane, ClipAxis } from './utils/ClipPlane';
@@ -8,6 +8,8 @@ import { debugLog } from './debug';
 import ColorMap from './ColorMap';
 import { GPULayerCompositor } from './GPULayerCompositor';
 import { OutlineLayer } from './OutlineLayer';
+import { TemporalDataLayer } from './temporal/TemporalDataLayer';
+import type { TemporalDataConfig } from './temporal/types';
 import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
@@ -69,11 +71,14 @@ function computeBoundaryEdges(
 
 export interface LayerUpdate {
   id: string;
-  type?: 'base' | 'rgba' | 'data' | 'outline' | 'label' | 'curvature';
+  type?: 'base' | 'rgba' | 'data' | 'outline' | 'label' | 'curvature' | 'volume' | 'temporal';
   data?: Float32Array;
   indices?: Uint32Array;
+  range?: [number, number];
+  threshold?: [number, number];
   colormap?: ColorMap | string;
   colorMap?: ColorMap | string; // Allow both spellings
+  cmap?: string;
   color?: THREE.ColorRepresentation;
   opacity?: number;
   visible?: boolean;
@@ -94,6 +99,22 @@ export interface LayerUpdate {
   brightness?: number;
   contrast?: number;
   smoothness?: number;
+
+  // Temporal layer properties
+  frames?: Float32Array[];
+  times?: number[];
+  factor?: import('./temporal/types').FactorDescriptor;
+
+  // Volume projection layer properties
+  volumeData?: Float32Array | number[];
+  dims?: [number, number, number];
+  worldToIJK?: THREE.Matrix4 | ArrayLike<number>;
+  affineMatrix?: THREE.Matrix4 | ArrayLike<number>;
+  affine?: ArrayLike<number>;
+  voxelSize?: [number, number, number];
+  volumeOrigin?: [number, number, number];
+  useHalfFloat?: boolean;
+  fillValue?: number;
 }
 
 export interface ClearLayersOptions {
@@ -435,6 +456,16 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
   addLayer(layer: Layer): void {
     this.layerStack.addLayer(layer);
     this.emit('layer:added', { surface: this, layer });
+
+    const maybeAttach = (layer as any).attach;
+    if (typeof maybeAttach === 'function') {
+      try {
+        maybeAttach.call(layer, this);
+      } catch (err) {
+        console.warn(`MultiLayerNeuroSurface: failed to attach layer "${layer.id}"`, err);
+      }
+    }
+
     if (layer instanceof OutlineLayer) {
       this.applyOutlineLayer(layer);
     } else {
@@ -496,6 +527,16 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     const layer = this.layerStack.getLayer(id);
     if (layer instanceof OutlineLayer) {
       this.detachOutlineLayer(layer);
+    }
+    if (layer) {
+      const maybeDetach = (layer as any).detach;
+      if (typeof maybeDetach === 'function') {
+        try {
+          maybeDetach.call(layer);
+        } catch (err) {
+          console.warn(`MultiLayerNeuroSurface: failed to detach layer "${layer.id}"`, err);
+        }
+      }
     }
 
     if (this.layerStack.removeLayer(id)) {
@@ -734,6 +775,33 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
               layer = new DataLayer(id, props.data, props.indices, colormap || 'jet', props);
             }
             break;
+          case 'volume':
+            if (props.volumeData && props.dims) {
+              const colormapName = typeof props.colormap === 'string'
+                ? props.colormap
+                : (props.cmap ?? 'viridis');
+              layer = new VolumeProjectionLayer(
+                id,
+                props.volumeData,
+                props.dims,
+                {
+                  colormap: colormapName,
+                  range: props.range,
+                  threshold: props.threshold,
+                  worldToIJK: props.worldToIJK,
+                  affineMatrix: props.affineMatrix ?? props.affine,
+                  voxelSize: props.voxelSize,
+                  volumeOrigin: props.volumeOrigin,
+                  useHalfFloat: props.useHalfFloat,
+                  fillValue: props.fillValue,
+                  visible: props.visible,
+                  opacity: props.opacity,
+                  blendMode: props.blendMode,
+                  order: props.order
+                }
+              );
+            }
+            break;
           case 'label':
             if (props.labels && props.labelDefs) {
               layer = new LabelLayer(id, {
@@ -765,6 +833,26 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
               });
             }
             break;
+          case 'temporal':
+            if (props.frames && props.times) {
+              const colormapTemporal = props.colormap || props.colorMap || props.cmap || 'jet';
+              layer = new TemporalDataLayer(
+                id,
+                props.frames,
+                props.times,
+                colormapTemporal,
+                {
+                  range: props.range,
+                  threshold: props.threshold,
+                  factor: props.factor,
+                  visible: props.visible,
+                  opacity: props.opacity,
+                  blendMode: props.blendMode,
+                  order: props.order
+                }
+              );
+            }
+            break;
           case 'curvature':
             if (props.curvature) {
               layer = new CurvatureLayer(id, props.curvature, {
@@ -785,6 +873,14 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
         
         if (layer) {
           this.layerStack.addLayer(layer);
+          const maybeAttach = (layer as any).attach;
+          if (typeof maybeAttach === 'function') {
+            try {
+              maybeAttach.call(layer, this);
+            } catch (err) {
+              console.warn(`MultiLayerNeuroSurface: failed to attach layer "${layer.id}"`, err);
+            }
+          }
           if (layer instanceof OutlineLayer) {
             this.applyOutlineLayer(layer);
           }
@@ -1048,13 +1144,13 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
       meshVisible: this.mesh?.visible,
     });
 
-    // Compute bounding box/sphere for camera centering
-    geometry.computeBoundingBox();
-    geometry.computeBoundingSphere();
-    if (geometry.boundingSphere) {
-      debugLog('MultiLayerNeuroSurface: Bounding sphere center:',
-        geometry.boundingSphere.center.toArray(),
-        'radius:', geometry.boundingSphere.radius);
+    // Only compute bounding box/sphere if not already computed
+    // (positions don't change during color updates)
+    if (!geometry.boundingBox) {
+      geometry.computeBoundingBox();
+    }
+    if (!geometry.boundingSphere) {
+      geometry.computeBoundingSphere();
     }
   }
 

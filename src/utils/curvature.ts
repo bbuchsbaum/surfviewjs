@@ -4,8 +4,8 @@ import * as THREE from 'three';
 /**
  * Compute mean curvature for each vertex of a mesh.
  *
- * Uses the discrete Laplace-Beltrami operator approach:
- * Mean curvature H = 0.5 * |Δx| where Δ is the cotangent Laplacian.
+ * Uses the umbrella operator (uniform Laplacian) as a fast approximation:
+ * H ≈ |v - mean(neighbors)| with sign determined by the vertex normal.
  *
  * NOTE: This is only meaningful on folded (pial) surfaces.
  * On inflated or flat surfaces, curvature will be near-zero.
@@ -19,29 +19,44 @@ export function computeMeanCurvature(geometry: SurfaceGeometry): Float32Array {
   const faces = geometry.faces;
   const vertexCount = vertices.length / 3;
 
-  // Build adjacency structure
+  // Build adjacency structure: neighbors and adjacent faces per vertex
   const neighbors: Set<number>[] = new Array(vertexCount);
+  const vertexFaces: number[][] = new Array(vertexCount);
   for (let i = 0; i < vertexCount; i++) {
     neighbors[i] = new Set();
+    vertexFaces[i] = [];
   }
 
-  // Build neighbor lists from faces
+  // Build neighbor lists and vertex-to-face map from faces
   for (let i = 0; i < faces.length; i += 3) {
     const a = faces[i];
     const b = faces[i + 1];
     const c = faces[i + 2];
+    const faceIdx = i / 3;
     neighbors[a].add(b);
     neighbors[a].add(c);
     neighbors[b].add(a);
     neighbors[b].add(c);
     neighbors[c].add(a);
     neighbors[c].add(b);
+    vertexFaces[a].push(faceIdx);
+    vertexFaces[b].push(faceIdx);
+    vertexFaces[c].push(faceIdx);
   }
 
   const curvature = new Float32Array(vertexCount);
-  const tempVec = new THREE.Vector3();
+
+  // Reusable vectors to avoid per-vertex allocation
   const vertexPos = new THREE.Vector3();
   const neighborPos = new THREE.Vector3();
+  const tempVec = new THREE.Vector3();
+  const v0 = new THREE.Vector3();
+  const v1 = new THREE.Vector3();
+  const v2 = new THREE.Vector3();
+  const edge1 = new THREE.Vector3();
+  const edge2 = new THREE.Vector3();
+  const faceNormal = new THREE.Vector3();
+  const normal = new THREE.Vector3();
 
   for (let i = 0; i < vertexCount; i++) {
     vertexPos.set(
@@ -57,7 +72,6 @@ export function computeMeanCurvature(geometry: SurfaceGeometry): Float32Array {
     }
 
     // Compute mean curvature using umbrella operator (simplified Laplacian)
-    // This is a fast approximation: H ≈ |v - mean(neighbors)|
     let sumX = 0, sumY = 0, sumZ = 0;
 
     for (const j of neighborSet) {
@@ -72,59 +86,21 @@ export function computeMeanCurvature(geometry: SurfaceGeometry): Float32Array {
     // Vector from vertex to centroid of neighbors
     tempVec.subVectors(neighborPos, vertexPos);
 
-    // Get vertex normal to determine sign (concave vs convex)
-    // We need to compute the normal from adjacent faces
-    const normal = computeVertexNormal(i, vertices, faces, neighbors[i]);
+    // Compute vertex normal from adjacent faces using pre-built vertex-to-face map
+    normal.set(0, 0, 0);
+    v0.copy(vertexPos);
+    let faceCount = 0;
 
-    // Curvature magnitude with sign based on normal direction
-    const magnitude = tempVec.length();
-    const sign = tempVec.dot(normal) > 0 ? 1 : -1;
+    for (const fi of vertexFaces[i]) {
+      const a = faces[fi * 3];
+      const b = faces[fi * 3 + 1];
+      const c = faces[fi * 3 + 2];
 
-    curvature[i] = sign * magnitude;
-  }
-
-  return curvature;
-}
-
-/**
- * Compute vertex normal by averaging adjacent face normals
- */
-function computeVertexNormal(
-  vertexIndex: number,
-  vertices: Float32Array,
-  faces: Uint32Array,
-  neighbors: Set<number>
-): THREE.Vector3 {
-  const normal = new THREE.Vector3(0, 0, 0);
-  const v0 = new THREE.Vector3(
-    vertices[vertexIndex * 3],
-    vertices[vertexIndex * 3 + 1],
-    vertices[vertexIndex * 3 + 2]
-  );
-  const v1 = new THREE.Vector3();
-  const v2 = new THREE.Vector3();
-  const edge1 = new THREE.Vector3();
-  const edge2 = new THREE.Vector3();
-  const faceNormal = new THREE.Vector3();
-
-  let faceCount = 0;
-
-  // Find all faces containing this vertex
-  for (let i = 0; i < faces.length; i += 3) {
-    const a = faces[i];
-    const b = faces[i + 1];
-    const c = faces[i + 2];
-
-    if (a === vertexIndex || b === vertexIndex || c === vertexIndex) {
       // Get the other two vertices
       let i1: number, i2: number;
-      if (a === vertexIndex) {
-        i1 = b; i2 = c;
-      } else if (b === vertexIndex) {
-        i1 = c; i2 = a;
-      } else {
-        i1 = a; i2 = b;
-      }
+      if (a === i) { i1 = b; i2 = c; }
+      else if (b === i) { i1 = c; i2 = a; }
+      else { i1 = a; i2 = b; }
 
       v1.set(vertices[i1 * 3], vertices[i1 * 3 + 1], vertices[i1 * 3 + 2]);
       v2.set(vertices[i2 * 3], vertices[i2 * 3 + 1], vertices[i2 * 3 + 2]);
@@ -139,14 +115,20 @@ function computeVertexNormal(
         faceCount++;
       }
     }
+
+    if (faceCount > 0) {
+      normal.divideScalar(faceCount);
+      normal.normalize();
+    }
+
+    // Curvature magnitude with sign based on normal direction
+    const magnitude = tempVec.length();
+    const sign = tempVec.dot(normal) > 0 ? 1 : -1;
+
+    curvature[i] = sign * magnitude;
   }
 
-  if (faceCount > 0) {
-    normal.divideScalar(faceCount);
-    normal.normalize();
-  }
-
-  return normal;
+  return curvature;
 }
 
 /**

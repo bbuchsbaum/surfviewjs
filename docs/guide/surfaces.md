@@ -21,6 +21,31 @@ const surface = new MultiLayerNeuroSurface(geometry, {
 });
 ```
 
+### VolumeProjectedSurface (WebGL2)
+
+Surface that samples a 3D volume texture at each vertex in a custom shader material (no CPU projection). This is a convenience option when you only need a single volume overlay; for a unified multi-layer workflow, prefer `MultiLayerNeuroSurface + VolumeProjectionLayer`.
+
+```javascript
+import { NeuroSurfaceViewer } from 'surfview';
+
+// Returns null if WebGL2 3D textures (and float linear filtering) aren’t supported.
+const surface = viewer.addVolumeProjectedSurface(
+  geometry,
+  'brain',
+  {
+    data: volumeData,
+    dims: [nx, ny, nz],
+    affineMatrix // voxel->world (column-major) or provide worldToIJK
+  },
+  {
+    colormap: 'hot',
+    range: [-3, 3],
+    threshold: [-1.96, 1.96],
+    opacity: 1.0
+  }
+);
+```
+
 ### ColorMappedNeuroSurface
 
 Surface with a single data layer and colormap.
