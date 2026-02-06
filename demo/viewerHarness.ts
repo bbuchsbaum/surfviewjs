@@ -1,4 +1,5 @@
 import { NeuroSurfaceViewer } from '@src/index.js';
+import type { NeuroSurfaceViewerConfig } from '@src/NeuroSurfaceViewer';
 
 export interface ViewerHandle {
   viewer: NeuroSurfaceViewer;
@@ -7,7 +8,7 @@ export interface ViewerHandle {
 
 export function createViewer(
   mount: HTMLElement,
-  config: Record<string, unknown> = {}
+  config: Partial<NeuroSurfaceViewerConfig> & { viewpoint?: string } = {}
 ): ViewerHandle {
   const width = mount.clientWidth || mount.parentElement?.clientWidth || 960;
   const height = mount.clientHeight || mount.parentElement?.clientHeight || 640;
@@ -22,7 +23,7 @@ export function createViewer(
       ambientLightColor: 0x404040,
       ...config
     },
-    (config as { viewpoint?: string }).viewpoint || 'lateral'
+    config.viewpoint || 'lateral'
   );
 
   viewer.startRenderLoop();

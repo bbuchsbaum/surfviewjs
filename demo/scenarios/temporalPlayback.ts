@@ -73,7 +73,7 @@ export const temporalPlayback: Scenario = {
     const { viewer, cleanup } = createViewer(mount, {
       showControls: true,
       backgroundColor: 0x0a0a14,
-      enableHoverCrosshair: true
+      hoverCrosshair: true
     });
 
     // Geometry
