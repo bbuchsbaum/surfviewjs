@@ -222,6 +222,23 @@ export class TimelineController extends EventEmitter {
     this.emit('timechange', event);
   }
 
+  toStateJSON(): { currentTime: number; speed: number; loopMode: string; playing: boolean } {
+    return {
+      currentTime: this.currentTime,
+      speed: this.speed,
+      loopMode: this.loopMode,
+      playing: this.playing
+    };
+  }
+
+  fromStateJSON(state: { currentTime?: number; speed?: number; loopMode?: string; playing?: boolean }): void {
+    if (state.currentTime !== undefined) this.seek(state.currentTime);
+    if (state.speed !== undefined) this.setSpeed(state.speed);
+    if (state.loopMode !== undefined) this.setLoop(state.loopMode as any);
+    if (state.playing === true) this.play();
+    else if (state.playing === false) this.pause();
+  }
+
   dispose(): void {
     this.pause();
     this.removeAllListeners();

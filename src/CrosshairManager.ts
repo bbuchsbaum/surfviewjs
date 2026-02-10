@@ -126,6 +126,17 @@ export class CrosshairManager {
     return true;
   }
 
+  toStateJSON(): { visible: boolean; surfaceId: string | null; vertexIndex: number | null; size: number; color: number; mode: string | null } {
+    return {
+      visible: this.visible,
+      surfaceId: this.surfaceId,
+      vertexIndex: this.vertexIndex,
+      size: this.size,
+      color: this.color,
+      mode: this.mode
+    };
+  }
+
   /**
    * Dispose all GPU resources (geometries, material).
    */

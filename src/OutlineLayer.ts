@@ -91,7 +91,20 @@ export class OutlineLayer extends Layer {
     if (update.blendMode !== undefined) this.setBlendMode(update.blendMode);
     if (update.order !== undefined) this.order = update.order;
 
-    this.needsUpdate = true;
+    this._notifyChange();
+  }
+
+  toStateJSON(): Record<string, unknown> {
+    return {
+      ...super.toStateJSON(),
+      type: 'outline',
+      color: this.color,
+      width: this.width,
+      halo: this.halo,
+      haloColor: this.haloColor,
+      haloWidth: this.haloWidth,
+      offset: this.offset
+    };
   }
 
   dispose(): void {

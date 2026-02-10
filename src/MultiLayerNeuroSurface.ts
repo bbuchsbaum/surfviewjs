@@ -8,6 +8,7 @@ import { debugLog } from './debug';
 import ColorMap from './ColorMap';
 import { GPULayerCompositor } from './GPULayerCompositor';
 import { OutlineLayer } from './OutlineLayer';
+import { ConnectivityLayer } from './ConnectivityLayer';
 import { TemporalDataLayer } from './temporal/TemporalDataLayer';
 import type { TemporalDataConfig } from './temporal/types';
 import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
@@ -457,6 +458,9 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     this.layerStack.addLayer(layer);
     this.emit('layer:added', { surface: this, layer });
 
+    // Wire up change notification so the layer can trigger re-compositing
+    layer._onChangeCallback = () => this.requestColorUpdate();
+
     const maybeAttach = (layer as any).attach;
     if (typeof maybeAttach === 'function') {
       try {
@@ -529,6 +533,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
       this.detachOutlineLayer(layer);
     }
     if (layer) {
+      layer._onChangeCallback = null;
       const maybeDetach = (layer as any).detach;
       if (typeof maybeDetach === 'function') {
         try {
@@ -733,6 +738,14 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
       }
     }
 
+    // Sync to connectivity layer materials
+    const threePlanes2 = this.clipPlanes.getThreePlanes();
+    this.layerStack.getAllLayers().forEach(layer => {
+      if (layer instanceof ConnectivityLayer) {
+        layer.setClipPlanes(threePlanes2.length > 0 ? threePlanes2 : null);
+      }
+    });
+
     // Enable clipping on the renderer if we have any planes
     if (this.viewer?.renderer) {
       this.viewer.renderer.localClippingEnabled = this.clipPlanes.hasEnabledPlanes();
@@ -934,7 +947,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     
     const visibleLayers = this.layerStack
       .getVisibleLayers()
-      .filter(layer => !(layer instanceof OutlineLayer));
+      .filter(layer => !(layer instanceof OutlineLayer) && !(layer instanceof ConnectivityLayer));
     this.gpuCompositor.updateLayers(visibleLayers);
     visibleLayers.forEach(layer => (layer.needsUpdate = false));
     
@@ -972,7 +985,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     // Get visible layers in order
     const visibleLayers = this.layerStack
       .getVisibleLayers()
-      .filter(layer => !(layer instanceof OutlineLayer));
+      .filter(layer => !(layer instanceof OutlineLayer) && !(layer instanceof ConnectivityLayer));
 
     debugLog(`MultiLayerNeuroSurface: updateColorsCPU found ${visibleLayers.length} visible layers`);
 
@@ -1309,10 +1322,12 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
    * Dispose of all resources
    */
   dispose(): void {
-    // Remove outline objects to avoid orphaned materials
+    // Remove outline and connectivity objects to avoid orphaned materials
     this.layerStack.getAllLayers().forEach(layer => {
       if (layer instanceof OutlineLayer) {
         this.detachOutlineLayer(layer);
+      } else if (layer instanceof ConnectivityLayer) {
+        layer.detach();
       }
     });
 

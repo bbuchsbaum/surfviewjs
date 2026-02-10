@@ -77,8 +77,8 @@ export class CurvatureLayer extends Layer {
     this.curvature = curvature instanceof Float32Array
       ? curvature
       : new Float32Array(curvature);
-    this.needsUpdate = true;
     this.rgbaBuffer = null;
+    this._notifyChange();
   }
 
   /**
@@ -93,8 +93,8 @@ export class CurvatureLayer extends Layer {
    */
   setBrightness(brightness: number): void {
     this.brightness = Math.max(0, Math.min(1, brightness));
-    this.needsUpdate = true;
     this.rgbaBuffer = null;
+    this._notifyChange();
   }
 
   /**
@@ -102,8 +102,8 @@ export class CurvatureLayer extends Layer {
    */
   setContrast(contrast: number): void {
     this.contrast = Math.max(0, Math.min(1, contrast));
-    this.needsUpdate = true;
     this.rgbaBuffer = null;
+    this._notifyChange();
   }
 
   /**
@@ -111,8 +111,8 @@ export class CurvatureLayer extends Layer {
    */
   setSmoothness(smoothness: number): void {
     this.smoothness = Math.max(0.01, smoothness);
-    this.needsUpdate = true;
     this.rgbaBuffer = null;
+    this._notifyChange();
   }
 
   /**
@@ -187,6 +187,16 @@ export class CurvatureLayer extends Layer {
     if (data.blendMode !== undefined) {
       this.setBlendMode(data.blendMode);
     }
+  }
+
+  toStateJSON(): Record<string, unknown> {
+    return {
+      ...super.toStateJSON(),
+      type: 'curvature',
+      brightness: this.brightness,
+      contrast: this.contrast,
+      smoothness: this.smoothness
+    };
   }
 
   /**

@@ -18,6 +18,10 @@ import { AnnotationManager, AnnotationRecord } from './annotations';
 import { GPUPicker, GPUPickResult } from './utils/GPUPicker';
 import { VolumeProjectedSurface } from './surfaces/VolumeProjectedSurface';
 import { CrosshairManager, CrosshairOptions } from './CrosshairManager';
+import { serialize } from './serialization/StateSerializer';
+import { deserialize } from './serialization/StateDeserializer';
+import { encode, decode } from './serialization/ViewerState';
+import type { ViewerStateV1, RestorationReport } from './serialization/ViewerState';
 
 export interface NeuroSurfaceViewerConfig {
   ambientLightColor?: number;
@@ -2156,6 +2160,35 @@ export class NeuroSurfaceViewer extends EventEmitter {
     
     this.requestRender();
     return { width, height, dpr };
+  }
+
+  // -------------------------------------------------------------------------
+  // State Serialization
+  // -------------------------------------------------------------------------
+
+  /** Capture the entire viewer state as a JSON-compatible object. */
+  toJSON(): ViewerStateV1 {
+    return serialize(this);
+  }
+
+  /** Restore viewer state from a serialized object. */
+  fromJSON(state: ViewerStateV1): RestorationReport {
+    return deserialize(this, state);
+  }
+
+  /** Encode the current viewer state as a URL hash fragment. */
+  toURL(baseUrl?: string): string {
+    const state = this.toJSON();
+    const hash = encode(state);
+    const base = baseUrl ?? (typeof window !== 'undefined' ? window.location.href.split('#')[0] : '');
+    return `${base}#${hash}`;
+  }
+
+  /** Restore viewer state from a URL hash fragment. */
+  fromURL(url?: string): RestorationReport {
+    const src = url ?? (typeof window !== 'undefined' ? window.location.hash : '');
+    const state = decode(src);
+    return this.fromJSON(state);
   }
 
   dispose(): void {

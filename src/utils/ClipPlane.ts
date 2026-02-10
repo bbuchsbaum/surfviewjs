@@ -204,6 +204,22 @@ export class ClipPlane {
     };
   }
 
+  toStateJSON(): { axis: string; normal: [number, number, number]; distance: number; enabled: boolean; flip: boolean } {
+    const n = this.normal;
+    // Detect axis from normal
+    let axis: string = 'custom';
+    if (Math.abs(Math.abs(n.x) - 1) < 0.001 && Math.abs(n.y) < 0.001 && Math.abs(n.z) < 0.001) axis = 'x';
+    else if (Math.abs(n.x) < 0.001 && Math.abs(Math.abs(n.y) - 1) < 0.001 && Math.abs(n.z) < 0.001) axis = 'y';
+    else if (Math.abs(n.x) < 0.001 && Math.abs(n.y) < 0.001 && Math.abs(Math.abs(n.z) - 1) < 0.001) axis = 'z';
+    return {
+      axis,
+      normal: [n.x, n.y, n.z],
+      distance: this.getDistance(),
+      enabled: this.enabled,
+      flip: this._flip
+    };
+  }
+
   /**
    * Clone this clip plane.
    */
@@ -328,6 +344,10 @@ export class ClipPlaneSet {
    */
   hasEnabledPlanes(): boolean {
     return this._planes.some(p => p.enabled);
+  }
+
+  toStateJSON(): Array<{ axis: string; normal: [number, number, number]; distance: number; enabled: boolean; flip: boolean }> {
+    return this._planes.map(p => p.toStateJSON());
   }
 
   /**

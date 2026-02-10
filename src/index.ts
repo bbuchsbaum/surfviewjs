@@ -37,7 +37,12 @@ import { computePickInfo } from './utils/Picking';
 import { GPUPicker } from './utils/GPUPicker';
 import { CrosshairManager } from './CrosshairManager';
 import { TemporalDataLayer, TimelineController, SparklineOverlay } from './temporal';
+import { StatisticalMapLayer } from './layers/StatisticalMapLayer';
+import { ConnectivityLayer } from './ConnectivityLayer';
+import { buildVertexAdjacency } from './utils/meshAdjacency';
+import { computeFDRThreshold, computeBonferroniThreshold, findClusters, filterClustersBySize, pToZ, tToZ } from './utils/statistics';
 import { detectCapabilities } from './utils/capabilities';
+import { serialize, deserialize, encode, decode, CURRENT_VERSION } from './serialization';
 
 // Register TemporalDataLayer with Layer factory to avoid circular dependency
 Layer.registerTemporalLayer(TemporalDataLayer);
@@ -100,7 +105,21 @@ export {
   VolumeTexture3D,
   VolumeProjectionMaterial,
   VolumeProjectedSurface,
-  createColormapTexture
+  createColormapTexture,
+  StatisticalMapLayer,
+  ConnectivityLayer,
+  buildVertexAdjacency,
+  computeFDRThreshold,
+  computeBonferroniThreshold,
+  findClusters,
+  filterClustersBySize,
+  pToZ,
+  tToZ,
+  serialize,
+  deserialize,
+  encode,
+  decode,
+  CURRENT_VERSION
 };
 
 // Export temporal types for TypeScript consumers
@@ -112,6 +131,43 @@ export type {
   LoopMode,
   SparklineOptions
 } from './temporal';
+
+// Export statistical map types for TypeScript consumers
+export type {
+  StatisticalMapLayerConfig,
+  DualThresholdConfig,
+  VertexStatInfo,
+  StatType
+} from './layers/StatisticalMapLayer';
+
+// Export connectivity layer types for TypeScript consumers
+export type {
+  ConnectivityEdge,
+  ConnectivityLayerConfig,
+  ConnectivityLayerUpdate,
+  RenderMode,
+  CSRData
+} from './ConnectivityLayer';
+
+// Export mesh adjacency types
+export type { MeshAdjacency } from './utils/meshAdjacency';
+
+// Export statistics result types
+export type { FDRResult, BonferroniResult, ClusterResult } from './utils/statistics';
+
+// Export serialization types
+export type {
+  ViewerStateV1,
+  CameraState,
+  LightingState,
+  ViewerConfigState,
+  ClipPlaneState as SerializedClipPlaneState,
+  LayerState,
+  SurfaceState,
+  CrosshairState as SerializedCrosshairState,
+  SelectionState,
+  RestorationReport
+} from './serialization';
 
 // Export loaders
 export * from './loaders';

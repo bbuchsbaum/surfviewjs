@@ -3,6 +3,7 @@ import ColorMap from './ColorMap';
 import { debugLog } from './debug';
 import { EventEmitter, UnsubscribeFn } from './EventEmitter';
 import { LaplacianSmoothing } from './utils/LaplacianSmoothing';
+import { MeshAdjacency, buildVertexAdjacency } from './utils/meshAdjacency';
 
 /**
  * Configuration options for surface material properties and appearance
@@ -80,6 +81,7 @@ export class SurfaceGeometry {
     size: THREE.Vector3;
     radius: number;
   } | null;
+  private _adjacencyCache: MeshAdjacency | null;
 
   constructor(
     vertices: Float32Array | number[],
@@ -94,6 +96,7 @@ export class SurfaceGeometry {
     this.mesh = null;
     this.hemisphere = hemi; // Add hemisphere property for viewer
     this._boundsCache = null;
+    this._adjacencyCache = null;
 
     debugLog('SurfaceGeometry constructor called');
     debugLog('Vertices:', this.vertices.length);
@@ -170,6 +173,17 @@ export class SurfaceGeometry {
     this._boundsCache = null;
   }
 
+  /**
+   * Get vertex adjacency structure, lazily built and cached.
+   * Returns neighbor and face-incidence information for mesh algorithms.
+   */
+  getAdjacency(): MeshAdjacency {
+    if (!this._adjacencyCache) {
+      this._adjacencyCache = buildVertexAdjacency(this.faces, this.getVertexCount());
+    }
+    return this._adjacencyCache;
+  }
+
   dispose(): void {
     if (this.mesh) {
       // Properly dispose Three.js resources
@@ -185,6 +199,7 @@ export class SurfaceGeometry {
       }
       this.mesh = null;
     }
+    this._adjacencyCache = null;
     // TypedArrays don't need disposal, just dereference
     this.vertices = null as any;
     this.faces = null as any;

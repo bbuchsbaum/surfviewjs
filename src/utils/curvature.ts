@@ -1,4 +1,5 @@
 import { SurfaceGeometry } from '../classes';
+import { buildVertexAdjacency } from './meshAdjacency';
 import * as THREE from 'three';
 
 /**
@@ -19,30 +20,10 @@ export function computeMeanCurvature(geometry: SurfaceGeometry): Float32Array {
   const faces = geometry.faces;
   const vertexCount = vertices.length / 3;
 
-  // Build adjacency structure: neighbors and adjacent faces per vertex
-  const neighbors: Set<number>[] = new Array(vertexCount);
-  const vertexFaces: number[][] = new Array(vertexCount);
-  for (let i = 0; i < vertexCount; i++) {
-    neighbors[i] = new Set();
-    vertexFaces[i] = [];
-  }
-
-  // Build neighbor lists and vertex-to-face map from faces
-  for (let i = 0; i < faces.length; i += 3) {
-    const a = faces[i];
-    const b = faces[i + 1];
-    const c = faces[i + 2];
-    const faceIdx = i / 3;
-    neighbors[a].add(b);
-    neighbors[a].add(c);
-    neighbors[b].add(a);
-    neighbors[b].add(c);
-    neighbors[c].add(a);
-    neighbors[c].add(b);
-    vertexFaces[a].push(faceIdx);
-    vertexFaces[b].push(faceIdx);
-    vertexFaces[c].push(faceIdx);
-  }
+  // Use shared adjacency builder
+  const adjacency = buildVertexAdjacency(faces, vertexCount);
+  const neighbors = adjacency.neighbors;
+  const vertexFaces = adjacency.vertexFaces;
 
   const curvature = new Float32Array(vertexCount);
 

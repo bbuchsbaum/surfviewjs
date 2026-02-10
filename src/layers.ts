@@ -106,6 +106,8 @@ export abstract class Layer {
   blendMode: BlendMode;
   order: number;
   needsUpdate: boolean;
+  /** Callback set by the parent surface to trigger re-compositing on change. */
+  _onChangeCallback: (() => void) | null;
   private static _outlineCtor: any;
   private static _temporalCtor: any;
 
@@ -116,12 +118,21 @@ export abstract class Layer {
     this.blendMode = config.blendMode || 'normal';
     this.order = config.order || 0;
     this.needsUpdate = true;
+    this._onChangeCallback = null;
+  }
+
+  /** Notify the parent surface that this layer's data has changed. */
+  protected _notifyChange(): void {
+    this.needsUpdate = true;
+    if (this._onChangeCallback) {
+      this._onChangeCallback();
+    }
   }
 
   setVisible(visible: boolean): void {
     if (this.visible !== visible) {
       this.visible = visible;
-      this.needsUpdate = true;
+      this._notifyChange();
     }
   }
 
@@ -129,7 +140,7 @@ export abstract class Layer {
     opacity = Math.max(0, Math.min(1, opacity));
     if (this.opacity !== opacity) {
       this.opacity = opacity;
-      this.needsUpdate = true;
+      this._notifyChange();
     }
   }
 
@@ -137,7 +148,7 @@ export abstract class Layer {
     const validModes: BlendMode[] = ['normal', 'additive', 'multiply'];
     if (validModes.includes(mode) && this.blendMode !== mode) {
       this.blendMode = mode;
-      this.needsUpdate = true;
+      this._notifyChange();
     }
   }
 
@@ -155,6 +166,18 @@ export abstract class Layer {
 
   dispose(): void {
     // Override in subclasses if needed
+  }
+
+  /** Serialize common layer state for state persistence. Override in subclasses. */
+  toStateJSON(): Record<string, unknown> {
+    return {
+      id: this.id,
+      type: this.constructor.name,
+      visible: this.visible,
+      opacity: this.opacity,
+      blendMode: this.blendMode,
+      order: this.order
+    };
   }
 
   static registerOutlineLayer(ctor: any): void {
@@ -325,7 +348,7 @@ export class RGBALayer extends Layer {
       throw new Error('RGBA data length must be divisible by 4');
     }
     
-    this.needsUpdate = true;
+    this._notifyChange();
     debugLog(`RGBALayer ${this.id}: Set RGBA data with ${this.rgbaData.length / 4} vertices`);
   }
 
@@ -355,6 +378,10 @@ export class RGBALayer extends Layer {
     if (data.blendMode !== undefined) {
       this.setBlendMode(data.blendMode);
     }
+  }
+
+  toStateJSON(): Record<string, unknown> {
+    return { ...super.toStateJSON(), type: 'rgba' };
   }
 }
 
@@ -413,7 +440,7 @@ export class DataLayer extends Layer {
       }
     }
     
-    this.needsUpdate = true;
+    this._notifyChange();
     debugLog(`DataLayer ${this.id}: Set data with ${this.data.length} values`);
   }
 
@@ -458,7 +485,7 @@ export class DataLayer extends Layer {
     
     // Invalidate cached RGBA buffer to force regeneration
     this._cachedRGBABuffer = null;
-    this.needsUpdate = true;
+    this._notifyChange();
     debugLog(`DataLayer ${this.id}: ColorMap updated, needsUpdate = true`);
   }
 
@@ -466,7 +493,7 @@ export class DataLayer extends Layer {
     this.range = range;
     if (this.colorMap) {
       this.colorMap.setRange(range);
-      this.needsUpdate = true;
+      this._notifyChange();
     }
   }
 
@@ -474,7 +501,7 @@ export class DataLayer extends Layer {
     this.threshold = threshold;
     if (this.colorMap) {
       this.colorMap.setThreshold(threshold);
-      this.needsUpdate = true;
+      this._notifyChange();
     }
   }
 
@@ -488,6 +515,16 @@ export class DataLayer extends Layer {
 
   getColorMapName(): string {
     return this.colorMapName || 'custom';
+  }
+
+  toStateJSON(): Record<string, unknown> {
+    return {
+      ...super.toStateJSON(),
+      type: 'data',
+      colorMapName: this.getColorMapName(),
+      range: this.getRange(),
+      threshold: this.getThreshold()
+    };
   }
 
   getRGBAData(vertexCount: number): Float32Array {
@@ -647,7 +684,7 @@ export class VolumeProjectionLayer extends Layer {
    */
   attach(surface: { geometry: { vertices: Float32Array }; mesh?: THREE.Mesh }): void {
     this.attachedSurface = surface;
-    this.needsUpdate = true;
+    this._notifyChange();
   }
 
   detach(): void {
@@ -685,18 +722,18 @@ export class VolumeProjectionLayer extends Layer {
   setRange(range: [number, number]): void {
     this.range = range;
     this.colorMap.setRange(range);
-    this.needsUpdate = true;
+    this._notifyChange();
   }
 
   setThreshold(threshold: [number, number]): void {
     this.threshold = threshold;
     this.colorMap.setThreshold(threshold);
-    this.needsUpdate = true;
+    this._notifyChange();
   }
 
   setFillValue(fillValue: number): void {
     this.fillValue = fillValue;
-    this.needsUpdate = true;
+    this._notifyChange();
   }
 
   setColormap(name: string): void {
@@ -718,20 +755,20 @@ export class VolumeProjectionLayer extends Layer {
       this.colormapTexture.dispose();
     }
     this.colormapTexture = createColormapTexture(this.colorMapName);
-    this.needsUpdate = true;
+    this._notifyChange();
   }
 
   setWorldToIJK(matrix: THREE.Matrix4 | ArrayLike<number>): void {
     this.worldToIJK = matrix instanceof THREE.Matrix4
       ? matrix.clone()
       : new THREE.Matrix4().fromArray(Array.from(matrix));
-    this.needsUpdate = true;
+    this._notifyChange();
   }
 
   updateVolumeData(data: Float32Array | number[]): void {
     this.volumeData = data instanceof Float32Array ? data : new Float32Array(data);
     this.volumeTexture.updateData(this.volumeData);
-    this.needsUpdate = true;
+    this._notifyChange();
   }
 
   getRGBAData(vertexCount: number): Float32Array {
@@ -838,7 +875,7 @@ export class VolumeProjectionLayer extends Layer {
         threshold: this.threshold,
         colormap: this.colorMapName
       });
-      this.needsUpdate = true;
+      this._notifyChange();
     }
     if (updates.fillValue !== undefined) {
       this.setFillValue(updates.fillValue);
@@ -852,6 +889,17 @@ export class VolumeProjectionLayer extends Layer {
     if (updates.blendMode !== undefined) {
       this.setBlendMode(updates.blendMode);
     }
+  }
+
+  toStateJSON(): Record<string, unknown> {
+    return {
+      ...super.toStateJSON(),
+      type: 'volume',
+      colorMapName: this.colorMapName,
+      range: [...this.range],
+      threshold: [...this.threshold],
+      fillValue: this.fillValue
+    };
   }
 
   dispose(): void {
@@ -983,7 +1031,7 @@ export class TwoDataLayer extends Layer {
       }
     }
 
-    this.needsUpdate = true;
+    this._notifyChange();
     debugLog(`TwoDataLayer ${this.id}: Set data with ${this.dataX.length} values`);
   }
 
@@ -1020,7 +1068,7 @@ export class TwoDataLayer extends Layer {
     this.colorMap.setThresholdX(this.thresholdX);
     this.colorMap.setThresholdY(this.thresholdY);
 
-    this.needsUpdate = true;
+    this._notifyChange();
     debugLog(`TwoDataLayer ${this.id}: ColorMap set to ${this.colorMapName}`);
   }
 
@@ -1032,7 +1080,7 @@ export class TwoDataLayer extends Layer {
     this.rangeX = range;
     if (this.colorMap) {
       this.colorMap.setRangeX(range);
-      this.needsUpdate = true;
+      this._notifyChange();
     }
   }
 
@@ -1040,7 +1088,7 @@ export class TwoDataLayer extends Layer {
     this.rangeY = range;
     if (this.colorMap) {
       this.colorMap.setRangeY(range);
-      this.needsUpdate = true;
+      this._notifyChange();
     }
   }
 
@@ -1048,7 +1096,7 @@ export class TwoDataLayer extends Layer {
     this.thresholdX = threshold;
     if (this.colorMap) {
       this.colorMap.setThresholdX(threshold);
-      this.needsUpdate = true;
+      this._notifyChange();
     }
   }
 
@@ -1056,7 +1104,7 @@ export class TwoDataLayer extends Layer {
     this.thresholdY = threshold;
     if (this.colorMap) {
       this.colorMap.setThresholdY(threshold);
-      this.needsUpdate = true;
+      this._notifyChange();
     }
   }
 
@@ -1148,6 +1196,18 @@ export class TwoDataLayer extends Layer {
     }
   }
 
+  toStateJSON(): Record<string, unknown> {
+    return {
+      ...super.toStateJSON(),
+      type: 'twodata',
+      colorMapName: this.getColorMapName(),
+      rangeX: this.getRangeX(),
+      rangeY: this.getRangeY(),
+      thresholdX: this.getThresholdX(),
+      thresholdY: this.getThresholdY()
+    };
+  }
+
   dispose(): void {
     this.dataX = null;
     this.dataY = null;
@@ -1172,7 +1232,7 @@ export class BaseLayer extends Layer {
 
   setColor(color: number): void {
     this.color = color;
-    this.needsUpdate = true;
+    this._notifyChange();
   }
 
   getRGBAData(vertexCount: number): Float32Array {
@@ -1204,6 +1264,10 @@ export class BaseLayer extends Layer {
     if (updates.visible !== undefined) {
       this.setVisible(updates.visible);
     }
+  }
+
+  toStateJSON(): Record<string, unknown> {
+    return { ...super.toStateJSON(), type: 'base', color: this.color };
   }
 }
 
@@ -1245,7 +1309,7 @@ export class LabelLayer extends Layer {
       : labels instanceof Int32Array
         ? new Uint32Array(labels)
         : new Uint32Array(labels);
-    this.needsUpdate = true;
+    this._notifyChange();
   }
 
   setLabelDefs(labelDefs: Array<{ id: number; color: THREE.ColorRepresentation }>): void {
@@ -1253,7 +1317,7 @@ export class LabelLayer extends Layer {
     labelDefs.forEach(def => {
       this.labelMap.set(def.id, new THREE.Color(def.color as any));
     });
-    this.needsUpdate = true;
+    this._notifyChange();
   }
 
   update(data: LabelLayerOptions & LayerUpdateData): void {
@@ -1265,7 +1329,7 @@ export class LabelLayer extends Layer {
     }
     if (data.defaultColor !== undefined) {
       this.defaultColor = new THREE.Color(data.defaultColor as any);
-      this.needsUpdate = true;
+      this._notifyChange();
     }
     if (data.opacity !== undefined) {
       this.setOpacity(data.opacity);
@@ -1300,6 +1364,10 @@ export class LabelLayer extends Layer {
 
     this.needsUpdate = false;
     return buffer;
+  }
+
+  toStateJSON(): Record<string, unknown> {
+    return { ...super.toStateJSON(), type: 'label' };
   }
 }
 

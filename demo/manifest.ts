@@ -13,6 +13,9 @@ import { colormap2d } from './scenarios/colormap2d';
 import { morphing } from './scenarios/morphing';
 import { gpupicking } from './scenarios/gpupicking';
 import { temporalPlayback } from './scenarios/temporalPlayback';
+import { statisticalMap } from './scenarios/statisticalMap';
+import { connectivity } from './scenarios/connectivity';
+import { stateSerialization } from './scenarios/stateSerialization';
 
 export const scenarios: Scenario[] = [
   quickstart,
@@ -23,6 +26,9 @@ export const scenarios: Scenario[] = [
   morphing,
   gpupicking,
   temporalPlayback,
+  statisticalMap,
+  connectivity,
+  stateSerialization,
   lighting,
   hemispheres,
   fslrFunc,
