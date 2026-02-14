@@ -38,6 +38,7 @@ import { GPUPicker } from './utils/GPUPicker';
 import { CrosshairManager } from './CrosshairManager';
 import { TemporalDataLayer, TimelineController, SparklineOverlay } from './temporal';
 import { StatisticalMapLayer } from './layers/StatisticalMapLayer';
+import { ParcelValueLayer } from './layers/ParcelValueLayer';
 import { ConnectivityLayer } from './ConnectivityLayer';
 import { buildVertexAdjacency } from './utils/meshAdjacency';
 import { computeFDRThreshold, computeBonferroniThreshold, findClusters, filterClustersBySize, pToZ, tToZ } from './utils/statistics';
@@ -107,6 +108,7 @@ export {
   VolumeProjectedSurface,
   createColormapTexture,
   StatisticalMapLayer,
+  ParcelValueLayer,
   ConnectivityLayer,
   buildVertexAdjacency,
   computeFDRThreshold,
@@ -171,6 +173,12 @@ export type {
 
 // Export loaders
 export * from './loaders';
+
+// Export parcel data representation types/utilities
+export * from './parcellation';
+
+// Export graph-native visualization primitives
+export * from './graphVisual';
 
 // Export event types
 export * from './events';

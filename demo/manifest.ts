@@ -16,6 +16,7 @@ import { temporalPlayback } from './scenarios/temporalPlayback';
 import { statisticalMap } from './scenarios/statisticalMap';
 import { connectivity } from './scenarios/connectivity';
 import { stateSerialization } from './scenarios/stateSerialization';
+import { topologyLens } from './scenarios/topologyLens';
 
 export const scenarios: Scenario[] = [
   quickstart,
@@ -28,6 +29,7 @@ export const scenarios: Scenario[] = [
   temporalPlayback,
   statisticalMap,
   connectivity,
+  topologyLens,
   stateSerialization,
   lighting,
   hemispheres,

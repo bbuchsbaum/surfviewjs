@@ -9,8 +9,10 @@ import ColorMap from './ColorMap';
 import { GPULayerCompositor } from './GPULayerCompositor';
 import { OutlineLayer } from './OutlineLayer';
 import { ConnectivityLayer } from './ConnectivityLayer';
+import { ParcelValueLayer, ParcelValueLayerConfig } from './layers/ParcelValueLayer';
 import { TemporalDataLayer } from './temporal/TemporalDataLayer';
 import type { TemporalDataConfig } from './temporal/types';
+import type { ParcelData } from './parcellation';
 import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
@@ -72,7 +74,7 @@ function computeBoundaryEdges(
 
 export interface LayerUpdate {
   id: string;
-  type?: 'base' | 'rgba' | 'data' | 'outline' | 'label' | 'curvature' | 'volume' | 'temporal';
+  type?: 'base' | 'rgba' | 'data' | 'outline' | 'label' | 'parcel' | 'curvature' | 'volume' | 'temporal';
   data?: Float32Array;
   indices?: Uint32Array;
   range?: [number, number];
@@ -95,6 +97,9 @@ export interface LayerUpdate {
   labels?: Uint32Array | Int32Array | number[];
   labelDefs?: Array<{ id: number; color: THREE.ColorRepresentation; name?: string }>;
   defaultColor?: THREE.ColorRepresentation;
+  parcelData?: ParcelData;
+  vertexLabels?: Uint32Array | Int32Array | number[];
+  valueColumn?: string;
   // Curvature layer properties
   curvature?: Float32Array | number[];
   brightness?: number;
@@ -517,6 +522,24 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
   }
 
   /**
+   * Add a parcel-native value layer.
+   *
+   * Parcel values are expanded to vertices using the provided per-vertex
+   * parcel labels.
+   */
+  addParcelValueLayer(
+    id: string,
+    parcelData: ParcelData,
+    vertexLabels: Uint32Array | Int32Array | number[],
+    colorMap: string = 'viridis',
+    config: ParcelValueLayerConfig = {}
+  ): ParcelValueLayer {
+    const layer = new ParcelValueLayer(id, parcelData, vertexLabels, colorMap, config);
+    this.addLayer(layer);
+    return layer;
+  }
+
+  /**
    * Get a TwoDataLayer by ID (type-safe convenience method)
    */
   getTwoDataLayer(id: string): TwoDataLayer | undefined {
@@ -821,6 +844,23 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
                 labels: props.labels,
                 labelDefs: props.labelDefs,
                 defaultColor: props.defaultColor,
+                visible: props.visible,
+                opacity: props.opacity,
+                blendMode: props.blendMode,
+                order: props.order
+              });
+            }
+            break;
+          case 'parcel':
+            if (props.parcelData && props.vertexLabels) {
+              const colormapParcel =
+                typeof props.colormap === 'string'
+                  ? props.colormap
+                  : (props.cmap ?? 'viridis');
+              layer = new ParcelValueLayer(id, props.parcelData, props.vertexLabels, colormapParcel, {
+                valueColumn: props.valueColumn,
+                range: props.range,
+                threshold: props.threshold,
                 visible: props.visible,
                 opacity: props.opacity,
                 blendMode: props.blendMode,
