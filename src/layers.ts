@@ -564,7 +564,7 @@ export class DataLayer extends Layer {
         rgbaData[offset] = color[0];     // R
         rgbaData[offset + 1] = color[1]; // G
         rgbaData[offset + 2] = color[2]; // B
-        rgbaData[offset + 3] = (color[3] || 1) * this.opacity; // A with layer opacity
+        rgbaData[offset + 3] = (color[3] ?? 1) * this.opacity; // A with layer opacity
 
         // Track transparency for debugging
         if (rgbaData[offset + 3] > 0) {

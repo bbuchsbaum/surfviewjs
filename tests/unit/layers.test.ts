@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Layer, DataLayer, RGBALayer, BaseLayer, LayerStack } from '../../src/layers';
+import ColorMap from '../../src/ColorMap';
 
 describe('DataLayer', () => {
   function makeDataLayer() {
@@ -49,6 +50,30 @@ describe('DataLayer', () => {
     const rgba = layer.getRGBAData(5);
     // Vertex 0 alpha should be scaled by 0.5
     expect(rgba[0 * 4 + 3]).toBeLessThanOrEqual(0.5);
+  });
+
+  it('preserves explicit transparent alpha from the colormap', () => {
+    const colorMap = new ColorMap([
+      [1, 0, 0, 1],
+      [0, 0, 1, 1]
+    ], {
+      range: [0, 1],
+      threshold: [0.4, 0.6]
+    });
+
+    const layer = new DataLayer(
+      'masked',
+      new Float32Array([0.5]),
+      null,
+      colorMap,
+      {
+        range: [0, 1],
+        threshold: [0.4, 0.6]
+      }
+    );
+
+    const rgba = layer.getRGBAData(1);
+    expect(rgba[3]).toBe(0);
   });
 
   it('throws on missing data', () => {
