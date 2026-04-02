@@ -122,7 +122,8 @@ export class ColorMap extends EventEmitter {
     if (thresholdActive) {
       // Value is IN the hide zone (between min and max) → make transparent
       if (value >= threshMin && value <= threshMax) {
-        return this.hasAlpha() ? [0, 0, 0, 0] : [0, 0, 0];
+        // Masked values must stay transparent even for RGB-only colormaps.
+        return [0, 0, 0, 0];
       }
     }
 

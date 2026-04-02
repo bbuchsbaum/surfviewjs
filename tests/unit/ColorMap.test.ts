@@ -93,6 +93,16 @@ describe('ColorMap', () => {
       expect(visible[3]).toBeGreaterThan(0);
     });
 
+    it('returns transparent RGBA for thresholded values from RGB-only colormaps', () => {
+      const cm = new ColorMap([[1, 0, 0], [0, 0, 1]]);
+      cm.setRange([0, 10]);
+      cm.setThreshold([3, 7]);
+
+      const hidden = cm.getColor(5);
+      expect(hidden).toHaveLength(4);
+      expect(hidden[3]).toBe(0);
+    });
+
     it('shows all values when threshold min === max', () => {
       const cm = new ColorMap([[1, 0, 0, 1], [0, 0, 1, 1]]);
       cm.setRange([0, 10]);
