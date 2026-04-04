@@ -39,6 +39,7 @@ import { CrosshairManager } from './CrosshairManager';
 import { TemporalDataLayer, TimelineController, SparklineOverlay } from './temporal';
 import { StatisticalMapLayer } from './layers/StatisticalMapLayer';
 import { ParcelValueLayer } from './layers/ParcelValueLayer';
+import { ParcelConnectivityLayer } from './layers/ParcelConnectivityLayer';
 import { ConnectivityLayer } from './ConnectivityLayer';
 import { buildVertexAdjacency } from './utils/meshAdjacency';
 import { computeFDRThreshold, computeBonferroniThreshold, findClusters, filterClustersBySize, pToZ, tToZ } from './utils/statistics';
@@ -51,6 +52,7 @@ import { NoopNeuroSurfaceViewer, hasDOM } from './NoopNeuroSurfaceViewer';
 import { VolumeTexture3D } from './textures/VolumeTexture3D';
 import { VolumeProjectionMaterial } from './materials/VolumeProjectionMaterial';
 import { VolumeProjectedSurface } from './surfaces/VolumeProjectedSurface';
+import { ParcelSurface } from './surfaces/ParcelSurface';
 import { createColormapTexture } from './textures/createColormapTexture';
 
 export {
@@ -106,9 +108,11 @@ export {
   VolumeTexture3D,
   VolumeProjectionMaterial,
   VolumeProjectedSurface,
+  ParcelSurface,
   createColormapTexture,
   StatisticalMapLayer,
   ParcelValueLayer,
+  ParcelConnectivityLayer,
   ConnectivityLayer,
   buildVertexAdjacency,
   computeFDRThreshold,
@@ -141,6 +145,12 @@ export type {
   VertexStatInfo,
   StatType
 } from './layers/StatisticalMapLayer';
+
+export type {
+  ParcelConnectivityLayerConfig,
+  ParcelConnectivityLayerUpdate,
+  ParcelConnectivityAlphaMode
+} from './layers/ParcelConnectivityLayer';
 
 // Export connectivity layer types for TypeScript consumers
 export type {
@@ -179,6 +189,7 @@ export * from './parcellation';
 
 // Export graph-native visualization primitives
 export * from './graphVisual';
+export * from './surfaces/ParcelSurface';
 
 // Export event types
 export * from './events';

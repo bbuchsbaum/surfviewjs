@@ -5,4 +5,11 @@
 export { EventEmitter } from '../EventEmitter';
 export type { EventListener, UnsubscribeFn } from '../EventEmitter';
 export type { SurfaceEventMap, SurfaceEventType } from './SurfaceEvents';
-export type { ViewerEventMap, ViewerEventType } from './ViewerEvents';
+export type {
+  ViewerEventMap,
+  ViewerEventType,
+  SurfacePickEvent,
+  VertexHoverEvent,
+  ParcelInteractionEvent,
+  ParcelSelectionEvent
+} from './ViewerEvents';

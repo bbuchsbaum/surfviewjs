@@ -15,6 +15,7 @@ import { gpupicking } from './scenarios/gpupicking';
 import { temporalPlayback } from './scenarios/temporalPlayback';
 import { statisticalMap } from './scenarios/statisticalMap';
 import { connectivity } from './scenarios/connectivity';
+import { parcelConnectivity } from './scenarios/parcelConnectivity';
 import { stateSerialization } from './scenarios/stateSerialization';
 import { topologyLens } from './scenarios/topologyLens';
 
@@ -29,6 +30,7 @@ export const scenarios: Scenario[] = [
   temporalPlayback,
   statisticalMap,
   connectivity,
+  parcelConnectivity,
   topologyLens,
   stateSerialization,
   lighting,

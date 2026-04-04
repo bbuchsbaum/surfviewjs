@@ -435,6 +435,10 @@ export abstract class NeuroSurface extends EventEmitter {
     }
   }
 
+  getPickMetadata(_vertexIndex: number): Record<string, unknown> | null {
+    return null;
+  }
+
   abstract createMesh(): THREE.Mesh;
   abstract updateColors(): void;
   

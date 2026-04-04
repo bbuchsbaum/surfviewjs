@@ -1,7 +1,7 @@
 import { DataLayer, DataLayerConfig, DataLayerUpdateData } from '../layers';
 import type { Color } from '../ColorMap';
 import type { ParcelData, ParcelRecord } from '../parcellation';
-import { validateParcelData, buildParcelLookup, mapParcelValuesToVertices } from '../parcellation';
+import { ParcelIndex } from '../parcellation';
 
 export interface ParcelValueLayerConfig extends DataLayerConfig {
   valueColumn?: string;
@@ -13,16 +13,6 @@ export interface ParcelValueLayerUpdateData extends DataLayerUpdateData {
   valueColumn?: string;
 }
 
-function normalizeVertexLabels(vertexLabels: Uint32Array | Int32Array | number[]): Uint32Array {
-  if (vertexLabels instanceof Uint32Array) {
-    return vertexLabels;
-  }
-  if (vertexLabels instanceof Int32Array) {
-    return new Uint32Array(vertexLabels);
-  }
-  return new Uint32Array(vertexLabels);
-}
-
 /**
  * Parcel-native data layer.
  *
@@ -30,9 +20,7 @@ function normalizeVertexLabels(vertexLabels: Uint32Array | Int32Array | number[]
  * vertices for rendering with the existing DataLayer compositing path.
  */
 export class ParcelValueLayer extends DataLayer {
-  private parcelData: ParcelData;
-  private parcelLookup: Map<number, ParcelRecord>;
-  private vertexLabels: Uint32Array;
+  private parcelIndex: ParcelIndex;
   private valueColumn: string;
 
   constructor(
@@ -43,20 +31,17 @@ export class ParcelValueLayer extends DataLayer {
     config: ParcelValueLayerConfig = {}
   ) {
     const valueColumn = config.valueColumn ?? 'value';
-    const validated = validateParcelData(parcelData);
-    const normalizedLabels = normalizeVertexLabels(vertexLabels);
-    const vertexData = mapParcelValuesToVertices(normalizedLabels, validated, valueColumn);
+    const parcelIndex = new ParcelIndex(parcelData, vertexLabels);
+    const vertexData = parcelIndex.mapParcelValues(valueColumn);
 
     super(id, vertexData, null, colorMap, config);
 
-    this.parcelData = validated;
-    this.parcelLookup = buildParcelLookup(validated);
-    this.vertexLabels = normalizedLabels;
+    this.parcelIndex = parcelIndex;
     this.valueColumn = valueColumn;
   }
 
   getParcelData(): ParcelData {
-    return this.parcelData;
+    return this.parcelIndex.getParcelData();
   }
 
   getValueColumn(): string {
@@ -64,37 +49,25 @@ export class ParcelValueLayer extends DataLayer {
   }
 
   getVertexLabels(): Uint32Array {
-    return this.vertexLabels.slice();
+    return this.parcelIndex.getVertexLabels();
   }
 
   getParcelMetadata(parcelId: number): ParcelRecord | null {
-    const row = this.parcelLookup.get(parcelId);
-    return row || null;
+    return this.parcelIndex.getParcelRecord(parcelId);
   }
 
   getParcelValue(parcelId: number, valueColumn: string = this.valueColumn): number | null {
-    const row = this.parcelLookup.get(parcelId);
-    if (!row) {
-      return null;
-    }
-
-    const value = row[valueColumn];
-    if (typeof value !== 'number' || !Number.isFinite(value)) {
-      return null;
-    }
-
-    return value;
+    return this.parcelIndex.getParcelValue(parcelId, valueColumn);
   }
 
   setParcelData(parcelData: ParcelData, valueColumn: string = this.valueColumn): void {
-    this.parcelData = validateParcelData(parcelData);
-    this.parcelLookup = buildParcelLookup(this.parcelData);
+    this.parcelIndex.setParcelData(parcelData);
     this.valueColumn = valueColumn;
     this.refreshVertexData();
   }
 
   setVertexLabels(vertexLabels: Uint32Array | Int32Array | number[]): void {
-    this.vertexLabels = normalizeVertexLabels(vertexLabels);
+    this.parcelIndex.setVertexLabels(vertexLabels);
     this.refreshVertexData();
   }
 
@@ -110,13 +83,12 @@ export class ParcelValueLayer extends DataLayer {
     let needsDataRefresh = false;
 
     if (updates.parcelData !== undefined) {
-      this.parcelData = validateParcelData(updates.parcelData);
-      this.parcelLookup = buildParcelLookup(this.parcelData);
+      this.parcelIndex.setParcelData(updates.parcelData);
       needsDataRefresh = true;
     }
 
     if (updates.vertexLabels !== undefined) {
-      this.vertexLabels = normalizeVertexLabels(updates.vertexLabels);
+      this.parcelIndex.setVertexLabels(updates.vertexLabels);
       needsDataRefresh = true;
     }
 
@@ -149,18 +121,14 @@ export class ParcelValueLayer extends DataLayer {
       ...super.toStateJSON(),
       type: 'parcel',
       valueColumn: this.valueColumn,
-      atlasId: this.parcelData.atlas.id,
-      schemaVersion: this.parcelData.schema_version,
-      parcelCount: this.parcelData.parcels.length
+      atlasId: this.getParcelData().atlas.id,
+      schemaVersion: this.getParcelData().schema_version,
+      parcelCount: this.getParcelData().parcels.length
     };
   }
 
   private refreshVertexData(): void {
-    const vertexData = mapParcelValuesToVertices(
-      this.vertexLabels,
-      this.parcelData,
-      this.valueColumn
-    );
+    const vertexData = this.parcelIndex.mapParcelValues(this.valueColumn);
     this.setData(vertexData, null);
   }
 }

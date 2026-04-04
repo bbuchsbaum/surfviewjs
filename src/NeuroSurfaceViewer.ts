@@ -22,6 +22,12 @@ import { serialize } from './serialization/StateSerializer';
 import { deserialize } from './serialization/StateDeserializer';
 import { encode, decode } from './serialization/ViewerState';
 import type { ViewerStateV1, RestorationReport } from './serialization/ViewerState';
+import type {
+  ParcelInteractionEvent,
+  ParcelSelectionEvent,
+  SurfacePickEvent,
+  VertexHoverEvent
+} from './events/ViewerEvents';
 
 export interface NeuroSurfaceViewerConfig {
   ambientLightColor?: number;
@@ -48,6 +54,13 @@ export interface NeuroSurfaceViewerConfig {
   allowCDNFallback?: boolean;
   /** Use GPU-based picking for faster vertex selection on large meshes */
   useGPUPicking?: boolean;
+}
+
+export interface ParcelFocusOptions {
+  showCrosshair?: boolean;
+  emitEvent?: boolean;
+  screenX?: number;
+  screenY?: number;
 }
 
 type Viewpoint = 'lateral' | 'medial' | 'ventral' | 'posterior' | 'anterior' | 'unknown_lateral';
@@ -1711,10 +1724,7 @@ export class NeuroSurfaceViewer extends EventEmitter {
       const rect = this.renderer.domElement.getBoundingClientRect();
       this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
-      if (this.config.hoverCrosshair && this.crosshair.mode !== 'selection') {
-        this.updateHoverCrosshair(event);
-      }
+      this.updateHoverCrosshair(event);
     };
     this.renderer.domElement.addEventListener('mousemove', this.handleMouseMove);
   }
@@ -1730,11 +1740,33 @@ export class NeuroSurfaceViewer extends EventEmitter {
     const hit = this.pick({ x: event.clientX, y: event.clientY });
     if (!hit.surfaceId || hit.vertexIndex === null) return;
 
+    const surface = this.surfaces.get(hit.surfaceId);
+    const pickMetadata = surface?.getPickMetadata(hit.vertexIndex) || {};
+    const payload = {
+      surfaceId: hit.surfaceId,
+      point: hit.point!,
+      vertexIndex: hit.vertexIndex,
+      ...pickMetadata
+    } as SurfacePickEvent;
+
+    const parcelPayload: ParcelInteractionEvent = {
+      surfaceId: payload.surfaceId,
+      point: payload.point,
+      vertexIndex: payload.vertexIndex,
+      parcelId: payload.parcelId ?? null,
+      parcel: (payload.parcel as Record<string, unknown> | null | undefined) ?? null,
+      parcelLabel: payload.parcelLabel ?? null,
+      atlasId: payload.atlasId ?? null
+    };
+
     // Emit callback/event
     if (this.onSurfaceClick) {
-      this.onSurfaceClick({ surfaceId: hit.surfaceId, point: hit.point!, vertexIndex: hit.vertexIndex } as any);
+      this.onSurfaceClick(payload as any);
     }
-    this.emit('surface:click', { surfaceId: hit.surfaceId, vertexIndex: hit.vertexIndex, point: hit.point });
+    this.emit('surface:click', payload);
+    if (parcelPayload.parcelId !== null) {
+      this.emit('parcel:click', parcelPayload);
+    }
 
     // Optional click-to-annotate
     if (this.config.clickToAddAnnotation) {
@@ -1757,25 +1789,114 @@ export class NeuroSurfaceViewer extends EventEmitter {
 
     const hit = this.pick({ x, y });
     if (hit.surfaceId && hit.vertexIndex !== null) {
-      this.showCrosshair(hit.surfaceId, hit.vertexIndex, {
-        size: this.config.hoverCrosshairSize ?? 1.2,
-        color: this.config.hoverCrosshairColor ?? 0x66ccff,
-        mode: 'hover'
-      });
-      this.emit('vertex:hover', {
+      const surface = this.surfaces.get(hit.surfaceId);
+      const pickMetadata = surface?.getPickMetadata(hit.vertexIndex) || {};
+      const payload = {
         surfaceId: hit.surfaceId,
         vertexIndex: hit.vertexIndex,
         screenX: x,
-        screenY: y
-      });
-    } else if (this.crosshair.mode === 'hover') {
-      this.hideCrosshair();
+        screenY: y,
+        ...pickMetadata
+      } as VertexHoverEvent;
+
+      const parcelPayload: ParcelInteractionEvent = {
+        surfaceId: payload.surfaceId,
+        vertexIndex: payload.vertexIndex,
+        screenX: payload.screenX,
+        screenY: payload.screenY,
+        parcelId: payload.parcelId ?? null,
+        parcel: (payload.parcel as Record<string, unknown> | null | undefined) ?? null,
+        parcelLabel: payload.parcelLabel ?? null,
+        atlasId: payload.atlasId ?? null
+      };
+
+      if (this.config.hoverCrosshair && this.crosshair.mode !== 'selection') {
+        this.showCrosshair(hit.surfaceId, hit.vertexIndex, {
+          size: this.config.hoverCrosshairSize ?? 1.2,
+          color: this.config.hoverCrosshairColor ?? 0x66ccff,
+          mode: 'hover'
+        });
+      }
+      this.emit('vertex:hover', payload);
+      this.emit('parcel:hover', parcelPayload);
+    } else {
+      if (this.crosshair.mode === 'hover') {
+        this.hideCrosshair();
+      }
       this.emit('vertex:hover', {
         surfaceId: null,
         vertexIndex: null,
         screenX: x,
         screenY: y
       });
+      this.emit('parcel:hover', {
+        surfaceId: null,
+        vertexIndex: null,
+        screenX: x,
+        screenY: y,
+        parcelId: null,
+        parcel: null,
+        parcelLabel: null,
+        atlasId: null
+      } as ParcelInteractionEvent);
+    }
+  }
+
+  setParcelHover(
+    surfaceId: string,
+    parcelId: number | null,
+    options: ParcelFocusOptions = {}
+  ): boolean {
+    return this.setParcelFocus('hover', surfaceId, parcelId, options);
+  }
+
+  setParcelSelection(
+    surfaceId: string,
+    parcelId: number | null,
+    options: ParcelFocusOptions = {}
+  ): boolean {
+    return this.setParcelFocus('selection', surfaceId, parcelId, options);
+  }
+
+  clearParcelHover(options: ParcelFocusOptions = {}): void {
+    if (this.crosshair.mode === 'hover') {
+      this.hideCrosshair();
+    }
+    if (options.emitEvent ?? true) {
+      this.emit('parcel:hover', {
+        surfaceId: null,
+        vertexIndex: null,
+        screenX: options.screenX,
+        screenY: options.screenY,
+        parcelId: null,
+        parcel: null,
+        parcelLabel: null,
+        atlasId: null
+      } as ParcelInteractionEvent);
+      this.emit('vertex:hover', {
+        surfaceId: null,
+        vertexIndex: null,
+        screenX: options.screenX ?? 0,
+        screenY: options.screenY ?? 0
+      } as VertexHoverEvent);
+    }
+  }
+
+  clearParcelSelection(options: ParcelFocusOptions = {}): void {
+    if (this.crosshair.mode === 'selection') {
+      this.hideCrosshair();
+    }
+    if (options.emitEvent ?? true) {
+      this.emit('parcel:selected', {
+        surfaceId: null,
+        point: null,
+        vertexIndex: null,
+        parcelId: null,
+        parcel: null,
+        parcelLabel: null,
+        atlasId: null,
+        selected: false
+      } as ParcelSelectionEvent);
     }
   }
 
@@ -1962,6 +2083,127 @@ export class NeuroSurfaceViewer extends EventEmitter {
 
   hideCrosshair(): void {
     this.crosshair.hide();
+  }
+
+  private setParcelFocus(
+    mode: 'hover' | 'selection',
+    surfaceId: string,
+    parcelId: number | null,
+    options: ParcelFocusOptions = {}
+  ): boolean {
+    if (parcelId === null) {
+      if (mode === 'hover') {
+        this.clearParcelHover(options);
+      } else {
+        this.clearParcelSelection(options);
+      }
+      return true;
+    }
+
+    const payload = this.buildParcelInteractionPayload(surfaceId, parcelId, options);
+    if (!payload) {
+      return false;
+    }
+
+    const focusVertexIndex = payload.vertexIndex;
+    if (focusVertexIndex === null) {
+      return false;
+    }
+
+    if (options.showCrosshair ?? true) {
+      this.showCrosshair(surfaceId, focusVertexIndex, {
+        size: mode === 'hover'
+          ? (this.config.hoverCrosshairSize ?? 1.2)
+          : this.crosshair.size,
+        color: mode === 'hover'
+          ? (this.config.hoverCrosshairColor ?? 0x66ccff)
+          : this.crosshair.color,
+        mode
+      });
+    }
+
+    if (options.emitEvent ?? true) {
+      if (mode === 'hover') {
+        this.emit('vertex:hover', {
+          surfaceId: payload.surfaceId,
+          vertexIndex: payload.vertexIndex,
+          screenX: options.screenX ?? 0,
+          screenY: options.screenY ?? 0,
+          parcelId: payload.parcelId,
+          parcel: payload.parcel,
+          parcelLabel: payload.parcelLabel,
+          atlasId: payload.atlasId
+        } as VertexHoverEvent);
+        this.emit('parcel:hover', {
+          ...payload,
+          screenX: options.screenX,
+          screenY: options.screenY
+        } as ParcelInteractionEvent);
+      } else {
+        this.emit('parcel:selected', {
+          ...payload,
+          selected: true
+        } as ParcelSelectionEvent);
+      }
+    }
+
+    this.requestRender();
+    return true;
+  }
+
+  private buildParcelInteractionPayload(
+    surfaceId: string,
+    parcelId: number,
+    _options: ParcelFocusOptions = {}
+  ): ParcelInteractionEvent | null {
+    const surface = this.surfaces.get(surfaceId) as any;
+    if (!surface) {
+      return null;
+    }
+
+    let vertexIndex: number | null = null;
+    if (typeof surface.getRepresentativeVertexIndex === 'function') {
+      vertexIndex = surface.getRepresentativeVertexIndex(parcelId);
+    }
+
+    if (vertexIndex === null || vertexIndex === undefined) {
+      return null;
+    }
+
+    const point = this.getWorldPositionForVertex(surface, vertexIndex);
+    const parcel = typeof surface.getParcelRecord === 'function'
+      ? (surface.getParcelRecord(parcelId) ?? null)
+      : null;
+
+    return {
+      surfaceId,
+      point,
+      vertexIndex,
+      parcelId,
+      parcel,
+      parcelLabel: parcel?.label ?? null,
+      atlasId: typeof surface.getParcelData === 'function'
+        ? surface.getParcelData()?.atlas?.id ?? null
+        : null
+    };
+  }
+
+  private getWorldPositionForVertex(surface: NeuroSurface, vertexIndex: number): THREE.Vector3 | null {
+    if (!surface.mesh) {
+      return null;
+    }
+
+    const geometry = surface.mesh.geometry as THREE.BufferGeometry;
+    const position = geometry.getAttribute('position') as THREE.BufferAttribute | undefined;
+    if (!position || vertexIndex < 0 || vertexIndex >= position.count) {
+      return null;
+    }
+
+    return new THREE.Vector3(
+      position.getX(vertexIndex),
+      position.getY(vertexIndex),
+      position.getZ(vertexIndex)
+    ).applyMatrix4(surface.mesh.matrixWorld);
   }
 
   toggleCrosshair(surfaceId?: string, vertexIndex?: number, options?: CrosshairOptions): void {

@@ -66,7 +66,7 @@ viewer.on('surface:click', (hit) => {
 
 ### Hover Events
 
-Emitted when the mouse hovers over a surface vertex (requires `enableHoverCrosshair: true` in viewer config).
+Emitted when the mouse hovers over a surface vertex. The visual hover crosshair is optional; the events themselves are emitted on mouse move.
 
 ```javascript
 viewer.on('vertex:hover', ({ surfaceId, vertexIndex, screenX, screenY }) => {
@@ -79,6 +79,56 @@ viewer.on('vertex:hover', ({ surfaceId, vertexIndex, screenX, screenY }) => {
 ```
 
 This event is useful for wiring up sparkline tooltips with `SparklineOverlay`. See the [Temporal Playback](/guide/temporal) guide.
+
+### Parcel Interaction Events
+
+When the hovered or clicked surface provides parcel metadata, the viewer emits parcel-native interaction events. These are intended for synchronizing external views such as parcel heatmaps, tables, or connectivity matrices.
+
+```javascript
+viewer.on('parcel:hover', ({ parcelId, parcelLabel, atlasId, surfaceId }) => {
+  if (parcelId === null) {
+    heatmap.clearHover();
+    return;
+  }
+
+  heatmap.setHoverParcel(parcelId);
+  console.log(`Hover parcel ${parcelLabel} on ${surfaceId} (${atlasId})`);
+});
+
+viewer.on('parcel:click', ({ parcelId }) => {
+  if (parcelId === null) {
+    return;
+  }
+
+  heatmap.setSelectedParcel(parcelId);
+});
+```
+
+`parcel:hover` is emitted with `parcelId: null` when the pointer leaves parcelized geometry, so external views can clear their hover state without listening to lower-level vertex events.
+
+External views can also drive the viewer back through the same parcel state:
+
+```javascript
+heatmap.onHoverParcel((parcelId) => {
+  if (parcelId === null) {
+    viewer.clearParcelHover();
+    return;
+  }
+
+  viewer.setParcelHover('parcel-connectivity', parcelId);
+});
+
+heatmap.onSelectParcel((parcelId) => {
+  if (parcelId === null) {
+    viewer.clearParcelSelection();
+    return;
+  }
+
+  viewer.setParcelSelection('parcel-connectivity', parcelId);
+});
+```
+
+These methods use a parcelized surface's representative vertex internally, so external tools can synchronize hover and selection without synthesizing mouse events.
 
 ### Annotation Events
 

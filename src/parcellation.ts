@@ -48,6 +48,18 @@ export interface ParcelValidationOptions {
   strict?: boolean;
 }
 
+export function normalizeVertexLabels(
+  vertexLabels: Uint32Array | Int32Array | number[]
+): Uint32Array {
+  if (vertexLabels instanceof Uint32Array) {
+    return vertexLabels;
+  }
+  if (vertexLabels instanceof Int32Array) {
+    return new Uint32Array(vertexLabels);
+  }
+  return new Uint32Array(vertexLabels);
+}
+
 const VALID_REPRESENTATIONS: AtlasRepresentation[] = ['volume', 'surface', 'derived'];
 const VALID_CONFIDENCE: AtlasConfidence[] = ['exact', 'high', 'approximate', 'uncertain'];
 
@@ -59,16 +71,6 @@ function assertNonEmptyString(value: unknown, field: string): void {
   if (typeof value !== 'string' || value.trim().length === 0) {
     throw new Error(`'${field}' must be a non-empty string`);
   }
-}
-
-function asVertexLabelArray(vertexLabels: Uint32Array | Int32Array | number[]): Uint32Array {
-  if (vertexLabels instanceof Uint32Array) {
-    return vertexLabels;
-  }
-  if (vertexLabels instanceof Int32Array) {
-    return new Uint32Array(vertexLabels);
-  }
-  return new Uint32Array(vertexLabels);
 }
 
 export function validateAtlasRef(ref: AtlasRef): AtlasRef {
@@ -194,7 +196,7 @@ export function mapParcelValuesToVertices(
     throw new Error("'valueColumn' must be a non-empty string");
   }
 
-  const labels = asVertexLabelArray(vertexLabels);
+  const labels = normalizeVertexLabels(vertexLabels);
   const lookup = buildParcelLookup(parcelData);
   const out = new Float32Array(labels.length);
 
@@ -237,4 +239,89 @@ export function parcelValuesInOrder(
   }
 
   return out;
+}
+
+/**
+ * Canonical parcel/native index for one mesh parcellation.
+ *
+ * Owns parcel metadata, per-vertex parcel ids, and value-expansion helpers.
+ */
+export class ParcelIndex {
+  private parcelData: ParcelData;
+  private parcelLookup: Map<number, ParcelRecord>;
+  private vertexLabels: Uint32Array;
+
+  constructor(
+    parcelData: ParcelData,
+    vertexLabels: Uint32Array | Int32Array | number[]
+  ) {
+    this.parcelData = validateParcelData(parcelData);
+    this.parcelLookup = buildParcelLookup(this.parcelData);
+    this.vertexLabels = normalizeVertexLabels(vertexLabels);
+  }
+
+  getParcelData(): ParcelData {
+    return this.parcelData;
+  }
+
+  getParcelLookup(): Map<number, ParcelRecord> {
+    return new Map(this.parcelLookup);
+  }
+
+  getVertexLabels(): Uint32Array {
+    return this.vertexLabels.slice();
+  }
+
+  getParcelIdForVertex(vertexIndex: number): number | null {
+    if (!Number.isInteger(vertexIndex) || vertexIndex < 0 || vertexIndex >= this.vertexLabels.length) {
+      return null;
+    }
+
+    const parcelId = this.vertexLabels[vertexIndex];
+    return Number.isFinite(parcelId) && parcelId > 0 ? parcelId : null;
+  }
+
+  getParcelRecord(parcelId: number): ParcelRecord | null {
+    return this.parcelLookup.get(parcelId) || null;
+  }
+
+  getParcelRecordForVertex(vertexIndex: number): ParcelRecord | null {
+    const parcelId = this.getParcelIdForVertex(vertexIndex);
+    return parcelId === null ? null : this.getParcelRecord(parcelId);
+  }
+
+  getParcelValue(parcelId: number, valueColumn: string = 'value'): number | null {
+    const row = this.getParcelRecord(parcelId);
+    if (!row) {
+      return null;
+    }
+
+    const value = row[valueColumn];
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      return null;
+    }
+
+    return value;
+  }
+
+  setParcelData(parcelData: ParcelData): void {
+    this.parcelData = validateParcelData(parcelData);
+    this.parcelLookup = buildParcelLookup(this.parcelData);
+  }
+
+  setVertexLabels(vertexLabels: Uint32Array | Int32Array | number[]): void {
+    this.vertexLabels = normalizeVertexLabels(vertexLabels);
+  }
+
+  setParcellation(
+    parcelData: ParcelData,
+    vertexLabels: Uint32Array | Int32Array | number[]
+  ): void {
+    this.setParcelData(parcelData);
+    this.setVertexLabels(vertexLabels);
+  }
+
+  mapParcelValues(valueColumn: string = 'value'): Float32Array {
+    return mapParcelValuesToVertices(this.vertexLabels, this.parcelData, valueColumn);
+  }
 }

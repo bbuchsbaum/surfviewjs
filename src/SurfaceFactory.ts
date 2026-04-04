@@ -4,8 +4,10 @@ import { MultiLayerNeuroSurface } from './MultiLayerNeuroSurface';
 import { VariantSurface } from './VariantSurface';
 import { SurfaceSet } from './SurfaceSet';
 import { LabeledNeuroSurface, LabelDefinition } from './LabeledNeuroSurface';
+import { ParcelSurface, ParcelSurfaceConfig } from './surfaces/ParcelSurface';
+import type { ParcelData } from './parcellation';
 
-export type SurfaceType = 'multi-layer' | 'color-mapped' | 'vertex-colored' | 'variant' | 'labeled';
+export type SurfaceType = 'multi-layer' | 'color-mapped' | 'vertex-colored' | 'variant' | 'labeled' | 'parcel';
 
 export interface SurfaceDefinition {
   type: SurfaceType;
@@ -24,6 +26,8 @@ export interface SurfaceDefinition {
   curv?: Record<string, Float32Array | number[]>;
   labels?: Uint32Array | number[];
   labelDefs?: LabelDefinition[];
+  parcelData?: ParcelData;
+  vertexLabels?: Uint32Array | Int32Array | number[];
   config?: Record<string, any>;
   layers?: any[]; // For multi-layer; pass through to consumer
 }
@@ -86,6 +90,16 @@ export class SurfaceFactory {
           def.labelDefs,
           def.config
         );
+      }
+      case 'parcel': {
+        if (!def.parcelData || !def.vertexLabels) {
+          throw new Error('parcel surface requires parcelData and vertexLabels');
+        }
+        return new ParcelSurface(geometry, {
+          ...(def.config || {}),
+          parcelData: def.parcelData,
+          vertexLabels: def.vertexLabels
+        } as ParcelSurfaceConfig);
       }
       default:
         throw new Error(`Unsupported surface type: ${def.type}`);
