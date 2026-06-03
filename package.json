@@ -1,6 +1,6 @@
 {
   "name": "surfview",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "A modular Three.js-based brain surface visualization library",
   "type": "module",
   "main": "./dist/surfview.umd.js",
