@@ -5,7 +5,7 @@
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
     "declaration": true,
-    "declarationMap": true,
+    "declarationMap": false,
     "declarationDir": "./dist/types",
     "outDir": "./dist",
     "rootDir": "./src",

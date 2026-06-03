@@ -1,6 +1,5 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
-import { copyFileSync } from 'fs';
 
 export default defineConfig({
   resolve: {
@@ -25,7 +24,7 @@ export default defineConfig({
         }
       }
     },
-    sourcemap: true,
+    sourcemap: false,
     minify: 'terser',
     terserOptions: {
       compress: {
@@ -34,23 +33,6 @@ export default defineConfig({
       }
     }
   },
-  plugins: [
-    {
-      name: 'copy-legacy-bundle',
-      closeBundle() {
-        // Create legacy neurosurface aliases for backwards compatibility
-        try {
-          copyFileSync('dist/surfview.es.js', 'dist/neurosurface.es.js');
-          copyFileSync('dist/surfview.es.js.map', 'dist/neurosurface.es.js.map');
-          copyFileSync('dist/surfview.umd.js', 'dist/neurosurface.umd.js');
-          copyFileSync('dist/surfview.umd.js.map', 'dist/neurosurface.umd.js.map');
-          console.log('✓ Created legacy neurosurface.* aliases');
-        } catch (e) {
-          console.warn('Could not create legacy aliases:', e.message);
-        }
-      }
-    }
-  ],
   optimizeDeps: {
     include: ['three', 'tweakpane', '@tweakpane/plugin-essentials', 'colormap'],
     exclude: ['react', 'react-dom', '@tweakpane/plugin-interval']
