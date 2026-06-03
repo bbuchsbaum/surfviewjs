@@ -1,0 +1,164 @@
+/* ============================================================================
+   surfviewjs docs — visual identity
+   A sibling of the neuroimjs design language: teal/cyan primary, sky accent,
+   near-black backdrops so rendered cortical surfaces feel at home on the page.
+   ========================================================================== */
+
+:root {
+  /* Brand ramp (teal → cyan) */
+  --vp-c-brand-1: #0d9488;
+  --vp-c-brand-2: #0ea5a0;
+  --vp-c-brand-3: #14b8b0;
+  --vp-c-brand-soft: rgba(14, 165, 160, 0.14);
+
+  --vp-c-accent: #38bdf8; /* sky, used for highlights / picked vertices */
+
+  /* Typography */
+  --vp-font-family-base: 'Inter', ui-sans-serif, system-ui, -apple-system,
+    'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --vp-font-family-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Cascadia Code',
+    Menlo, Consolas, monospace;
+}
+
+.dark {
+  --vp-c-bg: #0b0f14;
+  --vp-c-bg-alt: #0e131a;
+  --vp-c-bg-soft: #121922;
+  --vp-c-brand-1: #2dd4bf;
+  --vp-c-brand-2: #14b8b0;
+  --vp-c-brand-3: #0ea5a0;
+}
+
+/* ---- Home hero -------------------------------------------------------------
+   Give the landing a soft "render glow" behind the name. */
+.VPHome {
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(120deg, #0ea5a0 10%, #38bdf8 90%);
+  --vp-home-hero-image-background-image: linear-gradient(
+    160deg,
+    rgba(14, 165, 160, 0.35),
+    rgba(56, 189, 248, 0.25)
+  );
+  --vp-home-hero-image-filter: blur(72px);
+}
+
+.VPHero .text {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* ---- Feature cards --------------------------------------------------------- */
+.VPFeature {
+  border: 1px solid var(--vp-c-divider);
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+.VPFeature:hover {
+  border-color: var(--vp-c-brand-2);
+  transform: translateY(-2px);
+}
+
+/* ============================================================================
+   <SurfaceViewer /> — the live WebGL viewer embed
+   ========================================================================== */
+.surface-viewer {
+  margin: 1.75rem 0;
+}
+
+.surface-viewer__stage {
+  position: relative;
+  width: 100%;
+  border-radius: 14px;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 35%, #101820 0%, #06080b 100%);
+  border: 1px solid var(--vp-c-divider);
+  box-shadow: 0 18px 48px -24px rgba(0, 0, 0, 0.7);
+}
+
+.surface-viewer__canvas {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.surface-viewer__canvas canvas {
+  max-width: 100%;
+  height: 100% !important;
+  display: block;
+}
+
+.surface-viewer__overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  align-items: center;
+  justify-content: center;
+  color: #c6d2d6;
+  font-size: 0.85rem;
+  font-family: var(--vp-font-family-mono);
+  background: rgba(6, 8, 11, 0.6);
+  backdrop-filter: blur(2px);
+}
+
+.surface-viewer__overlay.error {
+  color: #ff9ba1;
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.surface-viewer__spinner {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 3px solid rgba(14, 165, 160, 0.25);
+  border-top-color: #38bdf8;
+  animation: surface-spin 0.9s linear infinite;
+}
+
+@keyframes surface-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.surface-viewer figcaption {
+  margin-top: 0.6rem;
+  font-size: 0.82rem;
+  color: var(--vp-c-text-2);
+  text-align: center;
+}
+
+/* Hero variant: let the live surface fill the hero image slot. */
+.hero-surface {
+  margin: 0;
+  width: min(440px, 80vw);
+}
+.hero-surface .surface-viewer__stage {
+  aspect-ratio: 1 / 1;
+}
+
+/* ---- Stability badges (used in the stability matrix) ----------------------- */
+.stability-badge {
+  display: inline-block;
+  padding: 0.05rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-family: var(--vp-font-family-mono);
+  line-height: 1.5;
+}
+.stability-badge.stable {
+  color: #0b3;
+  background: rgba(0, 187, 51, 0.13);
+}
+.stability-badge.experimental {
+  color: #d98a00;
+  background: rgba(217, 138, 0, 0.14);
+}
+.stability-badge.aspirational {
+  color: #e0506a;
+  background: rgba(224, 80, 106, 0.14);
+}
