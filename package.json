@@ -6,7 +6,7 @@
   "main": "./dist/surfview.umd.js",
   "module": "./dist/surfview.es.js",
   "types": "./dist/types/index.d.ts",
-  "sideEffects": true,
+  "sideEffects": false,
   "exports": {
     ".": {
       "import": "./dist/surfview.es.js",
@@ -17,16 +17,6 @@
       "types": "./dist/types/index.react.d.ts",
       "import": "./dist/surfview.react.es.js",
       "default": "./dist/surfview.react.es.js"
-    }
-  },
-  "typesVersions": {
-    "*": {
-      "react": [
-        "./dist/types/index.react.d.ts"
-      ],
-      "react/*": [
-        "./dist/types/*"
-      ]
     }
   },
   "files": [
@@ -70,13 +60,19 @@
   "author": "Bradley Buchsbaum",
   "repository": {
     "type": "git",
-    "url": "https://github.com/bbuchsbaum/surfviewjs"
+    "url": "git+https://github.com/bbuchsbaum/surfviewjs.git"
   },
   "bugs": {
     "url": "https://github.com/bbuchsbaum/surfviewjs/issues"
   },
   "homepage": "https://github.com/bbuchsbaum/surfviewjs#readme",
   "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "devDependencies": {
     "@playwright/test": "^1.56.1",
     "@rollup/plugin-commonjs": "^22.0.2",
