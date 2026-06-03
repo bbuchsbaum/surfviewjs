@@ -192,31 +192,26 @@ function parseGIfTIDataArray(
     const buffer = base64ToArrayBuffer(text);
     return toTypedArray(buffer, dataType, littleEndian);
   } else if (encoding === 'GZipBase64Binary') {
-    try {
-      const compressed = base64ToUint8(text);
-      let unzipped: Uint8Array;
+    const compressed = base64ToUint8(text);
+    let unzipped: Uint8Array;
 
+    try {
+      // Standard path: GZIP header present
+      unzipped = gunzipSync(compressed);
+    } catch (gzipError) {
+      // Some writers (e.g. certain FreeSurfer exports) mark data as GZipBase64Binary
+      // but actually store raw zlib/deflate content. Try inflate as a graceful fallback.
       try {
-        // Standard path: GZIP header present
-        unzipped = gunzipSync(compressed);
-      } catch (gzipError) {
-        // Some writers (e.g. certain FreeSurfer exports) mark data as GZipBase64Binary
-        // but actually store raw zlib/deflate content. Try inflate as a graceful fallback.
-        try {
-          unzipped = unzlibSync(compressed);
-          console.warn('GZipBase64Binary payload lacked gzip header; unzlib fallback succeeded.');
-        } catch (inflateError) {
-          console.warn('Failed to decompress GZipBase64Binary GIFTI data array', gzipError, inflateError);
-          throw inflateError;
-        }
+        unzipped = unzlibSync(compressed);
+        console.warn('GZipBase64Binary payload lacked gzip header; unzlib fallback succeeded.');
+      } catch (inflateError) {
+        console.warn('Failed to decompress GZipBase64Binary GIFTI data array', gzipError, inflateError);
+        throw inflateError;
       }
-      const buffer = new ArrayBuffer(unzipped.byteLength);
-      new Uint8Array(buffer).set(unzipped);
-      return toTypedArray(buffer, dataType, littleEndian);
-    } catch (err) {
-      // Let caller surface a meaningful error instead of falling through to "missing vertices"
-      throw err;
     }
+    const buffer = new ArrayBuffer(unzipped.byteLength);
+    new Uint8Array(buffer).set(unzipped);
+    return toTypedArray(buffer, dataType, littleEndian);
   }
   
   return null;
@@ -470,20 +465,23 @@ export async function loadSurface(
   }
   
     switch (detectedFormat) {
-      case 'freesurfer':
+      case 'freesurfer': {
         const fsBuffer = await response.arrayBuffer();
         parsedData = parseFreeSurferSurface(fsBuffer);
         break;
+      }
         
-      case 'gifti':
+      case 'gifti': {
         const giiText = await response.text();
         parsedData = parseGIfTISurface(giiText, await getDomParser());
         break;
+      }
         
-      case 'ply':
+      case 'ply': {
         const plyText = await response.text();
         parsedData = parsePLY(plyText);
         break;
+      }
         
       default:
         throw new Error(`Unsupported format: ${detectedFormat}`);
@@ -558,20 +556,23 @@ export async function loadSurfaceFromFile(
   let parsedData: ParsedSurfaceData;
   
   switch (detectedFormat) {
-    case 'freesurfer':
+    case 'freesurfer': {
       const fsBuffer = await file.arrayBuffer();
       parsedData = parseFreeSurferSurface(fsBuffer);
       break;
+    }
       
-    case 'gifti':
+    case 'gifti': {
       const giiText = await file.text();
       parsedData = parseGIfTISurface(giiText, await getDomParser());
       break;
+    }
       
-    case 'ply':
+    case 'ply': {
       const plyText = await file.text();
       parsedData = parsePLY(plyText);
       break;
+    }
       
     default:
       throw new Error(`Unsupported format: ${detectedFormat}`);

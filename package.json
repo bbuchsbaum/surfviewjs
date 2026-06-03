@@ -34,6 +34,8 @@
     "preview:ci": "vite preview --host 0.0.0.0 --port 4173",
     "build:legacy": "gulp",
     "type-check": "tsc --noEmit",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
@@ -74,6 +76,7 @@
     "access": "public"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.4",
     "@playwright/test": "^1.56.1",
     "@rollup/plugin-commonjs": "^22.0.2",
     "@rollup/plugin-node-resolve": "^13.3.0",
@@ -84,6 +87,8 @@
     "@types/react-dom": "^18.3.7",
     "@types/three": "^0.181.0",
     "@vitest/coverage-v8": "^4.0.18",
+    "eslint": "^9.39.4",
+    "globals": "^15.15.0",
     "gulp": "^4.0.2",
     "jsdom": "^26.1.0",
     "node-fetch": "^3.3.2",
@@ -95,6 +100,7 @@
     "typedoc-plugin-markdown": "^4.9.0",
     "typedoc-vitepress-theme": "^1.1.3",
     "typescript": "^5.9.2",
+    "typescript-eslint": "^8.60.1",
     "vite": "^5.0.0",
     "vitepress": "^1.6.4",
     "vitest": "^4.0.18",

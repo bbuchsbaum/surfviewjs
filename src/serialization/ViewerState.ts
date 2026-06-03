@@ -205,7 +205,7 @@ export function decode(hash: string): ViewerStateV1 {
 // ---------------------------------------------------------------------------
 
 function migrate(state: any): ViewerStateV1 {
-  let current = state;
+  const current = state;
 
   // Future: if (current.version === 1) current = migrateV1toV2(current);
   // Future: if (current.version === 2) current = migrateV2toV3(current);

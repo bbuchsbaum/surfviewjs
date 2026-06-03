@@ -12,7 +12,7 @@ export interface OutlineLayerOptions extends LayerConfig {
   roiSubset?: number[] | null;
 }
 
-export interface OutlineLayerUpdate extends Partial<OutlineLayerOptions> {}
+export type OutlineLayerUpdate = Partial<OutlineLayerOptions>;
 
 /**
  * Geometry-based layer that draws ROI boundaries as line segments.

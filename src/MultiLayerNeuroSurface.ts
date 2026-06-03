@@ -796,10 +796,11 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
         // Create new layer
         let layer: Layer | null = null;
         switch (type) {
-          case 'base':
+          case 'base': {
             const color = props.color || 0xcccccc;
             layer = new BaseLayer(typeof color === 'number' ? color : new THREE.Color(color).getHex(), props);
             break;
+          }
           case 'rgba':
             if (props.data) {
               layer = new RGBALayer(id, props.data, props);
@@ -1095,7 +1096,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
       const dstA = this.compositeBuffer[offset + 3];
       
       switch (blendMode) {
-        case 'normal':
+        case 'normal': {
           // Standard alpha blending
           const alpha = srcA + dstA * (1 - srcA);
           if (alpha > 0) {
@@ -1105,6 +1106,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
             this.compositeBuffer[offset + 3] = alpha;
           }
           break;
+        }
           
         case 'additive':
           // Additive blending (good for activations)
@@ -1114,7 +1116,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
           this.compositeBuffer[offset + 3] = Math.min(1, dstA + srcA);
           break;
           
-        case 'multiply':
+        case 'multiply': {
           // Multiply blending
           const invSrcA = 1 - srcA;
           this.compositeBuffer[offset] = dstR * (invSrcA + srcR * srcA);
@@ -1122,6 +1124,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
           this.compositeBuffer[offset + 2] = dstB * (invSrcA + srcB * srcA);
           this.compositeBuffer[offset + 3] = dstA + srcA * (1 - dstA);
           break;
+        }
       }
     }
   }
