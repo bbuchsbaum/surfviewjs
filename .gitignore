@@ -37,8 +37,16 @@ npm-debug.log*
 *.temp
 claude-instance-*/
 
+# Planning docs (internal)
+.planning/
+
 # Cruft folder (legacy/archived files)
 cruft/
+
+# Agent tooling / MCP state (not part of the project)
+.omc/
+.playwright-mcp/
+AGENTS.md
 
 # VitePress build output
 docs/.vitepress/dist/
