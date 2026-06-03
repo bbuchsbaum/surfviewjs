@@ -491,7 +491,29 @@ export class NeuroSurfaceViewer extends EventEmitter {
     }
   }
 
+  // Resolve the name of the colormap currently in use, preferring the active
+  // multi-layer entry and falling back to the first single ColorMappedNeuroSurface.
+  // Returns null when no colormapped content is present.
+  private getActiveColorMapName(): string | null {
+    const active = this.getActiveLayer();
+    if (active && typeof (active.layer as any).getColorMapName === 'function') {
+      return (active.layer as any).getColorMapName();
+    }
+    for (const surface of this.surfaces.values()) {
+      if (surface instanceof ColorMappedNeuroSurface
+          && typeof (surface as any).getColorMapName === 'function') {
+        return (surface as any).getColorMapName();
+      }
+    }
+    return null;
+  }
+
   private applyColormapChange(colormapName: string): void {
+    // 'custom' is a display-only sentinel for an externally-supplied palette;
+    // there is no preset to apply, so selecting it is a no-op.
+    if (colormapName === 'custom') {
+      return;
+    }
     const active = this.getActiveLayer();
     if (active && 'setColorMap' in active.layer) {
       (active.layer as any).setColorMap(colormapName);
@@ -760,7 +782,13 @@ export class NeuroSurfaceViewer extends EventEmitter {
     });
 
     const availableColormaps = ColorMap.getAvailableMaps();
-    const defaultColormap = this.colormapBindingState?.colormap
+    // Seed the dropdown from the colormap that is actually applied so the label
+    // is honest. Named presets show their name; an externally-supplied color
+    // array (e.g. a palette computed in R) reports 'custom' instead of
+    // masquerading as a preset (such as 'jet') that was never applied.
+    const activeColormapName = this.getActiveColorMapName();
+    const defaultColormap = activeColormapName
+      || this.colormapBindingState?.colormap
       || (availableColormaps.includes('jet') ? 'jet' : (availableColormaps[0] || 'jet'));
     this.colormapBindingState = { colormap: defaultColormap };
     const colormapOptions = (availableColormaps.length ? availableColormaps : [defaultColormap])
@@ -768,6 +796,12 @@ export class NeuroSurfaceViewer extends EventEmitter {
         acc[preset] = preset;
         return acc;
       }, {});
+    // Ensure the active selection is always a valid option. The 'custom'
+    // sentinel for array-based colormaps is not part of the preset list, so add
+    // it here; otherwise Tweakpane cannot display the current selection.
+    if (!(defaultColormap in colormapOptions)) {
+      colormapOptions[defaultColormap] = defaultColormap;
+    }
 
     colorFolder.addBinding(
       this.colormapBindingState,

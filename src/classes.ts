@@ -633,6 +633,11 @@ export abstract class NeuroSurface extends EventEmitter {
 
 export class ColorMappedNeuroSurface extends NeuroSurface {
   colorMap: ColorMap | null;
+  // Name of the active colormap. Set to a preset name (e.g. 'jet') when the
+  // colormap was created from a named preset, or 'custom' when it was supplied
+  // as a raw color array / ColorMap instance whose origin name is unknown.
+  // Used so UI controls can report the colormap honestly instead of guessing.
+  colorMapName: string;
   private rangeListener: UnsubscribeFn | null;
   private thresholdListener: UnsubscribeFn | null;
   private alphaListener: UnsubscribeFn | null;
@@ -645,8 +650,9 @@ export class ColorMappedNeuroSurface extends NeuroSurface {
     config: SurfaceConfig = {}
   ) {
     super(geometry, indices, data, config);
-    
+
     this.colorMap = null;
+    this.colorMapName = 'custom';
     this.rangeListener = null;
     this.thresholdListener = null;
     this.alphaListener = null;
@@ -665,20 +671,25 @@ export class ColorMappedNeuroSurface extends NeuroSurface {
       if (typeof colorMap === 'string') {
         try {
           this.colorMap = ColorMap.fromPreset(colorMap);
+          this.colorMapName = colorMap;
         } catch (err) {
           const presets = ColorMap.getAvailableMaps();
           const fallback = presets.includes('jet') ? 'jet' : (presets[0] || 'jet');
           console.warn(`ColorMappedNeuroSurface: preset "${colorMap}" unavailable, falling back to "${fallback}"`, err);
           this.colorMap = ColorMap.fromPreset(fallback);
+          this.colorMapName = fallback;
         }
       } else if (Array.isArray(colorMap)) {
         this.colorMap = new ColorMap(colorMap);
+        this.colorMapName = 'custom';
       } else {
         console.error('Invalid colorMap provided. Using default.');
         this.colorMap = ColorMap.fromPreset('jet');
+        this.colorMapName = 'jet';
       }
     } else {
       this.colorMap = colorMap;
+      this.colorMapName = 'custom';
     }
 
     this.colorMap.setThreshold(this.threshold);
@@ -705,6 +716,10 @@ export class ColorMappedNeuroSurface extends NeuroSurface {
     if (this.mesh) {
       this.updateColors();
     }
+  }
+
+  getColorMapName(): string {
+    return this.colorMapName;
   }
 
   createMesh(): THREE.Mesh {
