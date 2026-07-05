@@ -7,7 +7,7 @@ This directory contains tests and examples for the NeuroSurface viewer, particul
 ### test-gifti.html
 An interactive browser-based test for loading and viewing GIFTI surfaces. It includes:
 - Loading test GIFTI files from the GIFTI-Reader-JS repository
-- Support for ASCII and Base64 encoded GIFTI files
+- Support for ASCII, Base64, and GZip+Base64 encoded GIFTI files
 - Local file loading
 - Adding data layers to surfaces
 - Visual inspection of loaded surfaces
@@ -28,13 +28,27 @@ A Node.js test script that downloads and tests the GIFTI parser with real test f
 
 To run: `npm test`
 
+### E2E visual QA specs
+
+Playwright specs in `tests/e2e/` exercise browser-rendered demos and regression pages:
+- `publication-presets.spec.ts` verifies the publication preset demo renders and `exportPNG()` returns a figure PNG.
+- `new-feature-visual-qa.spec.ts` verifies linked 3D/flatmap ROI drawing/export and alignment QA slice/overlay panels with shifted-transform metrics.
+- `volume-layer-webgl2.spec.ts` verifies WebGL2 volume projection parity, including fragment and ribbon modes.
+
+To run a focused visual QA slice:
+
+```bash
+npx start-server-and-test dev:ci http://localhost:4173/demo/index.html "npx playwright test tests/e2e/new-feature-visual-qa.spec.ts"
+```
+
 ## Test Data Sources
 
 Test GIFTI files are sourced from the [GIFTI-Reader-JS](https://github.com/rii-mango/GIFTI-Reader-JS) repository:
 
 - **ascii.surf.gii** - ASCII-encoded surface mesh
 - **base64.surf.gii** - Base64-encoded surface mesh
-- **gzip.surf.gii** - GZip+Base64 encoded surface (not yet supported)
+- **tetrahedron_gzip.gii** - GZip+Base64 encoded surface mesh
+- **fsaverage5-*-pial.gii** - FreeSurfer-style fixtures marked as GZip+Base64 but stored as raw zlib/deflate payloads
 
 ## Adding New Tests
 
@@ -44,7 +58,6 @@ Test GIFTI files are sourced from the [GIFTI-Reader-JS](https://github.com/rii-m
 
 ## Known Limitations
 
-- GZip-encoded GIFTI files are not yet supported (would require adding a decompression library)
 - Only surface meshes are tested; other GIFTI data types (labels, time series) are not yet implemented
 
 ## Running All Tests
@@ -58,4 +71,7 @@ npm run test:browser
 
 # Build and test
 npm run build && npm test
+
+# Run Playwright browser tests
+npm run test:playwright
 ```

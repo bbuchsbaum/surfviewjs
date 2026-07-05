@@ -1,6 +1,20 @@
 import * as THREE from 'three';
 import { NeuroSurface, SurfaceGeometry, SurfaceConfig } from './classes';
-import { LayerStack, BaseLayer, RGBALayer, DataLayer, TwoDataLayer, LabelLayer, Layer, TwoDataLayerConfig, VolumeProjectionLayer } from './layers';
+import {
+  LayerStack,
+  BaseLayer,
+  RGBALayer,
+  DataLayer,
+  TwoDataLayer,
+  LabelLayer,
+  Layer,
+  TwoDataLayerConfig,
+  VolumeProjectionLayer,
+  VolumeProjectionMode,
+  VolumeSamplingMode,
+  VolumeProjectionQuality,
+  RibbonSamplingConfig
+} from './layers';
 import ColorMap2D, { ColorMap2DPreset } from './ColorMap2D';
 import { CurvatureLayer, CurvatureConfig } from './layers/CurvatureLayer';
 import { ClipPlaneSet, ClipPlane, ClipAxis } from './utils/ClipPlane';
@@ -121,6 +135,10 @@ export interface LayerUpdate {
   volumeOrigin?: [number, number, number];
   useHalfFloat?: boolean;
   fillValue?: number;
+  projectionMode?: VolumeProjectionMode;
+  sampling?: VolumeSamplingMode;
+  quality?: VolumeProjectionQuality;
+  ribbon?: RibbonSamplingConfig;
 }
 
 export interface ClearLayersOptions {
@@ -596,6 +614,9 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
   updateLayer(id: string, updates: Record<string, any>): void {
     this.layerStack.updateLayer(id, updates);
     const layer = this.layerStack.getLayer(id);
+    if (layer) {
+      this.emit('layer:updated', { surface: this, layer, changes: updates });
+    }
     if (layer instanceof OutlineLayer && layer.needsUpdate) {
       this.layerStack.needsComposite = false;
       this.applyOutlineLayer(layer);
@@ -831,6 +852,10 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
                   volumeOrigin: props.volumeOrigin,
                   useHalfFloat: props.useHalfFloat,
                   fillValue: props.fillValue,
+                  projectionMode: props.projectionMode,
+                  sampling: props.sampling,
+                  quality: props.quality,
+                  ribbon: props.ribbon,
                   visible: props.visible,
                   opacity: props.opacity,
                   blendMode: props.blendMode,

@@ -6,6 +6,21 @@ import { VolumeTexture3D } from './textures/VolumeTexture3D';
 import { createColormapTexture } from './textures/createColormapTexture';
 
 export type BlendMode = 'normal' | 'additive' | 'multiply';
+export type VolumeProjectionMode = 'vertex' | 'fragment' | 'ribbon' | 'hybrid';
+export type VolumeSamplingMode = 'nearest' | 'linear';
+export type VolumeProjectionQuality = 'interactive' | 'publication';
+export type RibbonReducer = 'mean' | 'max' | 'min' | 'median';
+
+export interface RibbonSamplingConfig {
+  /** Pial/world-outer surface positions in the same vertex order as the rendered surface. */
+  pial?: Float32Array | number[];
+  /** White/world-inner surface positions in the same vertex order as the rendered surface. */
+  white?: Float32Array | number[];
+  /** Number of samples between white and pial, inclusive. */
+  samples?: number;
+  /** How samples along the ribbon are collapsed to one displayed value. */
+  reducer?: RibbonReducer;
+}
 
 export interface LayerConfig {
   visible?: boolean;
@@ -34,6 +49,14 @@ export interface VolumeProjectionLayerConfig extends DataLayerConfig {
   useHalfFloat?: boolean;
   /** Treat values equal to fillValue as transparent (alpha=0). */
   fillValue?: number;
+  /** Projection path. Defaults to 'vertex' for current fast behavior. */
+  projectionMode?: VolumeProjectionMode;
+  /** Scalar sampling method for CPU/publication paths. Defaults to 'nearest' for compatibility. */
+  sampling?: VolumeSamplingMode;
+  /** Quality hint used by hybrid mode. Defaults to 'interactive'. */
+  quality?: VolumeProjectionQuality;
+  /** Ribbon sampling options for pial/white cortical thickness sampling. */
+  ribbon?: RibbonSamplingConfig;
 }
 
 export interface TwoDataLayerConfig extends LayerConfig {
@@ -73,6 +96,10 @@ export interface VolumeProjectionLayerUpdateData extends LayerUpdateData {
   volumeOrigin?: [number, number, number];
   useHalfFloat?: boolean;
   fillValue?: number;
+  projectionMode?: VolumeProjectionMode;
+  sampling?: VolumeSamplingMode;
+  quality?: VolumeProjectionQuality;
+  ribbon?: RibbonSamplingConfig;
 }
 
 export interface TwoDataLayerUpdateData extends LayerUpdateData {
@@ -313,7 +340,11 @@ export abstract class Layer {
             voxelSize: config.voxelSize,
             volumeOrigin: config.volumeOrigin,
             useHalfFloat: config.useHalfFloat,
-            fillValue: config.fillValue
+            fillValue: config.fillValue,
+            projectionMode: config.projectionMode,
+            sampling: config.sampling,
+            quality: config.quality,
+            ribbon: config.ribbon
           }
         );
       default:
@@ -638,6 +669,13 @@ export class VolumeProjectionLayer extends Layer {
   private range: [number, number];
   private threshold: [number, number];
   private fillValue: number;
+  private projectionMode: VolumeProjectionMode;
+  private sampling: VolumeSamplingMode;
+  private quality: VolumeProjectionQuality;
+  private ribbonPial: Float32Array | null = null;
+  private ribbonWhite: Float32Array | null = null;
+  private ribbonSamples: number;
+  private ribbonReducer: RibbonReducer;
   private attachedSurface: { geometry: { vertices: Float32Array }; mesh?: THREE.Mesh } | null = null;
   private rgbaBuffer: Float32Array | null = null;
 
@@ -653,6 +691,17 @@ export class VolumeProjectionLayer extends Layer {
     this.range = config.range || [0, 1];
     this.threshold = config.threshold || [0, 0];
     this.fillValue = config.fillValue ?? 0.0;
+    this.projectionMode = config.projectionMode ?? 'vertex';
+    this.sampling = config.sampling ?? 'nearest';
+    this.quality = config.quality ?? 'interactive';
+    this.ribbonSamples = this.normalizeRibbonSamples(config.ribbon?.samples ?? 7);
+    this.ribbonReducer = config.ribbon?.reducer ?? 'mean';
+    if (config.ribbon?.pial || config.ribbon?.white) {
+      this.setRibbonSurfaces(config.ribbon.pial ?? null, config.ribbon.white ?? null, {
+        samples: this.ribbonSamples,
+        reducer: this.ribbonReducer
+      });
+    }
 
     this.volumeData = volumeData instanceof Float32Array ? volumeData : new Float32Array(volumeData);
     this.volumeTexture = new VolumeTexture3D(this.volumeData, dims[0], dims[1], dims[2], {
@@ -719,6 +768,30 @@ export class VolumeProjectionLayer extends Layer {
     return this.fillValue;
   }
 
+  getProjectionMode(): VolumeProjectionMode {
+    return this.projectionMode;
+  }
+
+  getSamplingMode(): VolumeSamplingMode {
+    return this.sampling;
+  }
+
+  getQuality(): VolumeProjectionQuality {
+    return this.quality;
+  }
+
+  getRibbonConfig(): { samples: number; reducer: RibbonReducer; hasSurfaces: boolean } {
+    return {
+      samples: this.ribbonSamples,
+      reducer: this.ribbonReducer,
+      hasSurfaces: !!(this.ribbonPial && this.ribbonWhite)
+    };
+  }
+
+  usesGPUVertexProjection(): boolean {
+    return this.resolveProjectionMode() === 'vertex';
+  }
+
   setRange(range: [number, number]): void {
     this.range = range;
     this.colorMap.setRange(range);
@@ -733,6 +806,43 @@ export class VolumeProjectionLayer extends Layer {
 
   setFillValue(fillValue: number): void {
     this.fillValue = fillValue;
+    this._notifyChange();
+  }
+
+  setProjectionMode(mode: VolumeProjectionMode): void {
+    this.projectionMode = mode;
+    this._notifyChange();
+  }
+
+  setSamplingMode(mode: VolumeSamplingMode): void {
+    this.sampling = mode;
+    this._notifyChange();
+  }
+
+  setQuality(quality: VolumeProjectionQuality): void {
+    this.quality = quality;
+    this._notifyChange();
+  }
+
+  setRibbonSurfaces(
+    pial: Float32Array | number[] | null,
+    white: Float32Array | number[] | null,
+    options: { samples?: number; reducer?: RibbonReducer } = {}
+  ): void {
+    this.ribbonPial = pial ? new Float32Array(pial) : null;
+    this.ribbonWhite = white ? new Float32Array(white) : null;
+    if ((this.ribbonPial && !this.ribbonWhite) || (!this.ribbonPial && this.ribbonWhite)) {
+      throw new Error('VolumeProjectionLayer: ribbon sampling requires both pial and white surfaces');
+    }
+    if (this.ribbonPial && this.ribbonWhite && this.ribbonPial.length !== this.ribbonWhite.length) {
+      throw new Error('VolumeProjectionLayer: pial and white ribbon surfaces must have matching vertex counts');
+    }
+    if (options.samples !== undefined) {
+      this.ribbonSamples = this.normalizeRibbonSamples(options.samples);
+    }
+    if (options.reducer !== undefined) {
+      this.ribbonReducer = options.reducer;
+    }
     this._notifyChange();
   }
 
@@ -795,12 +905,10 @@ export class VolumeProjectionLayer extends Layer {
 
     const worldMatrix = mesh ? mesh.matrixWorld : new THREE.Matrix4();
     const we = worldMatrix.elements;
-    const me = this.worldToIJK.elements;
-
-    const nx = this.dims[0];
-    const ny = this.dims[1];
-    const nz = this.dims[2];
-    const data = this.volumeData;
+    const mode = this.resolveProjectionMode();
+    if (mode === 'ribbon') {
+      this.validateRibbonForVertexCount(vertexCount);
+    }
 
     for (let vi = 0; vi < vertexCount; vi++) {
       const base = vi * 3;
@@ -808,37 +916,15 @@ export class VolumeProjectionLayer extends Layer {
       const y = vertices[base + 1];
       const z = vertices[base + 2];
 
-      // Local -> world
-      const wx = we[0] * x + we[4] * y + we[8] * z + we[12];
-      const wy = we[1] * x + we[5] * y + we[9] * z + we[13];
-      const wz = we[2] * x + we[6] * y + we[10] * z + we[14];
+      const value = mode === 'ribbon'
+        ? this.sampleRibbonValue(vi, we)
+        : this.sampleValueAtWorldCoordinates(
+          we[0] * x + we[4] * y + we[8] * z + we[12],
+          we[1] * x + we[5] * y + we[9] * z + we[13],
+          we[2] * x + we[6] * y + we[10] * z + we[14]
+        );
 
-      // World -> IJK
-      const ijkX = me[0] * wx + me[4] * wy + me[8] * wz + me[12];
-      const ijkY = me[1] * wx + me[5] * wy + me[9] * wz + me[13];
-      const ijkZ = me[2] * wx + me[6] * wy + me[10] * wz + me[14];
-
-      // Bounds check in normalized texture coordinates (matches shader behavior)
-      const uvwX = (ijkX + 0.5) / nx;
-      const uvwY = (ijkY + 0.5) / ny;
-      const uvwZ = (ijkZ + 0.5) / nz;
-
-      if (
-        uvwX < 0 || uvwX > 1 ||
-        uvwY < 0 || uvwY > 1 ||
-        uvwZ < 0 || uvwZ > 1
-      ) {
-        continue;
-      }
-
-      // Nearest-neighbor sample with clamp-to-edge behavior.
-      const i = Math.min(nx - 1, Math.max(0, Math.floor(ijkX + 0.5)));
-      const j = Math.min(ny - 1, Math.max(0, Math.floor(ijkY + 0.5)));
-      const k = Math.min(nz - 1, Math.max(0, Math.floor(ijkZ + 0.5)));
-      const idx = i + nx * j + nx * ny * k;
-      const value = data[idx];
-
-      if (!isFinite(value)) continue;
+      if (value === null || !isFinite(value)) continue;
       if (Math.abs(value - this.fillValue) < 1e-6) continue;
 
       const color = this.colorMap.getColor(value);
@@ -851,6 +937,39 @@ export class VolumeProjectionLayer extends Layer {
 
     this.needsUpdate = false;
     return rgba;
+  }
+
+  sampleValueAtWorld(point: THREE.Vector3): number | null {
+    return this.sampleValueAtWorldCoordinates(point.x, point.y, point.z);
+  }
+
+  sampleValueAtVertex(vertexIndex: number): number | null {
+    if (!this.attachedSurface) {
+      throw new Error('VolumeProjectionLayer.sampleValueAtVertex requires attachment to a surface');
+    }
+    const vertices = this.attachedSurface.geometry.vertices;
+    if (vertexIndex < 0 || vertexIndex >= vertices.length / 3) {
+      throw new Error(`VolumeProjectionLayer.sampleValueAtVertex vertex ${vertexIndex} out of range`);
+    }
+    const mesh = this.attachedSurface.mesh;
+    if (mesh && typeof mesh.updateMatrixWorld === 'function') {
+      mesh.updateMatrixWorld(true);
+    }
+    const worldMatrix = mesh ? mesh.matrixWorld : new THREE.Matrix4();
+    const we = worldMatrix.elements;
+    if (this.resolveProjectionMode() === 'ribbon') {
+      this.validateRibbonForVertexCount(vertices.length / 3);
+      return this.sampleRibbonValue(vertexIndex, we);
+    }
+    const base = vertexIndex * 3;
+    const x = vertices[base];
+    const y = vertices[base + 1];
+    const z = vertices[base + 2];
+    return this.sampleValueAtWorldCoordinates(
+      we[0] * x + we[4] * y + we[8] * z + we[12],
+      we[1] * x + we[5] * y + we[9] * z + we[13],
+      we[2] * x + we[6] * y + we[10] * z + we[14]
+    );
   }
 
   update(updates: VolumeProjectionLayerUpdateData): void {
@@ -880,6 +999,25 @@ export class VolumeProjectionLayer extends Layer {
     if (updates.fillValue !== undefined) {
       this.setFillValue(updates.fillValue);
     }
+    if (updates.projectionMode !== undefined) {
+      this.setProjectionMode(updates.projectionMode);
+    }
+    if (updates.sampling !== undefined) {
+      this.setSamplingMode(updates.sampling);
+    }
+    if (updates.quality !== undefined) {
+      this.setQuality(updates.quality);
+    }
+    if (updates.ribbon !== undefined) {
+      this.setRibbonSurfaces(
+        updates.ribbon.pial ?? this.ribbonPial,
+        updates.ribbon.white ?? this.ribbonWhite,
+        {
+          samples: updates.ribbon.samples ?? this.ribbonSamples,
+          reducer: updates.ribbon.reducer ?? this.ribbonReducer
+        }
+      );
+    }
     if (updates.opacity !== undefined) {
       this.setOpacity(updates.opacity);
     }
@@ -898,7 +1036,15 @@ export class VolumeProjectionLayer extends Layer {
       colorMapName: this.colorMapName,
       range: [...this.range],
       threshold: [...this.threshold],
-      fillValue: this.fillValue
+      fillValue: this.fillValue,
+      projectionMode: this.projectionMode,
+      sampling: this.sampling,
+      quality: this.quality,
+      ribbon: {
+        samples: this.ribbonSamples,
+        reducer: this.ribbonReducer,
+        hasSurfaces: !!(this.ribbonPial && this.ribbonWhite)
+      }
     };
   }
 
@@ -911,6 +1057,129 @@ export class VolumeProjectionLayer extends Layer {
       this.volumeTexture.dispose();
     }
     this.rgbaBuffer = null;
+  }
+
+  private resolveProjectionMode(): Exclude<VolumeProjectionMode, 'hybrid'> {
+    if (this.projectionMode === 'hybrid') {
+      if (this.quality === 'publication' && this.ribbonPial && this.ribbonWhite) return 'ribbon';
+      return 'vertex';
+    }
+    if (this.projectionMode === 'ribbon' && !(this.ribbonPial && this.ribbonWhite)) {
+      return 'vertex';
+    }
+    return this.projectionMode === 'fragment' ? 'fragment' : this.projectionMode;
+  }
+
+  private sampleValueAtWorldCoordinates(wx: number, wy: number, wz: number): number | null {
+    const me = this.worldToIJK.elements;
+    const ijkX = me[0] * wx + me[4] * wy + me[8] * wz + me[12];
+    const ijkY = me[1] * wx + me[5] * wy + me[9] * wz + me[13];
+    const ijkZ = me[2] * wx + me[6] * wy + me[10] * wz + me[14];
+    return this.sampleValueAtIJK(ijkX, ijkY, ijkZ);
+  }
+
+  private sampleValueAtIJK(ijkX: number, ijkY: number, ijkZ: number): number | null {
+    const nx = this.dims[0];
+    const ny = this.dims[1];
+    const nz = this.dims[2];
+
+    const uvwX = (ijkX + 0.5) / nx;
+    const uvwY = (ijkY + 0.5) / ny;
+    const uvwZ = (ijkZ + 0.5) / nz;
+    if (
+      uvwX < 0 || uvwX > 1 ||
+      uvwY < 0 || uvwY > 1 ||
+      uvwZ < 0 || uvwZ > 1
+    ) {
+      return null;
+    }
+
+    return this.sampling === 'linear'
+      ? this.sampleLinear(ijkX, ijkY, ijkZ)
+      : this.sampleNearest(ijkX, ijkY, ijkZ);
+  }
+
+  private sampleNearest(ijkX: number, ijkY: number, ijkZ: number): number {
+    const nx = this.dims[0];
+    const ny = this.dims[1];
+    const nz = this.dims[2];
+    const i = Math.min(nx - 1, Math.max(0, Math.floor(ijkX + 0.5)));
+    const j = Math.min(ny - 1, Math.max(0, Math.floor(ijkY + 0.5)));
+    const k = Math.min(nz - 1, Math.max(0, Math.floor(ijkZ + 0.5)));
+    return this.volumeData[i + nx * j + nx * ny * k];
+  }
+
+  private sampleLinear(ijkX: number, ijkY: number, ijkZ: number): number {
+    const nx = this.dims[0];
+    const ny = this.dims[1];
+    const nz = this.dims[2];
+    const x0 = Math.min(nx - 1, Math.max(0, Math.floor(ijkX)));
+    const y0 = Math.min(ny - 1, Math.max(0, Math.floor(ijkY)));
+    const z0 = Math.min(nz - 1, Math.max(0, Math.floor(ijkZ)));
+    const x1 = Math.min(nx - 1, x0 + 1);
+    const y1 = Math.min(ny - 1, y0 + 1);
+    const z1 = Math.min(nz - 1, z0 + 1);
+    const tx = Math.min(1, Math.max(0, ijkX - x0));
+    const ty = Math.min(1, Math.max(0, ijkY - y0));
+    const tz = Math.min(1, Math.max(0, ijkZ - z0));
+
+    const at = (i: number, j: number, k: number) => this.volumeData[i + nx * j + nx * ny * k];
+    const c00 = at(x0, y0, z0) * (1 - tx) + at(x1, y0, z0) * tx;
+    const c10 = at(x0, y1, z0) * (1 - tx) + at(x1, y1, z0) * tx;
+    const c01 = at(x0, y0, z1) * (1 - tx) + at(x1, y0, z1) * tx;
+    const c11 = at(x0, y1, z1) * (1 - tx) + at(x1, y1, z1) * tx;
+    const c0 = c00 * (1 - ty) + c10 * ty;
+    const c1 = c01 * (1 - ty) + c11 * ty;
+    return c0 * (1 - tz) + c1 * tz;
+  }
+
+  private sampleRibbonValue(vertexIndex: number, worldMatrixElements: ArrayLike<number>): number | null {
+    if (!this.ribbonPial || !this.ribbonWhite) return null;
+    const base = vertexIndex * 3;
+    const values: number[] = [];
+    const denom = Math.max(1, this.ribbonSamples - 1);
+    for (let s = 0; s < this.ribbonSamples; s++) {
+      const t = denom === 0 ? 0 : s / denom;
+      const x = this.ribbonWhite[base] + (this.ribbonPial[base] - this.ribbonWhite[base]) * t;
+      const y = this.ribbonWhite[base + 1] + (this.ribbonPial[base + 1] - this.ribbonWhite[base + 1]) * t;
+      const z = this.ribbonWhite[base + 2] + (this.ribbonPial[base + 2] - this.ribbonWhite[base + 2]) * t;
+      const wx = worldMatrixElements[0] * x + worldMatrixElements[4] * y + worldMatrixElements[8] * z + worldMatrixElements[12];
+      const wy = worldMatrixElements[1] * x + worldMatrixElements[5] * y + worldMatrixElements[9] * z + worldMatrixElements[13];
+      const wz = worldMatrixElements[2] * x + worldMatrixElements[6] * y + worldMatrixElements[10] * z + worldMatrixElements[14];
+      const value = this.sampleValueAtWorldCoordinates(wx, wy, wz);
+      if (value !== null && isFinite(value) && Math.abs(value - this.fillValue) >= 1e-6) {
+        values.push(value);
+      }
+    }
+    if (!values.length) return null;
+    switch (this.ribbonReducer) {
+      case 'max':
+        return Math.max(...values);
+      case 'min':
+        return Math.min(...values);
+      case 'median': {
+        const sorted = [...values].sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+      }
+      case 'mean':
+      default:
+        return values.reduce((sum, value) => sum + value, 0) / values.length;
+    }
+  }
+
+  private validateRibbonForVertexCount(vertexCount: number): void {
+    if (!this.ribbonPial || !this.ribbonWhite) {
+      throw new Error('VolumeProjectionLayer: ribbon projection requires pial and white surfaces');
+    }
+    const expected = vertexCount * 3;
+    if (this.ribbonPial.length !== expected || this.ribbonWhite.length !== expected) {
+      throw new Error(`VolumeProjectionLayer: ribbon surface vertex count mismatch; expected ${vertexCount} vertices`);
+    }
+  }
+
+  private normalizeRibbonSamples(samples: number): number {
+    return Math.max(1, Math.min(32, Math.round(samples)));
   }
 
   private computeWorldToIJK(config: VolumeProjectionLayerConfig | VolumeProjectionLayerUpdateData): THREE.Matrix4 {

@@ -23,3 +23,20 @@ export type {
 
 export { serialize } from './StateSerializer';
 export { deserialize } from './StateDeserializer';
+export {
+  SURFVIEW_EXPORT_SCHEMA,
+  SURFVIEW_VERSION,
+  exportScene,
+  exportSceneJSON,
+  exportSceneBlob,
+  exportStaticHTML
+} from './SceneExporter';
+
+export type {
+  SceneAssetType,
+  SceneAssetManifest,
+  SceneExportProvenance,
+  SceneExportManifest,
+  SceneExportOptions,
+  StaticHTMLExportOptions
+} from './SceneExporter';

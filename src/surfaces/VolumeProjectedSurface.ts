@@ -3,6 +3,7 @@ import { NeuroSurface, SurfaceGeometry, SurfaceConfig } from '../classes';
 import { VolumeProjectionMaterial } from '../materials/VolumeProjectionMaterial';
 import { VolumeTexture3D } from '../textures/VolumeTexture3D';
 import { createColormapTexture } from '../textures/createColormapTexture';
+import type { RibbonReducer, VolumeProjectionMode } from '../layers';
 
 export interface VolumeProjectedSurfaceOptions {
   volumeData: Float32Array | ArrayLike<number>;
@@ -30,6 +31,11 @@ export interface VolumeProjectedSurfaceOptions {
   overlayOpacity?: number;
   baseColor?: THREE.ColorRepresentation;
   fillValue?: number;
+  projectionMode?: VolumeProjectionMode;
+  pialPositions?: Float32Array | ArrayLike<number>;
+  whitePositions?: Float32Array | ArrayLike<number>;
+  ribbonSamples?: number;
+  ribbonReducer?: RibbonReducer;
   materialConfig?: Partial<SurfaceConfig>;
 }
 
@@ -38,6 +44,11 @@ export class VolumeProjectedSurface extends NeuroSurface {
   private colormapTexture: THREE.DataTexture;
   private projectionMaterial: VolumeProjectionMaterial;
   private worldToIJKMatrix: THREE.Matrix4;
+  private pialPositions: Float32Array | null;
+  private whitePositions: Float32Array | null;
+  private projectionMode: VolumeProjectionMode;
+  private ribbonSamples: number;
+  private ribbonReducer: RibbonReducer;
 
   constructor(geometry: SurfaceGeometry, options: VolumeProjectedSurfaceOptions) {
     super(geometry, null, [], options.materialConfig ?? {});
@@ -51,8 +62,17 @@ export class VolumeProjectedSurface extends NeuroSurface {
       threshold = [0, 0],
       overlayOpacity = 1.0,
       baseColor = 0x888888,
-      fillValue = 0.0
+      fillValue = 0.0,
+      projectionMode = 'vertex',
+      ribbonSamples = 7,
+      ribbonReducer = 'mean'
     } = options;
+    this.projectionMode = projectionMode;
+    this.ribbonSamples = Math.max(1, Math.min(16, Math.round(ribbonSamples)));
+    this.ribbonReducer = ribbonReducer;
+    this.pialPositions = options.pialPositions ? new Float32Array(options.pialPositions) : null;
+    this.whitePositions = options.whitePositions ? new Float32Array(options.whitePositions) : null;
+    this.validateRibbonAttributes();
 
     this.volumeTexture = new VolumeTexture3D(
       volumeData,
@@ -74,7 +94,10 @@ export class VolumeProjectedSurface extends NeuroSurface {
         threshold,
         overlayOpacity,
         baseColor,
-        fillValue
+        fillValue,
+        projectionMode,
+        ribbonSamples: this.ribbonSamples,
+        ribbonReducer: this.ribbonReducer
       }
     });
 
@@ -84,6 +107,8 @@ export class VolumeProjectedSurface extends NeuroSurface {
   createMesh(): THREE.Mesh {
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(this.geometry.vertices, 3));
+    geometry.setAttribute('pialPosition', new THREE.Float32BufferAttribute(this.pialPositions ?? this.geometry.vertices, 3));
+    geometry.setAttribute('whitePosition', new THREE.Float32BufferAttribute(this.whitePositions ?? this.geometry.vertices, 3));
 
     const faceArray = (this.geometry.faces && this.geometry.faces.length > 0)
       ? this.geometry.faces
@@ -147,6 +172,34 @@ export class VolumeProjectedSurface extends NeuroSurface {
     this.emit('render:needed', { surface: this });
   }
 
+  setProjectionMode(mode: VolumeProjectionMode): void {
+    this.projectionMode = mode;
+    this.projectionMaterial.setProjectionMode(mode);
+    this.emit('material:updated', { surface: this });
+    this.emit('render:needed', { surface: this });
+  }
+
+  setRibbonSampling(samples: number, reducer: RibbonReducer = this.ribbonReducer): void {
+    this.ribbonSamples = Math.max(1, Math.min(16, Math.round(samples)));
+    this.ribbonReducer = reducer;
+    this.projectionMaterial.setRibbonSampling(this.ribbonSamples, this.ribbonReducer);
+    this.emit('material:updated', { surface: this });
+    this.emit('render:needed', { surface: this });
+  }
+
+  setRibbonSurfaces(pial: Float32Array | ArrayLike<number>, white: Float32Array | ArrayLike<number>): void {
+    this.pialPositions = new Float32Array(pial);
+    this.whitePositions = new Float32Array(white);
+    this.validateRibbonAttributes();
+    if (this.mesh) {
+      const geometry = this.mesh.geometry as THREE.BufferGeometry;
+      geometry.setAttribute('pialPosition', new THREE.Float32BufferAttribute(this.pialPositions, 3));
+      geometry.setAttribute('whitePosition', new THREE.Float32BufferAttribute(this.whitePositions, 3));
+    }
+    this.emit('geometry:updated', { surface: this });
+    this.emit('render:needed', { surface: this });
+  }
+
   static isSupported(
     renderer: THREE.WebGLRenderer,
     options: { requireLinearFiltering?: boolean; useHalfFloat?: boolean } = {}
@@ -189,5 +242,17 @@ export class VolumeProjectedSurface extends NeuroSurface {
 
     return voxelToWorld.clone().invert();
   }
-}
 
+  private validateRibbonAttributes(): void {
+    const expected = this.geometry.vertices.length;
+    if ((this.pialPositions && !this.whitePositions) || (!this.pialPositions && this.whitePositions)) {
+      throw new Error('VolumeProjectedSurface: ribbon projection requires both pialPositions and whitePositions');
+    }
+    if (this.pialPositions && this.pialPositions.length !== expected) {
+      throw new Error('VolumeProjectedSurface: pialPositions length must match geometry vertices');
+    }
+    if (this.whitePositions && this.whitePositions.length !== expected) {
+      throw new Error('VolumeProjectedSurface: whitePositions length must match geometry vertices');
+    }
+  }
+}

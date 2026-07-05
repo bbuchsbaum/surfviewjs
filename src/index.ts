@@ -41,10 +41,29 @@ import { StatisticalMapLayer } from './layers/StatisticalMapLayer';
 import { ParcelValueLayer } from './layers/ParcelValueLayer';
 import { ParcelConnectivityLayer } from './layers/ParcelConnectivityLayer';
 import { ConnectivityLayer } from './ConnectivityLayer';
+import { SubjectPackage, validateSubjectPackageManifest } from './SubjectPackage';
+import { PluginHost } from './PluginHost';
+import { FlatMapView } from './FlatMapView';
+import { LinkedBrainWorkspace } from './LinkedBrainWorkspace';
+import { ROIManager } from './roi';
+import { AlignmentQAWorkspace } from './AlignmentQA';
+import { STYLE_PRESETS, getStylePreset, listStylePresets, resolveFigureExportOptions, resolveStylePreset } from './StylePresets';
 import { buildVertexAdjacency } from './utils/meshAdjacency';
 import { computeFDRThreshold, computeBonferroniThreshold, findClusters, filterClustersBySize, pToZ, tToZ } from './utils/statistics';
 import { detectCapabilities } from './utils/capabilities';
-import { serialize, deserialize, encode, decode, CURRENT_VERSION } from './serialization';
+import {
+  serialize,
+  deserialize,
+  encode,
+  decode,
+  CURRENT_VERSION,
+  SURFVIEW_EXPORT_SCHEMA,
+  SURFVIEW_VERSION,
+  exportScene,
+  exportSceneJSON,
+  exportSceneBlob,
+  exportStaticHTML
+} from './serialization';
 
 // Register TemporalDataLayer with Layer factory to avoid circular dependency
 Layer.registerTemporalLayer(TemporalDataLayer);
@@ -114,6 +133,18 @@ export {
   ParcelValueLayer,
   ParcelConnectivityLayer,
   ConnectivityLayer,
+  SubjectPackage,
+  validateSubjectPackageManifest,
+  PluginHost,
+  FlatMapView,
+  LinkedBrainWorkspace,
+  ROIManager,
+  AlignmentQAWorkspace,
+  STYLE_PRESETS,
+  getStylePreset,
+  listStylePresets,
+  resolveFigureExportOptions,
+  resolveStylePreset,
   buildVertexAdjacency,
   computeFDRThreshold,
   computeBonferroniThreshold,
@@ -125,7 +156,13 @@ export {
   deserialize,
   encode,
   decode,
-  CURRENT_VERSION
+  CURRENT_VERSION,
+  SURFVIEW_EXPORT_SCHEMA,
+  SURFVIEW_VERSION,
+  exportScene,
+  exportSceneJSON,
+  exportSceneBlob,
+  exportStaticHTML
 };
 
 // Export temporal types for TypeScript consumers
@@ -134,6 +171,7 @@ export type {
   FactorDescriptor,
   TimelineState,
   TimelineEvent,
+  TimelineEventMap,
   LoopMode,
   SparklineOptions
 } from './temporal';
@@ -151,6 +189,120 @@ export type {
   ParcelConnectivityLayerUpdate,
   ParcelConnectivityAlphaMode
 } from './layers/ParcelConnectivityLayer';
+
+export type {
+  VolumeProjectionMode,
+  VolumeSamplingMode,
+  VolumeProjectionQuality,
+  RibbonReducer,
+  RibbonSamplingConfig,
+  VolumeProjectionLayerConfig,
+  VolumeProjectionLayerUpdateData
+} from './layers';
+
+export type {
+  RoiDrawMode,
+  RoiPoint,
+  RoiProvenance,
+  VertexROI,
+  CreateROIOptions,
+  PolygonVertexSource,
+  RoiSVGOptions,
+  RoiLabelExportOptions,
+  RoiManifestExportOptions
+} from './roi';
+
+export {
+  selectVerticesInPolygon,
+  createROIFromPolygon,
+  roiToLabelArray,
+  roiToSVG,
+  roiToLabelGIFTI,
+  roiToSubjectPackageRoi,
+  cloneROI
+} from './roi';
+
+export type {
+  SubjectPackageManifest,
+  SubjectPackageSoftware,
+  SubjectPackageProvenance,
+  SurfaceSetManifest,
+  SurfaceVariantManifest,
+  MetricManifest,
+  ParcellationManifest,
+  RoiManifest,
+  TransformManifest,
+  VolumeManifest,
+  SceneManifest,
+  SceneLayerManifest,
+  SceneSurfaceManifest,
+  SubjectPackageValidationIssue,
+  SubjectPackageValidationReport,
+  SubjectPackageOptions,
+  SubjectPackageLoadOptions
+} from './SubjectPackage';
+
+export type {
+  SurfViewStylePresetName,
+  LabelDensity,
+  StylePresetBackground,
+  StylePresetLighting,
+  StylePresetMaterial,
+  StylePresetCurvature,
+  StylePresetROI,
+  StylePresetAnnotation,
+  StylePresetColormaps,
+  StylePresetFigure,
+  SurfViewStylePreset,
+  FigureExportLabel,
+  FigureExportOptions,
+  ResolvedFigureExportOptions
+} from './StylePresets';
+
+export type {
+  PluginHostViewer,
+  ViewerPluginContext,
+  PluginTeardown,
+  ViewerPlugin,
+  RegisterPluginOptions,
+  PluginRegistration
+} from './PluginHost';
+
+export type {
+  FlatMapGeometryInput,
+  FlatMapViewOptions,
+  FlatMapVertexEvent,
+  FlatMapClickEvent,
+  FlatMapSelectionEvent,
+  FlatMapROIEvent,
+  FlatMapROIDrawingOptions,
+  FlatMapEventMap
+} from './FlatMapView';
+
+export type {
+  LinkOptions,
+  LinkedViewerLike,
+  LinkedTimelineLike,
+  LinkedBrainWorkspaceOptions
+} from './LinkedBrainWorkspace';
+
+export type {
+  AlignmentSliceAxis,
+  AlignmentVolume,
+  AlignmentSurface,
+  AlignmentTransform,
+  AlignmentQAConfig,
+  SurfaceDistanceSummary,
+  EdgeAgreementSummary,
+  DropoutSummary,
+  AlignmentQAMetrics,
+  AlignmentQAReport
+} from './AlignmentQA';
+
+export {
+  computeAlignmentQAMetrics,
+  createAlignmentQAReport
+} from './AlignmentQA';
 
 // Export connectivity layer types for TypeScript consumers
 export type {
@@ -178,7 +330,13 @@ export type {
   SurfaceState,
   CrosshairState as SerializedCrosshairState,
   SelectionState,
-  RestorationReport
+  RestorationReport,
+  SceneAssetType,
+  SceneAssetManifest,
+  SceneExportProvenance,
+  SceneExportManifest,
+  SceneExportOptions,
+  StaticHTMLExportOptions
 } from './serialization';
 
 // Export loaders

@@ -6,6 +6,20 @@ import { TemporalDataLayer } from '../../src/temporal/TemporalDataLayer';
 import { TimelineController } from '../../src/temporal/TimelineController';
 import { SparklineOverlay } from '../../src/temporal/SparklineOverlay';
 
+function createMockCanvasContext(): CanvasRenderingContext2D {
+  return {
+    beginPath: vi.fn(),
+    clearRect: vi.fn(),
+    fill: vi.fn(),
+    fillRect: vi.fn(),
+    lineTo: vi.fn(),
+    moveTo: vi.fn(),
+    roundRect: vi.fn(),
+    setLineDash: vi.fn(),
+    stroke: vi.fn()
+  } as unknown as CanvasRenderingContext2D;
+}
+
 // ──────────────────────────────────────────────────────
 // TemporalDataLayer
 // ──────────────────────────────────────────────────────
@@ -326,8 +340,15 @@ describe('TimelineController', () => {
 // ──────────────────────────────────────────────────────
 describe('SparklineOverlay', () => {
   let container: HTMLElement;
+  let getContextSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
+    getContextSpy = vi
+      .spyOn(HTMLCanvasElement.prototype, 'getContext')
+      .mockImplementation((contextId: string) => {
+        return contextId === '2d' ? createMockCanvasContext() : null;
+      });
+
     container = document.createElement('div');
     container.style.width = '800px';
     container.style.height = '600px';
@@ -341,6 +362,7 @@ describe('SparklineOverlay', () => {
   });
 
   afterEach(() => {
+    getContextSpy.mockRestore();
     document.body.removeChild(container);
   });
 

@@ -32,10 +32,18 @@ function makePatternVolume(dims: [number, number, number]): Float32Array {
   return data;
 }
 
+function scalePositions(vertices: Float32Array, scale: number): Float32Array {
+  const scaled = new Float32Array(vertices.length);
+  for (let i = 0; i < vertices.length; i++) {
+    scaled[i] = vertices[i] * scale;
+  }
+  return scaled;
+}
+
 export const volumeProjection: Scenario = {
   id: 'volume-projection',
-  title: 'GPU Volume Projection',
-  description: 'Sample a 3D volume texture at surface vertices in the GPU compositor.',
+  title: 'Volume Projection Quality',
+  description: 'Compare vertex, fragment, hybrid, and ribbon volume projection modes.',
   tags: ['volume', 'gpu', 'layers', 'webgl2'],
   run: async (ctx: ScenarioRunContext) => {
     ctx.status('Setting up volume projection demo…');
@@ -78,6 +86,13 @@ export const volumeProjection: Scenario = {
     let opacity = 1.0;
     let useHalfFloat = false;
     const fillValue = -1;
+    let projectionMode: 'vertex' | 'fragment' | 'ribbon' | 'hybrid' = 'vertex';
+    let sampling: 'nearest' | 'linear' = 'nearest';
+    let quality: 'interactive' | 'publication' = 'interactive';
+    let ribbonSamples = 7;
+    let ribbonReducer: 'mean' | 'max' | 'min' | 'median' = 'mean';
+    const ribbonWhite = scalePositions(geometry.vertices, 0.84);
+    const ribbonPial = scalePositions(geometry.vertices, 1.08);
 
     let volumeLayer: VolumeProjectionLayer | null = null;
 
@@ -97,7 +112,16 @@ export const volumeProjection: Scenario = {
         voxelSize,
         volumeOrigin,
         useHalfFloat,
-        fillValue
+        fillValue,
+        projectionMode,
+        sampling,
+        quality,
+        ribbon: {
+          white: ribbonWhite,
+          pial: ribbonPial,
+          samples: ribbonSamples,
+          reducer: ribbonReducer
+        }
       });
 
       surface.addLayer(volumeLayer);
@@ -177,6 +201,42 @@ export const volumeProjection: Scenario = {
         </div>
       </div>
       <div class="panel-section">
+        <h4>Projection Quality</h4>
+        <div class="panel-controls">
+          <label>Projection
+            <select id="projection-mode">
+              <option value="vertex">vertex</option>
+              <option value="fragment">fragment</option>
+              <option value="ribbon">ribbon</option>
+              <option value="hybrid">hybrid</option>
+            </select>
+          </label>
+          <label>Sampling
+            <select id="sampling-mode">
+              <option value="nearest">nearest</option>
+              <option value="linear">linear</option>
+            </select>
+          </label>
+          <label>Quality
+            <select id="quality-mode">
+              <option value="interactive">interactive</option>
+              <option value="publication">publication</option>
+            </select>
+          </label>
+          <label>Ribbon samples <span id="ribbon-samples-label">${ribbonSamples}</span>
+            <input id="ribbon-samples" type="range" min="1" max="15" step="2" value="${ribbonSamples}" />
+          </label>
+          <label>Ribbon reducer
+            <select id="ribbon-reducer">
+              <option value="mean">mean</option>
+              <option value="max">max</option>
+              <option value="min">min</option>
+              <option value="median">median</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <div class="panel-section">
         <h4>GPU Texture</h4>
         <div class="panel-controls">
           <label><input id="half-float" type="checkbox" ${useHalfFloat ? 'checked' : ''} /> Half-float (saves VRAM)</label>
@@ -197,9 +257,19 @@ export const volumeProjection: Scenario = {
     const thrHighInput = ctx.panel.querySelector('#thr-high') as HTMLInputElement | null;
     const thrLowLabel = ctx.panel.querySelector('#thr-low-label');
     const thrHighLabel = ctx.panel.querySelector('#thr-high-label');
+    const projectionModeSelect = ctx.panel.querySelector('#projection-mode') as HTMLSelectElement | null;
+    const samplingModeSelect = ctx.panel.querySelector('#sampling-mode') as HTMLSelectElement | null;
+    const qualityModeSelect = ctx.panel.querySelector('#quality-mode') as HTMLSelectElement | null;
+    const ribbonSamplesInput = ctx.panel.querySelector('#ribbon-samples') as HTMLInputElement | null;
+    const ribbonSamplesLabel = ctx.panel.querySelector('#ribbon-samples-label');
+    const ribbonReducerSelect = ctx.panel.querySelector('#ribbon-reducer') as HTMLSelectElement | null;
     const halfFloatInput = ctx.panel.querySelector('#half-float') as HTMLInputElement | null;
 
     if (colormapSelect) colormapSelect.value = colormap;
+    if (projectionModeSelect) projectionModeSelect.value = projectionMode;
+    if (samplingModeSelect) samplingModeSelect.value = sampling;
+    if (qualityModeSelect) qualityModeSelect.value = quality;
+    if (ribbonReducerSelect) ribbonReducerSelect.value = ribbonReducer;
 
     function applySettings() {
       if (!volumeLayer) return;
@@ -207,6 +277,13 @@ export const volumeProjection: Scenario = {
       volumeLayer.setOpacity(opacity);
       volumeLayer.setRange(range);
       volumeLayer.setThreshold(threshold);
+      volumeLayer.setProjectionMode(projectionMode);
+      volumeLayer.setSamplingMode(sampling);
+      volumeLayer.setQuality(quality);
+      volumeLayer.setRibbonSurfaces(ribbonPial, ribbonWhite, {
+        samples: ribbonSamples,
+        reducer: ribbonReducer
+      });
       surface.updateColors();
       viewer.requestRender();
     }
@@ -269,6 +346,33 @@ export const volumeProjection: Scenario = {
         threshold = [threshold[1], threshold[0]];
         thrHighInput.value = String(threshold[1]);
       }
+      applySettings();
+    });
+
+    projectionModeSelect?.addEventListener('change', () => {
+      projectionMode = projectionModeSelect.value as typeof projectionMode;
+      ctx.status(`Projection: ${projectionMode}`);
+      applySettings();
+    });
+
+    samplingModeSelect?.addEventListener('change', () => {
+      sampling = samplingModeSelect.value as typeof sampling;
+      applySettings();
+    });
+
+    qualityModeSelect?.addEventListener('change', () => {
+      quality = qualityModeSelect.value as typeof quality;
+      applySettings();
+    });
+
+    ribbonSamplesInput?.addEventListener('input', () => {
+      ribbonSamples = Number(ribbonSamplesInput.value);
+      if (ribbonSamplesLabel) ribbonSamplesLabel.textContent = String(ribbonSamples);
+      applySettings();
+    });
+
+    ribbonReducerSelect?.addEventListener('change', () => {
+      ribbonReducer = ribbonReducerSelect.value as typeof ribbonReducer;
       applySettings();
     });
 

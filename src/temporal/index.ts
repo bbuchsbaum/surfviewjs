@@ -6,6 +6,7 @@ export type {
   FactorDescriptor,
   TimelineState,
   TimelineEvent,
+  TimelineEventMap,
   LoopMode,
   SparklineOptions
 } from './types';

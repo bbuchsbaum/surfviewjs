@@ -27,12 +27,13 @@ const layer = new DataLayer(
 surface.addLayer(layer);
 ```
 
-### VolumeProjectionLayer (GPU Volume Projection)
+### VolumeProjectionLayer (Volume Projection)
 
 Sample a 3D volume at each surface vertex and map it through a 1D colormap.
 
-- **GPU path**: when `MultiLayerNeuroSurface` is in GPU compositing mode, sampling happens in the vertex shader (WebGL2 required).
-- **CPU fallback**: in CPU compositing mode, SurfView falls back to a per-vertex nearest-neighbor lookup + colormap on the CPU.
+- **Vertex GPU path**: when `MultiLayerNeuroSurface` is in GPU compositing mode and `projectionMode: 'vertex'`, sampling happens in the vertex shader (WebGL2 required).
+- **Quality fallback**: `projectionMode: 'fragment'`, `'ribbon'`, or `'hybrid'` can be configured on the layer API; in the multi-layer compositor these modes render through the CPU RGBA texture path so publication-oriented settings stay available without changing the layer stack.
+- **Ribbon sampling**: provide matching pial and white vertex positions to sample through cortical thickness with `mean`, `max`, `min`, or `median` reducers.
 
 ```javascript
 import { MultiLayerNeuroSurface, VolumeProjectionLayer } from 'surfview';
@@ -55,7 +56,17 @@ const volumeLayer = new VolumeProjectionLayer(
     range: [-3, 3],
     threshold: [-1.96, 1.96], // hide values inside [low, high]
     opacity: 0.85,
-    fillValue: 0
+    fillValue: 0,
+
+    projectionMode: 'ribbon', // 'vertex' | 'fragment' | 'ribbon' | 'hybrid'
+    sampling: 'linear',       // 'nearest' | 'linear'
+    quality: 'publication',   // 'interactive' | 'publication'
+    ribbon: {
+      white: whiteSurfaceVertices,
+      pial: pialSurfaceVertices,
+      samples: 7,
+      reducer: 'mean'
+    }
   }
 );
 
@@ -81,6 +92,8 @@ surface.updateLayer('volume', { volumeData: nextVolumeData });
 **Notes**
 - `affineMatrix` / `worldToIJK` arrays are interpreted as Three.js `Matrix4` layout (column-major).
 - Values equal to `fillValue` (and out-of-bounds samples) are treated as transparent.
+- `projectionMode: 'hybrid'` resolves to vertex sampling during interactive use and ribbon sampling in publication mode.
+- For direct shader fragment/ribbon projection on one volume overlay, use `VolumeProjectedSurface`.
 - GPU compositing currently supports up to 8 total layers (including the base layer); volume layers count toward this limit.
 
 ### TemporalDataLayer

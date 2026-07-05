@@ -344,7 +344,7 @@ export class GPULayerCompositor {
       this.material.uniforms.layerOpacity.value[i] = layer.opacity;
       this.material.uniforms.layerBlendMode.value[i] = this.getBlendModeIndex(layer.blendMode);
 
-      if (layer instanceof VolumeProjectionLayer) {
+      if (layer instanceof VolumeProjectionLayer && layer.usesGPUVertexProjection()) {
         this.material.uniforms.layerKind.value[i] = 1;
         this.updateVolumeLayerUniforms(i, layer);
       } else {

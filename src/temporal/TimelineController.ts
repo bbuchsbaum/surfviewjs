@@ -1,5 +1,5 @@
 import { EventEmitter } from '../EventEmitter';
-import type { TimelineState, TimelineEvent, LoopMode } from './types';
+import type { TimelineState, TimelineEvent, TimelineEventMap, LoopMode } from './types';
 
 /**
  * Playback state machine for temporal data.
@@ -8,7 +8,7 @@ import type { TimelineState, TimelineEvent, LoopMode } from './types';
  * animation frame. Knows nothing about layers or rendering — it is a pure
  * time-source driven entirely by `requestAnimationFrame`.
  */
-export class TimelineController extends EventEmitter {
+export class TimelineController extends EventEmitter<TimelineEventMap> {
   private times: number[];
   private currentTime: number;
   private playing: boolean;

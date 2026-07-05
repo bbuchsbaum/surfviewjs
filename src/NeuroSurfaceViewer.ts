@@ -17,16 +17,35 @@ import { detectCapabilities, ViewerCapabilities } from './utils/capabilities';
 import { AnnotationManager, AnnotationRecord } from './annotations';
 import { GPUPicker, GPUPickResult } from './utils/GPUPicker';
 import { VolumeProjectedSurface } from './surfaces/VolumeProjectedSurface';
+import type { RibbonReducer, VolumeProjectionMode } from './layers';
 import { CrosshairManager, CrosshairOptions } from './CrosshairManager';
+import { PluginHost } from './PluginHost';
+import type { ViewerPlugin, RegisterPluginOptions, PluginRegistration } from './PluginHost';
 import { serialize } from './serialization/StateSerializer';
 import { deserialize } from './serialization/StateDeserializer';
+import {
+  exportScene as buildSceneExport,
+  exportSceneJSON as buildSceneExportJSON,
+  exportSceneBlob as buildSceneExportBlob,
+  exportStaticHTML as buildStaticHTMLExport
+} from './serialization/SceneExporter';
+import { resolveFigureExportOptions, resolveStylePreset } from './StylePresets';
 import { encode, decode } from './serialization/ViewerState';
 import type { ViewerStateV1, RestorationReport } from './serialization/ViewerState';
+import type { SceneExportManifest, SceneExportOptions, StaticHTMLExportOptions } from './serialization/SceneExporter';
+import type {
+  FigureExportLabel,
+  FigureExportOptions,
+  ResolvedFigureExportOptions,
+  SurfViewStylePreset,
+  SurfViewStylePresetName
+} from './StylePresets';
 import type {
   ParcelInteractionEvent,
   ParcelSelectionEvent,
   SurfacePickEvent,
-  VertexHoverEvent
+  VertexHoverEvent,
+  ViewerEventMap
 } from './events/ViewerEvents';
 
 export interface NeuroSurfaceViewerConfig {
@@ -45,7 +64,7 @@ export interface NeuroSurfaceViewerConfig {
   useControls?: boolean;
   controlType?: 'trackball' | 'surface';
   backgroundColor?: number;
-  preset?: 'default' | 'presentation';
+  preset?: SurfViewStylePresetName;
   linkHemispheres?: boolean;
   hoverCrosshair?: boolean;
   hoverCrosshairColor?: number;
@@ -87,7 +106,11 @@ interface RangeValue {
   range: DataRange;
 }
 
-export class NeuroSurfaceViewer extends EventEmitter {
+function colorToCSS(color: number): string {
+  return `#${color.toString(16).padStart(6, '0')}`;
+}
+
+export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   container: HTMLElement;
   width!: number;
   height!: number;
@@ -130,7 +153,9 @@ export class NeuroSurfaceViewer extends EventEmitter {
   variantBindingState!: { variant: string } | null;
   layerOpacityBindingState: { opacity: number } = { opacity: 1 };
   annotations!: AnnotationManager;
+  plugins!: PluginHost;
   capabilities!: ViewerCapabilities;
+  stylePreset!: SurfViewStylePreset;
   options!: Map<string, any>;
   sceneBoundsRadius!: number;
   initializationFailed: boolean;
@@ -155,6 +180,7 @@ export class NeuroSurfaceViewer extends EventEmitter {
     super(); // Initialize EventEmitter
     this.initializationFailed = false;
     this.container = container;
+    this.plugins = new PluginHost(this);
     // Ensure absolute children (pane, etc.) position relative to the viewer container.
     if (typeof window !== 'undefined') {
       const computed = window.getComputedStyle(container);
@@ -200,6 +226,7 @@ export class NeuroSurfaceViewer extends EventEmitter {
       useGPUPicking: false,
       ...config
     };
+    this.stylePreset = resolveStylePreset(this.config.preset);
     this.viewpoint = viewpoint;
 
     // Initialize core state before any setup functions that rely on it
@@ -231,8 +258,8 @@ export class NeuroSurfaceViewer extends EventEmitter {
     this.setupSurfaceClick();
     this.setupPostProcessing();
 
-    if (this.config.preset === 'presentation') {
-      this.applyPresentationPreset();
+    if (this.config.preset !== 'default') {
+      this.applyStylePreset(this.config.preset);
     }
 
     this.handleSurfaceClick = this.onSurfaceClickHandler.bind(this);
@@ -283,6 +310,22 @@ export class NeuroSurfaceViewer extends EventEmitter {
 
     // Start the animation loop
     this.animate();
+  }
+
+  registerPlugin(plugin: ViewerPlugin, options?: RegisterPluginOptions): PluginRegistration {
+    return this.plugins.register(plugin, options);
+  }
+
+  unregisterPlugin(id: string): boolean {
+    return this.plugins.unregister(id);
+  }
+
+  getPlugin(id: string): PluginRegistration | null {
+    return this.plugins.get(id);
+  }
+
+  listPlugins(): PluginRegistration[] {
+    return this.plugins.list();
   }
 
   setupRenderer(): void {
@@ -390,6 +433,14 @@ export class NeuroSurfaceViewer extends EventEmitter {
   }
 
   onControlsChange = (): void => {
+    const target = this.controls && 'target' in this.controls
+      ? ((this.controls as any).target as THREE.Vector3).clone()
+      : null;
+    this.emit('camera:changed', {
+      camera: this.camera,
+      position: this.camera.position.clone(),
+      target
+    });
     this.requestRender();
   }
 
@@ -1261,7 +1312,11 @@ export class NeuroSurfaceViewer extends EventEmitter {
     }
     
     // Emit viewpoint changed event
-    this.emit('viewpoint:changed', { viewpoint: fullViewpoint });
+    this.emit('viewpoint:changed', {
+      viewpoint: fullViewpoint,
+      position: this.camera.position.clone(),
+      target: this.viewpointState.target.clone()
+    });
     
     this.requestRender();
   }
@@ -1381,6 +1436,7 @@ export class NeuroSurfaceViewer extends EventEmitter {
       if (!id) {
         id = `surface_${this.surfaces.size}`;
       }
+      const surfaceId = id;
 
       // Set viewer reference on the surface
       surface.viewer = this;
@@ -1429,12 +1485,50 @@ export class NeuroSurfaceViewer extends EventEmitter {
       surface.on('opacity:changed', () => this.requestRender());
       surface.on('material:updated', () => this.requestRender());
       surface.on('geometry:updated', () => this.requestRender());
-      surface.on('layer:added', () => this.requestRender());
-      surface.on('layer:removed', () => this.requestRender());
-      surface.on('layer:updated', () => this.requestRender());
+      surface.on('layer:added', (event: any) => {
+        const layer = event?.layer ?? null;
+        const layerId = layer?.id ?? event?.layerId;
+        if (!layerId) {
+          this.requestRender();
+          return;
+        }
+        this.emit('layer:added', {
+          surfaceId,
+          layerId,
+          layer
+        });
+        this.requestRender();
+      });
+      surface.on('layer:removed', (event: any) => {
+        if (!event?.layerId) {
+          this.requestRender();
+          return;
+        }
+        this.emit('layer:removed', {
+          surfaceId,
+          layerId: event.layerId,
+          layer: null
+        });
+        this.requestRender();
+      });
+      surface.on('layer:updated', (event: any) => {
+        const layer = event?.layer ?? null;
+        const layerId = layer?.id ?? event?.layerId;
+        if (!layerId) {
+          this.requestRender();
+          return;
+        }
+        this.emit('layer:updated', {
+          surfaceId,
+          layerId,
+          layer,
+          changes: event?.changes
+        });
+        this.requestRender();
+      });
       
       // Emit viewer event
-      this.emit('surface:added', { surface, id });
+      this.emit('surface:added', { surface, id: surfaceId, surfaceId });
 
       // Fit camera/controls to current surfaces and set initial viewpoint
       this.centerCamera();
@@ -1481,6 +1575,11 @@ export class NeuroSurfaceViewer extends EventEmitter {
       volumeOrigin?: [number, number, number];
       useHalfFloat?: boolean;
       fillValue?: number;
+      projectionMode?: VolumeProjectionMode;
+      pialPositions?: Float32Array | ArrayLike<number>;
+      whitePositions?: Float32Array | ArrayLike<number>;
+      ribbonSamples?: number;
+      ribbonReducer?: RibbonReducer;
     },
     displayConfig: {
       colormap?: string;
@@ -1509,6 +1608,11 @@ export class NeuroSurfaceViewer extends EventEmitter {
       volumeOrigin: volumeConfig.volumeOrigin,
       useHalfFloat: volumeConfig.useHalfFloat,
       fillValue: volumeConfig.fillValue ?? 0.0,
+      projectionMode: volumeConfig.projectionMode,
+      pialPositions: volumeConfig.pialPositions,
+      whitePositions: volumeConfig.whitePositions,
+      ribbonSamples: volumeConfig.ribbonSamples,
+      ribbonReducer: volumeConfig.ribbonReducer,
       colormap: displayConfig.colormap ?? 'viridis',
       intensityRange: displayConfig.range ?? [0, 1],
       threshold: displayConfig.threshold ?? [0, 0],
@@ -1613,7 +1717,7 @@ export class NeuroSurfaceViewer extends EventEmitter {
       this.surfaces.delete(id);
 
       // Emit viewer event
-      this.emit('surface:removed', { surface, id });
+      this.emit('surface:removed', { surface, id, surfaceId: id });
 
       this.requestRender();
     }
@@ -1695,37 +1799,20 @@ export class NeuroSurfaceViewer extends EventEmitter {
 
   addRimLightingShader(mesh: THREE.Mesh): void {
     const material = mesh.material as THREE.Material;
+    if ((material as any).userData?.hasRimShader) {
+      return;
+    }
     const rimStrengthUniform = { value: this.config.rimStrength };
     this.rimStrengthUniforms.push(rimStrengthUniform);
 
     material.onBeforeCompile = (shader) => {
       shader.uniforms.rimStrength = rimStrengthUniform;
       
-      shader.vertexShader = shader.vertexShader.replace(
-        '#include <common>',
-        `
-        #include <common>
-        varying vec3 vViewPosition;
-        varying vec3 vNormal;
-        `
-      );
-      
-      shader.vertexShader = shader.vertexShader.replace(
-        '#include <worldpos_vertex>',
-        `
-        #include <worldpos_vertex>
-        vViewPosition = -mvPosition.xyz;
-        vNormal = normalize(normalMatrix * normal);
-        `
-      );
-      
       shader.fragmentShader = shader.fragmentShader.replace(
         '#include <common>',
         `
         #include <common>
         uniform float rimStrength;
-        varying vec3 vViewPosition;
-        varying vec3 vNormal;
         `
       );
       
@@ -1735,14 +1822,18 @@ export class NeuroSurfaceViewer extends EventEmitter {
         #include <dithering_fragment>
         
         // Rim lighting
-        vec3 viewDir = normalize(vViewPosition);
-        float rim = 1.0 - abs(dot(viewDir, vNormal));
-        rim = pow(rim, 2.0);
-        gl_FragColor.rgb += rim * rimStrength;
+        #ifndef FLAT_SHADED
+          vec3 surfviewRimNormal = normalize(vNormal);
+          vec3 surfviewViewDir = normalize(vViewPosition);
+          float surfviewRim = 1.0 - abs(dot(surfviewViewDir, surfviewRimNormal));
+          surfviewRim = pow(surfviewRim, 2.0);
+          gl_FragColor.rgb += surfviewRim * rimStrength;
+        #endif
         `
       );
     };
     
+    material.userData = { ...(material as any).userData, hasRimShader: true };
     material.needsUpdate = true;
   }
 
@@ -1758,6 +1849,10 @@ export class NeuroSurfaceViewer extends EventEmitter {
       const rect = this.renderer.domElement.getBoundingClientRect();
       this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+      this.emit('mouse:move', {
+        position: this.mouse.clone(),
+        intersection: this.getIntersectionPoint().clone()
+      });
       this.updateHoverCrosshair(event);
     };
     this.renderer.domElement.addEventListener('mousemove', this.handleMouseMove);
@@ -1772,6 +1867,17 @@ export class NeuroSurfaceViewer extends EventEmitter {
 
   private onSurfaceClickHandler(event: MouseEvent): void {
     const hit = this.pick({ x: event.clientX, y: event.clientY });
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const position = new THREE.Vector2(
+      ((event.clientX - rect.left) / rect.width) * 2 - 1,
+      -((event.clientY - rect.top) / rect.height) * 2 + 1
+    );
+    this.emit('mouse:click', {
+      position,
+      surface: hit.surfaceId ? this.surfaces.get(hit.surfaceId) ?? null : null,
+      point: hit.point
+    });
+
     if (!hit.surfaceId || hit.vertexIndex === null) return;
 
     const surface = this.surfaces.get(hit.surfaceId);
@@ -2247,7 +2353,11 @@ export class NeuroSurfaceViewer extends EventEmitter {
   }
 
   requestRender(): void {
+    const shouldEmit = this.needsRender !== true;
     this.needsRender = true;
+    if (shouldEmit) {
+      this.emit('render:needed');
+    }
   }
 
   animate(): void {
@@ -2434,6 +2544,7 @@ export class NeuroSurfaceViewer extends EventEmitter {
       }
     });
     
+    this.emit('resize', { width, height });
     this.requestRender();
     return { width, height, dpr };
   }
@@ -2450,6 +2561,264 @@ export class NeuroSurfaceViewer extends EventEmitter {
   /** Restore viewer state from a serialized object. */
   fromJSON(state: ViewerStateV1): RestorationReport {
     return deserialize(this, state);
+  }
+
+  /** Export viewer state plus provenance as a portable SurfView scene manifest. */
+  exportScene(options?: SceneExportOptions): SceneExportManifest {
+    return buildSceneExport(this, options);
+  }
+
+  /** Export viewer state plus provenance as a JSON scene manifest string. */
+  exportSceneJSON(options?: SceneExportOptions): string {
+    return buildSceneExportJSON(this, options);
+  }
+
+  /** Export viewer state plus provenance as a scene manifest Blob. */
+  exportSceneBlob(options?: SceneExportOptions): Blob {
+    return buildSceneExportBlob(this, options);
+  }
+
+  /** Export a standalone HTML shell that embeds the scene manifest. */
+  exportStaticHTML(options?: StaticHTMLExportOptions): string {
+    return buildStaticHTMLExport(this, options);
+  }
+
+  /**
+   * Export the current view as a high-resolution PNG data URL.
+   *
+   * The renderer is temporarily resized to the requested pixel dimensions, rendered,
+   * copied into a 2D export canvas, annotated with optional figure overlays, and then
+   * restored to its previous interactive size.
+   */
+  exportPNG(options: FigureExportOptions = {}): string {
+    if (!this.renderer || !this.renderer.domElement) {
+      throw new Error('exportPNG requires an initialized WebGL renderer');
+    }
+    if (typeof document === 'undefined') {
+      throw new Error('exportPNG requires a browser document');
+    }
+
+    const exportOptions = resolveFigureExportOptions(
+      options.preset ?? this.stylePreset ?? this.config.preset,
+      options,
+      { width: this.width, height: this.height }
+    );
+
+    const previousSize = new THREE.Vector2();
+    this.renderer.getSize(previousSize);
+    const previousPixelRatio = this.renderer.getPixelRatio();
+    const previousClearColor = new THREE.Color();
+    this.renderer.getClearColor(previousClearColor);
+    const previousClearAlpha = this.renderer.getClearAlpha();
+    const previousBackground = this.container.style.background;
+
+    try {
+      this.renderer.setPixelRatio(1);
+      this.resize(exportOptions.width, exportOptions.height, { dpr: 1 });
+      this.renderer.setClearColor(
+        exportOptions.backgroundColor,
+        exportOptions.transparent ? 0 : 1
+      );
+      this.render();
+
+      const canvas = document.createElement('canvas');
+      canvas.width = exportOptions.width;
+      canvas.height = exportOptions.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        throw new Error('exportPNG could not create a 2D canvas context');
+      }
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (!exportOptions.transparent) {
+        ctx.fillStyle = colorToCSS(exportOptions.backgroundColor);
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+      ctx.drawImage(this.renderer.domElement, 0, 0, canvas.width, canvas.height);
+      this.drawFigureOverlays(ctx, exportOptions);
+
+      const dataUrl = canvas.toDataURL('image/png');
+      if (exportOptions.downloadFilename) {
+        this.downloadDataURL(dataUrl, exportOptions.downloadFilename);
+      }
+      return dataUrl;
+    } finally {
+      this.renderer.setClearColor(previousClearColor, previousClearAlpha);
+      this.container.style.background = previousBackground;
+      this.resize(previousSize.x, previousSize.y, { dpr: previousPixelRatio });
+      this.render();
+    }
+  }
+
+  private drawFigureOverlays(ctx: CanvasRenderingContext2D, options: ResolvedFigureExportOptions): void {
+    const width = ctx.canvas.width;
+    const height = ctx.canvas.height;
+    const fontScale = options.fontScale;
+
+    if (options.title) {
+      ctx.save();
+      ctx.fillStyle = options.transparent ? '#111827' : this.readableTextColor(options.backgroundColor);
+      ctx.font = `${Math.round(24 * fontScale)}px sans-serif`;
+      ctx.textBaseline = 'top';
+      ctx.fillText(options.title, 28 * fontScale, 24 * fontScale);
+      if (options.subtitle) {
+        ctx.font = `${Math.round(14 * fontScale)}px sans-serif`;
+        ctx.fillText(options.subtitle, 28 * fontScale, 56 * fontScale);
+      }
+      ctx.restore();
+    }
+
+    if (options.colorbar) {
+      this.drawExportColorbar(ctx, options);
+    }
+    if (options.scaleBar) {
+      this.drawExportScaleBar(ctx, options);
+    }
+    if (options.roiLabels) {
+      this.drawExportLabels(ctx, options.roiLabels, options);
+    }
+
+    // Keep exports visibly bounded when transparent output is requested.
+    if (options.transparent) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(15, 23, 42, 0.12)';
+      ctx.lineWidth = Math.max(1, width / 1600);
+      ctx.strokeRect(0.5, 0.5, width - 1, height - 1);
+      ctx.restore();
+    }
+  }
+
+  private drawExportColorbar(ctx: CanvasRenderingContext2D, options: ResolvedFigureExportOptions): void {
+    const width = ctx.canvas.width;
+    const height = ctx.canvas.height;
+    const fontScale = options.fontScale;
+    const barWidth = Math.max(16, Math.round(width * 0.018));
+    const barHeight = Math.max(140, Math.round(height * 0.28));
+    const x = width - barWidth - Math.round(40 * fontScale);
+    const y = height - barHeight - Math.round(44 * fontScale);
+    const gradient = ctx.createLinearGradient(0, y + barHeight, 0, y);
+
+    const colors = options.colorbarColors.length > 0 ? options.colorbarColors : ['#000000', '#ffffff'];
+    colors.forEach((color, index) => {
+      gradient.addColorStop(colors.length === 1 ? 0 : index / (colors.length - 1), color);
+    });
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.78)';
+    ctx.fillRect(x - 8, y - 8, barWidth + 58 * fontScale, barHeight + 36 * fontScale);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(x, y, barWidth, barHeight);
+    ctx.strokeStyle = 'rgba(15, 23, 42, 0.55)';
+    ctx.lineWidth = Math.max(1, fontScale);
+    ctx.strokeRect(x, y, barWidth, barHeight);
+
+    ctx.fillStyle = '#111827';
+    ctx.font = `${Math.round(12 * fontScale)}px sans-serif`;
+    ctx.textBaseline = 'middle';
+    ctx.fillText(options.colorbarLabel, x + barWidth + 10 * fontScale, y + barHeight / 2);
+    if (options.colorbarRange) {
+      const [min, max] = options.colorbarRange;
+      ctx.font = `${Math.round(10 * fontScale)}px sans-serif`;
+      ctx.textBaseline = 'top';
+      ctx.fillText(String(max), x + barWidth + 10 * fontScale, y - 1);
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(String(min), x + barWidth + 10 * fontScale, y + barHeight + 1);
+    }
+    ctx.restore();
+  }
+
+  private drawExportScaleBar(ctx: CanvasRenderingContext2D, options: ResolvedFigureExportOptions): void {
+    const width = ctx.canvas.width;
+    const height = ctx.canvas.height;
+    const fontScale = options.fontScale;
+    const barWidth = Math.max(64, Math.round(width * options.scaleBarLength));
+    const x = Math.round(44 * fontScale);
+    const y = height - Math.round(48 * fontScale);
+    const color = options.transparent ? '#111827' : this.readableTextColor(options.backgroundColor);
+
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = Math.max(2, Math.round(3 * fontScale));
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + barWidth, y);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x, y - 7 * fontScale);
+    ctx.lineTo(x, y + 7 * fontScale);
+    ctx.moveTo(x + barWidth, y - 7 * fontScale);
+    ctx.lineTo(x + barWidth, y + 7 * fontScale);
+    ctx.stroke();
+    if (options.scaleBarLabel) {
+      ctx.fillStyle = color;
+      ctx.font = `${Math.round(12 * fontScale)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(options.scaleBarLabel, x + barWidth / 2, y - 10 * fontScale);
+    }
+    ctx.restore();
+  }
+
+  private drawExportLabels(
+    ctx: CanvasRenderingContext2D,
+    labels: boolean | FigureExportLabel[],
+    options: ResolvedFigureExportOptions
+  ): void {
+    const fontScale = options.fontScale;
+    const resolvedLabels = Array.isArray(labels)
+      ? labels
+      : this.annotationLabelsForExport();
+    if (resolvedLabels.length === 0) return;
+
+    ctx.save();
+    ctx.font = `${Math.round(12 * fontScale)}px sans-serif`;
+    ctx.textBaseline = 'middle';
+    resolvedLabels.forEach(label => {
+      const x = label.normalized ? label.x * ctx.canvas.width : label.x;
+      const y = label.normalized ? label.y * ctx.canvas.height : label.y;
+      const text = label.text;
+      const paddingX = 5 * fontScale;
+      const paddingY = 3 * fontScale;
+      const metrics = ctx.measureText(text);
+      const boxWidth = metrics.width + paddingX * 2;
+      const boxHeight = 16 * fontScale + paddingY * 2;
+      ctx.fillStyle = label.background ?? 'rgba(255, 255, 255, 0.82)';
+      ctx.fillRect(x - paddingX, y - boxHeight / 2, boxWidth, boxHeight);
+      ctx.fillStyle = label.color ?? options.preset.roi.labelColor;
+      ctx.fillText(text, x, y);
+    });
+    ctx.restore();
+  }
+
+  private annotationLabelsForExport(): FigureExportLabel[] {
+    return this.annotations.list().map(record => {
+      const projected = record.position.clone().project(this.camera);
+      const text = String(
+        record.data?.label ??
+        record.data?.name ??
+        record.id
+      );
+      return {
+        text,
+        x: (projected.x * 0.5 + 0.5) * this.width,
+        y: (-projected.y * 0.5 + 0.5) * this.height
+      };
+    });
+  }
+
+  private readableTextColor(backgroundColor: number): string {
+    const r = (backgroundColor >> 16) & 255;
+    const g = (backgroundColor >> 8) & 255;
+    const b = backgroundColor & 255;
+    const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    return luminance > 0.55 ? '#111827' : '#f8fafc';
+  }
+
+  private downloadDataURL(dataUrl: string, filename: string): void {
+    const link = document.createElement('a');
+    link.href = dataUrl;
+    link.download = filename;
+    link.click();
   }
 
   /** Encode the current viewer state as a URL hash fragment. */
@@ -2473,6 +2842,8 @@ export class NeuroSurfaceViewer extends EventEmitter {
     if (this.animationId !== null) {
       cancelAnimationFrame(this.animationId);
     }
+
+    this.plugins.dispose();
     
     // Dispose of all surfaces
     this.clearSurfaces();
@@ -2732,38 +3103,95 @@ export class NeuroSurfaceViewer extends EventEmitter {
       });
     }
 
-    if (newConfig.preset === 'presentation') {
-      this.applyPresentationPreset();
+    if (newConfig.preset !== undefined) {
+      this.applyStylePreset(newConfig.preset);
     }
     
     this.requestRender();
   }
 
   /**
-   * Apply a high-polish presentation preset: soft neutral background, gentle PBR material, boosted SSAO,
-   * and slightly increased ambient light. Kept intentionally minimal so it’s safe for static renders.
+   * Apply a named publication/presentation style preset to the viewer and current surfaces.
+   *
+   * Presets update background, lighting, material defaults, curvature contrast,
+   * annotation defaults, ROI/export style metadata, and default figure export size.
+   * Existing data layers are not recolored automatically; use `stylePreset.colormaps`
+   * as the default palette policy for newly created layers.
    */
-  applyPresentationPreset(): void {
-    // Background via CSS so we don’t burn fill rate
+  applyStylePreset(preset: SurfViewStylePresetName | SurfViewStylePreset): SurfViewStylePreset {
+    const style = resolveStylePreset(preset);
+    this.stylePreset = style;
+    this.config.preset = style.name;
+    this.config.backgroundColor = style.background.clearColor;
+    this.config.ambientLightColor = style.lighting.ambientColor;
+    this.config.directionalLightColor = style.lighting.directionalColor;
+    this.config.directionalLightIntensity = style.lighting.directionalIntensity;
+    this.config.metalness = style.material.metalness;
+    this.config.roughness = style.material.roughness;
+    this.config.rimStrength = style.lighting.rimStrength;
+    this.config.ssaoRadius = style.lighting.ssaoRadius;
+    this.config.ssaoKernelSize = style.lighting.ssaoKernelSize;
+
     if (this.container) {
-      (this.container.style as any).background = 'linear-gradient(135deg, #f7f7f9 0%, #e3e7ed 100%)';
+      this.container.style.background = style.background.css;
     }
+    if (this.renderer) {
+      this.renderer.setClearColor(style.background.clearColor, style.background.clearAlpha);
+    }
+    if (this.ambientLight) {
+      this.ambientLight.color.setHex(style.lighting.ambientColor);
+      this.ambientLight.intensity = style.lighting.ambientIntensity;
+    }
+    if (this.directionalLight) {
+      this.directionalLight.color.setHex(style.lighting.directionalColor);
+      this.directionalLight.intensity = style.lighting.directionalIntensity;
+      this.directionalLight.position.set(...style.lighting.directionalPosition);
+    }
+    if (this.ssaoPass) {
+      this.ssaoPass.kernelRadius = style.lighting.ssaoRadius;
+      if (typeof (this.ssaoPass as any).generateSampleKernel === 'function') {
+        (this.ssaoPass as any).kernelSize = style.lighting.ssaoKernelSize;
+        (this.ssaoPass as any).generateSampleKernel(style.lighting.ssaoKernelSize);
+      }
+    }
+    this.rimStrengthUniforms.forEach(uniform => {
+      uniform.value = style.lighting.rimStrength;
+    });
+    this.annotations.setDefaults({
+      radius: style.annotation.radius,
+      colorOn: style.annotation.colorOn,
+      colorOff: style.annotation.colorOff
+    });
 
-    this.renderer.setClearColor(0x000000, 0); // transparent to show CSS gradient
-
-    // Softer lighting
-    this.updateAmbientLight(0xb0b0b0);
-    this.updateDirectionalLightIntensity(1.0);
-
-    // Material defaults
-    this.updateConfig({
-      metalness: 0.05,
-      roughness: 0.35,
-      rimStrength: Math.max(this.config.rimStrength, 0.35),
-      ssaoRadius: Math.max(this.config.ssaoRadius, 6)
+    this.surfaces.forEach(surface => {
+      if (typeof (surface as any).updateConfig === 'function') {
+        (surface as any).updateConfig({
+          color: style.material.baseColor,
+          materialType: style.material.materialType,
+          metalness: style.material.metalness,
+          roughness: style.material.roughness,
+          alpha: style.material.alpha
+        });
+      }
+      if (surface instanceof MultiLayerNeuroSurface) {
+        const curvature = surface.getCurvatureLayer();
+        if (curvature) {
+          curvature.setBrightness(style.curvature.brightness);
+          curvature.setContrast(style.curvature.contrast);
+          curvature.setSmoothness(style.curvature.smoothness);
+        }
+      }
     });
 
     this.requestRender();
+    return style;
+  }
+
+  /**
+   * Back-compat wrapper for the original presentation preset API.
+   */
+  applyPresentationPreset(): void {
+    this.applyStylePreset('presentation');
   }
 
   takeScreenshot(filename: string = 'neurosurface.png'): void {

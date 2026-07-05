@@ -115,7 +115,7 @@ export class AnnotationManager {
       }
     }
 
-    this.viewer.emit('annotation:added', { annotation: record });
+    this.viewer.emit('annotation:added', this.buildEventPayload(record));
     return id;
   }
 
@@ -157,7 +157,7 @@ export class AnnotationManager {
       record.marker.position.copy(position);
     }
 
-    this.viewer.emit('annotation:moved', { annotation: record });
+    this.viewer.emit('annotation:moved', this.buildEventPayload(record));
     this.viewer.requestRender();
     return true;
   }
@@ -186,7 +186,7 @@ export class AnnotationManager {
     }
     this.disposeMarker(record.marker);
     this.annotations.delete(id);
-    this.viewer.emit('annotation:removed', { annotation: record });
+    this.viewer.emit('annotation:removed', this.buildEventPayload(record));
     this.viewer.requestRender();
   }
 
@@ -205,7 +205,7 @@ export class AnnotationManager {
       this.instancedMesh = null;
       this.instanceColors = null;
     }
-    this.viewer.emit('annotation:reset', {});
+    this.viewer.emit('annotation:reset');
     this.viewer.requestRender();
   }
 
@@ -244,7 +244,7 @@ export class AnnotationManager {
       this.instancedMesh.instanceColor.needsUpdate = true;
     }
 
-    this.viewer.emit('annotation:activated', { annotation: target });
+    this.viewer.emit('annotation:activated', this.buildEventPayload(target));
     this.viewer.requestRender();
   }
 
@@ -264,6 +264,22 @@ export class AnnotationManager {
     if (defaults.colorOff !== undefined) {
       this.defaultOffMaterial.color.setHex(defaults.colorOff);
     }
+  }
+
+  private buildEventPayload(record: AnnotationRecord): {
+    annotation: AnnotationRecord;
+    id: string;
+    surfaceId: string;
+    vertexIndex: number;
+    active: boolean;
+  } {
+    return {
+      annotation: record,
+      id: record.id,
+      surfaceId: record.surfaceId,
+      vertexIndex: record.vertexIndex,
+      active: record.active
+    };
   }
 
   private disposeMarker(marker: THREE.Mesh): void {

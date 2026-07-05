@@ -1,6 +1,6 @@
 # Events
 
-SurfView.js uses an event system for communication between components. Both the viewer and surfaces emit events you can listen to.
+SurfView.js uses events for viewer state, picking, surface/layer changes, annotations, rendering, and plugin panels. The public viewer event names and payloads are defined by `ViewerEventMap`.
 
 ## Viewer Events
 
@@ -8,7 +8,7 @@ SurfView.js uses an event system for communication between components. Both the 
 
 ```javascript
 viewer.on('surface:added', ({ surfaceId, surface }) => {
-  console.log(`Surface ${surfaceId} added`);
+  console.log(`Surface ${surfaceId} added`, surface);
 });
 
 viewer.on('surface:removed', ({ surfaceId }) => {
@@ -18,55 +18,62 @@ viewer.on('surface:removed', ({ surfaceId }) => {
 viewer.on('surface:variant', ({ surfaceId, variant }) => {
   console.log(`Surface ${surfaceId} switched to variant ${variant}`);
 });
+
+viewer.on('surface:colormap', ({ surfaceId, colormap }) => {
+  console.log(`Surface ${surfaceId} colormap changed to ${colormap}`);
+});
 ```
 
 ### Layer Events
 
+Viewer-level layer events are forwarded from `MultiLayerNeuroSurface` instances after they are added to the viewer.
+
 ```javascript
-viewer.on('layer:added', ({ surfaceId, layerId }) => {
-  console.log(`Layer ${layerId} added to ${surfaceId}`);
+viewer.on('layer:added', ({ surfaceId, layerId, layer }) => {
+  console.log(`Layer ${layerId} added to ${surfaceId}`, layer);
 });
 
 viewer.on('layer:removed', ({ surfaceId, layerId }) => {
   console.log(`Layer ${layerId} removed from ${surfaceId}`);
 });
 
-viewer.on('layer:updated', ({ surfaceId, layerId, changes }) => {
-  console.log(`Layer ${layerId} updated`, changes);
+viewer.on('layer:updated', ({ surfaceId, layerId, layer, changes }) => {
+  console.log(`Layer ${layerId} updated on ${surfaceId}`, layer, changes);
 });
 
-viewer.on('layer:colormap', ({ layerId, colormap }) => {
-  console.log(`Colormap changed to ${colormap}`);
+viewer.on('layer:colormap', ({ surfaceId, layerId, colormap }) => {
+  console.log(`Layer ${layerId} on ${surfaceId} changed to ${colormap}`);
 });
 
-viewer.on('layer:intensity', ({ layerId, range }) => {
-  console.log(`Intensity range changed to`, range);
+viewer.on('layer:intensity', ({ surfaceId, layerId, range }) => {
+  console.log(`Layer ${layerId} intensity range`, range);
 });
 
-viewer.on('layer:threshold', ({ layerId, threshold }) => {
-  console.log(`Threshold changed to`, threshold);
+viewer.on('layer:threshold', ({ surfaceId, layerId, threshold }) => {
+  console.log(`Layer ${layerId} threshold`, threshold);
 });
 
-viewer.on('layer:opacity', ({ layerId, opacity }) => {
-  console.log(`Opacity changed to ${opacity}`);
+viewer.on('layer:opacity', ({ surfaceId, layerId, opacity }) => {
+  console.log(`Layer ${layerId} opacity changed to ${opacity}`);
 });
 ```
 
-### Interaction Events
+### Picking Events
 
 ```javascript
 viewer.on('surface:click', (hit) => {
   if (hit.surfaceId && hit.vertexIndex !== null) {
     console.log(`Clicked ${hit.surfaceId} at vertex ${hit.vertexIndex}`);
-    console.log(`Position:`, hit.point);
-    console.log(`Normal:`, hit.normal);
+    console.log('Position:', hit.point);
   }
+});
+
+viewer.on('mouse:click', ({ position, surface, point }) => {
+  console.log('Mouse click in normalized device coordinates:', position, surface, point);
 });
 ```
 
 ### Hover Events
-
-Emitted when the mouse hovers over a surface vertex. The visual hover crosshair is optional; the events themselves are emitted on mouse move.
 
 ```javascript
 viewer.on('vertex:hover', ({ surfaceId, vertexIndex, screenX, screenY }) => {
@@ -102,6 +109,10 @@ viewer.on('parcel:click', ({ parcelId }) => {
 
   heatmap.setSelectedParcel(parcelId);
 });
+
+viewer.on('parcel:selected', ({ parcelId, selected }) => {
+  console.log('Parcel selection:', parcelId, selected);
+});
 ```
 
 `parcel:hover` is emitted with `parcelId: null` when the pointer leaves parcelized geometry, so external views can clear their hover state without listening to lower-level vertex events.
@@ -133,8 +144,8 @@ These methods use a parcelized surface's representative vertex internally, so ex
 ### Annotation Events
 
 ```javascript
-viewer.on('annotation:added', ({ id, surfaceId, vertexIndex }) => {
-  console.log(`Annotation ${id} added`);
+viewer.on('annotation:added', ({ id, surfaceId, vertexIndex, annotation }) => {
+  console.log(`Annotation ${id} added on ${surfaceId} at ${vertexIndex}`, annotation);
 });
 
 viewer.on('annotation:moved', ({ id, vertexIndex }) => {
@@ -145,8 +156,8 @@ viewer.on('annotation:removed', ({ id }) => {
   console.log(`Annotation ${id} removed`);
 });
 
-viewer.on('annotation:activated', ({ id }) => {
-  console.log(`Annotation ${id} activated`);
+viewer.on('annotation:activated', ({ id, active }) => {
+  console.log(`Annotation ${id} active: ${active}`);
 });
 
 viewer.on('annotation:reset', () => {
@@ -157,32 +168,38 @@ viewer.on('annotation:reset', () => {
 ### Render Events
 
 ```javascript
+viewer.on('render:needed', () => {
+  console.log('A render has been requested');
+});
+
 viewer.on('render:before', () => {
-  // Called before each render
+  console.log('About to render');
 });
 
 viewer.on('render:after', () => {
-  // Called after each render
-});
-
-viewer.on('render:needed', () => {
-  // Called when a render is requested
+  console.log('Rendered frame');
 });
 ```
 
-### Viewpoint Events
+`render:needed` is emitted when the viewer transitions from idle to needing a render. `render:before` and `render:after` are emitted around actual frame rendering.
+
+### View, Resize, And Controls Events
 
 ```javascript
-viewer.on('viewpoint:changed', ({ viewpoint, position }) => {
-  console.log(`Viewpoint changed to ${viewpoint}`);
+viewer.on('viewpoint:changed', ({ viewpoint, position, target }) => {
+  console.log(`Viewpoint changed to ${viewpoint}`, position, target);
 });
-```
 
-### Controls Events
+viewer.on('camera:changed', ({ camera, position, target }) => {
+  console.log('Camera changed', camera, position, target);
+});
 
-```javascript
-viewer.on('controls:changed', ({ name, value }) => {
-  console.log(`Control ${name} changed to ${value}`);
+viewer.on('resize', ({ width, height }) => {
+  console.log(`Viewer resized to ${width}x${height}`);
+});
+
+viewer.on('controls:changed', ({ enabled }) => {
+  console.log(`Controls enabled: ${enabled}`);
 });
 
 viewer.on('controls:error', ({ error }) => {
@@ -190,47 +207,75 @@ viewer.on('controls:error', ({ error }) => {
 });
 ```
 
+### State Events
+
+```javascript
+viewer.on('state:restored', (report) => {
+  console.log('State restored:', report.success, report.warnings);
+});
+```
+
+## Plugin Panels
+
+Plugins mount into an element and subscribe through the typed viewer event API. Subscriptions made through `api.on()` are removed automatically when the plugin is unregistered.
+
+```javascript
+viewer.registerPlugin({
+  id: 'retinotopy-panel',
+  mount(container, api) {
+    const label = document.createElement('div');
+    container.appendChild(label);
+
+    api.on('vertex:hover', ({ surfaceId, vertexIndex }) => {
+      label.textContent = surfaceId && vertexIndex !== null
+        ? `${surfaceId}:${vertexIndex}`
+        : '';
+    });
+
+    return () => {
+      container.textContent = '';
+    };
+  }
+});
+
+viewer.unregisterPlugin('retinotopy-panel');
+```
+
+## Temporal Events
+
+`TimelineController` has its own typed event map for temporal playback.
+
+```javascript
+timeline.on('timechange', ({ time, frameA, frameB, alpha }) => {
+  console.log(`t=${time}`, frameA, frameB, alpha);
+});
+
+timeline.on('play', () => {
+  console.log('Timeline started');
+});
+
+timeline.on('pause', () => {
+  console.log('Timeline paused');
+});
+
+timeline.on('stop', () => {
+  console.log('Timeline stopped');
+});
+```
+
 ## Removing Listeners
 
 ```javascript
-// Store the handler
 const handler = (event) => console.log(event);
 
-// Add listener
 viewer.on('surface:click', handler);
-
-// Remove listener
 viewer.off('surface:click', handler);
 ```
 
-## One-time Listeners
+## One-Time Listeners
 
 ```javascript
 viewer.once('surface:added', ({ surfaceId }) => {
   console.log(`First surface added: ${surfaceId}`);
-});
-```
-
-## Event Flow Example
-
-```javascript
-// Track all layer changes
-viewer.on('layer:updated', ({ surfaceId, layerId, changes }) => {
-  // Log to analytics
-  analytics.track('layer_updated', { surfaceId, layerId, ...changes });
-});
-
-// Sync state with React
-viewer.on('layer:opacity', ({ layerId, opacity }) => {
-  setLayerOpacity(prev => ({ ...prev, [layerId]: opacity }));
-});
-
-// Handle picking
-viewer.on('surface:click', (hit) => {
-  if (hit.vertexIndex !== null) {
-    // Show data at clicked vertex
-    const data = getDataAtVertex(hit.surfaceId, hit.vertexIndex);
-    showTooltip(hit.point, data);
-  }
 });
 ```

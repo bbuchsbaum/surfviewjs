@@ -9,9 +9,9 @@
   "sideEffects": false,
   "exports": {
     ".": {
+      "types": "./dist/types/index.d.ts",
       "import": "./dist/surfview.es.js",
-      "require": "./dist/surfview.umd.js",
-      "types": "./dist/types/index.d.ts"
+      "require": "./dist/surfview.umd.js"
     },
     "./react": {
       "types": "./dist/types/index.react.d.ts",

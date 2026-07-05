@@ -89,7 +89,15 @@
   </main>
 
   <script type="module">
-    import { THREE, GPULayerCompositor, VolumeProjectionLayer, ColorMap } from '../src/index.js';
+    import {
+      THREE,
+      GPULayerCompositor,
+      VolumeProjectionLayer,
+      VolumeProjectionMaterial,
+      VolumeTexture3D,
+      createColormapTexture,
+      ColorMap
+    } from '../src/index.ts';
 
     const logEl = document.getElementById('log');
     const statusPill = document.getElementById('status-pill');
@@ -240,11 +248,17 @@
       let maxX = -Infinity;
       let minY = Infinity;
       let maxY = -Infinity;
+      let minZ = Infinity;
+      let maxZ = -Infinity;
       for (const [x, y] of worldPositions) {
         if (x < minX) minX = x;
         if (x > maxX) maxX = x;
         if (y < minY) minY = y;
         if (y > maxY) maxY = y;
+      }
+      for (const [, , z] of worldPositions) {
+        if (z < minZ) minZ = z;
+        if (z > maxZ) maxZ = z;
       }
 
       // Infer step size from the first row/column when possible.
@@ -256,9 +270,11 @@
       const bottom = minY - stepY * 0.5;
       const top = minY + stepY * height - stepY * 0.5;
 
-      const camera = new THREE.OrthographicCamera(left, right, top, bottom, 0, 10);
-      camera.position.set(0, 0, 1);
-      camera.lookAt(0, 0, 0);
+      const centerZ = (minZ + maxZ) * 0.5;
+      const cameraZ = maxZ + 10;
+      const camera = new THREE.OrthographicCamera(left, right, top, bottom, 0.1, Math.max(20, maxZ - minZ + 20));
+      camera.position.set(0, 0, cameraZ);
+      camera.lookAt(0, 0, centerZ);
       camera.updateMatrixWorld(true);
       camera.updateProjectionMatrix();
 
@@ -295,6 +311,31 @@
 
       const maxDiff = maxAbsDiff(pixelRGB, expectedRGB);
       return { ok: maxDiff <= tolerance, maxDiff };
+    }
+
+    function expectedRGBFromLayer({ layer, vertexCount, baseColor }) {
+      const cpuRGBA = layer.getRGBAData(vertexCount);
+      const expectedRGB = new Float32Array(vertexCount * 3);
+      for (let v = 0; v < vertexCount; v++) {
+        const o = v * 4;
+        const rgb = v * 3;
+        const a = cpuRGBA[o + 3];
+        if (a > 0) {
+          expectedRGB[rgb] = clamp01(cpuRGBA[o]);
+          expectedRGB[rgb + 1] = clamp01(cpuRGBA[o + 1]);
+          expectedRGB[rgb + 2] = clamp01(cpuRGBA[o + 2]);
+        } else {
+          expectedRGB[rgb] = baseColor.r;
+          expectedRGB[rgb + 1] = baseColor.g;
+          expectedRGB[rgb + 2] = baseColor.b;
+        }
+      }
+      return { cpuRGBA, expectedRGB };
+    }
+
+    function setRibbonAttributes(geometry, pial, white) {
+      geometry.setAttribute('pialPosition', new THREE.BufferAttribute(pial, 3));
+      geometry.setAttribute('whitePosition', new THREE.BufferAttribute(white, 3));
     }
 
     async function runCase({ name, width, height, dims, volumeToWorld, layerConfig, meshTranslation, fillVoxel }) {
@@ -439,6 +480,128 @@
       };
     }
 
+    async function runShaderQualityCase({
+      name,
+      renderer,
+      width,
+      height,
+      dims,
+      projectionMode,
+      ribbonSamples,
+      ribbonReducer,
+      pixelTolerance
+    }) {
+      appendLog(`\n[case] ${name}`);
+
+      const volumeData = makeVolumeData(dims);
+      const fillValue = -1;
+      const range = [0, 500];
+      const threshold = [0, 0];
+      const colormap = 'viridis';
+      const meshTranslation = [0, 0, 0];
+      const worldPositions = [];
+      const pial = new Float32Array(width * height * 3);
+      const white = new Float32Array(width * height * 3);
+
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const v = x + width * y;
+          const offset = v * 3;
+          const z = projectionMode === 'ribbon' ? Math.floor((dims[2] - 1) / 2) : (x + y) % dims[2];
+          worldPositions.push([x, y, z]);
+
+          white[offset] = x;
+          white[offset + 1] = y;
+          white[offset + 2] = 0;
+          pial[offset] = x;
+          pial[offset + 1] = y;
+          pial[offset + 2] = dims[2] - 1;
+        }
+      }
+
+      const { points, vertices, vertexCount } = buildPointGrid({
+        width,
+        height,
+        worldPositions,
+        meshTranslation
+      });
+      setRibbonAttributes(points.geometry, projectionMode === 'ribbon' ? pial : vertices, projectionMode === 'ribbon' ? white : vertices);
+
+      const layer = new VolumeProjectionLayer('quality', volumeData, dims, {
+        colormap,
+        range,
+        threshold,
+        opacity: 1.0,
+        fillValue,
+        worldToIJK: new THREE.Matrix4(),
+        projectionMode,
+        sampling: 'nearest',
+        ribbon: projectionMode === 'ribbon'
+          ? { pial, white, samples: ribbonSamples, reducer: ribbonReducer }
+          : undefined
+      });
+      layer.attach({ geometry: { vertices }, mesh: points });
+
+      const baseColor = new THREE.Color(0x243040);
+      const { expectedRGB } = expectedRGBFromLayer({ layer, vertexCount, baseColor });
+
+      const volumeTexture = new VolumeTexture3D(volumeData, dims[0], dims[1], dims[2], {
+        minFilter: THREE.NearestFilter,
+        magFilter: THREE.NearestFilter
+      });
+      const colormapTexture = createColormapTexture(colormap);
+      const material = new VolumeProjectionMaterial({
+        volumeTexture,
+        worldToIJK: new THREE.Matrix4(),
+        colormapTexture,
+        config: {
+          intensityRange: range,
+          threshold,
+          overlayOpacity: 1.0,
+          baseColor,
+          fillValue,
+          ambientIntensity: 1.0,
+          diffuseIntensity: 0.0,
+          specularIntensity: 0.0,
+          projectionMode,
+          ribbonSamples,
+          ribbonReducer
+        }
+      });
+      material.transparent = false;
+      material.depthTest = false;
+      material.depthWrite = false;
+      material.blending = THREE.NoBlending;
+      material.needsUpdate = true;
+
+      points.material = material;
+
+      const scene = new THREE.Scene();
+      scene.add(points);
+      const camera = makeOrthoCameraForGrid({ width, height, worldPositions });
+
+      const pixels = readPixels(renderer, scene, camera, width, height);
+      const tolerance = pixelTolerance ?? 0.06;
+      const { ok: gpuOk, maxDiff: gpuDiff } = comparePixels({ pixels, expectedRGB, tolerance });
+      appendLog(`shader ${projectionMode} maxAbsDiff vs cpu: ${gpuDiff} (tolerance ${tolerance})`);
+
+      const ok = gpuOk;
+      appendLog(ok ? 'PASS' : 'FAIL');
+
+      layer.dispose();
+      material.dispose();
+      colormapTexture.dispose();
+      volumeTexture.dispose();
+      points.geometry.dispose();
+
+      return {
+        name,
+        ok,
+        gpuDiff,
+        mode: projectionMode
+      };
+    }
+
     async function run() {
       const results = {
         skipped: false,
@@ -543,6 +706,30 @@
           useHalfFloat: true,
           pixelTolerance: 0.06
         }
+      }));
+
+      results.cases.push(await runShaderQualityCase({
+        name: 'fragment shader projection parity',
+        renderer,
+        width: 4,
+        height: 4,
+        dims,
+        projectionMode: 'fragment',
+        ribbonSamples: 1,
+        ribbonReducer: 'mean',
+        pixelTolerance: 0.06
+      }));
+
+      results.cases.push(await runShaderQualityCase({
+        name: 'ribbon shader projection parity',
+        renderer,
+        width: 4,
+        height: 4,
+        dims: [4, 4, 5],
+        projectionMode: 'ribbon',
+        ribbonSamples: 5,
+        ribbonReducer: 'mean',
+        pixelTolerance: 0.06
       }));
 
       results.pass = results.cases.every(c => c.ok);

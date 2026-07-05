@@ -1,7 +1,14 @@
 export type EventListener = (...args: any[]) => void;
 export type UnsubscribeFn = () => void;
 
-export class EventEmitter {
+export type EventPayloadArgs<Payload> = [Payload] extends [void] ? [] : [payload: Payload];
+export type TypedEventListener<Payload> = [Payload] extends [void] ? () => void : (payload: Payload) => void;
+export type EventListenerFor<Events, K extends string> =
+  K extends keyof Events ? TypedEventListener<Events[K]> : EventListener;
+export type EventArgsFor<Events, K extends string> =
+  K extends keyof Events ? EventPayloadArgs<Events[K]> : any[];
+
+export class EventEmitter<Events extends object = {}> {
   private _events: Record<string, EventListener[]>;
 
   constructor() {
@@ -9,39 +16,41 @@ export class EventEmitter {
     this._events = Object.create(null);
   }
 
-  on(event: string, listener: EventListener): UnsubscribeFn {
+  on<K extends string>(event: K, listener: EventListenerFor<Events, K>): UnsubscribeFn {
     if (typeof listener !== 'function') {
       throw new TypeError('listener must be a function');
     }
     if (!this._events[event]) {
       this._events[event] = [];
     }
-    this._events[event].push(listener);
-    return () => this.removeListener(event, listener);
+    const eventListener = listener as EventListener;
+    this._events[event].push(eventListener);
+    return () => this.removeStoredListener(event, eventListener);
   }
 
-  once(event: string, listener: EventListener): UnsubscribeFn {
+  once<K extends string>(event: K, listener: EventListenerFor<Events, K>): UnsubscribeFn {
     if (typeof listener !== 'function') {
       throw new TypeError('listener must be a function');
     }
     const wrapped: EventListener = (...args) => {
-      this.removeListener(event, wrapped);
-      listener(...args);
+      this.removeStoredListener(event, wrapped);
+      (listener as EventListener)(...args);
     };
-    return this.on(event, wrapped);
+    return this.on(event, wrapped as EventListenerFor<Events, K>);
   }
 
-  emit(event: string, ...args: any[]): void {
+  emit<K extends string>(event: K, ...args: EventArgsFor<Events, K>): void {
     if (this._events[event]) {
       // Copy listeners to avoid issues if the array is modified during emit
       [...this._events[event]].forEach((listener) => listener(...args));
     }
   }
 
-  removeListener(event: string, listenerToRemove: EventListener): void {
+  removeListener<K extends string>(event: K, listenerToRemove: EventListenerFor<Events, K>): void {
     if (this._events[event]) {
+      const eventListener = listenerToRemove as EventListener;
       this._events[event] = this._events[event].filter(
-        (listener) => listener !== listenerToRemove
+        (listener) => listener !== eventListener
       );
       if (this._events[event].length === 0) {
         delete this._events[event];
@@ -58,7 +67,18 @@ export class EventEmitter {
   }
 
   // Alias for removeListener
-  off(event: string, listener: EventListener): void {
+  off<K extends string>(event: K, listener: EventListenerFor<Events, K>): void {
     return this.removeListener(event, listener);
+  }
+
+  private removeStoredListener(event: string, listenerToRemove: EventListener): void {
+    if (this._events[event]) {
+      this._events[event] = this._events[event].filter(
+        (listener) => listener !== listenerToRemove
+      );
+      if (this._events[event].length === 0) {
+        delete this._events[event];
+      }
+    }
   }
 }

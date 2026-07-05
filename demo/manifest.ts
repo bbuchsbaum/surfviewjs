@@ -18,6 +18,9 @@ import { connectivity } from './scenarios/connectivity';
 import { parcelConnectivity } from './scenarios/parcelConnectivity';
 import { stateSerialization } from './scenarios/stateSerialization';
 import { topologyLens } from './scenarios/topologyLens';
+import { linkedFlatmap } from './scenarios/linkedFlatmap';
+import { alignmentQA } from './scenarios/alignmentQA';
+import { publicationPresets } from './scenarios/publicationPresets';
 
 export const scenarios: Scenario[] = [
   quickstart,
@@ -32,6 +35,9 @@ export const scenarios: Scenario[] = [
   connectivity,
   parcelConnectivity,
   topologyLens,
+  linkedFlatmap,
+  alignmentQA,
+  publicationPresets,
   stateSerialization,
   lighting,
   hemispheres,

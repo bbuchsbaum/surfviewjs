@@ -23,7 +23,7 @@ const surface = new MultiLayerNeuroSurface(geometry, {
 
 ### VolumeProjectedSurface (WebGL2)
 
-Surface that samples a 3D volume texture at each vertex in a custom shader material (no CPU projection). This is a convenience option when you only need a single volume overlay; for a unified multi-layer workflow, prefer `MultiLayerNeuroSurface + VolumeProjectionLayer`.
+Surface that samples a 3D volume texture in a custom shader material (no CPU projection). Use `projectionMode: 'vertex'` for fast interaction, `'fragment'` for per-pixel sampling, or `'ribbon'` to sample through cortical thickness between white and pial surfaces. This is a convenience option when you only need a single volume overlay; for a unified multi-layer workflow, prefer `MultiLayerNeuroSurface + VolumeProjectionLayer`.
 
 ```javascript
 import { NeuroSurfaceViewer } from 'surfview';
@@ -35,7 +35,12 @@ const surface = viewer.addVolumeProjectedSurface(
   {
     data: volumeData,
     dims: [nx, ny, nz],
-    affineMatrix // voxel->world (column-major) or provide worldToIJK
+    affineMatrix, // voxel->world (column-major) or provide worldToIJK
+    projectionMode: 'ribbon',
+    whitePositions,
+    pialPositions,
+    ribbonSamples: 7,
+    ribbonReducer: 'mean'
   },
   {
     colormap: 'hot',
@@ -131,6 +136,61 @@ const geometry = new SurfaceGeometry(
   new Uint32Array([/* v0,v1,v2, v0,v1,v2, ... */]),
   'custom'
 );
+```
+
+## Linked Flatmaps
+
+`FlatMapView` renders a 2D embedding that shares vertex ids with a 3D surface. `LinkedBrainWorkspace` keeps hover, selection, layer state, and optional timeline state synchronized between the flatmap and `NeuroSurfaceViewer`.
+
+```javascript
+import { FlatMapView, LinkedBrainWorkspace } from 'surfview';
+
+const flatmap = new FlatMapView(flatContainer, {
+  surfaceId: 'lh',
+  vertices: flatPositions,
+  faces
+});
+
+const workspace = new LinkedBrainWorkspace({
+  viewer,
+  flatmap,
+  surfaceId: 'lh'
+});
+
+flatmap.on('selection:changed', ({ vertexIndex }) => {
+  console.log('Flatmap selected vertex:', vertexIndex);
+});
+```
+
+The 3D and flat positions must have the same vertex order. The flatmap uses the x/y coordinates from `vertices` and ignores z.
+
+Flatmaps can also create vertex-space ROIs without leaving the browser:
+
+```javascript
+flatmap.startROIDrawing({
+  mode: 'polygon', // or 'lasso'
+  name: 'V1_candidate',
+  color: '#ffd166',
+  provenance: { sourceLayer: 'retinotopy.angle' }
+});
+
+flatmap.on('roi:created', ({ roi }) => {
+  console.log(roi.vertexIndices);
+});
+```
+
+For scripted workflows, create an ROI from a polygon in canvas coordinates and export it as SVG or label data:
+
+```javascript
+import { roiToSVG, roiToLabelGIFTI } from 'surfview';
+
+const roi = flatmap.createROIFromPolygon(polygon, {
+  name: 'V1_candidate',
+  provenance: { sourceLayer: 'activation' }
+});
+
+const svg = roiToSVG(roi, { width: flatmap.canvas.width, height: flatmap.canvas.height });
+const labelGii = roiToLabelGIFTI(roi, { vertexCount });
 ```
 
 ## Material Options

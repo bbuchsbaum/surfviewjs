@@ -45,6 +45,13 @@ export interface TimelineEvent {
   alpha: number;
 }
 
+export interface TimelineEventMap {
+  play: void;
+  pause: void;
+  stop: void;
+  timechange: TimelineEvent;
+}
+
 export type LoopMode = 'none' | 'loop' | 'bounce';
 
 /**

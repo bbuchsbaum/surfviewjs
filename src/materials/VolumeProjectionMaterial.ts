@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { VOLUME_PROJECTION_FRAGMENT_SHADER, VOLUME_PROJECTION_VERTEX_SHADER } from '../shaders/volumeProjection';
 import { VolumeTexture3D } from '../textures/VolumeTexture3D';
+import type { RibbonReducer, VolumeProjectionMode } from '../layers';
 
 export interface VolumeProjectionMaterialConfig {
   intensityRange?: [number, number];
@@ -12,6 +13,9 @@ export interface VolumeProjectionMaterialConfig {
   diffuseIntensity?: number;
   specularIntensity?: number;
   shininess?: number;
+  projectionMode?: VolumeProjectionMode;
+  ribbonSamples?: number;
+  ribbonReducer?: RibbonReducer;
 }
 
 export interface VolumeProjectionMaterialOptions {
@@ -45,7 +49,10 @@ export class VolumeProjectionMaterial extends THREE.ShaderMaterial {
       ambientIntensity = 0.3,
       diffuseIntensity = 0.6,
       specularIntensity = 0.1,
-      shininess = 30.0
+      shininess = 30.0,
+      projectionMode = 'vertex',
+      ribbonSamples = 7,
+      ribbonReducer = 'mean'
     } = config;
 
     const base = new THREE.Color(baseColor);
@@ -67,7 +74,10 @@ export class VolumeProjectionMaterial extends THREE.ShaderMaterial {
         uAmbientIntensity: { value: ambientIntensity },
         uDiffuseIntensity: { value: diffuseIntensity },
         uSpecularIntensity: { value: specularIntensity },
-        uShininess: { value: shininess }
+        uShininess: { value: shininess },
+        uProjectionMode: { value: projectionModeToUniform(projectionMode) },
+        uRibbonSamples: { value: Math.max(1, Math.min(16, Math.round(ribbonSamples))) },
+        uRibbonReducer: { value: ribbonReducerToUniform(ribbonReducer) }
       },
       side: THREE.DoubleSide
     });
@@ -102,5 +112,41 @@ export class VolumeProjectionMaterial extends THREE.ShaderMaterial {
   setWorldToIJK(matrix: THREE.Matrix4): void {
     (this.uniforms.uWorldToIJK.value as THREE.Matrix4).copy(matrix);
   }
+
+  setProjectionMode(mode: VolumeProjectionMode): void {
+    this.uniforms.uProjectionMode.value = projectionModeToUniform(mode);
+  }
+
+  setRibbonSampling(samples: number, reducer: RibbonReducer = 'mean'): void {
+    this.uniforms.uRibbonSamples.value = Math.max(1, Math.min(16, Math.round(samples)));
+    this.uniforms.uRibbonReducer.value = ribbonReducerToUniform(reducer);
+  }
 }
 
+function projectionModeToUniform(mode: VolumeProjectionMode): number {
+  switch (mode) {
+    case 'fragment':
+      return 1;
+    case 'ribbon':
+      return 2;
+    case 'hybrid':
+      return 0;
+    case 'vertex':
+    default:
+      return 0;
+  }
+}
+
+function ribbonReducerToUniform(reducer: RibbonReducer): number {
+  switch (reducer) {
+    case 'max':
+      return 1;
+    case 'min':
+      return 2;
+    case 'median':
+      return 3;
+    case 'mean':
+    default:
+      return 0;
+  }
+}
