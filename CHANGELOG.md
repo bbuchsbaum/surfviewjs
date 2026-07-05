@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Restored legacy `dist/neurosurface.*` bundle aliases and UMD source maps for
+  downstream `neurosurf` htmlwidget/pkgdown sync targets that still consume the
+  historical artifact names.
+
 ## [2.2.0] - 2026-06-03
 
 First release published to npm.
