@@ -87,7 +87,8 @@ export class SurfaceGeometry {
     vertices: Float32Array | number[],
     faces: Uint32Array | number[],
     hemi: string,
-    vertexCurv: Float32Array | number[] | null = null
+    vertexCurv: Float32Array | number[] | null = null,
+    createStandaloneMesh = true
   ) {
     this.vertices = new Float32Array(vertices);
     this.faces = new Uint32Array(faces);
@@ -103,7 +104,9 @@ export class SurfaceGeometry {
     debugLog('Faces:', this.faces.length);
     debugLog('Hemi:', this.hemi);
 
-    this.createMesh();
+    if (createStandaloneMesh) {
+      this.createMesh();
+    }
   }
 
   createMesh(): void {

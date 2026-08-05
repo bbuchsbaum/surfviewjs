@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SurfView offline embed scene</title>
+  <style>
+    body { margin: 0; padding: 16px; background: #eef2f6; }
+    #viewer { width: 900px; height: 560px; }
+  </style>
+  <script>
+    window.__activeAnimationFrames = new Set();
+    const nativeRequestAnimationFrame = window.requestAnimationFrame.bind(window);
+    const nativeCancelAnimationFrame = window.cancelAnimationFrame.bind(window);
+    window.requestAnimationFrame = callback => {
+      let frameId;
+      frameId = nativeRequestAnimationFrame(timestamp => {
+        window.__activeAnimationFrames.delete(frameId);
+        callback(timestamp);
+      });
+      window.__activeAnimationFrames.add(frameId);
+      return frameId;
+    };
+    window.cancelAnimationFrame = frameId => {
+      window.__activeAnimationFrames.delete(frameId);
+      nativeCancelAnimationFrame(frameId);
+    };
+
+    window.__webglContexts = new Set();
+    const nativeGetContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function(type, ...args) {
+      const context = nativeGetContext.call(this, type, ...args);
+      if ((type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl') && context) {
+        window.__webglContexts.add(context);
+      }
+      return context;
+    };
+  </script>
+  <script src="/dist/surfview.embed.iife.js"></script>
+</head>
+<body>
+  <main id="viewer" aria-label="Bilateral surface report"></main>
+  <script>
+    async function asset(values, role, dtype, shape) {
+      return surfview.createSceneAsset(values, { role, dtype, shape });
+    }
+
+    async function start() {
+      const leftVertices = await asset(
+        [-1.4, -1, -0.7, -1.4, 1, -0.7, -1.4, 0, 1.1, -0.4, 0, 0],
+        'vertices', 'float32', [4, 3]
+      );
+      const rightVertices = await asset(
+        [0.4, -1, -0.7, 0.4, 1, -0.7, 0.4, 0, 1.1, 1.4, 0, 0],
+        'vertices', 'float32', [4, 3]
+      );
+      const faces = await asset(
+        [0, 1, 2, 0, 3, 1, 1, 3, 2, 2, 3, 0],
+        'faces', 'uint32', [4, 3]
+      );
+      const curvature = await asset([-1, 1, -0.5, 0.5], 'curvature', 'float32', [4]);
+      const leftA = await asset([-2, -0.5, 1, 2], 'values', 'float32', [4]);
+      const rightA = await asset([2, 0.5, -1, -2], 'values', 'float32', [4]);
+      const leftB = await asset([0, 1, 2, 3], 'values', 'float32', [4]);
+      const rightB = await asset([3, 2, 1, 0], 'values', 'float32', [4]);
+      const descriptors = [
+        leftVertices.descriptor,
+        rightVertices.descriptor,
+        faces.descriptor,
+        curvature.descriptor,
+        leftA.descriptor,
+        rightA.descriptor,
+        leftB.descriptor,
+        rightB.descriptor
+      ];
+      const assets = Object.fromEntries(descriptors.map(descriptor => [descriptor.id, descriptor]));
+      const manifest = {
+        schemaVersion: surfview.SURFVIEW_SCENE_SCHEMA,
+        id: 'offline-bilateral-scene',
+        assets,
+        geometries: {
+          left: {
+            id: 'left', hemisphere: 'left',
+            vertices: leftVertices.descriptor.id,
+            faces: faces.descriptor.id,
+            curvature: curvature.descriptor.id,
+            vertexCount: 4, faceCount: 4
+          },
+          right: {
+            id: 'right', hemisphere: 'right',
+            vertices: rightVertices.descriptor.id,
+            faces: faces.descriptor.id,
+            curvature: curvature.descriptor.id,
+            vertexCount: 4, faceCount: 4
+          }
+        },
+        layers: {
+          contrast: {
+            id: 'contrast', label: 'Task contrast',
+            values: {
+              left: { values: leftA.descriptor.id },
+              right: { values: rightA.descriptor.id }
+            },
+            colorMap: 'coolwarm', limits: [-2, 2], opacity: 0.9,
+            units: 'z', legend: { title: 'Task minus rest', visible: true }
+          },
+          response: {
+            id: 'response', label: 'Response',
+            values: {
+              left: { values: leftB.descriptor.id },
+              right: { values: rightB.descriptor.id }
+            },
+            colorMap: 'viridis', limits: [0, 3], opacity: 1,
+            units: 'a.u.', legend: { title: 'Response amplitude', visible: true }
+          }
+        },
+        selectedLayer: 'contrast',
+        metadata: { fixture: 'offline embed' },
+        provenance: { generator: 'tests/embed-scene.html' }
+      };
+      window.__surfviewManifest = manifest;
+      window.__surfviewHandle = surfview.mountSurfView(
+        document.getElementById('viewer'),
+        manifest,
+        { lazy: true, preset: 'paper-light', controls: true, height: 520 }
+      );
+      await window.__surfviewHandle.ready;
+      window.__surfviewReady = true;
+    }
+
+    window.__surfviewReady = false;
+    start().catch(error => {
+      window.__surfviewError = String(error && error.stack || error);
+      throw error;
+    });
+  </script>
+</body>
+</html>

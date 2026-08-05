@@ -12,7 +12,6 @@ const viewer = new NeuroSurfaceViewer(
   800,          // width
   600,          // height
   {
-    showControls: true,
     backgroundColor: 0x1a1a1a,
     ambientLightColor: 0x404040,
     directionalLightIntensity: 0.8
@@ -24,7 +23,7 @@ const viewer = new NeuroSurfaceViewer(
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `showControls` | boolean | false | Show Tweakpane UI controls |
+| `showControls` | boolean | false | Deprecated compatibility no-op; use report controls or a plugin |
 | `backgroundColor` | number | 0x000000 | Scene background color |
 | `ambientLightColor` | number | 0x404040 | Ambient light color |
 | `directionalLightIntensity` | number | 0.5 | Directional light intensity |
@@ -97,11 +96,12 @@ const scene = viewer.exportScene({
 const json = viewer.exportSceneJSON({ id: 'sub-01-activation' });
 const html = viewer.exportStaticHTML({
   id: 'sub-01-activation',
-  title: 'Subject 01 activation'
+  title: 'Subject 01 activation',
+  scriptUrl: './surfview.es.js'
 });
 ```
 
-`exportScene()` captures the current serialized viewer state plus provenance, asset references, software version, and optional `SubjectPackage` metadata. `exportStaticHTML()` embeds that scene manifest in a standalone HTML shell for sharing or later hydration.
+`exportScene()` captures the current serialized viewer state plus provenance, asset references, software version, and optional `SubjectPackage` metadata. `exportStaticHTML()` embeds that scene manifest in an HTML shell for later hydration. Its default module URL is the local `./surfview.es.js`; it never inserts a CDN URL.
 
 ### Style Presets and Figure Export
 
@@ -127,7 +127,7 @@ const png = viewer.exportPNG({
 console.log(listStylePresets(), getStylePreset('paper-light').figure.dpi);
 ```
 
-Style presets control the viewer background, lighting, material defaults, curvature display parameters, annotation defaults, ROI/export label styling, colormap defaults, export dimensions, and font scale. `exportPNG()` renders at the requested pixel size and returns a PNG data URL; `dpi` is retained as figure intent because browser PNG encoders do not reliably write DPI metadata.
+Style presets control the viewer background, lighting, material defaults, curvature display parameters, annotation defaults, ROI/export label styling, colormap defaults, export dimensions, and font scale. `paper-light` is an appearance preset, not a report behavior mode. `exportPNG()` renders at the requested pixel size and returns a PNG data URL; `dpi` is retained as figure intent because browser PNG encoders do not reliably write DPI metadata.
 
 ### Alignment QA
 

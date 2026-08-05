@@ -117,7 +117,7 @@ export function exportStaticHTML(viewer: unknown, options: StaticHTMLExportOptio
   const scene = exportScene(viewer, options);
   const title = escapeHTML(options.title ?? scene.id);
   const containerId = options.containerId ?? 'surfview-root';
-  const scriptUrl = options.scriptUrl ?? 'https://unpkg.com/surfview/dist/surfview.es.js';
+  const scriptUrl = options.scriptUrl ?? './surfview.es.js';
   const sceneJSON = escapeScriptJSON(JSON.stringify(scene));
 
   return `<!doctype html>

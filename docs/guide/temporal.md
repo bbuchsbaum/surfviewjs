@@ -240,7 +240,6 @@ import {
 // Setup
 const container = document.getElementById('viewer');
 const viewer = new NeuroSurfaceViewer(container, 800, 600, {
-  showControls: true,
   enableHoverCrosshair: true
 });
 

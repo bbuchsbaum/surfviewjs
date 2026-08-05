@@ -40,8 +40,6 @@ function BrainViewer() {
       width={800}
       height={600}
       config={{
-        showControls: true,
-        useControls: true, // requires tweakpane peer
         backgroundColor: 0x1a1a1a
       }}
     />
@@ -70,8 +68,6 @@ function BrainViewer() {
   width={window.innerWidth}
   height={window.innerHeight}
   config={{
-    showControls: true,
-    useControls: true,
     backgroundColor: 0x1a1a1a,
     ambientLightColor: 0x404040,
     directionalLightIntensity: 0.8
@@ -163,7 +159,6 @@ import NeuroSurfaceViewerReact from 'surfview/react';
 import type { ViewerConfig, SurfaceClickEvent } from 'surfview';
 
 const config: ViewerConfig = {
-  showControls: true,
   backgroundColor: 0x1a1a1a
 };
 
@@ -224,7 +219,7 @@ function App() {
   ref={viewerRef}
   width={800}
   height={600}
-  config={{ showControls: true, useControls: true }}
+  config={{ preset: 'paper-light' }}
 />
       <input
         type="range"

@@ -78,7 +78,7 @@ export const statisticalMap: Scenario = {
     ctx.mount.replaceChildren(mount);
 
     const { viewer, cleanup } = createViewer(mount, {
-      showControls: true,
+      showControls: false,
       backgroundColor: 0x0a0f1c,
       preset: 'presentation',
       rimStrength: 0.1

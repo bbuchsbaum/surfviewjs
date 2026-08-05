@@ -30,9 +30,7 @@ export const quickstart: Scenario = {
     ctx.mount.replaceChildren(mount);
 
     const { viewer, cleanup } = createViewer(mount, {
-      showControls: true,
-      useControls: true,
-      allowCDNFallback: true,
+      showControls: false,
       backgroundColor: 0x050912
     });
 

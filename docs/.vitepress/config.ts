@@ -27,7 +27,9 @@ export default defineConfig({
   description:
     'Brain surface visualization for JavaScript — GPU-accelerated cortical meshes, multi-layer data overlays, scientific colormaps, and temporal playback, powered by Three.js.',
   cleanUrls: true,
-  lastUpdated: true,
+  // TypeDoc creates hundreds of pages. VitePress otherwise spawns one git
+  // process per page to compute timestamps and can exhaust CI process limits.
+  lastUpdated: false,
   ignoreDeadLinks: true,
 
   head: [
@@ -69,6 +71,7 @@ export default defineConfig({
           items: [
             { text: 'Getting Started', link: '/guide/getting-started' },
             { text: 'Quick Start', link: '/guide/quick-start' },
+            { text: 'Portable report scenes', link: '/guide/portable-scenes' },
           ],
         },
         {

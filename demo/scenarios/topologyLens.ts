@@ -310,7 +310,7 @@ export const topologyLens: Scenario = {
     ctx.mount.replaceChildren(mount);
 
     const { viewer, cleanup } = createViewer(mount, {
-      showControls: true,
+      showControls: false,
       useControls: false,
       backgroundColor: 0x09111b,
       preset: 'presentation',

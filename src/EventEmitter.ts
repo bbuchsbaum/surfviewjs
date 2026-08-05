@@ -8,7 +8,7 @@ export type EventListenerFor<Events, K extends string> =
 export type EventArgsFor<Events, K extends string> =
   K extends keyof Events ? EventPayloadArgs<Events[K]> : any[];
 
-export class EventEmitter<Events extends object = {}> {
+export class EventEmitter<Events extends object = Record<never, never>> {
   private _events: Record<string, EventListener[]>;
 
   constructor() {

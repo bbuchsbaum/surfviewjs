@@ -172,7 +172,7 @@ export const parcelConnectivity: Scenario = {
     ctx.mount.replaceChildren(mount);
 
     const { viewer, cleanup } = createViewer(mount, {
-      showControls: true,
+      showControls: false,
       backgroundColor: 0xf4f7fb,
       preset: 'presentation',
       rimStrength: 0.08,

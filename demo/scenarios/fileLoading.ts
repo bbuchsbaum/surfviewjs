@@ -51,7 +51,7 @@ export const fileLoading: Scenario = {
     ctx.mount.replaceChildren(mount);
 
     const { viewer, cleanup } = createViewer(mount, {
-      showControls: true,
+      showControls: false,
       backgroundColor: 0x0b1222
     });
     ctx.setBusy(false);

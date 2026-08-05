@@ -75,6 +75,6 @@ viewer.addLayer('cortex', new DataLayer('overlay', metric, null, 'Spectral'))
 
 ::: tip Three.js peer dependency
 SurfView.js renders with [Three.js](https://threejs.org). Install it alongside the
-library (`npm install surfview three`), plus the optional `tweakpane` peers if you
-want the built-in control panel. See **[Getting Started](/guide/getting-started)**.
+library (`npm install surfview three`). Generated reports can instead use the
+self-contained [browser embed](/guide/portable-scenes), which includes Three.js.
 :::

@@ -4,69 +4,54 @@ test('hemisphere views load and controls respond', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
 
-  await page.goto('/test-hemisphere-views.html');
+  await page.goto('/demo/index.html');
+  await page.getByRole('button', { name: /Hemisphere views/i }).click();
   await expect(page.locator('canvas')).toBeVisible({ timeout: 15000 });
+  await expect(page.locator('#status-text')).toContainText('Running: Hemisphere views');
 
-  // Change separation and toggle wireframe
-  const separation = page.locator('#sep');
+  const separation = page.locator('#hemi-gap');
   await separation.fill('40');
   await expect(separation).toHaveValue('40');
 
-  await page.getByRole('button', { name: /Medial/i }).click();
-  await page.getByRole('button', { name: /Anterior/i }).click();
-  await page.locator('#wire').check();
+  await page.getByRole('button', { name: 'Medial', exact: true }).click();
+  await page.getByRole('button', { name: 'Anterior', exact: true }).click();
+  await expect(page.locator('#status-text')).toContainText('View: anterior');
 
   await page.waitForTimeout(200);
   expect(errors).toEqual([]);
 });
 
 test('GPU compositing toggle updates mode and layer counts', async ({ page }) => {
-  await page.goto('/test-gpu-compositing.html');
+  await page.goto('/demo/index.html');
+  await page.getByRole('button', { name: /Multi-layer \+ compositing/i }).click();
   await expect(page.locator('canvas')).toBeVisible({ timeout: 15000 });
 
-  const mode = page.locator('#mode');
-  await expect(mode).toHaveText(/CPU/i);
-
-  await page.locator('#toggleMode').click();
-  await expect(mode).toHaveText(/GPU/i, { timeout: 5000 });
-
-  const layers = page.locator('#layers');
-  const initialLayers = Number(await layers.textContent());
-
-  await page.locator('#addLayer').click();
-  await expect(layers).toHaveText(String(initialLayers + 1));
-
-  await page.locator('#removeLayer').click();
-  await expect(layers).toHaveText(String(initialLayers));
+  const perf = page.locator('#perf-text');
+  await expect(perf).toContainText(/Layers: 2/);
+  const beforeMode = await perf.textContent();
+  await page.getByRole('button', { name: /Toggle GPU\/CPU/i }).click();
+  await expect(perf).not.toHaveText(beforeMode ?? '');
+  await page.getByRole('button', { name: /Add RGBA layer/i }).click();
+  await expect(perf).toContainText(/Layers: 3/);
+  await page.getByRole('button', { name: /Clear to base/i }).click();
+  await expect(perf).toContainText(/Layers: 1/);
 });
 
-test('layer opacity and visibility can be adjusted', async ({ page }) => {
-  await page.goto('/demo-multilayer.html');
-
-  await page.getByRole('button', { name: /Load Demo Surface/i }).click();
+test('layer stack actions remain coherent', async ({ page }) => {
+  await page.goto('/demo/index.html');
+  await page.getByRole('button', { name: /Multi-layer \+ compositing/i }).click();
   await expect(page.locator('canvas')).toBeVisible({ timeout: 10000 });
 
-  await page.getByRole('button', { name: /Add RGBA Layer/i }).click();
-  await page.getByRole('button', { name: /Add Data Layer/i }).click();
-
-  const layers = page.locator('#layer-list .layer-control');
-  await expect(layers).toHaveCount(2, { timeout: 5000 });
-
-  const opacitySlider = layers.first().locator('input[type="range"]');
-  await opacitySlider.fill('50');
-  await expect(opacitySlider).toHaveValue('50');
-
-  const toggleButton = layers.first().getByRole('button', { name: /Hide|Show/ });
-  await toggleButton.click();
-  await expect(toggleButton).toHaveText(/Hide|Show/);
-
-  await layers.nth(1).getByRole('button', { name: /Remove/i }).click();
-  await expect(layers).toHaveCount(1, { timeout: 2000 });
+  await page.getByRole('button', { name: /Add RGBA layer/i }).click();
+  await page.getByRole('button', { name: /Add activation/i }).click();
+  await expect(page.locator('#perf-text')).toContainText(/Layers: 3/);
+  await page.getByRole('button', { name: /Clear to base/i }).click();
+  await expect(page.locator('#status-text')).toContainText('Cleared layers');
 });
 
-test('natural controls respond to drag on comparison page', async ({ page }) => {
-  await page.goto('/test-natural-controls.html');
-  const rightCanvas = page.locator('#viewer2-container canvas');
+test('interactive controls respond to drag', async ({ page }) => {
+  await page.goto('/demo/index.html');
+  const rightCanvas = page.locator('#viewer-slot canvas');
   await expect(rightCanvas).toBeVisible({ timeout: 15000 });
 
   const before = await rightCanvas.screenshot();
@@ -83,9 +68,10 @@ test('natural controls respond to drag on comparison page', async ({ page }) => 
   expect(after.equals(before)).toBe(false);
 });
 
-test('natural rotation page reacts to drag', async ({ page }) => {
-  await page.goto('/test-natural-rotation.html');
-  const canvas = page.locator('canvas');
+test('hemisphere view reacts to drag after preset selection', async ({ page }) => {
+  await page.goto('/demo/index.html');
+  await page.getByRole('button', { name: /Hemisphere views/i }).click();
+  const canvas = page.locator('#viewer-slot canvas');
   await expect(canvas).toBeVisible({ timeout: 15000 });
 
   const before = await canvas.screenshot();

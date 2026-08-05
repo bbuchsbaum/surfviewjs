@@ -156,6 +156,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
   compositeBuffer: Float32Array;
   vertexCount: number;
   private _updatePending: boolean;
+  private _updateFrameId: number | null;
   private useGPUCompositing: boolean;
   private gpuCompositor: GPULayerCompositor | null = null;
   private outlineResolution: THREE.Vector2 | null = null;
@@ -180,6 +181,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     this.compositeBuffer = new Float32Array(vertexCount * 4);
     this.vertexCount = vertexCount;
     this._updatePending = false; // For throttling updates
+    this._updateFrameId = null;
     this.useGPUCompositing = config.useGPUCompositing ?? false; // Default to CPU for compatibility
     this.useWideLines = config.useWideLines ?? true;
     this.clipPlanes = new ClipPlaneSet();
@@ -466,7 +468,8 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     if (!this._updatePending) {
       this._updatePending = true;
       // Use requestAnimationFrame for smooth updates
-      requestAnimationFrame(() => {
+      this._updateFrameId = requestAnimationFrame(() => {
+        this._updateFrameId = null;
         this._updatePending = false;
         this.updateColors();
         this.emit('render:needed', { surface: this });
@@ -1390,6 +1393,11 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
    * Dispose of all resources
    */
   dispose(): void {
+    if (this._updateFrameId !== null) {
+      cancelAnimationFrame(this._updateFrameId);
+      this._updateFrameId = null;
+      this._updatePending = false;
+    }
     // Remove outline and connectivity objects to avoid orphaned materials
     this.layerStack.getAllLayers().forEach(layer => {
       if (layer instanceof OutlineLayer) {

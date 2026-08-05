@@ -20,15 +20,9 @@ pnpm add surfview three
 
 :::
 
-## Peer Dependencies
-
-Optional peer dependencies for enhanced features:
+## Optional React dependencies
 
 ```bash
-# For Tweakpane UI controls
-npm install tweakpane @tweakpane/plugin-essentials
-
-# For React integration
 npm install react react-dom
 ```
 
@@ -42,8 +36,6 @@ const container = document.getElementById('viewer-container');
 
 // Initialize the viewer
 const viewer = new NeuroSurfaceViewer(container, 800, 600, {
-  showControls: false,
-  useControls: false, // set true + install tweakpane to enable built-in UI
   backgroundColor: 0x1a1a1a
 });
 
@@ -76,4 +68,5 @@ viewer.centerCamera();
 - Explore [layer system](/guide/layers) for data visualization
 - Check out [colormaps](/guide/colormaps) for data mapping
 - Try [temporal playback](/guide/temporal) for time-series animation
+- Build an offline [portable report scene](/guide/portable-scenes)
 - See [React integration](/guide/react) for React apps

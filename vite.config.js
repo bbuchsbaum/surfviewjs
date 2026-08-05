@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
-import { copyFileSync, existsSync } from 'fs';
+import { copyFileSync, existsSync, readFileSync } from 'fs';
 
 function legacyBundleAliases() {
   return {
@@ -21,6 +21,24 @@ function legacyBundleAliases() {
   };
 }
 
+function serveBuiltEmbedWithoutTransforms() {
+  return {
+    name: 'serve-built-embed-without-transforms',
+    configureServer(server) {
+      server.middlewares.use('/dist/surfview.embed.iife.js', (_request, response) => {
+        const embedPath = resolve(__dirname, 'dist', 'surfview.embed.iife.js');
+        if (!existsSync(embedPath)) {
+          response.statusCode = 404;
+          response.end('Run npm run build before the embed browser test.');
+          return;
+        }
+        response.setHeader('Content-Type', 'text/javascript; charset=utf-8');
+        response.end(readFileSync(embedPath));
+      });
+    }
+  };
+}
+
 export default defineConfig({
   resolve: {
     alias: {
@@ -28,7 +46,7 @@ export default defineConfig({
     },
     extensions: ['.ts', '.tsx', '.js', '.jsx']
   },
-  plugins: [legacyBundleAliases()],
+  plugins: [serveBuiltEmbedWithoutTransforms(), legacyBundleAliases()],
   build: {
     lib: {
       entry: resolve(__dirname, 'src/index.ts'),
@@ -37,14 +55,12 @@ export default defineConfig({
       formats: ['es', 'umd']
     },
     rollupOptions: {
-      external: ['react', 'react-dom', 'three', 'tweakpane', '@tweakpane/plugin-essentials'],
+      external: ['react', 'react-dom', 'three'],
       output: {
         globals: {
           'react': 'React',
           'react-dom': 'ReactDOM',
-          'three': 'THREE',
-          'tweakpane': 'Tweakpane',
-          '@tweakpane/plugin-essentials': 'TweakpaneEssentials'
+          'three': 'THREE'
         }
       }
     },
@@ -58,7 +74,7 @@ export default defineConfig({
     }
   },
   optimizeDeps: {
-    include: ['three', 'tweakpane', '@tweakpane/plugin-essentials', 'colormap'],
-    exclude: ['react', 'react-dom', '@tweakpane/plugin-interval']
+    include: ['three', 'colormap'],
+    exclude: ['react', 'react-dom']
   }
 });

@@ -36,7 +36,7 @@ function App() {
 - `width` (number): Width of the viewer in pixels
 - `height` (number): Height of the viewer in pixels
 - `config` (object): Configuration options
-  - `showControls` (boolean): Show/hide Tweakpane UI controls
+  - `showControls` (boolean): Deprecated compatibility no-op
   - `ambientLightColor` (number): Ambient light color (hex)
   - `directionalLightIntensity` (number): Directional light intensity
   - Other Three.js and rendering options

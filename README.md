@@ -12,20 +12,18 @@ A modular Three.js-based brain surface visualization library for neuroimaging ap
 - Customizable colormaps for data visualization
 - React component support
 - Temporal playback with frame interpolation and sparkline tooltips
-- Interactive controls with Tweakpane UI
+- Report controls and a plugin API for application-specific controls
 - Support for GIFTI format
 - TypeScript support
 
 ## Installation
 
-Install the library with its peer dependencies (Three.js + Tweakpane). React bindings need React 18+.
+Install the library with its Three.js peer dependency. React bindings need React 18+.
 
 ```bash
-npm install surfview three tweakpane
+npm install surfview three
 # React apps
 npm install react react-dom
-# Optional Tweakpane extras
-npm install @tweakpane/plugin-essentials
 ```
 
 ## Quick Start
@@ -35,7 +33,7 @@ npm install @tweakpane/plugin-essentials
 import { NeuroSurfaceViewer, SurfaceGeometry, ColorMappedNeuroSurface } from 'surfview';
 
 const container = document.getElementById('viewer-container');
-const viewer = new NeuroSurfaceViewer(container, 800, 600, { showControls: true });
+const viewer = new NeuroSurfaceViewer(container, 800, 600, { preset: 'paper-light' });
 
 // Typed arrays for vertices (xyz) and faces (triangle indices)
 const geometry = new SurfaceGeometry(
@@ -91,7 +89,6 @@ function BrainViewer() {
       width={window.innerWidth}
       height={window.innerHeight}
       config={{
-        showControls: true,
         ambientLightColor: 0x404040
       }}
       viewpoint="lateral"
@@ -267,9 +264,9 @@ const surfaceData = {
 #### Config Options
 ```typescript
 interface ViewerConfig {
-  showControls?: boolean;
-  useControls?: boolean;       // leave false to tree-shake Tweakpane
-  allowCDNFallback?: boolean;  // opt-in CDN fetch if tweakpane peer is missing
+  showControls?: boolean;      // deprecated compatibility no-op
+  useControls?: boolean;       // deprecated compatibility no-op
+  allowCDNFallback?: boolean;  // deprecated compatibility no-op
   backgroundColor?: number;
   ambientLightColor?: number;
   directionalLightColor?: number;
@@ -303,7 +300,7 @@ type Viewpoint = 'lateral' | 'medial' | 'ventral' | 'posterior' | 'anterior' | '
 - `setViewpoint(viewpoint)`: Set camera viewpoint
 - `startRenderLoop()`: Begin the animation/render loop
 - `resize(width, height)`: Resize renderer + controls
-- `toggleControls(show?)`: Show/hide Tweakpane UI
+- `toggleControls(show?)`: Deprecated compatibility no-op
 - `addLayer(surfaceId, layer)`, `updateLayer(surfaceId, layerId, updates)`, `removeLayer(surfaceId, layerId)`, `clearLayers(surfaceId, { includeBase? })`
 - `pick({ x, y })`: Ray-pick a surface/vertex under screen coordinates
 - `dispose()`: Clean up resources
@@ -325,7 +322,7 @@ if (hit.surfaceId && hit.vertexIndex !== null) {
 - Set `config.hoverCrosshair = true` to show a lightweight hover crosshair (throttled).
 - Set `config.clickToAddAnnotation = true` to drop an annotation + activate it on click.
 - `onSurfaceClick` is now fired from the core viewer after a successful pick.
-- Controls are opt-in: set `config.useControls = true`/`showControls = true` (and optionally `allowCDNFallback = true`) and install the `tweakpane` peer if you want the built-in UI.
+- For generated reports, use `mountSurfView(..., { controls: true })`. Applications can build controls against viewer methods and events or package them as a `ViewerPlugin`.
 
 ### ColorMap
 
@@ -422,5 +419,5 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 Built with:
 - [Three.js](https://threejs.org/) - 3D graphics library
-- [Tweakpane](https://tweakpane.github.io/docs/) - GUI controls
+- [Three.js](https://threejs.org/) - WebGL rendering
 - [colormap](https://github.com/bpostlethwaite/colormap) - Colormap generation

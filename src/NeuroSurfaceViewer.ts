@@ -60,7 +60,9 @@ export interface NeuroSurfaceViewerConfig {
   metalness?: number;
   roughness?: number;
   useShaders?: boolean;
+  /** @deprecated Tweakpane controls are no longer part of the viewer runtime. */
   showControls?: boolean;
+  /** @deprecated Use the report mount controls or a ViewerPlugin. */
   useControls?: boolean;
   controlType?: 'trackball' | 'surface';
   backgroundColor?: number;
@@ -70,6 +72,7 @@ export interface NeuroSurfaceViewerConfig {
   hoverCrosshairColor?: number;
   hoverCrosshairSize?: number;
   clickToAddAnnotation?: boolean;
+  /** @deprecated Runtime CDN loading is disabled and will be removed in v3. */
   allowCDNFallback?: boolean;
   /** Use GPU-based picking for faster vertex selection on large meshes */
   useGPUPicking?: boolean;
@@ -108,6 +111,17 @@ interface RangeValue {
 
 function colorToCSS(color: number): string {
   return `#${color.toString(16).padStart(6, '0')}`;
+}
+
+let legacyControlsWarningEmitted = false;
+
+function warnLegacyControlsDeprecated(): void {
+  if (legacyControlsWarningEmitted) return;
+  legacyControlsWarningEmitted = true;
+  console.warn(
+    'surfview: Tweakpane controls are deprecated and disabled. ' +
+    'Use the report mount controls or a ViewerPlugin instead.'
+  );
 }
 
 export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
@@ -169,6 +183,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   private handleMouseMove?: (event: MouseEvent) => void;
   private handlePanePointerMove?: (event: PointerEvent) => void;
   private handlePanePointerUp?: (event: PointerEvent) => void;
+  private disposed = false;
 
   constructor(
     container: HTMLElement, 
@@ -212,8 +227,8 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
       metalness: 0.1,
       roughness: 0.6,
       useShaders: false,
-      showControls: false, // default off to avoid unexpected peer/CDN fetches
-      useControls: false, // leave disabled unless consumer opts in
+      showControls: false,
+      useControls: false,
       allowCDNFallback: false,
       backgroundColor: 0x000000,
       controlType: 'trackball', // 'trackball' or 'surface' - new natural controls
@@ -226,6 +241,12 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
       useGPUPicking: false,
       ...config
     };
+    if (config.showControls || config.useControls || config.allowCDNFallback) {
+      warnLegacyControlsDeprecated();
+      this.config.showControls = false;
+      this.config.useControls = false;
+      this.config.allowCDNFallback = false;
+    }
     this.stylePreset = resolveStylePreset(this.config.preset);
     this.viewpoint = viewpoint;
 
@@ -244,7 +265,15 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     this.scene = new THREE.Scene();
     this.environmentMap = null;
     this.camera = new THREE.PerspectiveCamera(35, this.width / this.height, 0.1, 1000);
-    this.renderer = new THREE.WebGLRenderer({ antialias: true });
+    try {
+      this.renderer = new THREE.WebGLRenderer({ antialias: true });
+    } catch (error) {
+      this.renderFallback(
+        `WebGL renderer initialization failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+      this.initializationFailed = true;
+      return;
+    }
     this.annotations = new AnnotationManager(this);
     this.crosshair = new CrosshairManager(() => this.requestRender());
 
@@ -302,11 +331,6 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
       right_anterior: { direction: new THREE.Vector3(0, 1, 0),  up: new THREE.Vector3(0, 0, 1) },
       unknown_lateral:{ direction: new THREE.Vector3(1, 0, 0),  up: new THREE.Vector3(0, 0, 1) }
     };
-
-    if (this.config.showControls && this.config.useControls) {
-      // Setup Tweakpane after everything else is initialized
-      setTimeout(() => this.setupTweakPane(), 0);
-    }
 
     // Start the animation loop
     this.animate();
@@ -644,6 +668,11 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   }
 
   async setupTweakPane(): Promise<void> {
+    warnLegacyControlsDeprecated();
+    this.config.showControls = false;
+    this.config.useControls = false;
+    return;
+
     if (!this.config.useControls) return;
     if (this.pane || this.paneLoading) return;
     this.paneLoading = true;
@@ -652,8 +681,9 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
       await this.buildTweakPane(Pane, essentials, null);
 
       // If controls were toggled off before pane finished loading, hide it.
-      if (!this.config.showControls && this.paneContainer) {
-        this.paneContainer.style.display = 'none';
+      const paneContainer = this.paneContainer;
+      if (!this.config.showControls && paneContainer) {
+        paneContainer!.style.display = 'none';
       }
     } catch (err) {
       console.error('setupTweakPane failed', err);
@@ -663,35 +693,9 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     }
   }
 
-  /**
-   * Tries multiple strategies to obtain Tweakpane in environments that lack module resolution
-   * (e.g., about:blank iframes/htmlwidgets). Prefers a global if provided, then bare import,
-   * then CDN fallback. Essentials plugin is optional.
-   */
+  /** @deprecated Tweakpane is no longer shipped or loaded by surfview. */
   private async loadTweakpane(): Promise<{ Pane: any; essentials: any | null }> {
-    // 1) Global already present
-    const globalPane = (typeof window !== 'undefined') && ((window as any).tweakpane || (window as any).Tweakpane || (window as any).Pane);
-    if (globalPane && globalPane.Pane) {
-      return { Pane: globalPane.Pane, essentials: (globalPane as any).EssentialsPlugin || null };
-    }
-
-    // 2) Try bare import (works when consumer bundles tweakpane)
-    try {
-      const mod = await import('tweakpane');
-      const essentials = await import('@tweakpane/plugin-essentials').catch(() => null);
-      return { Pane: mod.Pane || (mod as any).default || mod, essentials: essentials ? ((essentials as any).default ?? essentials) : null };
-    } catch (err) {
-      debugLog('loadTweakpane: bare import failed, trying CDN fallback', err);
-    }
-
-    if (this.config.allowCDNFallback) {
-      const cdnUrl = 'https://cdn.jsdelivr.net/npm/tweakpane@4.0.3/dist/tweakpane.min.js';
-      const mod = await import(/* webpackIgnore: true */ cdnUrl);
-      const Pane = (mod as any).Pane || (mod as any).default || (mod as any);
-      return { Pane, essentials: null };
-    }
-
-    throw new Error('Tweakpane not available; install it as a peer or provide a global Pane/Tweakpane.');
+    throw new Error('Tweakpane controls are deprecated and disabled.');
   }
 
   private async buildTweakPane(Pane: any, EssentialsPlugin: any | null, IntervalPlugin: any | null): Promise<void> {
@@ -1690,15 +1694,6 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
       this.thresholdRange.range = { min: 0, max: 0 };
     }
 
-    // Rebuild controls so sliders reflect the true data range
-    if (this.pane) {
-      this.disposePane();
-      if (this.config.showControls && this.config.useControls) {
-        void this.setupTweakPane().catch(err => {
-          console.error('Failed to reinitialize controls after data range update:', err);
-        });
-      }
-    }
   }
 
   removeSurface(id: string): void {
@@ -2837,6 +2832,8 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   }
 
   dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
     if (this.initializationFailed) return;
     // Stop animation loop
     if (this.animationId !== null) {
@@ -2895,6 +2892,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
 
     // Dispose of renderer
     this.renderer.dispose();
+    this.renderer.forceContextLoss();
     
     // Remove from DOM
     if (this.renderer.domElement.parentNode) {
@@ -2916,9 +2914,8 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
 
   private isWebGLAvailable(): boolean {
     if (!this.hasDOM()) return false;
-    const canvas = document.createElement('canvas');
-    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-    return !!gl;
+    return typeof WebGLRenderingContext !== 'undefined' ||
+      typeof WebGL2RenderingContext !== 'undefined';
   }
 
   private renderFallback(message: string): void {
@@ -2946,33 +2943,15 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
 
   // Get current visibility state of controls
   getControlsVisible(): boolean {
-    return this.config.showControls;
+    return false;
   }
 
-  // Toggle controls; when enabling for the first time, lazily create the pane.
+  /** @deprecated Tweakpane controls are disabled; use report controls or a plugin. */
   toggleControls(show?: boolean): void {
-    const nextState = typeof show === 'boolean' ? show : !this.config.showControls;
-    this.config.showControls = nextState;
-
-    if (nextState) {
-      // If controls were never initialized, create them now.
-      if (!this.paneContainer && this.config.useControls) {
-        void this.setupTweakPane().catch(err => {
-          console.error('Failed to initialize Tweakpane controls:', err);
-          this.emit('controls:error', { error: err });
-        });
-      } else if (this.paneContainer) {
-        this.paneContainer.style.display = 'block';
-        // Restore last minimized state visually
-        this.setPaneMinimized(this.paneDragState.minimized);
-      }
-      return;
-    }
-
-    // Hide controls if they exist
-    if (this.paneContainer) {
-      this.paneContainer.style.display = 'none';
-    }
+    void show;
+    warnLegacyControlsDeprecated();
+    this.config.showControls = false;
+    this.config.useControls = false;
   }
 
   togglePaneMinimized(): void {

@@ -34,7 +34,7 @@
   </div>
 
   <script type="module">
-    import { NeuroSurfaceViewer, SurfaceGeometry, THREE } from '../src/index.js';
+    import { NeuroSurfaceViewer, SurfaceGeometry, THREE } from '../src/index.ts';
 
     function makeIcosphere(radius = 12, subdivisions = 5) {
       const g = new THREE.IcosahedronGeometry(radius, subdivisions);
@@ -109,4 +109,3 @@
   </script>
 </body>
 </html>
-

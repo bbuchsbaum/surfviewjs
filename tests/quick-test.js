@@ -1,5 +1,5 @@
 import { readFileSync } from 'fs';
-import { parseGIfTISurface } from '../src/loaders.js';
+import { parseGIfTISurface } from '../src/loaders.ts';
 import { JSDOM } from 'jsdom';
 
 // Make DOMParser available

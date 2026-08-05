@@ -12,9 +12,7 @@ import { resolve } from 'path';
 const PEER_EXTERNALS = [
   'react',
   'react-dom',
-  'three',
-  'tweakpane',
-  '@tweakpane/plugin-essentials'
+  'three'
 ];
 
 // The core index is imported as `./index` (from src/index.react.js) and

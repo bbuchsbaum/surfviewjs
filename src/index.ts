@@ -73,6 +73,14 @@ import { VolumeProjectionMaterial } from './materials/VolumeProjectionMaterial';
 import { VolumeProjectedSurface } from './surfaces/VolumeProjectedSurface';
 import { ParcelSurface } from './surfaces/ParcelSurface';
 import { createColormapTexture } from './textures/createColormapTexture';
+import {
+  SURFVIEW_SCENE_SCHEMA,
+  SceneManifestError,
+  validateSceneManifest,
+  createSceneAsset,
+  loadSceneAsset
+} from './scene';
+import { mountSurfView } from './report';
 
 export {
   NeuroSurfaceViewer,
@@ -129,6 +137,12 @@ export {
   VolumeProjectedSurface,
   ParcelSurface,
   createColormapTexture,
+  SURFVIEW_SCENE_SCHEMA,
+  SceneManifestError,
+  validateSceneManifest,
+  createSceneAsset,
+  loadSceneAsset,
+  mountSurfView,
   StatisticalMapLayer,
   ParcelValueLayer,
   ParcelConnectivityLayer,
@@ -258,6 +272,27 @@ export type {
   FigureExportOptions,
   ResolvedFigureExportOptions
 } from './StylePresets';
+
+export type {
+  SceneAssetDescriptor,
+  SceneAssetDType,
+  SceneAssetRole,
+  SceneGeometryManifest,
+  SceneHemisphere,
+  SceneLayerLegend,
+  SurfViewSceneLayerManifest,
+  SceneLayerValuesManifest,
+  SurfViewSceneManifest,
+  CreateSceneAssetOptions,
+  LoadSceneAssetOptions,
+  SceneTypedArray
+} from './scene';
+
+export type {
+  MountSurfViewOptions,
+  SurfViewMountHandle,
+  SurfViewSceneView
+} from './report';
 
 export type {
   PluginHostViewer,
