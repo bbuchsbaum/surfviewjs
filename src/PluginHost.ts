@@ -41,12 +41,16 @@ interface StoredPluginRegistration extends PluginRegistration {
 export class PluginHost {
   private viewer: PluginHostViewer;
   private registrations = new Map<string, StoredPluginRegistration>();
+  private disposed = false;
 
   constructor(viewer: PluginHostViewer) {
     this.viewer = viewer;
   }
 
   register(plugin: ViewerPlugin, options: RegisterPluginOptions = {}): PluginRegistration {
+    if (this.disposed) {
+      throw new Error('PluginHost is disposed');
+    }
     if (!plugin || typeof plugin.id !== 'string' || plugin.id.trim() === '') {
       throw new Error('PluginHost.register requires a plugin with a non-empty id');
     }
@@ -65,6 +69,7 @@ export class PluginHost {
     const container = options.container ?? this.createPluginContainer(plugin.id);
     const subscriptions: UnsubscribeFn[] = [];
     let teardown: PluginTeardown = undefined;
+    let cleaned = false;
 
     const api: ViewerPluginContext = {
       viewer: this.viewer,
@@ -83,25 +88,53 @@ export class PluginHost {
       requestRender: () => this.viewer.requestRender()
     };
 
-    const dispose = (): void => {
+    const cleanup = (): void => {
+      if (cleaned) return;
+      cleaned = true;
+      let failure: unknown;
+      let failed = false;
+      const run = (step: () => void): void => {
+        try {
+          step();
+        } catch (error) {
+          if (!failed) {
+            failed = true;
+            failure = error;
+          }
+        }
+      };
       while (subscriptions.length) {
-        subscriptions.pop()?.();
+        const unsubscribe = subscriptions.pop();
+        if (unsubscribe) run(unsubscribe);
       }
-      this.runTeardown(teardown);
-      plugin.unmount?.();
+      run(() => this.runTeardown(teardown));
+      if (plugin.unmount) run(() => plugin.unmount?.());
       if (autoContainer && container.parentNode) {
         container.parentNode.removeChild(container);
       }
+      if (failed) throw failure;
     };
 
     try {
       teardown = plugin.mount(container, api);
     } catch (err) {
-      dispose();
+      try {
+        cleanup();
+      } catch (cleanupError) {
+        console.error(`Plugin "${plugin.id}" cleanup failed after mount error`, cleanupError);
+      }
       throw err;
     }
 
-    const registration: StoredPluginRegistration = {
+    let registration: StoredPluginRegistration;
+    const dispose = (): void => {
+      if (this.registrations.get(plugin.id) === registration) {
+        this.registrations.delete(plugin.id);
+      }
+      cleanup();
+    };
+
+    registration = {
       id: plugin.id,
       plugin,
       container,
@@ -131,9 +164,21 @@ export class PluginHost {
   }
 
   dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    let failure: unknown;
+    let failed = false;
     for (const id of Array.from(this.registrations.keys())) {
-      this.unregister(id);
+      try {
+        this.unregister(id);
+      } catch (error) {
+        if (!failed) {
+          failed = true;
+          failure = error;
+        }
+      }
     }
+    if (failed) throw failure;
   }
 
   private createPluginContainer(id: string): HTMLElement {

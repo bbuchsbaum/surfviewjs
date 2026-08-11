@@ -22,7 +22,8 @@ test('offline embed mounts once, switches maps, exports, and disposes cleanly', 
   await page.waitForFunction(() => (window as any).__surfviewReady === true);
 
   await expect(page.locator('#viewer canvas')).toHaveCount(1);
-  await expect(page.getByRole('toolbar', { name: 'Surface report controls' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Surface report controls' })).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Anatomical view' })).toBeVisible();
   await expect(page.getByLabel('Displayed surface map')).toHaveValue('contrast');
   await expect(page.locator('.surfview-report-controls')).not.toContainText('Tweakpane');
 
@@ -35,6 +36,9 @@ test('offline embed mounts once, switches maps, exports, and disposes cleanly', 
       surfaces: viewer.getSurfaceIds(),
       contexts: (window as any).__webglContexts.size,
       background: viewer.stylePreset.name,
+      reportTarget: Boolean(handle.controlTarget),
+      displayedLayer: handle.controlTarget?.getSnapshot()
+        .capabilities.exclusiveMap?.displayedLayerId,
       tweakpaneGlobal: Boolean((window as any).Tweakpane || (window as any).tweakpane)
     };
   });
@@ -43,6 +47,8 @@ test('offline embed mounts once, switches maps, exports, and disposes cleanly', 
     surfaces: ['left', 'right'],
     contexts: 1,
     background: 'paper-light',
+    reportTarget: true,
+    displayedLayer: 'contrast',
     tweakpaneGlobal: false
   });
 
@@ -64,22 +70,71 @@ test('offline embed mounts once, switches maps, exports, and disposes cleanly', 
   });
   expect(remountCheck).toEqual({ sameViewer: true, contexts: 1, canvases: 1 });
 
-  const identityPreserved = await page.evaluate(() => {
+  const layerSwitch = await page.evaluate(() => {
     const handle = (window as any).__surfviewHandle;
     const viewer = handle.viewer;
     const before = viewer.getSurfaceIds().map((id: string) => viewer.getSurface(id).geometry);
+    const legacySelectedLayer = viewer.selectedLayerId;
     handle.selectLayer('response');
     const after = viewer.getSurfaceIds().map((id: string) => viewer.getSurface(id).geometry);
-    return before.every((geometry: unknown, index: number) => geometry === after[index]);
+    return {
+      identityPreserved: before.every(
+        (geometry: unknown, index: number) => geometry === after[index]
+      ),
+      displayedLayer: handle.controlTarget.getSnapshot()
+        .capabilities.exclusiveMap.displayedLayerId,
+      legacySelectionUntouched: viewer.selectedLayerId === legacySelectedLayer,
+      responseVisibleEverywhere: viewer.getSurfaceIds().every((id: string) => {
+        const layers = viewer.getOrderedLayers(id);
+        return layers.find((layer: any) => layer.id === 'response')?.visible === true &&
+          layers.find((layer: any) => layer.id === 'contrast')?.visible === false;
+      })
+    };
   });
-  expect(identityPreserved).toBe(true);
+  expect(layerSwitch).toEqual({
+    identityPreserved: true,
+    displayedLayer: 'response',
+    legacySelectionUntouched: true,
+    responseVisibleEverywhere: true
+  });
   await expect(page.getByLabel('Displayed surface map')).toHaveValue('response');
   await expect(page.getByRole('status')).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Medial' }).click();
-  await expect(page.getByRole('button', { name: 'Medial' })).toHaveAttribute('aria-pressed', 'true');
-  await page.getByRole('button', { name: 'Dorsal' }).click();
-  await expect(page.getByRole('button', { name: 'Dorsal' })).toHaveAttribute('aria-pressed', 'true');
+  expect(await page.evaluate(() => (window as any).__surfviewHandle.controlTarget
+    .setDisplayedLayer('contrast'))).toEqual({ ok: true });
+  await expect(page.getByLabel('Displayed surface map')).toHaveValue('contrast');
+  expect(await page.evaluate(() => (window as any).__surfviewHandle.controlTarget
+    .setDisplayedLayer('response'))).toEqual({ ok: true });
+  await expect(page.getByLabel('Displayed surface map')).toHaveValue('response');
+
+  await page.getByLabel('Displayed surface map').selectOption('contrast');
+  await expect.poll(() => page.evaluate(() => (window as any).__surfviewHandle.controlTarget
+    .getSnapshot().capabilities.exclusiveMap.displayedLayerId)).toBe('contrast');
+
+  const lateral = page.getByRole('radio', { name: 'Lateral' });
+  const medial = page.getByRole('radio', { name: 'Medial' });
+  await lateral.focus();
+  await lateral.press('ArrowRight');
+  await expect(medial).toBeChecked();
+  await expect.poll(() => page.evaluate(() => (window as any).__surfviewHandle.controlTarget
+    .getSnapshot().view.current.view)).toBe('medial');
+
+  for (const [name, view] of [
+    ['Lateral', 'lateral'],
+    ['Medial', 'medial'],
+    ['Dorsal', 'dorsal'],
+    ['Ventral', 'ventral']
+  ] as const) {
+    const radio = page.getByRole('radio', { name });
+    await radio.check();
+    await expect(radio).toBeChecked();
+    await expect.poll(() => page.evaluate(() => (window as any).__surfviewHandle.controlTarget
+      .getSnapshot().view.current.view)).toBe(view);
+  }
+
+  const toolbarDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export surface view as PNG' }).click();
+  expect((await toolbarDownload).suggestedFilename()).toBe('offline-bilateral-scene.png');
 
   const png = await page.evaluate(() => (window as any).__surfviewHandle.exportPNG({
     width: 320,
@@ -95,6 +150,8 @@ test('offline embed mounts once, switches maps, exports, and disposes cleanly', 
   });
   await page.waitForTimeout(50);
   await expect(page.locator('#viewer canvas')).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Surface report controls' })).toHaveCount(0);
+  expect(await page.evaluate(() => (window as any).__surfviewHandle.controlTarget)).toBeNull();
   expect(await page.evaluate(() => (window as any).__activeAnimationFrames.size)).toBe(0);
 
   expect(remoteRequests).toEqual([]);

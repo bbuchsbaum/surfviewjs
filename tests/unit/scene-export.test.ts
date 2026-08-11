@@ -8,11 +8,11 @@ import {
   SURFVIEW_VERSION
 } from '../../src/serialization';
 import type { SubjectPackageManifest } from '../../src/SubjectPackage';
-import type { ViewerStateV1 } from '../../src/serialization';
+import type { ViewerStateV2 } from '../../src/serialization';
 
-function makeState(): ViewerStateV1 {
+function makeState(): ViewerStateV2 {
   return {
-    version: 1,
+    version: 2,
     camera: {
       position: [1, 2, 3],
       quaternion: [0, 0, 0, 1],
@@ -48,9 +48,11 @@ function makeState(): ViewerStateV1 {
             threshold: [-2, 2]
           }
         ],
+        layerOrder: ['activation'],
         clipPlanes: []
       }
     },
+    surfaceGroups: [],
     crosshair: {
       visible: false,
       surfaceId: null,
@@ -60,10 +62,7 @@ function makeState(): ViewerStateV1 {
       mode: null
     },
     timeline: null,
-    selection: {
-      surfaceId: 'lh',
-      layerId: 'activation'
-    }
+    inspectionSelection: { kind: 'vertex', surfaceId: 'lh', vertexIndex: 0 }
   };
 }
 
@@ -76,7 +75,7 @@ function makeViewer() {
       zoom: 1,
       fov: 45
     },
-    controls: {
+    cameraControls: {
       target: { x: 0, y: 0, z: 0 }
     },
     config: { backgroundColor: 0x000000 },
@@ -85,8 +84,8 @@ function makeViewer() {
       intensity: 1,
       position: { x: 1, y: 1, z: 1 }
     },
-    selectedSurfaceId: 'lh',
-    selectedLayerId: 'activation',
+    getInspectionSelection: () => ({ kind: 'none' }),
+    getBilateralSurfaceGroups: () => [],
     surfaces: new Map([
       ['lh', {
         constructor: { name: 'MultiLayerNeuroSurface' },
@@ -201,7 +200,11 @@ describe('scene export', () => {
     });
     const parsed = JSON.parse(json);
     expect(parsed.id).toBe('json-scene');
-    expect(parsed.state.selection.layerId).toBe('activation');
+    expect(parsed.state.inspectionSelection).toEqual({
+      kind: 'vertex',
+      surfaceId: 'lh',
+      vertexIndex: 0
+    });
 
     const blob = exportSceneBlob(makeViewer(), { state: makeState() });
     expect(blob.type).toBe('application/vnd.surfview.scene+json');

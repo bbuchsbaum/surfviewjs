@@ -9,11 +9,17 @@ export type {
   EventPayloadArgs,
   TypedEventListener
 } from '../EventEmitter';
-export type { SurfaceEventMap, SurfaceEventType } from './SurfaceEvents';
+export type {
+  SurfaceEventMap,
+  SurfaceEventType,
+  SurfaceLayerReorderedEvent
+} from './SurfaceEvents';
 export type {
   ViewerEventMap,
   ViewerEventType,
   ViewerEventListener,
+  ControlDomain,
+  ViewerStateChangedEvent,
   NumericRange,
   SurfacePickEvent,
   VertexHoverEvent,
@@ -22,6 +28,7 @@ export type {
   ViewerSurfaceEvent,
   LayerEvent,
   LayerUpdatedEvent,
+  LayerReorderedEvent,
   LayerColormapEvent,
   LayerRangeEvent,
   LayerThresholdEvent,
@@ -30,3 +37,11 @@ export type {
   ViewpointChangedEvent,
   CameraChangedEvent
 } from './ViewerEvents';
+
+export type {
+  AnatomicalViewChangedEvent,
+  BilateralSurfaceGroupRegisteredEvent,
+  BilateralSurfaceGroupRemovedEvent
+} from '../AnatomicalView';
+
+export type { InspectionSelectionChangedEvent } from '../Inspection';

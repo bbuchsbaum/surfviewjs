@@ -36,7 +36,11 @@ export class OutlineLayer extends Layer {
       visible: options.visible,
       opacity: options.opacity ?? 1,
       blendMode: options.blendMode,
-      order: options.order
+      order: options.order ?? 10
+    }, {
+      role: 'outline',
+      pinned: 'top',
+      reorderable: false
     });
 
     if (!options.roiLabels) {
@@ -49,7 +53,6 @@ export class OutlineLayer extends Layer {
         ? new Uint32Array(options.roiLabels)
         : new Uint32Array(options.roiLabels);
 
-    this.order = options.order !== undefined ? options.order : 10;
     this.color = new THREE.Color(options.color ?? 0x000000).getHex();
     this.width = options.width ?? 1.5;
     this.halo = options.halo ?? false;

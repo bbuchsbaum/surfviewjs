@@ -56,6 +56,8 @@ import {
   deserialize,
   encode,
   decode,
+  migrateViewerState,
+  migrateV1toV2,
   CURRENT_VERSION,
   SURFVIEW_EXPORT_SCHEMA,
   SURFVIEW_VERSION,
@@ -80,7 +82,20 @@ import {
   createSceneAsset,
   loadSceneAsset
 } from './scene';
-import { mountSurfView } from './report';
+import {
+  createReportSceneControlTarget,
+  layoutReportAnatomicalMeshes,
+  mountSurfView,
+  ReportSceneController,
+  ReportSceneControlTarget
+} from './report';
+import {
+  SurfViewControlSession,
+  ViewerControlTarget,
+  createManagedViewerControlSession,
+  createSurfViewControlSession,
+  createViewerControlTarget
+} from './controls';
 
 export {
   NeuroSurfaceViewer,
@@ -143,6 +158,7 @@ export {
   createSceneAsset,
   loadSceneAsset,
   mountSurfView,
+  layoutReportAnatomicalMeshes,
   StatisticalMapLayer,
   ParcelValueLayer,
   ParcelConnectivityLayer,
@@ -170,13 +186,23 @@ export {
   deserialize,
   encode,
   decode,
+  migrateViewerState,
+  migrateV1toV2,
   CURRENT_VERSION,
   SURFVIEW_EXPORT_SCHEMA,
   SURFVIEW_VERSION,
   exportScene,
   exportSceneJSON,
   exportSceneBlob,
-  exportStaticHTML
+  exportStaticHTML,
+  SurfViewControlSession,
+  createManagedViewerControlSession,
+  createSurfViewControlSession,
+  ViewerControlTarget,
+  createViewerControlTarget,
+  ReportSceneController,
+  ReportSceneControlTarget,
+  createReportSceneControlTarget
 };
 
 // Export temporal types for TypeScript consumers
@@ -205,6 +231,18 @@ export type {
 } from './layers/ParcelConnectivityLayer';
 
 export type {
+  LayerChangeSet,
+  LayerRole,
+  LayerPinnedPosition,
+  LayerOrderConstraints,
+  LayerOrderDescriptor,
+  LayerOrderFailureCode,
+  LayerOrderResult,
+  LayerPresentation,
+  LayerHistogram,
+  LayerDataSummary,
+  LayerHistogramOptions,
+  LayerDataSummaryOptions,
   VolumeProjectionMode,
   VolumeSamplingMode,
   VolumeProjectionQuality,
@@ -213,6 +251,51 @@ export type {
   VolumeProjectionLayerConfig,
   VolumeProjectionLayerUpdateData
 } from './layers';
+
+export {
+  ANATOMICAL_VIEWS,
+  getAnatomicalViewAxes,
+  normalizeAnatomicalHemisphere
+} from './AnatomicalView';
+
+export { NO_INSPECTION_SELECTION } from './Inspection';
+
+export type {
+  InspectionSelection,
+  NoInspectionSelection,
+  VertexInspectionSelection,
+  ParcelInspectionSelection,
+  InspectionSelectionOptions,
+  InspectionSelectionFailureCode,
+  InspectionSelectionResult,
+  InspectionSelectionChangedEvent,
+  VertexInspection,
+  VertexInspectionLayerValue,
+  VertexInspectionParcel,
+  VertexInspectionAtlas
+} from './Inspection';
+
+export type {
+  AnatomicalView,
+  AnatomicalHemisphere,
+  AnatomicalViewLayout,
+  AnatomicalViewAxes,
+  Vector3Tuple,
+  AnatomicalViewOptions,
+  SingleAnatomicalViewOptions,
+  PairedAnatomicalViewOptions,
+  AnatomicalViewCapabilities,
+  AnatomicalViewFailureCode,
+  AnatomicalViewResult,
+  AnatomicalViewResetResult,
+  AnatomicalViewChangedEvent,
+  BilateralSurfaceGroup,
+  BilateralSurfaceGroupFailureCode,
+  BilateralSurfaceGroupResult,
+  BilateralSurfaceGroupRemovalReason,
+  BilateralSurfaceGroupRegisteredEvent,
+  BilateralSurfaceGroupRemovedEvent
+} from './AnatomicalView';
 
 export type {
   RoiDrawMode,
@@ -291,8 +374,81 @@ export type {
 export type {
   MountSurfViewOptions,
   SurfViewMountHandle,
-  SurfViewSceneView
+  SurfViewSceneView,
+  ReportAnatomicalMesh,
+  ReportSceneDisposingListener,
+  ReportSceneControllerOptions,
+  ReportSceneControllerState,
+  ReportSceneMutationListener,
+  ReportSceneMutationPhase,
+  ReportSceneControlTargetOptions
 } from './report';
+
+export type {
+  ControlDomain,
+  ViewerStateChangedEvent,
+  LayerReorderedEvent,
+  SurfaceLayerReorderedEvent,
+  ViewerEventMap,
+  ViewerEventType,
+  ViewerEventListener
+} from './events';
+
+export type {
+  ControlJsonPrimitive,
+  ControlJsonObject,
+  ControlJsonValue,
+  CapabilityAvailability,
+  ControlOptionDescriptor,
+  NumericRangeControlDescriptor,
+  HistogramControlDescriptor,
+  LayerDataSummaryControlDescriptor,
+  ScalarMappingControls,
+  BivariateMappingControls,
+  TemporalControls,
+  ParcelControls,
+  OutlineControls,
+  LayerColorPreviewDescriptor,
+  LayerControlDescriptor,
+  SurfaceControlDescriptor,
+  AnatomicalViewTargetRef,
+  AnatomicalViewTargetDescriptor,
+  CurrentAnatomicalViewDescriptor,
+  ViewControlDescriptor,
+  SelectionControlDescriptor,
+  FigurePresetControlDescriptor,
+  FigureControlDescriptor,
+  ExclusiveMapCapability,
+  SurfViewControlCapabilities,
+  SurfViewControlSnapshot,
+  ControlCommandFailureCode,
+  ControlCommandFailure,
+  ControlCommandSuccess,
+  ControlCommandResult,
+  SetAnatomicalViewRequest,
+  LayerControlAddress,
+  ScalarMappingUpdate,
+  FigureExportRequest,
+  FigureExportResult,
+  SurfViewControlTargetCommands,
+  SurfViewControlSnapshotListener,
+  SurfViewControlSubscription,
+  SurfViewControlTarget,
+  SurfViewControlSectionId,
+  SurfViewControlSessionState,
+  SurfViewControlSessionOptions,
+  SurfViewControlFocusSnapshot,
+  SurfViewControlSessionSnapshot,
+  SurfViewControlSessionSnapshotListener,
+  ManagedViewerControlSessionOptions,
+  ViewerControlTargetOptions
+} from './controls';
+
+export type {
+  NeuroSurfaceViewerConfig,
+  ParcelFocusOptions,
+  ViewerFigureBackground
+} from './NeuroSurfaceViewer';
 
 export type {
   PluginHostViewer,
@@ -356,15 +512,21 @@ export type { FDRResult, BonferroniResult, ClusterResult } from './utils/statist
 
 // Export serialization types
 export type {
+  ViewerState,
   ViewerStateV1,
+  ViewerStateV2,
   CameraState,
   LightingState,
   ViewerConfigState,
   ClipPlaneState as SerializedClipPlaneState,
   LayerState,
+  SurfaceStateV1,
   SurfaceState,
+  SurfaceGroupState,
   CrosshairState as SerializedCrosshairState,
   SelectionState,
+  RestorationIssueCode,
+  RestorationIssue,
   RestorationReport,
   SceneAssetType,
   SceneAssetManifest,

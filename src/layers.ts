@@ -6,6 +6,71 @@ import { VolumeTexture3D } from './textures/VolumeTexture3D';
 import { createColormapTexture } from './textures/createColormapTexture';
 
 export type BlendMode = 'normal' | 'additive' | 'multiply';
+export type LayerRole = 'anatomy' | 'data' | 'outline' | 'connectivity';
+export type LayerPinnedPosition = 'bottom' | 'top' | null;
+
+export interface LayerOrderConstraints {
+  readonly reorderable: boolean;
+  readonly pinned: LayerPinnedPosition;
+  readonly role: LayerRole;
+}
+
+export interface LayerOrderDescriptor extends LayerOrderConstraints {
+  readonly id: string;
+  readonly index: number;
+}
+
+export type LayerOrderFailureCode =
+  | 'surface-not-found'
+  | 'layer-not-found'
+  | 'duplicate-layer-id'
+  | 'incomplete-order'
+  | 'invalid-destination'
+  | 'layer-not-reorderable'
+  | 'constraint-violation';
+
+export type LayerOrderResult =
+  | {
+      readonly ok: true;
+      readonly changed: boolean;
+      readonly order: readonly string[];
+    }
+  | {
+      readonly ok: false;
+      readonly code: LayerOrderFailureCode;
+      readonly message: string;
+    };
+
+export interface LayerPresentation {
+  readonly label: string;
+  readonly description?: string;
+  readonly units?: string;
+  readonly provenance?: Readonly<Record<string, unknown>>;
+  readonly missingValueLabel?: string;
+}
+
+export interface LayerHistogram {
+  readonly edges: readonly number[];
+  readonly counts: readonly number[];
+}
+
+export interface LayerDataSummary {
+  readonly finiteCount: number;
+  readonly missingCount: number;
+  readonly minimum: number | null;
+  readonly maximum: number | null;
+  readonly histogram?: LayerHistogram;
+}
+
+export interface LayerHistogramOptions {
+  readonly bins?: number;
+  readonly range?: readonly [number, number];
+}
+
+export interface LayerDataSummaryOptions {
+  readonly histogram?: boolean | LayerHistogramOptions;
+}
+
 export type VolumeProjectionMode = 'vertex' | 'fragment' | 'ribbon' | 'hybrid';
 export type VolumeSamplingMode = 'nearest' | 'linear';
 export type VolumeProjectionQuality = 'interactive' | 'publication';
@@ -26,7 +91,9 @@ export interface LayerConfig {
   visible?: boolean;
   opacity?: number;
   blendMode?: BlendMode;
+  /** @deprecated Initialization hint only; use LayerStack ordering commands at runtime. */
   order?: number;
+  presentation?: Partial<LayerPresentation>;
 }
 
 export interface DataLayerConfig extends LayerConfig {
@@ -71,6 +138,50 @@ export interface LayerUpdateData {
   visible?: boolean;
   blendMode?: BlendMode;
   [key: string]: any;
+}
+
+/** Property/value summary delivered when a public layer mutation succeeds. */
+export type LayerChangeSet = Readonly<Record<string, unknown>>;
+
+function cloneReadonlyValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return Object.freeze(value.map(item => cloneReadonlyValue(item)));
+  }
+  if (value && typeof value === 'object') {
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype === Object.prototype || prototype === null) {
+      const clone: Record<string, unknown> = {};
+      for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+        clone[key] = cloneReadonlyValue(item);
+      }
+      return Object.freeze(clone);
+    }
+  }
+  return value;
+}
+
+function normalizeLayerPresentation(
+  id: string,
+  presentation: Partial<LayerPresentation> = {}
+): LayerPresentation {
+  const normalized: {
+    label: string;
+    description?: string;
+    units?: string;
+    provenance?: Readonly<Record<string, unknown>>;
+    missingValueLabel?: string;
+  } = {
+    label: presentation.label?.trim() || id
+  };
+  if (presentation.description !== undefined) normalized.description = presentation.description;
+  if (presentation.units !== undefined) normalized.units = presentation.units;
+  if (presentation.missingValueLabel !== undefined) {
+    normalized.missingValueLabel = presentation.missingValueLabel;
+  }
+  if (presentation.provenance !== undefined) {
+    normalized.provenance = cloneReadonlyValue(presentation.provenance) as Readonly<Record<string, unknown>>;
+  }
+  return Object.freeze(normalized);
 }
 
 export interface RGBALayerUpdateData extends LayerUpdateData {
@@ -131,35 +242,145 @@ export abstract class Layer {
   visible: boolean;
   opacity: number;
   blendMode: BlendMode;
-  order: number;
   needsUpdate: boolean;
-  /** Callback set by the parent surface to trigger re-compositing on change. */
-  _onChangeCallback: (() => void) | null;
+  /** Callback set by the parent surface to propagate observable layer changes. */
+  _onChangeCallback: ((changes: LayerChangeSet) => void) | null;
+  private _changeBatchDepth: number;
+  private _pendingChanges: Record<string, unknown>;
+  private _orderHint: number;
+  private _orderConstraints: LayerOrderConstraints;
+  private _orderConstraintPriority: number;
+  private _attachedToLayerStack: boolean;
+  private _orderMutationWarned: boolean;
+  private _presentation: LayerPresentation;
   private static _outlineCtor: any;
   private static _temporalCtor: any;
 
-  constructor(id: string, config: LayerConfig = {}) {
+  constructor(
+    id: string,
+    config: LayerConfig = {},
+    orderConstraints: Partial<LayerOrderConstraints> & { priority?: number } = {}
+  ) {
     this.id = id;
     this.visible = config.visible !== undefined ? config.visible : true;
     this.opacity = config.opacity !== undefined ? config.opacity : 1.0;
     this.blendMode = config.blendMode || 'normal';
-    this.order = config.order || 0;
+    this._orderHint = config.order ?? 0;
+    this._orderConstraints = Object.freeze({
+      reorderable: orderConstraints.reorderable ?? true,
+      pinned: orderConstraints.pinned ?? null,
+      role: orderConstraints.role ?? 'data'
+    });
+    this._orderConstraintPriority = orderConstraints.priority ?? 0;
+    this._attachedToLayerStack = false;
+    this._orderMutationWarned = false;
+    this._presentation = normalizeLayerPresentation(id, config.presentation);
     this.needsUpdate = true;
     this._onChangeCallback = null;
+    this._changeBatchDepth = 0;
+    this._pendingChanges = {};
+  }
+
+  /**
+   * Numeric initialization hint used when this layer first enters a stack.
+   * Runtime ordering is owned exclusively by LayerStack.
+   *
+   * @deprecated Use LayerStack.setLayerOrder() or LayerStack.moveLayer() after
+   * the layer has been added. Runtime writes are ignored.
+   */
+  get order(): number {
+    return this._orderHint;
+  }
+
+  set order(order: number) {
+    if (!Number.isFinite(order)) return;
+    if (this._attachedToLayerStack) {
+      if (!this._orderMutationWarned && order !== this._orderHint) {
+        console.warn(
+          `Layer.order is an initialization hint; use setLayerOrder() or moveLayer() to reorder attached layer "${this.id}".`
+        );
+        this._orderMutationWarned = true;
+      }
+      return;
+    }
+    this._orderHint = order;
+  }
+
+  getOrderConstraints(): LayerOrderConstraints {
+    return this._orderConstraints;
+  }
+
+  getPresentation(): LayerPresentation {
+    return this._presentation;
+  }
+
+  setPresentation(presentation: Partial<LayerPresentation>): void {
+    this._presentation = normalizeLayerPresentation(this.id, presentation);
+    if (this._onChangeCallback) {
+      this._onChangeCallback({ presentation: this._presentation });
+    }
+  }
+
+  /** Scalar layers override this without exposing their underlying arrays. */
+  getDataSummary(_options: LayerDataSummaryOptions = {}): LayerDataSummary | null {
+    return null;
+  }
+
+  /** @internal Surfaces provide their vertex-domain size for sparse summaries. */
+  _setDataSummaryDomainSize(_domainSize: number | null): void {
+    // Only scalar layers need a domain size.
+  }
+
+  /** @internal LayerStack owns attachment and canonical order. */
+  _attachToLayerStack(): void {
+    this._attachedToLayerStack = true;
+  }
+
+  /** @internal LayerStack owns attachment and canonical order. */
+  _detachFromLayerStack(): void {
+    this._attachedToLayerStack = false;
+    this._orderMutationWarned = false;
+  }
+
+  /** @internal Stable priority within a pinned role group. */
+  _getOrderConstraintPriority(): number {
+    return this._orderConstraintPriority;
   }
 
   /** Notify the parent surface that this layer's data has changed. */
-  protected _notifyChange(): void {
+  protected _notifyChange(changes: LayerChangeSet = { content: true }): void {
     this.needsUpdate = true;
+    if (this._changeBatchDepth > 0) {
+      Object.assign(this._pendingChanges, changes);
+      return;
+    }
     if (this._onChangeCallback) {
-      this._onChangeCallback();
+      this._onChangeCallback(changes);
+    }
+  }
+
+  /** @internal Coalesce a compound update into one parent notification. */
+  _beginChangeBatch(): void {
+    this._changeBatchDepth += 1;
+  }
+
+  /** @internal Complete a compound update and publish its merged changes. */
+  _endChangeBatch(): void {
+    if (this._changeBatchDepth === 0) return;
+    this._changeBatchDepth -= 1;
+    if (this._changeBatchDepth > 0) return;
+
+    const changes = this._pendingChanges;
+    this._pendingChanges = {};
+    if (Object.keys(changes).length > 0 && this._onChangeCallback) {
+      this._onChangeCallback(changes);
     }
   }
 
   setVisible(visible: boolean): void {
     if (this.visible !== visible) {
       this.visible = visible;
-      this._notifyChange();
+      this._notifyChange({ visible });
     }
   }
 
@@ -167,7 +388,7 @@ export abstract class Layer {
     opacity = Math.max(0, Math.min(1, opacity));
     if (this.opacity !== opacity) {
       this.opacity = opacity;
-      this._notifyChange();
+      this._notifyChange({ opacity });
     }
   }
 
@@ -175,7 +396,7 @@ export abstract class Layer {
     const validModes: BlendMode[] = ['normal', 'additive', 'multiply'];
     if (validModes.includes(mode) && this.blendMode !== mode) {
       this.blendMode = mode;
-      this._notifyChange();
+      this._notifyChange({ blendMode: mode });
     }
   }
 
@@ -233,7 +454,8 @@ export abstract class Layer {
       visible: config.visible,
       opacity: config.opacity ?? (config.alpha !== undefined ? config.alpha : undefined),
       blendMode: config.blendMode,
-      order: config.order
+      order: config.order,
+      presentation: config.presentation
     };
 
     switch (type) {
@@ -270,7 +492,8 @@ export abstract class Layer {
           roiSubset: config.roiSubset,
           visible: commonConfig.visible,
           blendMode: commonConfig.blendMode,
-          order: commonConfig.order
+          order: commonConfig.order,
+          presentation: commonConfig.presentation
         });
       case 'label':
         if (!config.labels || !config.labelDefs) {
@@ -283,7 +506,8 @@ export abstract class Layer {
           visible: commonConfig.visible,
           opacity: commonConfig.opacity,
           blendMode: commonConfig.blendMode,
-          order: commonConfig.order
+          order: commonConfig.order,
+          presentation: commonConfig.presentation
         });
       case 'twodata':
         if (!config.dataX || !config.dataY) {
@@ -379,7 +603,7 @@ export class RGBALayer extends Layer {
       throw new Error('RGBA data length must be divisible by 4');
     }
     
-    this._notifyChange();
+    this._notifyChange({ rgbaData: true });
     debugLog(`RGBALayer ${this.id}: Set RGBA data with ${this.rgbaData.length / 4} vertices`);
   }
 
@@ -422,11 +646,17 @@ export class RGBALayer extends Layer {
 export class DataLayer extends Layer {
   private data: Float32Array | null = null;
   private indices: Uint32Array | null = null;
+  private denseMapping = true;
   private colorMap: ColorMap | null = null;
   private colorMapName: string | null = null;
   private range: [number, number];
   private threshold: [number, number];
   private _cachedRGBABuffer: Float32Array | null = null;
+  private dataRevision = 0;
+  private summaryDomainSize: number | null = null;
+  private baseSummaryCache: LayerDataSummary | null = null;
+  private histogramSummaryCache = new Map<string, LayerDataSummary>();
+  private sparseDataIndex: Map<number, number> | null = null;
 
   constructor(
     id: string, 
@@ -459,6 +689,7 @@ export class DataLayer extends Layer {
       ? data 
       : new Float32Array(data);
     
+    this.denseMapping = indices == null;
     if (indices) {
       this.indices = indices instanceof Uint32Array
         ? indices
@@ -470,13 +701,126 @@ export class DataLayer extends Layer {
         this.indices[i] = i;
       }
     }
-    
-    this._notifyChange();
+
+    this.sparseDataIndex = null;
+    this._markDataChanged();
+    this._notifyChange({ data: true, indices: true });
     debugLog(`DataLayer ${this.id}: Set data with ${this.data.length} values`);
   }
 
   getData(): Float32Array | null {
     return this.data;
+  }
+
+  getDataRevision(): number {
+    return this.dataRevision;
+  }
+
+  /**
+   * Sample the scalar mapped to one surface vertex without exposing private
+   * dense or sparse storage. Unmapped, out-of-domain, non-finite, and disposed
+   * values return null.
+   */
+  sampleValueAtVertex(vertexIndex: number): number | null {
+    if (!Number.isInteger(vertexIndex) || vertexIndex < 0) return null;
+    if (this.summaryDomainSize !== null && vertexIndex >= this.summaryDomainSize) return null;
+    if (!this.data || !this.indices) return null;
+
+    let dataIndex: number | undefined;
+    if (this.denseMapping) {
+      dataIndex = vertexIndex < this.data.length ? vertexIndex : undefined;
+    } else {
+      if (!this.sparseDataIndex) {
+        this.sparseDataIndex = new Map();
+        const count = Math.min(this.indices.length, this.data.length);
+        for (let index = 0; index < count; index++) {
+          // Match rendering and summary semantics: a later duplicate mapping wins.
+          this.sparseDataIndex.set(this.indices[index], index);
+        }
+      }
+      dataIndex = this.sparseDataIndex.get(vertexIndex);
+    }
+
+    if (dataIndex === undefined) return null;
+    const value = this.data[dataIndex];
+    return Number.isFinite(value) ? value : null;
+  }
+
+  override getDataSummary(options: LayerDataSummaryOptions = {}): LayerDataSummary {
+    const base = this.getBaseDataSummary();
+    if (!options.histogram) return base;
+
+    const histogramOptions = options.histogram === true ? {} : options.histogram;
+    const bins = histogramOptions.bins ?? 32;
+    if (!Number.isInteger(bins) || bins < 1 || bins > 4096) {
+      throw new RangeError('Histogram bins must be an integer between 1 and 4096.');
+    }
+
+    let lower = histogramOptions.range?.[0] ?? base.minimum;
+    let upper = histogramOptions.range?.[1] ?? base.maximum;
+    if (lower !== null && upper !== null && (!Number.isFinite(lower) || !Number.isFinite(upper) || lower > upper)) {
+      throw new RangeError('Histogram range must contain finite ascending bounds.');
+    }
+
+    const cacheKey = `${this.dataRevision}:${this.summaryDomainSize ?? 'stored'}:${bins}:${lower ?? 'empty'}:${upper ?? 'empty'}`;
+    const cached = this.histogramSummaryCache.get(cacheKey);
+    if (cached) return cached;
+
+    if (lower === null || upper === null) {
+      const empty = Object.freeze({
+        ...base,
+        histogram: Object.freeze({
+          edges: Object.freeze([] as number[]),
+          counts: Object.freeze([] as number[])
+        })
+      });
+      this.histogramSummaryCache.set(cacheKey, empty);
+      return empty;
+    }
+
+    if (lower === upper) {
+      const halfWidth = Math.max(Math.abs(lower) * 0.5, 0.5);
+      lower -= halfWidth;
+      upper += halfWidth;
+    }
+
+    const edges = new Array<number>(bins + 1);
+    const counts = new Array<number>(bins).fill(0);
+    const width = upper - lower;
+    for (let index = 0; index <= bins; index++) {
+      edges[index] = lower + (width * index) / bins;
+    }
+    const { values } = this.getSummaryValues();
+    for (const value of values) {
+      if (!Number.isFinite(value) || value < lower || value > upper) continue;
+      const bin = value === upper
+        ? bins - 1
+        : Math.min(bins - 1, Math.floor(((value - lower) / width) * bins));
+      counts[bin] += 1;
+    }
+
+    const summary = Object.freeze({
+      ...base,
+      histogram: Object.freeze({
+        edges: Object.freeze(edges),
+        counts: Object.freeze(counts)
+      })
+    });
+    this.histogramSummaryCache.set(cacheKey, summary);
+    return summary;
+  }
+
+  override _setDataSummaryDomainSize(domainSize: number | null): void {
+    const normalized = domainSize === null ? null : Math.max(0, Math.floor(domainSize));
+    if (normalized === this.summaryDomainSize) return;
+    this.summaryDomainSize = normalized;
+    this.clearSummaryCaches();
+  }
+
+  /** Mark in-place scalar changes without allocating a replacement data array. */
+  protected _markDataChanged(): void {
+    this.dataRevision += 1;
+    this.clearSummaryCaches();
   }
 
   setColorMap(colorMap: ColorMap | string | Color[]): void {
@@ -516,7 +860,7 @@ export class DataLayer extends Layer {
     
     // Invalidate cached RGBA buffer to force regeneration
     this._cachedRGBABuffer = null;
-    this._notifyChange();
+    this._notifyChange({ colorMap: this.getColorMapName() });
     debugLog(`DataLayer ${this.id}: ColorMap updated, needsUpdate = true`);
   }
 
@@ -524,7 +868,7 @@ export class DataLayer extends Layer {
     this.range = range;
     if (this.colorMap) {
       this.colorMap.setRange(range);
-      this._notifyChange();
+      this._notifyChange({ range: [...range] });
     }
   }
 
@@ -532,7 +876,7 @@ export class DataLayer extends Layer {
     this.threshold = threshold;
     if (this.colorMap) {
       this.colorMap.setThreshold(threshold);
-      this._notifyChange();
+      this._notifyChange({ threshold: [...threshold] });
     }
   }
 
@@ -648,6 +992,59 @@ export class DataLayer extends Layer {
     this.indices = null;
     this.colorMap = null;
     this._cachedRGBABuffer = null;
+    this.sparseDataIndex = null;
+    this._markDataChanged();
+  }
+
+  private getBaseDataSummary(): LayerDataSummary {
+    if (this.baseSummaryCache) return this.baseSummaryCache;
+    const { values, unmappedCount } = this.getSummaryValues();
+    let finiteCount = 0;
+    let missingCount = unmappedCount;
+    let minimum = Infinity;
+    let maximum = -Infinity;
+
+    for (const value of values) {
+      if (!Number.isFinite(value)) {
+        missingCount += 1;
+        continue;
+      }
+      finiteCount += 1;
+      if (value < minimum) minimum = value;
+      if (value > maximum) maximum = value;
+    }
+
+    this.baseSummaryCache = Object.freeze({
+      finiteCount,
+      missingCount,
+      minimum: finiteCount > 0 ? minimum : null,
+      maximum: finiteCount > 0 ? maximum : null
+    });
+    return this.baseSummaryCache;
+  }
+
+  private getSummaryValues(): { values: Iterable<number>; unmappedCount: number } {
+    if (!this.data) return { values: [], unmappedCount: this.summaryDomainSize ?? 0 };
+    if (this.summaryDomainSize === null) {
+      return { values: this.data, unmappedCount: 0 };
+    }
+
+    const valuesByVertex = new Map<number, number>();
+    const domainSize = this.summaryDomainSize;
+    for (let index = 0; index < this.data.length; index++) {
+      const vertexIndex = this.denseMapping ? index : this.indices?.[index];
+      if (vertexIndex === undefined || vertexIndex < 0 || vertexIndex >= domainSize) continue;
+      valuesByVertex.set(vertexIndex, this.data[index]);
+    }
+    return {
+      values: valuesByVertex.values(),
+      unmappedCount: Math.max(0, domainSize - valuesByVertex.size)
+    };
+  }
+
+  private clearSummaryCaches(): void {
+    this.baseSummaryCache = null;
+    this.histogramSummaryCache.clear();
   }
 }
 
@@ -733,7 +1130,7 @@ export class VolumeProjectionLayer extends Layer {
    */
   attach(surface: { geometry: { vertices: Float32Array }; mesh?: THREE.Mesh }): void {
     this.attachedSurface = surface;
-    this._notifyChange();
+    this._notifyChange({ attachment: true });
   }
 
   detach(): void {
@@ -795,33 +1192,33 @@ export class VolumeProjectionLayer extends Layer {
   setRange(range: [number, number]): void {
     this.range = range;
     this.colorMap.setRange(range);
-    this._notifyChange();
+    this._notifyChange({ range: [...range] });
   }
 
   setThreshold(threshold: [number, number]): void {
     this.threshold = threshold;
     this.colorMap.setThreshold(threshold);
-    this._notifyChange();
+    this._notifyChange({ threshold: [...threshold] });
   }
 
   setFillValue(fillValue: number): void {
     this.fillValue = fillValue;
-    this._notifyChange();
+    this._notifyChange({ fillValue });
   }
 
   setProjectionMode(mode: VolumeProjectionMode): void {
     this.projectionMode = mode;
-    this._notifyChange();
+    this._notifyChange({ projectionMode: mode });
   }
 
   setSamplingMode(mode: VolumeSamplingMode): void {
     this.sampling = mode;
-    this._notifyChange();
+    this._notifyChange({ sampling: mode });
   }
 
   setQuality(quality: VolumeProjectionQuality): void {
     this.quality = quality;
-    this._notifyChange();
+    this._notifyChange({ quality });
   }
 
   setRibbonSurfaces(
@@ -843,7 +1240,7 @@ export class VolumeProjectionLayer extends Layer {
     if (options.reducer !== undefined) {
       this.ribbonReducer = options.reducer;
     }
-    this._notifyChange();
+    this._notifyChange({ ribbon: this.getRibbonConfig() });
   }
 
   setColormap(name: string): void {
@@ -865,20 +1262,20 @@ export class VolumeProjectionLayer extends Layer {
       this.colormapTexture.dispose();
     }
     this.colormapTexture = createColormapTexture(this.colorMapName);
-    this._notifyChange();
+    this._notifyChange({ colormap: this.colorMapName });
   }
 
   setWorldToIJK(matrix: THREE.Matrix4 | ArrayLike<number>): void {
     this.worldToIJK = matrix instanceof THREE.Matrix4
       ? matrix.clone()
       : new THREE.Matrix4().fromArray(Array.from(matrix));
-    this._notifyChange();
+    this._notifyChange({ worldToIJK: true });
   }
 
   updateVolumeData(data: Float32Array | number[]): void {
     this.volumeData = data instanceof Float32Array ? data : new Float32Array(data);
     this.volumeTexture.updateData(this.volumeData);
-    this._notifyChange();
+    this._notifyChange({ volumeData: true });
   }
 
   getRGBAData(vertexCount: number): Float32Array {
@@ -994,7 +1391,7 @@ export class VolumeProjectionLayer extends Layer {
         threshold: this.threshold,
         colormap: this.colorMapName
       });
-      this._notifyChange();
+      this._notifyChange({ worldToIJK: true });
     }
     if (updates.fillValue !== undefined) {
       this.setFillValue(updates.fillValue);
@@ -1300,7 +1697,7 @@ export class TwoDataLayer extends Layer {
       }
     }
 
-    this._notifyChange();
+    this._notifyChange({ dataX: true, dataY: true, indices: true });
     debugLog(`TwoDataLayer ${this.id}: Set data with ${this.dataX.length} values`);
   }
 
@@ -1337,7 +1734,7 @@ export class TwoDataLayer extends Layer {
     this.colorMap.setThresholdX(this.thresholdX);
     this.colorMap.setThresholdY(this.thresholdY);
 
-    this._notifyChange();
+    this._notifyChange({ colorMap: this.colorMapName });
     debugLog(`TwoDataLayer ${this.id}: ColorMap set to ${this.colorMapName}`);
   }
 
@@ -1349,7 +1746,7 @@ export class TwoDataLayer extends Layer {
     this.rangeX = range;
     if (this.colorMap) {
       this.colorMap.setRangeX(range);
-      this._notifyChange();
+      this._notifyChange({ rangeX: [...range] });
     }
   }
 
@@ -1357,7 +1754,7 @@ export class TwoDataLayer extends Layer {
     this.rangeY = range;
     if (this.colorMap) {
       this.colorMap.setRangeY(range);
-      this._notifyChange();
+      this._notifyChange({ rangeY: [...range] });
     }
   }
 
@@ -1365,7 +1762,7 @@ export class TwoDataLayer extends Layer {
     this.thresholdX = threshold;
     if (this.colorMap) {
       this.colorMap.setThresholdX(threshold);
-      this._notifyChange();
+      this._notifyChange({ thresholdX: [...threshold] });
     }
   }
 
@@ -1373,7 +1770,7 @@ export class TwoDataLayer extends Layer {
     this.thresholdY = threshold;
     if (this.colorMap) {
       this.colorMap.setThresholdY(threshold);
-      this._notifyChange();
+      this._notifyChange({ thresholdY: [...threshold] });
     }
   }
 
@@ -1495,13 +1892,17 @@ export class BaseLayer extends Layer {
   private color: number;
 
   constructor(color: number = 0xcccccc, config: LayerConfig = {}) {
-    super('base', { ...config, order: -1 }); // Base layer always at bottom
+    super(
+      'base',
+      { ...config, order: -1 },
+      { role: 'anatomy', pinned: 'bottom', reorderable: false, priority: 1 }
+    );
     this.color = color;
   }
 
   setColor(color: number): void {
     this.color = color;
-    this._notifyChange();
+    this._notifyChange({ color });
   }
 
   getRGBAData(vertexCount: number): Float32Array {
@@ -1578,7 +1979,7 @@ export class LabelLayer extends Layer {
       : labels instanceof Int32Array
         ? new Uint32Array(labels)
         : new Uint32Array(labels);
-    this._notifyChange();
+    this._notifyChange({ labels: true });
   }
 
   setLabelDefs(labelDefs: Array<{ id: number; color: THREE.ColorRepresentation }>): void {
@@ -1586,7 +1987,7 @@ export class LabelLayer extends Layer {
     labelDefs.forEach(def => {
       this.labelMap.set(def.id, new THREE.Color(def.color as any));
     });
-    this._notifyChange();
+    this._notifyChange({ labelDefs: true });
   }
 
   update(data: LabelLayerOptions & LayerUpdateData): void {
@@ -1598,7 +1999,7 @@ export class LabelLayer extends Layer {
     }
     if (data.defaultColor !== undefined) {
       this.defaultColor = new THREE.Color(data.defaultColor as any);
-      this._notifyChange();
+      this._notifyChange({ defaultColor: data.defaultColor });
     }
     if (data.opacity !== undefined) {
       this.setOpacity(data.opacity);
@@ -1655,8 +2056,14 @@ export class LayerStack {
   }
 
   addLayer(layer: Layer): void {
+    const replaced = this.layers.get(layer.id);
+    if (replaced) {
+      replaced._detachFromLayerStack();
+      this.layerOrder = this.layerOrder.filter(id => id !== layer.id);
+    }
     this.layers.set(layer.id, layer);
-    this.updateLayerOrder();
+    this.insertLayerByInitializationHint(layer);
+    layer._attachToLayerStack();
     this.needsComposite = true;
     debugLog(`Added layer ${layer.id} to stack`);
   }
@@ -1667,8 +2074,9 @@ export class LayerStack {
       if (layer.dispose) {
         layer.dispose();
       }
+      layer._detachFromLayerStack();
       this.layers.delete(id);
-      this.updateLayerOrder();
+      this.layerOrder = this.layerOrder.filter(layerId => layerId !== id);
       this.needsComposite = true;
       debugLog(`Removed layer ${id} from stack`);
       return true;
@@ -1683,7 +2091,12 @@ export class LayerStack {
   updateLayer(id: string, updates: LayerUpdateData): void {
     const layer = this.layers.get(id);
     if (layer) {
-      layer.update(updates);
+      layer._beginChangeBatch();
+      try {
+        layer.update(updates);
+      } finally {
+        layer._endChangeBatch();
+      }
       if (layer.needsUpdate) {
         this.needsComposite = true;
       }
@@ -1691,31 +2104,107 @@ export class LayerStack {
   }
 
   getAllLayers(): Layer[] {
-    return Array.from(this.layers.values());
+    return [...this.getOrderedLayers()];
   }
 
-  setLayerOrder(ids: string[]): void {
-    // Validate that all ids exist
-    const validIds = ids.filter(id => this.layers.has(id));
-    
-    // Add any missing layers to the end
-    this.layers.forEach((layer, id) => {
-      if (!validIds.includes(id)) {
-        validIds.push(id);
-      }
+  /** Return the exact bottom-to-top order used by CPU and GPU compositing. */
+  getOrderedLayers(): readonly Layer[] {
+    return Object.freeze(
+      this.layerOrder.map(id => this.layers.get(id)).filter((layer): layer is Layer => Boolean(layer))
+    );
+  }
+
+  getLayerOrderDescriptors(): readonly LayerOrderDescriptor[] {
+    return Object.freeze(
+      this.layerOrder.map((id, index) => {
+        const constraints = this.layers.get(id)!.getOrderConstraints();
+        return Object.freeze({ id, index, ...constraints });
+      })
+    );
+  }
+
+  /** Validate a complete bottom-to-top order without mutating the stack. */
+  validateLayerOrder(ids: readonly string[]): LayerOrderResult {
+    const candidate = [...ids];
+    const duplicate = candidate.find((id, index) => candidate.indexOf(id) !== index);
+    if (duplicate !== undefined) {
+      return this.failure(
+        'duplicate-layer-id',
+        `Layer order contains duplicate id "${duplicate}".`
+      );
+    }
+
+    const unknown = candidate.find(id => !this.layers.has(id));
+    if (unknown !== undefined) {
+      return this.failure('layer-not-found', `Layer "${unknown}" does not exist.`);
+    }
+
+    if (candidate.length !== this.layers.size) {
+      const missing = this.layerOrder.filter(id => !candidate.includes(id));
+      return this.failure(
+        'incomplete-order',
+        `Layer order must contain every layer exactly once; missing: ${missing.join(', ') || 'unknown'}.`
+      );
+    }
+
+    const constraintFailure = this.validateConstraints(candidate);
+    if (constraintFailure) return constraintFailure;
+
+    const changed = candidate.some((id, index) => id !== this.layerOrder[index]);
+    return Object.freeze({
+      ok: true,
+      changed,
+      order: Object.freeze(candidate)
     });
-    
-    this.layerOrder = validIds;
+  }
+
+  setLayerOrder(ids: readonly string[]): LayerOrderResult {
+    const validation = this.validateLayerOrder(ids);
+    if (!validation.ok || !validation.changed) return validation;
+
+    this.layerOrder = [...validation.order];
     this.needsComposite = true;
+    return validation;
   }
 
+  moveLayer(layerId: string, destinationIndex: number): LayerOrderResult {
+    const layer = this.layers.get(layerId);
+    if (!layer) {
+      return this.failure('layer-not-found', `Layer "${layerId}" does not exist.`);
+    }
+    if (!Number.isInteger(destinationIndex) || destinationIndex < 0 || destinationIndex >= this.layerOrder.length) {
+      return this.failure(
+        'invalid-destination',
+        `Destination index ${destinationIndex} is outside the layer stack.`
+      );
+    }
+    if (!layer.getOrderConstraints().reorderable) {
+      return this.failure(
+        'layer-not-reorderable',
+        `Layer "${layerId}" is fixed in the ${layer.getOrderConstraints().pinned ?? 'current'} group.`
+      );
+    }
+
+    const sourceIndex = this.layerOrder.indexOf(layerId);
+    if (sourceIndex === destinationIndex) return this.success(false);
+
+    const candidate = [...this.layerOrder];
+    candidate.splice(sourceIndex, 1);
+    candidate.splice(destinationIndex, 0, layerId);
+    return this.setLayerOrder(candidate);
+  }
+
+  /**
+   * @deprecated LayerStack maintains canonical order automatically. This
+   * compatibility method repairs membership without consulting Layer.order.
+   */
   updateLayerOrder(): void {
-    // Sort layers by order property
-    this.layerOrder = Array.from(this.layers.keys()).sort((a, b) => {
-      const layerA = this.layers.get(a)!;
-      const layerB = this.layers.get(b)!;
-      return layerA.order - layerB.order;
-    });
+    this.layerOrder = this.layerOrder.filter(id => this.layers.has(id));
+    for (const layer of this.layers.values()) {
+      if (!this.layerOrder.includes(layer.id)) {
+        this.insertLayerByInitializationHint(layer);
+      }
+    }
   }
 
   getVisibleLayers(): Layer[] {
@@ -1729,6 +2218,7 @@ export class LayerStack {
       if (layer.dispose) {
         layer.dispose();
       }
+      layer._detachFromLayerStack();
     });
     this.layers.clear();
     this.layerOrder = [];
@@ -1737,5 +2227,87 @@ export class LayerStack {
 
   dispose(): void {
     this.clear();
+  }
+
+  private insertLayerByInitializationHint(layer: Layer): void {
+    const candidateRank = this.constraintRank(layer);
+    const insertionIndex = this.layerOrder.findIndex(id => {
+      const existing = this.layers.get(id)!;
+      const existingRank = this.constraintRank(existing);
+      if (existingRank.pin !== candidateRank.pin) return existingRank.pin > candidateRank.pin;
+      if (existingRank.role !== candidateRank.role) return existingRank.role > candidateRank.role;
+      if (existingRank.priority !== candidateRank.priority) {
+        return existingRank.priority > candidateRank.priority;
+      }
+      return existing.order > layer.order;
+    });
+    if (insertionIndex === -1) {
+      this.layerOrder.push(layer.id);
+    } else {
+      this.layerOrder.splice(insertionIndex, 0, layer.id);
+    }
+  }
+
+  private validateConstraints(candidate: readonly string[]): LayerOrderResult | null {
+    let previousPinRank = -1;
+    let previousRoleRank = -1;
+    let previousPriorityRank = -Infinity;
+
+    for (let index = 0; index < candidate.length; index++) {
+      const id = candidate[index];
+      const layer = this.layers.get(id)!;
+      const rank = this.constraintRank(layer);
+      if (
+        rank.pin < previousPinRank ||
+        (rank.pin === previousPinRank && rank.role < previousRoleRank) ||
+        (
+          rank.pin === previousPinRank &&
+          rank.role === previousRoleRank &&
+          rank.priority < previousPriorityRank
+        )
+      ) {
+        return this.failure(
+          'constraint-violation',
+          `Layer "${id}" cannot cross its ${layer.getOrderConstraints().role} ordering boundary.`
+        );
+      }
+      previousPinRank = rank.pin;
+      previousRoleRank = rank.role;
+      previousPriorityRank = rank.priority;
+
+      const constraints = layer.getOrderConstraints();
+      const currentIndex = this.layerOrder.indexOf(id);
+      if (!constraints.reorderable && currentIndex !== index) {
+        return this.failure(
+          'constraint-violation',
+          `Layer "${id}" is fixed at index ${currentIndex}.`
+        );
+      }
+    }
+    return null;
+  }
+
+  private constraintRank(layer: Layer): { pin: number; role: number; priority: number } {
+    const constraints = layer.getOrderConstraints();
+    const pin = constraints.pinned === 'bottom' ? 0 : constraints.pinned === 'top' ? 2 : 1;
+    const role = {
+      anatomy: 0,
+      data: 1,
+      outline: 2,
+      connectivity: 3
+    }[constraints.role];
+    return { pin, role, priority: layer._getOrderConstraintPriority() };
+  }
+
+  private success(changed: boolean): LayerOrderResult {
+    return Object.freeze({
+      ok: true,
+      changed,
+      order: Object.freeze([...this.layerOrder])
+    });
+  }
+
+  private failure(code: LayerOrderFailureCode, message: string): LayerOrderResult {
+    return Object.freeze({ ok: false, code, message });
   }
 }

@@ -7,17 +7,23 @@ import { SSAOPass } from 'three/examples/jsm/postprocessing/SSAOPass.js';
 import { NeuroSurface, ColorMappedNeuroSurface, VertexColoredNeuroSurface, SurfaceGeometry } from './classes';
 import { MultiLayerNeuroSurface, ClearLayersOptions } from './MultiLayerNeuroSurface';
 import { VariantSurface } from './VariantSurface';
-import { RGBALayer, DataLayer } from './layers';
+import { RGBALayer, DataLayer, Layer } from './layers';
 import { OutlineLayer } from './OutlineLayer';
 import { debugLog } from './debug';
 import ColorMap from './ColorMap';
 import { EventEmitter } from './EventEmitter';
+import type { EventArgsFor, UnsubscribeFn } from './EventEmitter';
 import { BoundingBoxHelper } from './utils/BoundingBox';
 import { detectCapabilities, ViewerCapabilities } from './utils/capabilities';
 import { AnnotationManager, AnnotationRecord } from './annotations';
 import { GPUPicker, GPUPickResult } from './utils/GPUPicker';
 import { VolumeProjectedSurface } from './surfaces/VolumeProjectedSurface';
-import type { RibbonReducer, VolumeProjectionMode } from './layers';
+import type {
+  LayerOrderDescriptor,
+  LayerOrderResult,
+  RibbonReducer,
+  VolumeProjectionMode
+} from './layers';
 import { CrosshairManager, CrosshairOptions } from './CrosshairManager';
 import { PluginHost } from './PluginHost';
 import type { ViewerPlugin, RegisterPluginOptions, PluginRegistration } from './PluginHost';
@@ -31,7 +37,7 @@ import {
 } from './serialization/SceneExporter';
 import { resolveFigureExportOptions, resolveStylePreset } from './StylePresets';
 import { encode, decode } from './serialization/ViewerState';
-import type { ViewerStateV1, RestorationReport } from './serialization/ViewerState';
+import type { ViewerState, ViewerStateV2, RestorationReport } from './serialization/ViewerState';
 import type { SceneExportManifest, SceneExportOptions, StaticHTMLExportOptions } from './serialization/SceneExporter';
 import type {
   FigureExportLabel,
@@ -40,12 +46,45 @@ import type {
   SurfViewStylePreset,
   SurfViewStylePresetName
 } from './StylePresets';
+import {
+  ANATOMICAL_VIEWS,
+  freezeBilateralSurfaceGroup,
+  getAnatomicalViewAxes,
+  normalizeAnatomicalHemisphere
+} from './AnatomicalView';
+import type {
+  AnatomicalView,
+  AnatomicalViewChangedEvent,
+  AnatomicalViewCapabilities,
+  AnatomicalViewOptions,
+  AnatomicalViewResetResult,
+  AnatomicalViewResult,
+  BilateralSurfaceGroup,
+  BilateralSurfaceGroupRemovalReason,
+  BilateralSurfaceGroupResult
+} from './AnatomicalView';
+import {
+  freezeInspectionSelection,
+  inspectionSelectionsEqual,
+  NO_INSPECTION_SELECTION
+} from './Inspection';
+import type {
+  InspectionSelection,
+  InspectionSelectionOptions,
+  InspectionSelectionResult,
+  VertexInspection,
+  VertexInspectionAtlas,
+  VertexInspectionLayerValue,
+  VertexInspectionParcel
+} from './Inspection';
 import type {
   ParcelInteractionEvent,
   ParcelSelectionEvent,
   SurfacePickEvent,
   VertexHoverEvent,
-  ViewerEventMap
+  ViewerEventMap,
+  ViewerEventType,
+  ControlDomain
 } from './events/ViewerEvents';
 
 export interface NeuroSurfaceViewerConfig {
@@ -60,7 +99,7 @@ export interface NeuroSurfaceViewerConfig {
   metalness?: number;
   roughness?: number;
   useShaders?: boolean;
-  /** @deprecated Tweakpane controls are no longer part of the viewer runtime. */
+  /** @deprecated Pane UI is no longer part of the viewer runtime. */
   showControls?: boolean;
   /** @deprecated Use the report mount controls or a ViewerPlugin. */
   useControls?: boolean;
@@ -85,6 +124,12 @@ export interface ParcelFocusOptions {
   screenY?: number;
 }
 
+/** Immutable, control-neutral background state used by figure tooling. */
+export interface ViewerFigureBackground {
+  readonly color: number;
+  readonly transparent: boolean;
+}
+
 type Viewpoint = 'lateral' | 'medial' | 'ventral' | 'posterior' | 'anterior' | 'unknown_lateral';
 
 interface ViewpointConfig {
@@ -100,28 +145,56 @@ interface ViewpointState {
   target: THREE.Vector3;
 }
 
-interface DataRange {
-  min: number;
-  max: number;
-}
-
-interface RangeValue {
-  range: DataRange;
-}
-
 function colorToCSS(color: number): string {
   return `#${color.toString(16).padStart(6, '0')}`;
 }
 
-let legacyControlsWarningEmitted = false;
+const legacyPaneWarnings = new Set<string>();
+const CONTROL_DOMAIN_ORDER: readonly ControlDomain[] = [
+  'camera',
+  'surfaces',
+  'layers',
+  'selection',
+  'appearance',
+  'timeline'
+];
+
+function warnLegacyPaneMember(member: string, replacement: string): void {
+  if (legacyPaneWarnings.has(member)) return;
+  legacyPaneWarnings.add(member);
+  console.warn(
+    `surfview: ${member} is a deprecated pane-era compatibility API and does not create or control viewer UI. ` +
+    `${replacement} It will be removed in SurfView 3.`
+  );
+}
 
 function warnLegacyControlsDeprecated(): void {
-  if (legacyControlsWarningEmitted) return;
-  legacyControlsWarningEmitted = true;
-  console.warn(
-    'surfview: Tweakpane controls are deprecated and disabled. ' +
-    'Use the report mount controls or a ViewerPlugin instead.'
+  warnLegacyPaneMember(
+    'showControls/useControls/allowCDNFallback',
+    'Use report controls, a ViewerPlugin, or the optional first-party controls package instead.'
   );
+}
+
+function warnLegacyInteractionMember(member: string): void {
+  if (legacyPaneWarnings.has(member)) return;
+  legacyPaneWarnings.add(member);
+  console.warn(
+    `surfview: ${member} is deprecated because it ambiguously refers to UI controls. ` +
+    'Use setInteractionEnabled() for camera and surface interaction. It will be removed in SurfView 3.'
+  );
+}
+
+function normalizeLegacyViewerConfig(
+  config: Partial<NeuroSurfaceViewerConfig>
+): Partial<NeuroSurfaceViewerConfig> {
+  const normalized = { ...config };
+  if (normalized.showControls || normalized.useControls || normalized.allowCDNFallback) {
+    warnLegacyControlsDeprecated();
+  }
+  if (normalized.showControls !== undefined) normalized.showControls = false;
+  if (normalized.useControls !== undefined) normalized.useControls = false;
+  if (normalized.allowCDNFallback !== undefined) normalized.allowCDNFallback = false;
+  return normalized;
 }
 
 export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
@@ -134,7 +207,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   environmentMap!: THREE.Texture | null;
   camera!: THREE.PerspectiveCamera;
   renderer!: THREE.WebGLRenderer;
-  controls!: TrackballControls | SurfaceControls;
+  cameraControls!: TrackballControls | SurfaceControls;
   composer!: EffectComposer;
   ssaoPass: SSAOPass | null = null;
   surfaces!: Map<string, NeuroSurface>;
@@ -143,29 +216,12 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   mouse!: THREE.Vector2;
   intersectionPoint!: THREE.Vector3;
   animationId!: number | null;
-  paneContainer!: HTMLElement | null;
   needsRender!: boolean;
-  dataRange!: DataRange;
-  intensityRange!: RangeValue;
-  thresholdRange!: RangeValue;
   ambientLight!: THREE.AmbientLight;
   directionalLight!: THREE.DirectionalLight;
-  pane: any | null;
-  paneLoading!: boolean;
-  controlsEnabled!: boolean;
-  paneContentEl!: HTMLElement | null;
-  paneHandleEl!: HTMLElement | null;
-  paneMinimizeButtonEl: HTMLButtonElement | null = null;
-  paneDragState!: { dragging: boolean; offsetX: number; offsetY: number; pointerId: number | null; minimized: boolean };
-  resetCameraButton: any;
-  fpsGraph: any;
   viewpoints!: Record<string, ViewpointConfig>;
   viewpointState!: ViewpointState | null;
   currentViewpointKey!: string;
-  colormapBindingState!: { colormap: string } | null;
-  viewBindingState!: { viewpoint: Viewpoint } | null;
-  variantBindingState!: { variant: string } | null;
-  layerOpacityBindingState: { opacity: number } = { opacity: 1 };
   annotations!: AnnotationManager;
   plugins!: PluginHost;
   capabilities!: ViewerCapabilities;
@@ -181,9 +237,39 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   crosshair!: CrosshairManager;
   handleSurfaceClick!: (event: MouseEvent) => void;
   private handleMouseMove?: (event: MouseEvent) => void;
-  private handlePanePointerMove?: (event: PointerEvent) => void;
-  private handlePanePointerUp?: (event: PointerEvent) => void;
+  private cameraInteractionEnabled = true;
   private disposed = false;
+  private stateRevision = 0;
+  private stateChangeBatchDepth = 0;
+  private pendingStateDomains = new Set<ControlDomain>();
+  private surfaceSubscriptions = new Map<string, UnsubscribeFn[]>();
+  private bilateralSurfaceGroups = new Map<string, BilateralSurfaceGroup>();
+  private surfaceGroupMembership = new Map<string, string>();
+  private inspectionSelection: InspectionSelection = NO_INSPECTION_SELECTION;
+  private currentAnatomicalView: AnatomicalViewChangedEvent | null = null;
+
+  /** @deprecated Use cameraControls. This alias will be removed in SurfView 3. */
+  get controls(): TrackballControls | SurfaceControls {
+    return this.cameraControls;
+  }
+
+  /** @deprecated Use cameraControls. This alias will be removed in SurfView 3. */
+  set controls(value: TrackballControls | SurfaceControls) {
+    this.cameraControls = value;
+    if ('enabled' in value) {
+      value.enabled = this.cameraInteractionEnabled;
+    }
+  }
+
+  /** @deprecated Use isInteractionEnabled() and setInteractionEnabled(). */
+  get controlsEnabled(): boolean {
+    return this.cameraInteractionEnabled;
+  }
+
+  /** @deprecated Use setInteractionEnabled(). */
+  set controlsEnabled(enabled: boolean) {
+    this.setInteractionEnabled(enabled);
+  }
 
   constructor(
     container: HTMLElement, 
@@ -196,13 +282,6 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     this.initializationFailed = false;
     this.container = container;
     this.plugins = new PluginHost(this);
-    // Ensure absolute children (pane, etc.) position relative to the viewer container.
-    if (typeof window !== 'undefined') {
-      const computed = window.getComputedStyle(container);
-      if (computed.position === 'static') {
-        container.style.position = 'relative';
-      }
-    }
     if (!this.hasDOM()) {
       this.renderFallback('NeuroSurfaceViewer requires a browser DOM environment.');
       this.initializationFailed = true;
@@ -239,24 +318,21 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
       hoverCrosshairSize: 1.2,
       clickToAddAnnotation: false,
       useGPUPicking: false,
-      ...config
+      ...normalizeLegacyViewerConfig(config)
     };
-    if (config.showControls || config.useControls || config.allowCDNFallback) {
-      warnLegacyControlsDeprecated();
-      this.config.showControls = false;
-      this.config.useControls = false;
-      this.config.allowCDNFallback = false;
-    }
     this.stylePreset = resolveStylePreset(this.config.preset);
     this.viewpoint = viewpoint;
 
     // Initialize core state before any setup functions that rely on it
     this.surfaces = new Map(); // Store multiple surfaces
+    this.bilateralSurfaceGroups = new Map();
+    this.surfaceGroupMembership = new Map();
     this.rimStrengthUniforms = [];
     this.options = new Map();
     this.sceneBoundsRadius = 0;
     this.selectedLayerId = null;
     this.selectedSurfaceId = null;
+    this.inspectionSelection = NO_INSPECTION_SELECTION;
 
     this.raycaster = new THREE.Raycaster();
     this.mouse = new THREE.Vector2();
@@ -294,23 +370,10 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     this.handleSurfaceClick = this.onSurfaceClickHandler.bind(this);
 
     this.animationId = null; // Store animation frame id for cleanup
-    this.paneContainer = null; // Reference to tweakpane container
     this.needsRender = true; // Flag for on-demand rendering
-    this.pane = null;
-    this.paneLoading = false;
-    this.controlsEnabled = true;
-    this.paneContentEl = null;
-    this.paneHandleEl = null;
-    this.paneDragState = { dragging: false, offsetX: 0, offsetY: 0, pointerId: null, minimized: false };
+    this.cameraInteractionEnabled = true;
     this.viewpointState = null;
     this.currentViewpointKey = '';
-    this.colormapBindingState = null;
-    this.viewBindingState = { viewpoint: viewpoint as Viewpoint };
-    this.variantBindingState = null;
-
-    this.dataRange = { min: 0, max: 500 }; // Initialize to default values
-    this.intensityRange = { range: { min: 0, max: 500 } };
-    this.thresholdRange = { range: { min: 0, max: 0 } }; // Set default threshold to [0, 0]
 
     // Bind methods to preserve context
     this.animate = this.animate.bind(this);
@@ -321,16 +384,23 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     this.viewpoints = {
       left_lateral:   { direction: new THREE.Vector3(-1, 0, 0), up: new THREE.Vector3(0, 0, 1) },
       left_medial:    { direction: new THREE.Vector3(1, 0, 0),  up: new THREE.Vector3(0, 0, 1) },
+      left_dorsal:    { direction: new THREE.Vector3(0, 0, 1),  up: new THREE.Vector3(0, 1, 0) },
       left_ventral:   { direction: new THREE.Vector3(0, 0, -1), up: new THREE.Vector3(0, 1, 0) }, // use anterior as up when viewing from below
       left_posterior: { direction: new THREE.Vector3(0, -1, 0), up: new THREE.Vector3(0, 0, 1) },
       left_anterior:  { direction: new THREE.Vector3(0, 1, 0),  up: new THREE.Vector3(0, 0, 1) },
       right_lateral:  { direction: new THREE.Vector3(1, 0, 0),  up: new THREE.Vector3(0, 0, 1) },
       right_medial:   { direction: new THREE.Vector3(-1, 0, 0), up: new THREE.Vector3(0, 0, 1) },
+      right_dorsal:   { direction: new THREE.Vector3(0, 0, 1),  up: new THREE.Vector3(0, 1, 0) },
       right_ventral:  { direction: new THREE.Vector3(0, 0, -1), up: new THREE.Vector3(0, 1, 0) },
       right_posterior:{ direction: new THREE.Vector3(0, -1, 0), up: new THREE.Vector3(0, 0, 1) },
       right_anterior: { direction: new THREE.Vector3(0, 1, 0),  up: new THREE.Vector3(0, 0, 1) },
       unknown_lateral:{ direction: new THREE.Vector3(1, 0, 0),  up: new THREE.Vector3(0, 0, 1) }
     };
+
+    // Construction establishes revision zero; only post-construction mutations
+    // are observable by callers.
+    this.stateRevision = 0;
+    this.pendingStateDomains.clear();
 
     // Start the animation loop
     this.animate();
@@ -352,6 +422,127 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     return this.plugins.list();
   }
 
+  /** Current monotonic revision of observable control-relevant state. */
+  getStateRevision(): number {
+    return this.stateRevision ?? 0;
+  }
+
+  /** Whether this viewer has completed its idempotent disposal lifecycle. */
+  isDisposed(): boolean {
+    return this.disposed;
+  }
+
+  emit<K extends string>(event: K, ...args: EventArgsFor<ViewerEventMap, K>): void {
+    if (this.disposed) return;
+    const domains = this.domainsForEvent(event as ViewerEventType, args[0]);
+    try {
+      super.emit(event, ...args);
+    } finally {
+      if (event !== 'state:changed' && domains.length > 0) {
+        this.invalidateState(domains);
+      }
+    }
+  }
+
+  private domainsForEvent(event: ViewerEventType, payload: unknown): readonly ControlDomain[] {
+    switch (event) {
+      case 'camera:changed':
+      case 'viewpoint:changed':
+      case 'controls:changed':
+        return ['camera'];
+      case 'surface:added':
+      case 'surface:removed':
+      case 'surface:variant':
+      case 'surface-group:registered':
+      case 'surface-group:removed':
+        return ['surfaces'];
+      case 'anatomical-view:changed':
+        return (payload as { layout?: string } | undefined)?.layout === 'paired'
+          ? ['camera', 'surfaces']
+          : ['camera'];
+      case 'anatomical-view:reset':
+        return ['camera'];
+      case 'surface:colormap':
+        return ['appearance'];
+      case 'surface:selected':
+      case 'parcel:selected':
+      case 'selection:changed':
+        return ['selection'];
+      case 'layer:added':
+      case 'layer:removed':
+      case 'layer:reordered':
+      case 'layer:colormap':
+      case 'layer:intensity':
+      case 'layer:threshold':
+      case 'layer:opacity':
+        return ['layers'];
+      case 'layer:updated': {
+        const changes = (payload as { changes?: Record<string, unknown> } | undefined)?.changes;
+        return changes && 'timeline' in changes ? ['layers', 'timeline'] : ['layers'];
+      }
+      case 'annotation:added':
+      case 'annotation:moved':
+      case 'annotation:removed':
+      case 'annotation:activated':
+      case 'annotation:reset':
+        return ['selection', 'appearance'];
+      case 'resize':
+        return ['camera', 'appearance'];
+      case 'context:restored':
+        return ['appearance'];
+      case 'state:restored':
+        return (payload as RestorationReport | undefined)?.success
+          ? CONTROL_DOMAIN_ORDER
+          : [];
+      default:
+        return [];
+    }
+  }
+
+  private invalidateState(domains: readonly ControlDomain[]): void {
+    if (this.disposed) return;
+    this.pendingStateDomains ??= new Set<ControlDomain>();
+    for (const domain of domains) {
+      this.pendingStateDomains.add(domain);
+    }
+    if ((this.stateChangeBatchDepth ?? 0) > 0) return;
+    this.flushStateChange();
+  }
+
+  private beginStateChangeBatch(): void {
+    this.stateChangeBatchDepth = (this.stateChangeBatchDepth ?? 0) + 1;
+  }
+
+  private endStateChangeBatch(): void {
+    if ((this.stateChangeBatchDepth ?? 0) === 0) return;
+    this.stateChangeBatchDepth -= 1;
+    if (this.stateChangeBatchDepth === 0) {
+      this.flushStateChange();
+    }
+  }
+
+  private withStateChangeBatch<T>(operation: () => T): T {
+    this.beginStateChangeBatch();
+    try {
+      return operation();
+    } finally {
+      this.endStateChangeBatch();
+    }
+  }
+
+  private flushStateChange(): void {
+    if (this.disposed || !this.pendingStateDomains || this.pendingStateDomains.size === 0) return;
+    const domains = Object.freeze(
+      CONTROL_DOMAIN_ORDER.filter(domain => this.pendingStateDomains.has(domain))
+    );
+    this.pendingStateDomains.clear();
+    this.stateRevision = (this.stateRevision ?? 0) + 1;
+    super.emit('state:changed', {
+      revision: this.stateRevision,
+      domains
+    });
+  }
+
   setupRenderer(): void {
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setSize(this.width, this.height);
@@ -365,6 +556,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     this.renderer.shadowMap.enabled = false;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.container.appendChild(this.renderer.domElement);
+    this.invalidateState(['appearance']);
   }
 
   /**
@@ -397,6 +589,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     this.camera.lookAt(new THREE.Vector3(0, 0, 0));
     this.camera.up.set(0, 1, 0);
     this.camera.updateProjectionMatrix();
+    this.invalidateState(['camera']);
   }
 
   setupLighting(): void {
@@ -417,48 +610,51 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     const fillLight = new THREE.DirectionalLight(0xffffff, 0.8);
     fillLight.position.set(-1, -0.5, -1);
     this.scene.add(fillLight);
+    this.invalidateState(['appearance']);
   }
 
   setupControls(): void {
     if (this.config.controlType === 'surface') {
       // Use new natural surface controls
-      this.controls = new SurfaceControls(this.camera, this.renderer.domElement);
-      this.controls.rotateSpeed = this.config.rotationSpeed;
-      this.controls.enableDamping = false;
-      this.controls.dampingFactor = 0.05;
-      this.controls.zoomSpeed = 0.8;
-      this.controls.panSpeed = 0.8;
-      (this.controls as any).minDistance = 0.05;
-      (this.controls as any).maxDistance = Infinity;
+      this.cameraControls = new SurfaceControls(this.camera, this.renderer.domElement);
+      this.cameraControls.rotateSpeed = this.config.rotationSpeed;
+      this.cameraControls.enableDamping = false;
+      this.cameraControls.dampingFactor = 0.05;
+      this.cameraControls.zoomSpeed = 0.8;
+      this.cameraControls.panSpeed = 0.8;
+      (this.cameraControls as any).minDistance = 0.05;
+      (this.cameraControls as any).maxDistance = Infinity;
       
       // Set initial target and position
-      this.controls.target.set(0, 0, 0);
+      this.cameraControls.target.set(0, 0, 0);
       this.camera.position.z = this.config.initialZoom;
     } else {
       // Use traditional trackball controls
-      this.controls = new TrackballControls(this.camera, this.renderer.domElement);
-      this.controls.rotateSpeed = this.config.rotationSpeed;
-      this.controls.zoomSpeed = 0.8;
-      this.controls.panSpeed = 0.8;
-      this.controls.keys = ['KeyA', 'KeyS', 'KeyD'];
-      (this.controls as any).minDistance = 0.05;
-      (this.controls as any).maxDistance = Infinity;
+      this.cameraControls = new TrackballControls(this.camera, this.renderer.domElement);
+      this.cameraControls.rotateSpeed = this.config.rotationSpeed;
+      this.cameraControls.zoomSpeed = 0.8;
+      this.cameraControls.panSpeed = 0.8;
+      this.cameraControls.keys = ['KeyA', 'KeyS', 'KeyD'];
+      (this.cameraControls as any).minDistance = 0.05;
+      (this.cameraControls as any).maxDistance = Infinity;
       
       // Set initial position with larger zoom value
-      this.controls.target.set(0, 0, 0);
+      this.cameraControls.target.set(0, 0, 0);
       this.camera.position.z = this.config.initialZoom;
-      this.controls.update();
+      this.cameraControls.update();
     }
 
     // Add event listener for controls change
-    if (this.controls.addEventListener) {
-      (this.controls as any).addEventListener('change', this.onControlsChange);
+    if (this.cameraControls.addEventListener) {
+      (this.cameraControls as any).addEventListener('change', this.onControlsChange);
     }
+    this.invalidateState(['camera']);
   }
 
   onControlsChange = (): void => {
-    const target = this.controls && 'target' in this.controls
-      ? ((this.controls as any).target as THREE.Vector3).clone()
+    this.currentAnatomicalView = null;
+    const target = this.cameraControls && 'target' in this.cameraControls
+      ? ((this.cameraControls as any).target as THREE.Vector3).clone()
       : null;
     this.emit('camera:changed', {
       camera: this.camera,
@@ -466,191 +662,6 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
       target
     });
     this.requestRender();
-  }
-
-  private computeRangeStep(): number {
-    const span = this.dataRange.max - this.dataRange.min;
-    const candidate = Math.abs(span) / 1000;
-    if (!isFinite(candidate) || candidate === 0) {
-      return 0.1;
-    }
-    return Math.max(0.001, candidate);
-  }
-
-  private getLayerOptions(): { options: Record<string, string>; selectedLayerId: string; surfaceId: string } | null {
-    const multiEntry = this.getActiveMultiLayerEntry();
-    if (!multiEntry) return null;
-    const layers = multiEntry.surface.layerStack.getAllLayers();
-    if (!layers.length) return null;
-    const options: Record<string, string> = {};
-    layers.forEach(layer => options[layer.id] = layer.id);
-    const current = (this.selectedLayerId && layers.find(l => l.id === this.selectedLayerId))
-      ? this.selectedLayerId
-      : layers[0].id;
-    return {
-      options,
-      selectedLayerId: current,
-      surfaceId: multiEntry.id
-    };
-  }
-
-  private getActiveMultiLayerEntry(): { id: string; surface: MultiLayerNeuroSurface } | null {
-    let fallback: { id: string; surface: MultiLayerNeuroSurface } | null = null;
-    this.surfaces.forEach((surface, id) => {
-      if (surface instanceof MultiLayerNeuroSurface) {
-        if (!fallback) fallback = { id, surface };
-      }
-    });
-    if (!fallback) return null;
-    if (this.selectedSurfaceId && this.surfaces.has(this.selectedSurfaceId)) {
-      const candidate = this.surfaces.get(this.selectedSurfaceId);
-      if (candidate instanceof MultiLayerNeuroSurface) {
-        return { id: this.selectedSurfaceId, surface: candidate };
-      }
-    }
-    return fallback;
-  }
-
-  private getActiveVariantEntry(): { id: string; surface: VariantSurface } | null {
-    let fallback: { id: string; surface: VariantSurface } | null = null;
-    this.surfaces.forEach((surface, id) => {
-      if (surface instanceof VariantSurface) {
-        if (!fallback) fallback = { id, surface };
-      }
-    });
-    if (!fallback) return null;
-    if (this.selectedSurfaceId && this.surfaces.has(this.selectedSurfaceId)) {
-      const candidate = this.surfaces.get(this.selectedSurfaceId);
-      if (candidate instanceof VariantSurface) {
-        return { id: this.selectedSurfaceId, surface: candidate };
-      }
-    }
-    return fallback;
-  }
-
-  private getActiveLayer(): { surface: MultiLayerNeuroSurface; layer: any; surfaceId: string } | null {
-    const entry = this.getActiveMultiLayerEntry();
-    if (!entry) return null;
-    const layerId = this.selectedLayerId;
-    const layers = entry.surface.layerStack.getAllLayers();
-    const layer = layers.find(l => l.id === layerId) || layers[0];
-    if (!layer) return null;
-    return { surface: entry.surface, layer, surfaceId: entry.id };
-  }
-
-  private syncLayerBindingsFromSelection(): void {
-    const active = this.getActiveLayer();
-    if (!active) return;
-    // Only sync if DataLayer-like
-    if ('getRange' in active.layer && 'getThreshold' in active.layer) {
-      const range = (active.layer as any).getRange();
-      const threshold = (active.layer as any).getThreshold();
-      this.intensityRange.range.min = range[0];
-      this.intensityRange.range.max = range[1];
-      this.thresholdRange.range.min = threshold[0];
-      this.thresholdRange.range.max = threshold[1];
-    }
-    if ('getColorMapName' in active.layer) {
-      const name = (active.layer as any).getColorMapName();
-      if (this.colormapBindingState) {
-        this.colormapBindingState.colormap = name;
-      } else {
-        this.colormapBindingState = { colormap: name };
-      }
-    }
-    if ((active.layer as any).opacity !== undefined) {
-      this.layerOpacityBindingState.opacity = (active.layer as any).opacity;
-    }
-    if (this.pane) {
-      (this.pane as any).refresh();
-    }
-  }
-
-  // Resolve the name of the colormap currently in use, preferring the active
-  // multi-layer entry and falling back to the first single ColorMappedNeuroSurface.
-  // Returns null when no colormapped content is present.
-  private getActiveColorMapName(): string | null {
-    const active = this.getActiveLayer();
-    if (active && typeof (active.layer as any).getColorMapName === 'function') {
-      return (active.layer as any).getColorMapName();
-    }
-    for (const surface of this.surfaces.values()) {
-      if (surface instanceof ColorMappedNeuroSurface
-          && typeof (surface as any).getColorMapName === 'function') {
-        return (surface as any).getColorMapName();
-      }
-    }
-    return null;
-  }
-
-  private applyColormapChange(colormapName: string): void {
-    // 'custom' is a display-only sentinel for an externally-supplied palette;
-    // there is no preset to apply, so selecting it is a no-op.
-    if (colormapName === 'custom') {
-      return;
-    }
-    const active = this.getActiveLayer();
-    if (active && 'setColorMap' in active.layer) {
-      (active.layer as any).setColorMap(colormapName);
-      active.surface.requestColorUpdate?.();
-      this.emit('layer:colormap', { surfaceId: active.surfaceId, layerId: active.layer.id, colormap: colormapName });
-      this.requestRender();
-      return;
-    }
-    // Fallback to global single-surface behavior
-    this.surfaces.forEach((surface, surfaceId) => {
-      if (surface instanceof ColorMappedNeuroSurface) {
-        surface.setColorMap(colormapName);
-        this.emit('surface:colormap', { surfaceId, colormap: colormapName });
-      }
-    });
-    this.requestRender();
-  }
-
-  private applyIntensityRangeChange(): void {
-    const range: [number, number] = [this.intensityRange.range.min, this.intensityRange.range.max];
-    const active = this.getActiveLayer();
-    if (active && 'setRange' in active.layer) {
-      (active.layer as any).setRange(range);
-      active.surface.requestColorUpdate?.();
-      this.emit('layer:intensity', { surfaceId: active.surfaceId, layerId: active.layer.id, range });
-      this.requestRender();
-      return;
-    }
-    this.surfaces.forEach(surface => {
-      if (surface instanceof ColorMappedNeuroSurface && surface.colorMap) {
-        surface.colorMap.setRange(range);
-      }
-    });
-    this.requestRender();
-  }
-
-  private applyThresholdChange(): void {
-    const threshold: [number, number] = [this.thresholdRange.range.min, this.thresholdRange.range.max];
-    const active = this.getActiveLayer();
-    if (active && 'setThreshold' in active.layer) {
-      (active.layer as any).setThreshold(threshold);
-      active.surface.requestColorUpdate?.();
-      this.emit('layer:threshold', { surfaceId: active.surfaceId, layerId: active.layer.id, threshold });
-      this.requestRender();
-      return;
-    }
-    this.surfaces.forEach(surface => {
-      if (surface instanceof ColorMappedNeuroSurface && surface.colorMap) {
-        surface.colorMap.setThreshold(threshold);
-      }
-    });
-    this.requestRender();
-  }
-
-  private applyOpacityChange(opacity: number): void {
-    const active = this.getActiveLayer();
-    if (active && 'setOpacity' in active.layer) {
-      (active.layer as any).setOpacity(opacity);
-      active.surface.requestColorUpdate?.();
-      this.emit('layer:opacity', { surfaceId: active.surfaceId, layerId: active.layer.id, opacity });
-      this.requestRender();
-    }
   }
 
   setupPostProcessing(): void {
@@ -665,594 +676,340 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     } else {
       this.ssaoPass = null;
     }
-  }
-
-  async setupTweakPane(): Promise<void> {
-    warnLegacyControlsDeprecated();
-    this.config.showControls = false;
-    this.config.useControls = false;
-    return;
-
-    if (!this.config.useControls) return;
-    if (this.pane || this.paneLoading) return;
-    this.paneLoading = true;
-    try {
-      const { Pane, essentials } = await this.loadTweakpane();
-      await this.buildTweakPane(Pane, essentials, null);
-
-      // If controls were toggled off before pane finished loading, hide it.
-      const paneContainer = this.paneContainer;
-      if (!this.config.showControls && paneContainer) {
-        paneContainer!.style.display = 'none';
-      }
-    } catch (err) {
-      console.error('setupTweakPane failed', err);
-      debugLog('setupTweakPane failed', err);
-    } finally {
-      this.paneLoading = false;
-    }
-  }
-
-  /** @deprecated Tweakpane is no longer shipped or loaded by surfview. */
-  private async loadTweakpane(): Promise<{ Pane: any; essentials: any | null }> {
-    throw new Error('Tweakpane controls are deprecated and disabled.');
-  }
-
-  private async buildTweakPane(Pane: any, EssentialsPlugin: any | null, IntervalPlugin: any | null): Promise<void> {
-    // Create a container for the pane
-    this.paneContainer = document.createElement('div');
-    this.paneContainer.style.position = 'absolute';
-    this.paneContainer.style.top = '10px';
-    this.paneContainer.style.right = '10px';
-    this.paneContainer.style.zIndex = '1000';
-    this.paneContainer.style.maxHeight = '90%';
-    this.paneContainer.style.minWidth = '260px';
-    this.paneContainer.style.pointerEvents = 'auto';
-    this.paneContainer.style.boxShadow = '0 4px 12px rgba(0,0,0,0.25)';
-    this.paneContainer.style.borderRadius = '6px';
-    this.paneContainer.style.background = 'rgba(255,255,255,0.92)';
-    this.paneContainer.style.backdropFilter = 'blur(4px)';
-    this.paneContainer.style.overflow = 'hidden';
-
-    // Drag handle
-    this.paneHandleEl = document.createElement('div');
-    this.paneHandleEl.style.height = '14px';
-    this.paneHandleEl.style.cursor = 'grab';
-    this.paneHandleEl.style.display = 'flex';
-    this.paneHandleEl.style.alignItems = 'center';
-    this.paneHandleEl.style.justifyContent = 'space-between';
-    this.paneHandleEl.style.padding = '0 6px';
-    this.paneHandleEl.style.background = 'linear-gradient(90deg, rgba(0,0,0,0.08), rgba(0,0,0,0.02))';
-    this.paneHandleEl.style.borderBottom = '1px solid rgba(0,0,0,0.08)';
-    this.paneHandleEl.style.userSelect = 'none';
-    const dragLabel = document.createElement('span');
-    dragLabel.textContent = '☰ drag';
-    dragLabel.style.fontSize = '10px';
-    dragLabel.style.opacity = '0.7';
-
-    const minimizeBtn = document.createElement('button');
-    minimizeBtn.textContent = '–';
-    minimizeBtn.title = 'Minimize / restore controls';
-    minimizeBtn.style.border = 'none';
-    minimizeBtn.style.background = 'transparent';
-    minimizeBtn.style.cursor = 'pointer';
-    minimizeBtn.style.fontSize = '12px';
-    minimizeBtn.style.lineHeight = '12px';
-    minimizeBtn.style.padding = '0 4px';
-
-    this.paneHandleEl.appendChild(dragLabel);
-    this.paneHandleEl.appendChild(minimizeBtn);
-    this.paneMinimizeButtonEl = minimizeBtn;
-    this.paneContainer.appendChild(this.paneHandleEl);
-
-    this.paneContentEl = document.createElement('div');
-    this.paneContentEl.style.maxHeight = 'calc(90vh - 40px)';
-    this.paneContentEl.style.overflow = 'auto';
-    this.paneContainer.appendChild(this.paneContentEl);
-    this.container.appendChild(this.paneContainer);
-
-    // Create the pane
-    this.pane = new Pane({
-      container: this.paneContentEl
-    });
-    const essentials = EssentialsPlugin ? ((EssentialsPlugin as any).default ?? EssentialsPlugin) : null;
-    const interval = IntervalPlugin ? ((IntervalPlugin as any).default ?? IntervalPlugin) : null;
-
-    // Register plugins with error handling
-    const supportsEssentials = !!essentials;
-    if (essentials) {
-      try {
-        this.pane.registerPlugin(essentials);
-      } catch (err) {
-        console.warn('Failed to register Tweakpane essentials plugin:', err);
-        debugLog('Failed to register essentials plugin', err);
-      }
-    }
-    if (interval) {
-      try {
-        this.pane.registerPlugin(interval);
-      } catch (err) {
-        console.warn('Failed to register Tweakpane interval plugin (may be incompatible with Tweakpane v4):', err);
-      }
-    }
-
-    // Minimize / restore behavior
-    if (this.paneContentEl) {
-      minimizeBtn.addEventListener('click', () => {
-        this.togglePaneMinimized();
-      });
-    }
-
-    // Enable dragging for the whole pane via handle
-    this.setupPaneDragging();
-
-    const layerFolder = (this.pane as any).addFolder({
-      title: 'Layer',
-      expanded: true
-    });
-
-    const layerOptions = this.getLayerOptions();
-    if (layerOptions) {
-      if (!this.selectedLayerId) {
-        this.selectedLayerId = layerOptions.selectedLayerId;
-        this.selectedSurfaceId = layerOptions.surfaceId;
-      }
-      const layerBindingState = { layer: this.selectedLayerId || layerOptions.selectedLayerId };
-      layerFolder.addBinding(layerBindingState, 'layer', {
-        label: 'active layer',
-        options: layerOptions.options
-      }).on('change', (ev: any) => {
-        this.selectedLayerId = ev.value;
-        this.selectedSurfaceId = layerOptions.surfaceId;
-        this.syncLayerBindingsFromSelection();
-      });
-    }
-
-    const variantEntry = this.getActiveVariantEntry();
-    if (variantEntry) {
-      const variantFolder = (this.pane as any).addFolder({
-        title: 'Surface',
-        expanded: true
-      });
-      const variantOptions = variantEntry.surface.variantNames().reduce((acc: Record<string, string>, name) => {
-        acc[name] = name;
-        return acc;
-      }, {} as Record<string, string>);
-      this.variantBindingState = { variant: variantEntry.surface.currentVariant() };
-      variantFolder.addBinding(
-        this.variantBindingState,
-        'variant',
-        { label: 'variant', options: variantOptions }
-      ).on('change', (ev: any) => {
-        this.selectedSurfaceId = variantEntry.id;
-        this.setSurfaceVariant(variantEntry.id, ev.value, { animate: true });
-      });
-    } else {
-      this.variantBindingState = null;
-    }
-
-    const colorFolder = (this.pane as any).addFolder({
-      title: 'Colormap',
-      expanded: true
-    });
-
-    const availableColormaps = ColorMap.getAvailableMaps();
-    // Seed the dropdown from the colormap that is actually applied so the label
-    // is honest. Named presets show their name; an externally-supplied color
-    // array (e.g. a palette computed in R) reports 'custom' instead of
-    // masquerading as a preset (such as 'jet') that was never applied.
-    const activeColormapName = this.getActiveColorMapName();
-    const defaultColormap = activeColormapName
-      || this.colormapBindingState?.colormap
-      || (availableColormaps.includes('jet') ? 'jet' : (availableColormaps[0] || 'jet'));
-    this.colormapBindingState = { colormap: defaultColormap };
-    const colormapOptions = (availableColormaps.length ? availableColormaps : [defaultColormap])
-      .reduce((acc: Record<string, string>, preset) => {
-        acc[preset] = preset;
-        return acc;
-      }, {});
-    // Ensure the active selection is always a valid option. The 'custom'
-    // sentinel for array-based colormaps is not part of the preset list, so add
-    // it here; otherwise Tweakpane cannot display the current selection.
-    if (!(defaultColormap in colormapOptions)) {
-      colormapOptions[defaultColormap] = defaultColormap;
-    }
-
-    colorFolder.addBinding(
-      this.colormapBindingState,
-      'colormap',
-      { options: colormapOptions, label: 'colormap' }
-    ).on('change', (ev: any) => {
-      this.colormapBindingState!.colormap = ev.value;
-      this.applyColormapChange(ev.value);
-    });
-
-    const rangeStep = this.computeRangeStep();
-
-    // Intensity range controls (using separate sliders instead of interval plugin)
-    colorFolder.addBinding(
-      this.intensityRange.range,
-      'min',
-      {
-        label: 'intensity min',
-        min: this.dataRange.min,
-        max: this.dataRange.max,
-        step: rangeStep
-      }
-    ).on('change', () => {
-      // Ensure min doesn't exceed max
-      if (this.intensityRange.range.min > this.intensityRange.range.max) {
-        this.intensityRange.range.min = this.intensityRange.range.max;
-      }
-      this.applyIntensityRangeChange();
-    });
-
-    colorFolder.addBinding(
-      this.intensityRange.range,
-      'max',
-      {
-        label: 'intensity max',
-        min: this.dataRange.min,
-        max: this.dataRange.max,
-        step: rangeStep
-      }
-    ).on('change', () => {
-      // Ensure max doesn't go below min
-      if (this.intensityRange.range.max < this.intensityRange.range.min) {
-        this.intensityRange.range.max = this.intensityRange.range.min;
-      }
-      this.applyIntensityRangeChange();
-    });
-
-    // Threshold range controls (using separate sliders instead of interval plugin)
-    colorFolder.addBinding(
-      this.thresholdRange.range,
-      'min',
-      {
-        label: 'threshold min',
-        min: this.dataRange.min,
-        max: this.dataRange.max,
-        step: rangeStep
-      }
-    ).on('change', () => {
-      // Ensure min doesn't exceed max
-      if (this.thresholdRange.range.min > this.thresholdRange.range.max) {
-        this.thresholdRange.range.min = this.thresholdRange.range.max;
-      }
-      this.applyThresholdChange();
-    });
-
-    colorFolder.addBinding(
-      this.thresholdRange.range,
-      'max',
-      {
-        label: 'threshold max',
-        min: this.dataRange.min,
-        max: this.dataRange.max,
-        step: rangeStep
-      }
-    ).on('change', () => {
-      // Ensure max doesn't go below min
-      if (this.thresholdRange.range.max < this.thresholdRange.range.min) {
-        this.thresholdRange.range.max = this.thresholdRange.range.min;
-      }
-      this.applyThresholdChange();
-    });
-
-    colorFolder.addBinding(
-      this.layerOpacityBindingState,
-      'opacity',
-      {
-        label: 'layer opacity',
-        min: 0,
-        max: 1,
-        step: 0.01
-      }
-    ).on('change', (ev: any) => {
-      this.applyOpacityChange(ev.value);
-    });
-
-    // Lighting folder
-    const lightingFolder = (this.pane as any).addFolder({
-      title: 'Lighting',
-      expanded: false
-    });
-
-    lightingFolder.addBinding(
-      { ambientColor: `#${this.config.ambientLightColor.toString(16).padStart(6, '0')}` },
-      'ambientColor',
-      { view: 'color' }
-    ).on('change', (ev: any) => {
-      // Convert hex string to number
-      const colorValue = parseInt(ev.value.replace('#', ''), 16);
-      this.updateConfig({ ambientLightColor: colorValue });
-    });
-
-    lightingFolder.addBinding(
-      { directionalColor: `#${this.config.directionalLightColor.toString(16).padStart(6, '0')}` },
-      'directionalColor',
-      { view: 'color' }
-    ).on('change', (ev: any) => {
-      // Convert hex string to number
-      const colorValue = parseInt(ev.value.replace('#', ''), 16);
-      this.updateConfig({ directionalLightColor: colorValue });
-    });
-
-    lightingFolder.addBinding(
-      { intensity: this.config.directionalLightIntensity },
-      'intensity',
-      {
-        min: 0,
-        max: 2,
-        step: 0.1
-      }
-    ).on('change', (ev: any) => {
-      this.updateDirectionalLightIntensity(ev.value);
-      this.config.directionalLightIntensity = ev.value;
-    });
-
-    lightingFolder.addBinding(
-      { background: `#${this.config.backgroundColor.toString(16).padStart(6, '0')}` },
-      'background',
-      { view: 'color' }
-    ).on('change', (ev: any) => {
-      const colorValue = parseInt(ev.value.replace('#', ''), 16);
-      this.updateConfig({ backgroundColor: colorValue });
-    });
-
-    // Post processing folder
-    const postProcessingFolder = (this.pane as any).addFolder({
-      title: 'Post Processing',
-      expanded: false
-    });
-
-    postProcessingFolder.addBinding(
-      { ssaoRadius: this.config.ssaoRadius },
-      'ssaoRadius',
-      {
-        min: 0,
-        max: 32,
-        step: 0.1
-      }
-    ).on('change', (ev: any) => {
-      if (this.ssaoPass) {
-        this.ssaoPass.kernelRadius = ev.value;
-        this.requestRender();
-      }
-    });
-
-    postProcessingFolder.addBinding(
-      { ssaoKernelSize: this.config.ssaoKernelSize },
-      'ssaoKernelSize',
-      {
-        min: 1,
-        max: 128,
-        step: 1
-      }
-    ).on('change', (ev: any) => {
-      if (this.ssaoPass) {
-        const kernelSize = Math.max(1, Math.floor(ev.value));
-        if (typeof (this.ssaoPass as any).generateSampleKernel === 'function') {
-          (this.ssaoPass as any).generateSampleKernel(kernelSize);
-          this.requestRender();
-        }
-      }
-    });
-
-    // Material folder
-    // Performance settings
-    const performanceFolder = (this.pane as any).addFolder({
-      title: 'Performance',
-      expanded: false
-    });
-
-    performanceFolder.addBinding(
-      { gpuCompositing: false },
-      'gpuCompositing',
-      {
-        label: 'GPU Compositing'
-      }
-    ).on('change', (ev: any) => {
-      // Toggle GPU compositing for all MultiLayerNeuroSurface instances
-      this.surfaces.forEach(surface => {
-        if ('setCompositingMode' in surface) {
-          (surface as any).setCompositingMode(ev.value);
-          debugLog(`Surface compositing mode: ${(surface as any).getCompositingMode()}`);
-        }
-      });
-      this.requestRender();
-    });
-
-    performanceFolder.addBinding(
-      { wideLines: true },
-      'wideLines',
-      { label: 'Wide Lines' }
-    ).on('change', (ev: any) => {
-      this.surfaces.forEach(surface => {
-        if (surface instanceof MultiLayerNeuroSurface) {
-          surface.setWideLines(ev.value);
-        }
-      });
-      this.requestRender();
-    });
-
-    const materialFolder = (this.pane as any).addFolder({
-      title: 'Material',
-      expanded: false
-    });
-
-    const viewFolder = (this.pane as any).addFolder({
-      title: 'View',
-      expanded: true
-    });
-
-    if (this.viewBindingState) {
-      this.viewBindingState.viewpoint = this.viewpoint as Viewpoint;
-    } else {
-      this.viewBindingState = { viewpoint: this.viewpoint as Viewpoint };
-    }
-
-    viewFolder.addBinding(
-      this.viewBindingState,
-      'viewpoint',
-      {
-        options: {
-          lateral: 'lateral',
-          medial: 'medial',
-          ventral: 'ventral',
-          posterior: 'posterior',
-          anterior: 'anterior',
-          unknown_lateral: 'unknown_lateral'
-        }
-      }
-    ).on('change', (ev: any) => {
-      this.setViewpoint(ev.value);
-    });
-
-    viewFolder.addButton({
-      title: 'Fit View'
-    }).on('click', () => {
-      this.centerCamera();
-    });
-
-    materialFolder.addBinding(
-      { metalness: this.config.metalness },
-      'metalness',
-      {
-        min: 0,
-        max: 1,
-        step: 0.01
-      }
-    ).on('change', (ev: any) => {
-      this.config.metalness = ev.value;
-      this.updateMaterials();
-    });
-
-    materialFolder.addBinding(
-      { roughness: this.config.roughness },
-      'roughness',
-      {
-        min: 0,
-        max: 1,
-        step: 0.01
-      }
-    ).on('change', (ev: any) => {
-      this.config.roughness = ev.value;
-      this.updateMaterials();
-    });
-
-    materialFolder.addBinding(
-      { rimStrength: this.config.rimStrength },
-      'rimStrength',
-      {
-        min: 0,
-        max: 2,
-        step: 0.01
-      }
-    ).on('change', (ev: any) => {
-      this.config.rimStrength = ev.value;
-      
-      // Update existing uniforms
-      this.rimStrengthUniforms.forEach(uniform => {
-        uniform.value = ev.value;
-      });
-      
-      // Add rim lighting shaders to surfaces if not already added and rimStrength > 0
-      if (this.config.useShaders && ev.value > 0) {
-        Object.values(this.surfaces).forEach(surface => {
-          if (surface.mesh && surface.mesh.material) {
-            // Check if shader already applied
-            const material = surface.mesh.material as any;
-            if (!material.userData?.hasRimShader) {
-              this.addRimLightingShader(surface.mesh);
-              material.userData = { ...material.userData, hasRimShader: true };
-            }
-          }
-        });
-      }
-      
-      this.requestRender();
-    });
-
-    // Add reset camera button
-    this.resetCameraButton = (this.pane as any).addButton({
-      title: 'Reset Camera'
-    });
-    this.resetCameraButton.on('click', () => {
-      this.resetCamera();
-    });
-
-    // Add FPS monitor only if essentials plugin is available (fpsgraph view comes from it)
-    if (supportsEssentials) {
-      try {
-        this.fpsGraph = (this.pane as any).addBlade({
-          view: 'fpsgraph',
-          label: 'FPS',
-          rows: 2
-        }) as any;
-      } catch (err) {
-        console.warn('Failed to add fpsgraph blade; continuing without it', err);
-        this.fpsGraph = null as any;
-      }
-    } else {
-      this.fpsGraph = null as any;
-    }
-  }
-
-  private setupPaneDragging(): void {
-    if (!this.paneContainer || !this.paneHandleEl) return;
-    const handle = this.paneHandleEl;
-    handle.style.touchAction = 'none';
-
-    handle.addEventListener('pointerdown', (ev: PointerEvent) => {
-      this.paneDragState.dragging = true;
-      this.paneDragState.pointerId = ev.pointerId;
-      handle.setPointerCapture(ev.pointerId);
-      const rect = this.paneContainer!.getBoundingClientRect();
-      this.paneDragState.offsetX = ev.clientX - rect.left;
-      this.paneDragState.offsetY = ev.clientY - rect.top;
-      handle.style.cursor = 'grabbing';
-    });
-
-    const onPointerMove = (ev: PointerEvent) => {
-      if (!this.paneDragState.dragging || !this.paneContainer) return;
-      const parentRect = this.container.getBoundingClientRect();
-      const paneRect = this.paneContainer.getBoundingClientRect();
-
-      let newLeft = ev.clientX - this.paneDragState.offsetX - parentRect.left;
-      let newTop = ev.clientY - this.paneDragState.offsetY - parentRect.top;
-
-      // Clamp to viewer bounds
-      newLeft = Math.max(0, Math.min(newLeft, parentRect.width - paneRect.width));
-      newTop = Math.max(0, Math.min(newTop, parentRect.height - paneRect.height));
-
-      this.paneContainer.style.left = `${newLeft}px`;
-      this.paneContainer.style.top = `${newTop}px`;
-      this.paneContainer.style.right = 'auto';
-      this.paneContainer.style.bottom = 'auto';
-    };
-
-    const onPointerUp = (ev: PointerEvent) => {
-      if (this.paneDragState.pointerId !== null && ev.pointerId !== this.paneDragState.pointerId) return;
-      this.paneDragState.dragging = false;
-      this.paneDragState.pointerId = null;
-      handle.releasePointerCapture(ev.pointerId);
-      handle.style.cursor = 'grab';
-    };
-
-    this.handlePanePointerMove = onPointerMove;
-    this.handlePanePointerUp = onPointerUp;
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', onPointerUp);
-    window.addEventListener('pointercancel', onPointerUp);
+    this.invalidateState(['appearance']);
   }
 
   private normalizeHemisphere(hemi: string): string {
     if (!hemi) return 'unknown';
-    const h = hemi.toLowerCase();
-    if (h === 'lh' || h === 'l' || h === 'left') return 'left';
-    if (h === 'rh' || h === 'r' || h === 'right') return 'right';
-    return h;
+    return normalizeAnatomicalHemisphere(hemi) ?? hemi.toLowerCase();
+  }
+
+  /** Register a deliberate left/right coordination group. No group is inferred from loaded surfaces. */
+  registerBilateralSurfaceGroup(group: BilateralSurfaceGroup): BilateralSurfaceGroupResult {
+    if (this.disposed) {
+      return Object.freeze({
+        ok: false,
+        code: 'disposed',
+        message: 'The viewer has been disposed.'
+      });
+    }
+    this.bilateralSurfaceGroups ??= new Map();
+    this.surfaceGroupMembership ??= new Map();
+
+    const id = group.id.trim();
+    if (!id) {
+      return Object.freeze({
+        ok: false,
+        code: 'invalid-group-id',
+        message: 'A bilateral surface group requires a non-empty id.'
+      });
+    }
+    if (this.bilateralSurfaceGroups.has(id)) {
+      return Object.freeze({
+        ok: false,
+        code: 'group-id-exists',
+        message: `Bilateral surface group "${id}" already exists.`
+      });
+    }
+    if (group.leftSurfaceId === group.rightSurfaceId) {
+      return Object.freeze({
+        ok: false,
+        code: 'duplicate-surface',
+        message: 'The left and right members must be different surfaces.'
+      });
+    }
+
+    const left = this.surfaces?.get(group.leftSurfaceId);
+    const right = this.surfaces?.get(group.rightSurfaceId);
+    if (!left || !right) {
+      const missing = !left ? group.leftSurfaceId : group.rightSurfaceId;
+      return Object.freeze({
+        ok: false,
+        code: 'surface-not-found',
+        message: `Surface "${missing}" was not found.`
+      });
+    }
+    if (normalizeAnatomicalHemisphere(left.hemisphere) !== 'left') {
+      return Object.freeze({
+        ok: false,
+        code: 'invalid-hemisphere',
+        message: `Surface "${group.leftSurfaceId}" is not marked as the left hemisphere.`
+      });
+    }
+    if (normalizeAnatomicalHemisphere(right.hemisphere) !== 'right') {
+      return Object.freeze({
+        ok: false,
+        code: 'invalid-hemisphere',
+        message: `Surface "${group.rightSurfaceId}" is not marked as the right hemisphere.`
+      });
+    }
+    const occupiedSurfaceId = [group.leftSurfaceId, group.rightSurfaceId]
+      .find(surfaceId => this.surfaceGroupMembership.has(surfaceId));
+    if (occupiedSurfaceId) {
+      return Object.freeze({
+        ok: false,
+        code: 'surface-already-grouped',
+        message: `Surface "${occupiedSurfaceId}" already belongs to bilateral surface group ` +
+          `"${this.surfaceGroupMembership.get(occupiedSurfaceId)}".`
+      });
+    }
+
+    const registered = freezeBilateralSurfaceGroup({
+      id,
+      leftSurfaceId: group.leftSurfaceId,
+      rightSurfaceId: group.rightSurfaceId
+    });
+    this.withStateChangeBatch(() => {
+      this.bilateralSurfaceGroups.set(id, registered);
+      this.surfaceGroupMembership.set(registered.leftSurfaceId, id);
+      this.surfaceGroupMembership.set(registered.rightSurfaceId, id);
+      this.emit('surface-group:registered', { group: registered });
+    });
+    return Object.freeze({ ok: true, group: registered });
+  }
+
+  unregisterBilateralSurfaceGroup(groupId: string): BilateralSurfaceGroupResult {
+    if (this.disposed) {
+      return Object.freeze({
+        ok: false,
+        code: 'disposed',
+        message: 'The viewer has been disposed.'
+      });
+    }
+    const group = this.bilateralSurfaceGroups?.get(groupId);
+    if (!group) {
+      return Object.freeze({
+        ok: false,
+        code: 'group-not-found',
+        message: `Bilateral surface group "${groupId}" was not found.`
+      });
+    }
+    this.withStateChangeBatch(() => {
+      this.removeBilateralSurfaceGroup(groupId, 'explicit');
+    });
+    return Object.freeze({ ok: true, group });
+  }
+
+  getBilateralSurfaceGroup(groupId: string): BilateralSurfaceGroup | null {
+    return this.bilateralSurfaceGroups?.get(groupId) ?? null;
+  }
+
+  getBilateralSurfaceGroups(): readonly BilateralSurfaceGroup[] {
+    return Object.freeze(
+      [...(this.bilateralSurfaceGroups?.values() ?? [])]
+        .sort((left, right) => left.id.localeCompare(right.id))
+    );
+  }
+
+  getAnatomicalViewCapabilities(): AnatomicalViewCapabilities {
+    const singleSurfaceIds = [...(this.surfaces?.entries() ?? [])]
+      .filter(([, surface]) => normalizeAnatomicalHemisphere(surface.hemisphere) !== null)
+      .map(([surfaceId]) => surfaceId)
+      .sort();
+    return Object.freeze({
+      views: ANATOMICAL_VIEWS,
+      singleSurfaceIds: Object.freeze(singleSurfaceIds),
+      bilateralGroups: this.getBilateralSurfaceGroups()
+    });
+  }
+
+  /** Last explicit anatomical orientation, or null after a free camera mutation. */
+  getCurrentAnatomicalView(): AnatomicalViewChangedEvent | null {
+    return this.currentAnatomicalView;
+  }
+
+  /**
+   * Apply a camera-oriented anatomical view to one explicit surface or group.
+   * Paired camera views use the registered left member as the lateral/medial
+   * reference; report adapters may instead orient each member independently.
+   */
+  setAnatomicalView(
+    view: AnatomicalView,
+    options: AnatomicalViewOptions
+  ): AnatomicalViewResult {
+    if (this.disposed) {
+      return Object.freeze({
+        ok: false,
+        code: 'disposed',
+        message: 'The viewer has been disposed.'
+      });
+    }
+
+    let referenceSurfaceId: string;
+    let surfaceIds: readonly string[];
+    if (options.layout === 'single') {
+      referenceSurfaceId = options.surfaceId;
+      surfaceIds = Object.freeze([options.surfaceId]);
+    } else {
+      if (options.hemisphereGap !== undefined &&
+          (!Number.isFinite(options.hemisphereGap) || options.hemisphereGap < 0)) {
+        return Object.freeze({
+          ok: false,
+          code: 'invalid-gap',
+          message: 'hemisphereGap must be a finite, non-negative number.'
+        });
+      }
+      const group = this.bilateralSurfaceGroups?.get(options.groupId);
+      if (!group) {
+        return Object.freeze({
+          ok: false,
+          code: 'group-not-found',
+          message: `Bilateral surface group "${options.groupId}" was not found.`
+        });
+      }
+      referenceSurfaceId = group.leftSurfaceId;
+      surfaceIds = Object.freeze([group.leftSurfaceId, group.rightSurfaceId]);
+    }
+
+    const referenceSurface = this.surfaces?.get(referenceSurfaceId);
+    if (!referenceSurface) {
+      return Object.freeze({
+        ok: false,
+        code: 'surface-not-found',
+        message: `Surface "${referenceSurfaceId}" was not found.`
+      });
+    }
+    const hemisphere = normalizeAnatomicalHemisphere(referenceSurface.hemisphere);
+    if (!hemisphere) {
+      return Object.freeze({
+        ok: false,
+        code: 'invalid-hemisphere',
+        message: `Surface "${referenceSurfaceId}" has unsupported hemisphere metadata.`
+      });
+    }
+
+    const bounds = new THREE.Box3();
+    for (const surfaceId of surfaceIds) {
+      const surface = this.surfaces?.get(surfaceId);
+      if (!surface) {
+        return Object.freeze({
+          ok: false,
+          code: 'surface-not-found',
+          message: `Surface "${surfaceId}" was not found.`
+        });
+      }
+      surface.mesh?.updateMatrixWorld(true);
+      if (surface.mesh) bounds.expandByObject(surface.mesh);
+    }
+    const target = bounds.isEmpty()
+      ? new THREE.Vector3()
+      : bounds.getCenter(new THREE.Vector3());
+    const { direction: directionTuple, up: upTuple } = getAnatomicalViewAxes(hemisphere, view);
+    const direction = new THREE.Vector3(...directionTuple).normalize();
+    const up = new THREE.Vector3(...upTuple).normalize();
+    const fit = options.fit ?? true;
+    const previousTarget = this.cameraControls?.target?.clone?.() ?? new THREE.Vector3();
+    let distance = this.camera.position.distanceTo(previousTarget);
+    if (!Number.isFinite(distance) || distance <= 0) {
+      distance = this.config.initialZoom;
+    }
+
+    if (fit && !bounds.isEmpty()) {
+      const sphere = bounds.getBoundingSphere(new THREE.Sphere());
+      const verticalFov = THREE.MathUtils.degToRad(this.camera.fov);
+      const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * this.camera.aspect);
+      const limitingFov = Math.max(0.01, Math.min(verticalFov, horizontalFov));
+      distance = Math.max(sphere.radius / Math.sin(limitingFov / 2) * 1.08, 1);
+    }
+
+    this.withStateChangeBatch(() => {
+      this.camera.position.copy(target).addScaledVector(direction, distance);
+      this.camera.up.copy(up);
+      this.camera.lookAt(target);
+      if (fit) {
+        this.camera.near = Math.max(distance / 1000, 0.001);
+        this.camera.far = Math.max(distance * 10, 100);
+        this.camera.updateProjectionMatrix();
+        this.sceneBoundsRadius = bounds.isEmpty()
+          ? 0
+          : bounds.getBoundingSphere(new THREE.Sphere()).radius;
+      }
+      if (this.cameraControls) {
+        this.cameraControls.target.copy(target);
+        if (fit) {
+          (this.cameraControls as any).minDistance = Math.max(this.sceneBoundsRadius * 0.6, 0.05);
+          (this.cameraControls as any).maxDistance = Math.max(this.sceneBoundsRadius * 20, distance * 2);
+        }
+        this.cameraControls.update();
+      }
+      this.viewpointState = {
+        rotation: this.camera.quaternion.clone(),
+        position: this.camera.position.clone(),
+        target: target.clone()
+      };
+      this.currentViewpointKey = `${options.layout}:${view}`;
+      this.viewpoint = view;
+      this.currentAnatomicalView = Object.freeze({
+        view,
+        layout: options.layout,
+        surfaceIds,
+        fit
+      });
+      this.emit('anatomical-view:changed', this.currentAnatomicalView);
+      this.emit('viewpoint:changed', {
+        viewpoint: this.currentViewpointKey,
+        position: this.camera.position.clone(),
+        target: target.clone()
+      });
+      this.requestRender();
+    });
+
+    return Object.freeze({
+      ok: true,
+      view,
+      layout: options.layout,
+      surfaceIds
+    });
+  }
+
+  /** Reset the ordinary viewer camera to its configured origin and zoom. */
+  resetAnatomicalView(): AnatomicalViewResetResult {
+    if (this.disposed) {
+      return Object.freeze({
+        ok: false,
+        code: 'disposed',
+        message: 'The viewer has been disposed.'
+      });
+    }
+    if (this.initializationFailed || !this.camera || !this.cameraControls) {
+      return Object.freeze({
+        ok: false,
+        code: 'unsupported',
+        message: 'An anatomical camera view is unavailable because viewer initialization failed.'
+      });
+    }
+    this.withStateChangeBatch(() => {
+      this.currentAnatomicalView = null;
+      this.resetCamera();
+      this.emit('anatomical-view:reset');
+    });
+    return Object.freeze({ ok: true });
+  }
+
+  private removeBilateralSurfaceGroup(
+    groupId: string,
+    reason: BilateralSurfaceGroupRemovalReason,
+    removedSurfaceId?: string
+  ): BilateralSurfaceGroup | null {
+    const group = this.bilateralSurfaceGroups?.get(groupId);
+    if (!group) return null;
+    this.bilateralSurfaceGroups.delete(groupId);
+    this.surfaceGroupMembership?.delete(group.leftSurfaceId);
+    this.surfaceGroupMembership?.delete(group.rightSurfaceId);
+    this.emit('surface-group:removed', {
+      group,
+      reason,
+      ...(removedSurfaceId ? { removedSurfaceId } : {})
+    });
+    return group;
+  }
+
+  private removeBilateralSurfaceGroupForSurface(
+    surfaceId: string,
+    reason: BilateralSurfaceGroupRemovalReason
+  ): void {
+    const groupId = this.surfaceGroupMembership?.get(surfaceId);
+    if (groupId) this.removeBilateralSurfaceGroup(groupId, reason, surfaceId);
   }
 
   setViewpoint(viewpoint: string): void {
@@ -1280,6 +1037,8 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
       return;
     }
 
+    this.currentAnatomicalView = null;
+
     const { direction, up } = viewConfig;
     const distance = this.config.initialZoom;
 
@@ -1291,10 +1050,10 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     this.camera.up.copy(up).normalize();
     this.camera.lookAt(new THREE.Vector3(0, 0, 0));
     
-    // Update controls
-    if (this.controls) {
-      this.controls.target.set(0, 0, 0);
-      this.controls.update();
+    // Update camera interaction controls
+    if (this.cameraControls) {
+      this.cameraControls.target.set(0, 0, 0);
+      this.cameraControls.update();
     }
     
     // Store the viewpoint state
@@ -1308,12 +1067,6 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
       ? fullViewpoint.split('_')[1] as Viewpoint
       : fullViewpoint as Viewpoint;
     this.viewpoint = shortView;
-    if (this.viewBindingState && this.viewBindingState.viewpoint !== shortView) {
-      this.viewBindingState.viewpoint = shortView;
-      if (this.pane) {
-        (this.pane as any).refresh();
-      }
-    }
     
     // Emit viewpoint changed event
     this.emit('viewpoint:changed', {
@@ -1327,9 +1080,11 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
 
   /**
    * Convenience wrapper to set common hemisphere-oriented views.
-   * Accepts 'lateral', 'medial', 'anterior', 'posterior', 'inferior'.
+   * Accepts 'lateral', 'medial', 'dorsal', 'anterior', 'posterior', 'inferior'.
    */
-  setHemisphereView(view: 'lateral' | 'medial' | 'anterior' | 'posterior' | 'inferior'): void {
+  setHemisphereView(
+    view: 'lateral' | 'medial' | 'dorsal' | 'anterior' | 'posterior' | 'inferior'
+  ): void {
     const firstSurface = this.surfaces.values().next().value as any;
     const hemi = firstSurface?.hemisphere || 'unknown';
     const normalizedView = view === 'inferior' ? 'ventral' : view;
@@ -1350,16 +1105,68 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
         surface.mesh.position.x = half;
       }
     });
+    this.invalidateState(['surfaces']);
     this.requestRender();
   }
 
+  /**
+   * @deprecated Use updateLayer(surfaceId, layerId, { colorMap }) or
+   * updateColorMap(surfaceId, colorMap). This compatibility helper is removed in v3.
+   */
   updateColormap(presetName: string): void {
-    this.applyColormapChange(presetName);
+    warnLegacyPaneMember(
+      'updateColormap()',
+      'Use updateLayer(surfaceId, layerId, { colorMap }) or updateColorMap(surfaceId, colorMap).'
+    );
+    if (presetName === 'custom') return;
+
+    let targetSurfaceId: string | null = null;
+    let targetSurface: MultiLayerNeuroSurface | null = null;
+    if (this.selectedSurfaceId) {
+      const selectedSurface = this.surfaces.get(this.selectedSurfaceId);
+      if (selectedSurface instanceof MultiLayerNeuroSurface) {
+        targetSurfaceId = this.selectedSurfaceId;
+        targetSurface = selectedSurface;
+      }
+    }
+    if (!targetSurface) {
+      for (const [surfaceId, surface] of this.surfaces) {
+        if (surface instanceof MultiLayerNeuroSurface) {
+          targetSurfaceId = surfaceId;
+          targetSurface = surface;
+          break;
+        }
+      }
+    }
+
+    if (targetSurface && targetSurfaceId) {
+      const layers = targetSurface.layerStack.getAllLayers();
+      const targetLayer = layers.find(layer => layer.id === this.selectedLayerId) ?? layers[0];
+      if (targetLayer && 'setColorMap' in targetLayer) {
+        targetSurface.updateLayer(targetLayer.id, { colorMap: presetName });
+        this.emit('layer:colormap', {
+          surfaceId: targetSurfaceId,
+          layerId: targetLayer.id,
+          colormap: presetName
+        });
+        this.requestRender();
+        return;
+      }
+    }
+
+    this.surfaces.forEach((surface, surfaceId) => {
+      if (surface instanceof ColorMappedNeuroSurface) {
+        surface.setColorMap(presetName);
+        this.emit('surface:colormap', { surfaceId, colormap: presetName });
+      }
+    });
+    this.requestRender();
   }
 
   updateAmbientLight(color: number): void {
     if (this.ambientLight) {
       this.ambientLight.color.setHex(color);
+      this.invalidateState(['appearance']);
       this.requestRender();
     }
   }
@@ -1367,6 +1174,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   updateDirectionalLight(color: number): void {
     if (this.directionalLight) {
       this.directionalLight.color.setHex(color);
+      this.invalidateState(['appearance']);
       this.requestRender();
     }
   }
@@ -1374,6 +1182,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   updateDirectionalLightIntensity(intensity: number): void {
     if (this.directionalLight) {
       this.directionalLight.intensity = intensity;
+      this.invalidateState(['appearance']);
       this.requestRender();
     }
   }
@@ -1403,32 +1212,51 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
         material.envMap = this.environmentMap;
       }
     });
+    this.invalidateState(['appearance']);
     this.requestRender();
   }
 
+  /** @deprecated Pane range bindings no longer exist. This no-op is removed in v3. */
   updateIntensityRange(): void {
-    this.applyIntensityRangeChange();
+    warnLegacyPaneMember(
+      'updateIntensityRange()',
+      'Use updateLayer(surfaceId, layerId, { range }) or the layer setRange() API.'
+    );
   }
 
+  /** @deprecated Pane threshold bindings no longer exist. This no-op is removed in v3. */
   updateThresholdRange(): void {
-    this.applyThresholdChange();
+    warnLegacyPaneMember(
+      'updateThresholdRange()',
+      'Use updateLayer(surfaceId, layerId, { threshold }) or the layer setThreshold() API.'
+    );
   }
 
   resetCamera(): void {
-    if (this.camera && this.controls) {
+    if (this.camera && this.cameraControls) {
+      this.currentAnatomicalView = null;
       const minClamp = this.sceneBoundsRadius > 0 ? Math.max(0.05, this.sceneBoundsRadius * 0.6) : 0.05;
       const maxClamp = this.sceneBoundsRadius > 0 ? Math.max(this.sceneBoundsRadius * 20, this.config.initialZoom) : Infinity;
-      (this.controls as any).minDistance = minClamp;
-      (this.controls as any).maxDistance = maxClamp;
+      (this.cameraControls as any).minDistance = minClamp;
+      (this.cameraControls as any).maxDistance = maxClamp;
       this.camera.position.set(0, 0, this.config.initialZoom);
       this.camera.up.set(0, 1, 0);
-      this.controls.target.set(0, 0, 0);
-      this.controls.update();
+      this.cameraControls.target.set(0, 0, 0);
+      this.cameraControls.update();
+      this.invalidateState(['camera']);
       this.requestRender();
     }
   }
 
+  private detachSurfaceSubscriptions(surfaceId: string): void {
+    const subscriptions = this.surfaceSubscriptions.get(surfaceId);
+    if (!subscriptions) return;
+    this.surfaceSubscriptions.delete(surfaceId);
+    subscriptions.forEach(unsubscribe => unsubscribe());
+  }
+
   addSurface(surface: NeuroSurface, id?: string): void {
+    this.beginStateChangeBatch();
     try {
       debugLog('Adding surface:', surface, 'with id:', id);
       
@@ -1441,6 +1269,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
         id = `surface_${this.surfaces.size}`;
       }
       const surfaceId = id;
+      this.detachSurfaceSubscriptions(surfaceId);
 
       // Set viewer reference on the surface
       surface.viewer = this;
@@ -1465,14 +1294,14 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
         }
       }
 
-      // Update data range based on surface data
-      if (surface.data && surface.data.length > 0) {
-        debugLog('Updating data range for surface with data');
-        this.updateDataRange(surface.data);
-      } else {
-        debugLog('Surface has no data, using default ranges');
+      if (this.surfaces.has(surfaceId)) {
+        this.removeBilateralSurfaceGroupForSurface(surfaceId, 'surface-replaced');
+        const inspectionSelection = this.getInspectionSelection();
+        if (inspectionSelection.kind !== 'none' &&
+            inspectionSelection.surfaceId === surfaceId) {
+          this.clearInspectionSelection();
+        }
       }
-
       this.surfaces.set(id, surface);
       this.scene.add(surface.mesh);
       if (surface instanceof MultiLayerNeuroSurface) {
@@ -1483,13 +1312,57 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
         );
       }
       
-      // Subscribe to surface events for automatic re-rendering
-      surface.on('render:needed', () => this.requestRender());
-      surface.on('visibility:changed', () => this.requestRender());
-      surface.on('opacity:changed', () => this.requestRender());
-      surface.on('material:updated', () => this.requestRender());
-      surface.on('geometry:updated', () => this.requestRender());
-      surface.on('layer:added', (event: any) => {
+      // Subscribe to surface events for rendering and observable state propagation.
+      const subscriptions: UnsubscribeFn[] = [];
+      const subscribe = (event: string, listener: (payload: any) => void): void => {
+        subscriptions.push(surface.on(event, listener));
+      };
+      subscribe('render:needed', () => this.requestRender());
+      subscribe('visibility:changed', () => {
+        this.invalidateState(['surfaces', 'appearance']);
+        this.requestRender();
+      });
+      subscribe('opacity:changed', () => {
+        this.invalidateState(['appearance']);
+        this.requestRender();
+      });
+      subscribe('color:changed', () => {
+        this.invalidateState(['appearance']);
+        this.requestRender();
+      });
+      subscribe('material:updated', () => {
+        this.invalidateState(['appearance']);
+        this.requestRender();
+      });
+      subscribe('data:updated', () => {
+        this.invalidateState(['layers']);
+        this.requestRender();
+      });
+      subscribe('geometry:updated', () => {
+        this.invalidateState(['surfaces']);
+        this.requestRender();
+      });
+      subscribe('variant:changed', (event: any) => {
+        this.emit('surface:variant', { surfaceId, variant: event.variant });
+        this.requestRender();
+      });
+      subscribe('morph:changed', () => {
+        this.invalidateState(['surfaces']);
+        this.requestRender();
+      });
+      subscribe('morph:animating', () => {
+        this.invalidateState(['surfaces']);
+        this.requestRender();
+      });
+      subscribe('morph:complete', () => {
+        this.invalidateState(['surfaces']);
+        this.requestRender();
+      });
+      subscribe('morph:cancelled', () => {
+        this.invalidateState(['surfaces']);
+        this.requestRender();
+      });
+      subscribe('layer:added', (event: any) => {
         const layer = event?.layer ?? null;
         const layerId = layer?.id ?? event?.layerId;
         if (!layerId) {
@@ -1503,7 +1376,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
         });
         this.requestRender();
       });
-      surface.on('layer:removed', (event: any) => {
+      subscribe('layer:removed', (event: any) => {
         if (!event?.layerId) {
           this.requestRender();
           return;
@@ -1515,7 +1388,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
         });
         this.requestRender();
       });
-      surface.on('layer:updated', (event: any) => {
+      subscribe('layer:updated', (event: any) => {
         const layer = event?.layer ?? null;
         const layerId = layer?.id ?? event?.layerId;
         if (!layerId) {
@@ -1530,6 +1403,40 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
         });
         this.requestRender();
       });
+      subscribe('layer:reordered', (event: any) => {
+        this.emit('layer:reordered', {
+          surfaceId,
+          order: event.order,
+          previousOrder: event.previousOrder,
+          movedLayerId: event.movedLayerId
+        });
+        this.requestRender();
+      });
+      subscribe('dispose', () => {
+        if (this.surfaces.get(surfaceId) !== surface) return;
+        this.withStateChangeBatch(() => {
+          this.removeBilateralSurfaceGroupForSurface(surfaceId, 'surface-removed');
+          const inspectionSelection = this.getInspectionSelection();
+          if (inspectionSelection.kind !== 'none' &&
+              inspectionSelection.surfaceId === surfaceId) {
+            this.clearInspectionSelection();
+          }
+          this.detachSurfaceSubscriptions(surfaceId);
+          if (surface.mesh) {
+            this.scene.remove(surface.mesh);
+          }
+          this.gpuPicker?.removeSurface(surfaceId);
+          this.annotations.removeBySurface(surfaceId);
+          this.surfaces.delete(surfaceId);
+          if (this.selectedSurfaceId === surfaceId) {
+            this.selectedSurfaceId = null;
+            this.selectedLayerId = null;
+            this.invalidateState(['selection']);
+          }
+          this.emit('surface:removed', { surface, id: surfaceId, surfaceId });
+        });
+      });
+      this.surfaceSubscriptions.set(surfaceId, subscriptions);
       
       // Emit viewer event
       this.emit('surface:added', { surface, id: surfaceId, surfaceId });
@@ -1544,6 +1451,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
         if (layers.length) {
           this.selectedLayerId = layers[0].id;
           this.selectedSurfaceId = id;
+          this.invalidateState(['selection']);
         }
       }
 
@@ -1556,8 +1464,11 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     } catch (error) {
       console.error('Error adding surface:', error);
       if (id && this.surfaces.has(id)) {
+        this.detachSurfaceSubscriptions(id);
         this.surfaces.delete(id);
       }
+    } finally {
+      this.endStateChangeBatch();
     }
   }
 
@@ -1639,99 +1550,53 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
       return;
     }
     surface.setVariant(variantName, options);
-    if (this.variantBindingState) {
-      this.variantBindingState.variant = variantName;
-    }
     this.selectedSurfaceId = surfaceId;
-    this.emit('surface:variant', { surfaceId, variant: variantName });
+    this.invalidateState(['selection']);
   }
 
+  /** @deprecated Pane data-range bindings no longer exist. This no-op is removed in v3. */
   updateDataRange(data: Float32Array): void {
-    if (!data || data.length === 0) {
-      debugLog('No data provided to updateDataRange, using defaults');
-      return;
-    }
-
-    // Filter out non-finite values for robust statistics
-    const validData = Array.from(data).filter(v => isFinite(v));
-    debugLog('Valid data points:', validData.length, 'out of', data.length);
-
-    if (validData.length === 0) {
-      debugLog('No valid data points found, using defaults');
-      return;
-    }
-
-    let min = validData[0];
-    let max = validData[0];
-    for (let i = 1; i < validData.length; i++) {
-      const v = validData[i];
-      if (v < min) min = v;
-      if (v > max) max = v;
-    }
-
-    if (min === max) {
-      // Prevent collapsed sliders/ranges
-      const epsilon = Math.max(0.1, Math.abs(min) * 0.01 || 0.1);
-      max = min + epsilon;
-    }
-    
-    debugLog('Data range - Min:', min, 'Max:', max);
-    
-    this.dataRange = { min, max };
-
-    if (this.intensityRange.range) {
-      this.intensityRange.range.min = min;
-      this.intensityRange.range.max = max;
-    } else {
-      this.intensityRange.range = { min, max };
-    }
-
-    // Keep threshold at 0 initially
-    if (this.thresholdRange.range) {
-      this.thresholdRange.range.min = 0;
-      this.thresholdRange.range.max = 0;
-    } else {
-      this.thresholdRange.range = { min: 0, max: 0 };
-    }
-
+    void data;
+    warnLegacyPaneMember(
+      'updateDataRange()',
+      'Read ranges from individual layers and mutate them through layer APIs.'
+    );
   }
 
   removeSurface(id: string): void {
-    const surface = this.surfaces.get(id);
-    if (surface && surface.mesh) {
-      // Clean up event listeners
-      surface.removeAllListeners();
+    this.withStateChangeBatch(() => {
+      const surface = this.surfaces.get(id);
+      if (!surface) return;
 
-      // Unregister from GPU picker
+      this.removeBilateralSurfaceGroupForSurface(id, 'surface-removed');
+      const inspectionSelection = this.getInspectionSelection();
+      if (inspectionSelection.kind !== 'none' && inspectionSelection.surfaceId === id) {
+        this.clearInspectionSelection();
+      }
+      this.detachSurfaceSubscriptions(id);
       if (this.gpuPicker) {
         this.gpuPicker.removeSurface(id);
       }
-
-      this.scene.remove(surface.mesh);
+      if (surface.mesh) {
+        this.scene.remove(surface.mesh);
+      }
       surface.dispose();
       this.surfaces.delete(id);
 
-      // Emit viewer event
+      if (this.selectedSurfaceId === id) {
+        this.selectedSurfaceId = null;
+        this.selectedLayerId = null;
+        this.invalidateState(['selection']);
+      }
       this.emit('surface:removed', { surface, id, surfaceId: id });
-
       this.requestRender();
-    }
+    });
   }
 
   addLayer(surfaceId: string, layer: RGBALayer | DataLayer | OutlineLayer): void {
     const surface = this.surfaces.get(surfaceId);
     if (surface && surface instanceof MultiLayerNeuroSurface) {
       surface.addLayer(layer);
-      if (layer instanceof DataLayer) {
-        const layerData = layer.getData();
-        if (layerData) {
-          this.updateDataRange(layerData);
-        }
-      }
-      // Make the newly added layer the active one for UI bindings
-      this.selectedSurfaceId = surfaceId;
-      this.selectedLayerId = layer.id;
-      this.syncLayerBindingsFromSelection();
       this.requestRender();
     }
   }
@@ -1776,20 +1641,72 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     }
   }
 
-  clearSurfaces(): void {
-    // Detach any crosshair before surfaces are removed
-    if (this.crosshair.visible) {
-      this.hideCrosshair();
+  getOrderedLayers(surfaceId: string): readonly Layer[] {
+    const surface = this.surfaces.get(surfaceId);
+    return surface instanceof MultiLayerNeuroSurface
+      ? surface.getOrderedLayers()
+      : Object.freeze([]);
+  }
+
+  getLayerOrderDescriptors(surfaceId: string): readonly LayerOrderDescriptor[] {
+    const surface = this.surfaces.get(surfaceId);
+    return surface instanceof MultiLayerNeuroSurface
+      ? surface.getLayerOrderDescriptors()
+      : Object.freeze([]);
+  }
+
+  setLayerOrder(surfaceId: string, layerIds: readonly string[]): LayerOrderResult {
+    const surface = this.surfaces.get(surfaceId);
+    if (!(surface instanceof MultiLayerNeuroSurface)) {
+      return Object.freeze({
+        ok: false,
+        code: 'surface-not-found',
+        message: `Surface "${surfaceId}" does not expose a layer stack.`
+      });
     }
-    this.surfaces.forEach((surface, id) => {
-      if (surface.mesh) {
-        this.scene.remove(surface.mesh);
+    return surface.setLayerOrder(layerIds);
+  }
+
+  moveLayer(surfaceId: string, layerId: string, destinationIndex: number): LayerOrderResult {
+    const surface = this.surfaces.get(surfaceId);
+    if (!(surface instanceof MultiLayerNeuroSurface)) {
+      return Object.freeze({
+        ok: false,
+        code: 'surface-not-found',
+        message: `Surface "${surfaceId}" does not expose a layer stack.`
+      });
+    }
+    return surface.moveLayer(layerId, destinationIndex);
+  }
+
+  clearSurfaces(): void {
+    this.withStateChangeBatch(() => {
+      if (this.crosshair.visible) {
+        this.hideCrosshair();
       }
-      surface.dispose();
-      this.annotations.removeBySurface(id);
+      if (this.getInspectionSelection().kind !== 'none') {
+        this.clearInspectionSelection();
+      }
+      for (const groupId of [...(this.bilateralSurfaceGroups?.keys() ?? [])]) {
+        this.removeBilateralSurfaceGroup(groupId, 'surfaces-cleared');
+      }
+      this.surfaces.forEach((surface, id) => {
+        this.detachSurfaceSubscriptions(id);
+        if (surface.mesh) {
+          this.scene.remove(surface.mesh);
+        }
+        surface.dispose();
+        this.annotations.removeBySurface(id);
+        this.emit('surface:removed', { surface, id, surfaceId: id });
+      });
+      this.surfaces.clear();
+      if (this.selectedSurfaceId !== null || this.selectedLayerId !== null) {
+        this.selectedSurfaceId = null;
+        this.selectedLayerId = null;
+        this.invalidateState(['selection']);
+      }
+      this.requestRender();
     });
-    this.surfaces.clear();
-    this.requestRender();
   }
 
   addRimLightingShader(mesh: THREE.Mesh): void {
@@ -1830,6 +1747,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     
     material.userData = { ...(material as any).userData, hasRimShader: true };
     material.needsUpdate = true;
+    this.invalidateState(['appearance']);
   }
 
   setupPicking(): void {
@@ -1851,6 +1769,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
       this.updateHoverCrosshair(event);
     };
     this.renderer.domElement.addEventListener('mousemove', this.handleMouseMove);
+    this.invalidateState(['selection']);
   }
 
   private setupSurfaceClick(): void {
@@ -1893,6 +1812,12 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
       parcelLabel: payload.parcelLabel ?? null,
       atlasId: payload.atlasId ?? null
     };
+
+    this.setInspectionSelection({
+      kind: 'vertex',
+      surfaceId: hit.surfaceId,
+      vertexIndex: hit.vertexIndex
+    });
 
     // Emit callback/event
     if (this.onSurfaceClick) {
@@ -1977,6 +1902,283 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     }
   }
 
+  /** Return the canonical scientific inspection selection. */
+  getInspectionSelection(): InspectionSelection {
+    return this.inspectionSelection ?? NO_INSPECTION_SELECTION;
+  }
+
+  /**
+   * Validate and atomically replace the scientific inspection selection.
+   * Panel focus, annotations, and crosshair state are deliberately separate.
+   */
+  setInspectionSelection(
+    selection: InspectionSelection,
+    options: InspectionSelectionOptions = {}
+  ): InspectionSelectionResult {
+    if (this.disposed) {
+      return Object.freeze({
+        ok: false,
+        code: 'disposed',
+        message: 'The viewer has been disposed.'
+      });
+    }
+
+    let normalized: InspectionSelection;
+    if (selection.kind === 'none') {
+      normalized = NO_INSPECTION_SELECTION;
+    } else {
+      const surface = this.surfaces?.get(selection.surfaceId);
+      if (!surface) {
+        return Object.freeze({
+          ok: false,
+          code: 'surface-not-found',
+          message: `Surface "${selection.surfaceId}" was not found.`
+        });
+      }
+
+      if (selection.kind === 'vertex') {
+        if (!this.isValidSurfaceVertex(surface, selection.vertexIndex)) {
+          return Object.freeze({
+            ok: false,
+            code: 'invalid-vertex',
+            message: `Vertex ${selection.vertexIndex} is outside surface "${selection.surfaceId}".`
+          });
+        }
+        normalized = freezeInspectionSelection(selection);
+      } else {
+        const parcelSurface = surface as any;
+        if (typeof parcelSurface.getParcelRecord !== 'function') {
+          return Object.freeze({
+            ok: false,
+            code: 'unsupported',
+            message: `Surface "${selection.surfaceId}" does not expose parcel inspection.`
+          });
+        }
+        if (!Number.isInteger(selection.parcelId)) {
+          return Object.freeze({
+            ok: false,
+            code: 'parcel-not-found',
+            message: `Parcel ${selection.parcelId} is not a valid parcel ID.`
+          });
+        }
+
+        let parcelRecord: unknown;
+        try {
+          parcelRecord = parcelSurface.getParcelRecord(selection.parcelId);
+        } catch {
+          parcelRecord = null;
+        }
+        if (!parcelRecord) {
+          return Object.freeze({
+            ok: false,
+            code: 'parcel-not-found',
+            message: `Parcel ${selection.parcelId} was not found on surface "${selection.surfaceId}".`
+          });
+        }
+
+        let representativeVertexIndex = selection.representativeVertexIndex;
+        if (representativeVertexIndex === undefined &&
+            typeof parcelSurface.getRepresentativeVertexIndex === 'function') {
+          try {
+            representativeVertexIndex = parcelSurface.getRepresentativeVertexIndex(selection.parcelId) ?? undefined;
+          } catch {
+            representativeVertexIndex = undefined;
+          }
+        }
+        if (representativeVertexIndex !== undefined) {
+          if (!this.isValidSurfaceVertex(surface, representativeVertexIndex)) {
+            return Object.freeze({
+              ok: false,
+              code: 'invalid-vertex',
+              message: `Representative vertex ${representativeVertexIndex} is outside surface ` +
+                `"${selection.surfaceId}".`
+            });
+          }
+          if (typeof parcelSurface.getParcelIdForVertex === 'function') {
+            let representativeParcelId: number | null = null;
+            try {
+              representativeParcelId = parcelSurface.getParcelIdForVertex(representativeVertexIndex);
+            } catch {
+              representativeParcelId = null;
+            }
+            if (representativeParcelId !== null && representativeParcelId !== selection.parcelId) {
+              return Object.freeze({
+                ok: false,
+                code: 'invalid-vertex',
+                message: `Representative vertex ${representativeVertexIndex} belongs to parcel ` +
+                  `${representativeParcelId}, not ${selection.parcelId}.`
+              });
+            }
+          }
+        }
+
+        let actualAtlasId: string | undefined;
+        if (typeof parcelSurface.getParcelData === 'function') {
+          try {
+            const id = parcelSurface.getParcelData()?.atlas?.id;
+            if (typeof id === 'string' && id.length > 0) actualAtlasId = id;
+          } catch {
+            actualAtlasId = undefined;
+          }
+        }
+        if (selection.atlasId !== undefined && actualAtlasId !== undefined &&
+            selection.atlasId !== actualAtlasId) {
+          return Object.freeze({
+            ok: false,
+            code: 'atlas-mismatch',
+            message: `Atlas "${selection.atlasId}" does not match surface atlas "${actualAtlasId}".`
+          });
+        }
+
+        normalized = freezeInspectionSelection({
+          kind: 'parcel',
+          surfaceId: selection.surfaceId,
+          parcelId: selection.parcelId,
+          ...(representativeVertexIndex !== undefined ? { representativeVertexIndex } : {}),
+          ...(actualAtlasId !== undefined || selection.atlasId !== undefined
+            ? { atlasId: actualAtlasId ?? selection.atlasId }
+            : {})
+        });
+      }
+    }
+
+    const previous = this.getInspectionSelection();
+    const changed = !inspectionSelectionsEqual(previous, normalized);
+    if (changed) {
+      this.inspectionSelection = normalized;
+      this.emit('selection:changed', { selection: normalized, previous });
+    }
+    this.updateInspectionCrosshair(normalized, options);
+    return Object.freeze({ ok: true, changed, selection: normalized });
+  }
+
+  clearInspectionSelection(
+    options: InspectionSelectionOptions = {}
+  ): InspectionSelectionResult {
+    return this.setInspectionSelection(NO_INSPECTION_SELECTION, options);
+  }
+
+  /**
+   * Inspect one vertex through stable surface/layer IDs. Missing scalar values
+   * are represented as null; no live viewer, layer, surface, Three.js, or typed
+   * array object escapes in the returned snapshot.
+   */
+  inspectVertex(surfaceId: string, vertexIndex: number): VertexInspection | null {
+    if (this.disposed) return null;
+    const surface = this.surfaces?.get(surfaceId);
+    if (!surface || !this.isValidSurfaceVertex(surface, vertexIndex)) return null;
+
+    surface.mesh?.updateMatrixWorld(true);
+    const worldPosition = this.getWorldPositionForVertex(surface, vertexIndex);
+    if (!worldPosition || !worldPosition.toArray().every(Number.isFinite)) return null;
+    const world = Object.freeze(worldPosition.toArray()) as readonly [number, number, number];
+
+    const values: VertexInspectionLayerValue[] = [];
+    const orderedLayers = typeof (surface as any).getOrderedLayers === 'function'
+      ? ((surface as any).getOrderedLayers() as readonly Layer[])
+      : [];
+    for (const layer of orderedLayers) {
+      const sampler = (layer as Layer & {
+        sampleValueAtVertex?: (index: number) => number | string | null;
+      }).sampleValueAtVertex;
+      if (typeof sampler !== 'function') continue;
+
+      let sampled: number | string | null = null;
+      try {
+        const value = sampler.call(layer, vertexIndex);
+        sampled = typeof value === 'number'
+          ? (Number.isFinite(value) ? value : null)
+          : typeof value === 'string'
+            ? value
+            : null;
+      } catch {
+        sampled = null;
+      }
+      const presentation = layer.getPresentation();
+      values.push(Object.freeze({
+        layerId: layer.id,
+        label: presentation.label,
+        value: sampled,
+        ...(presentation.units !== undefined ? { units: presentation.units } : {}),
+        missing: sampled === null
+      }));
+    }
+
+    let parcel: VertexInspectionParcel | undefined;
+    let atlas: VertexInspectionAtlas | undefined;
+    const parcelSurface = surface as any;
+    let parcelId: number | null = null;
+    if (typeof parcelSurface.getParcelIdForVertex === 'function') {
+      try {
+        parcelId = parcelSurface.getParcelIdForVertex(vertexIndex);
+      } catch {
+        parcelId = null;
+      }
+    }
+    let parcelLabel: string | undefined;
+    if (parcelId !== null && Number.isInteger(parcelId)) {
+      if (typeof parcelSurface.getParcelRecord === 'function') {
+        try {
+          const label = parcelSurface.getParcelRecord(parcelId)?.label;
+          if (typeof label === 'string') parcelLabel = label;
+        } catch {
+          parcelLabel = undefined;
+        }
+      }
+      parcel = Object.freeze({
+        id: parcelId,
+        ...(parcelLabel !== undefined ? { label: parcelLabel } : {})
+      });
+    }
+
+    if (typeof parcelSurface.getParcelData === 'function') {
+      try {
+        const atlasMetadata = parcelSurface.getParcelData()?.atlas;
+        if (typeof atlasMetadata?.id === 'string' && atlasMetadata.id.length > 0) {
+          atlas = Object.freeze({
+            id: atlasMetadata.id,
+            ...(typeof atlasMetadata.name === 'string' ? { name: atlasMetadata.name } : {})
+          });
+        }
+      } catch {
+        atlas = undefined;
+      }
+    }
+
+    return Object.freeze({
+      surfaceId,
+      vertexIndex,
+      world,
+      ...(parcel ? { parcel } : {}),
+      ...(atlas ? { atlas } : {}),
+      values: Object.freeze(values)
+    });
+  }
+
+  private isValidSurfaceVertex(surface: NeuroSurface, vertexIndex: number): boolean {
+    if (!Number.isInteger(vertexIndex) || vertexIndex < 0) return false;
+    const position = surface.mesh?.geometry.getAttribute('position');
+    if (position) return vertexIndex < position.count;
+    return vertexIndex < surface.geometry.vertices.length / 3;
+  }
+
+  private updateInspectionCrosshair(
+    selection: InspectionSelection,
+    options: InspectionSelectionOptions
+  ): void {
+    if (!options.showCrosshair) return;
+    if (selection.kind === 'none') {
+      if (this.crosshair?.mode === 'selection') this.hideCrosshair();
+      return;
+    }
+    const vertexIndex = selection.kind === 'vertex'
+      ? selection.vertexIndex
+      : selection.representativeVertexIndex;
+    if (vertexIndex !== undefined) {
+      this.showCrosshair(selection.surfaceId, vertexIndex, { mode: 'selection' });
+    }
+  }
+
   setParcelHover(
     surfaceId: string,
     parcelId: number | null,
@@ -2018,7 +2220,12 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   }
 
   clearParcelSelection(options: ParcelFocusOptions = {}): void {
-    if (this.crosshair.mode === 'selection') {
+    const currentSelection = this.getInspectionSelection();
+    const clearsCanonicalParcel = currentSelection.kind === 'parcel';
+    if (clearsCanonicalParcel) {
+      this.clearInspectionSelection();
+    }
+    if (clearsCanonicalParcel && this.crosshair.mode === 'selection') {
       this.hideCrosshair();
     }
     if (options.emitEvent ?? true) {
@@ -2122,6 +2329,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   // Lightweight option bag for embed environments (e.g. R HTML widgets)
   setOption(key: string, value: any): void {
     this.options.set(key, value);
+    this.invalidateState(['appearance']);
   }
 
   getOption<T = any>(key: string, fallback?: T): T | undefined {
@@ -2135,6 +2343,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   enableGPUPicking(): boolean {
     if (this.gpuPicker) {
       this.gpuPicker.setEnabled(true);
+      this.invalidateState(['selection']);
       return true;
     }
     if (!GPUPicker.isSupported(this.renderer)) {
@@ -2149,6 +2358,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
       }
     });
     debugLog('GPU picking enabled');
+    this.invalidateState(['selection']);
     return true;
   }
 
@@ -2158,6 +2368,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   disableGPUPicking(): void {
     if (this.gpuPicker) {
       this.gpuPicker.setEnabled(false);
+      this.invalidateState(['selection']);
     }
   }
 
@@ -2214,10 +2425,12 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
       return;
     }
     this.crosshair.show(surface.mesh, surfaceId, vertexIndex, options);
+    this.invalidateState(['selection']);
   }
 
   hideCrosshair(): void {
     this.crosshair.hide();
+    this.invalidateState(['selection']);
   }
 
   private setParcelFocus(
@@ -2243,6 +2456,17 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     const focusVertexIndex = payload.vertexIndex;
     if (focusVertexIndex === null) {
       return false;
+    }
+
+    if (mode === 'selection') {
+      const selectionResult = this.setInspectionSelection({
+        kind: 'parcel',
+        surfaceId,
+        parcelId,
+        representativeVertexIndex: focusVertexIndex,
+        ...(payload.atlasId ? { atlasId: payload.atlasId } : {})
+      });
+      if (!selectionResult.ok) return false;
     }
 
     if (options.showCrosshair ?? true) {
@@ -2345,6 +2569,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     const targetSurface = surfaceId ?? this.crosshair.surfaceId;
     const mesh = targetSurface ? this.surfaces.get(targetSurface)?.mesh ?? null : null;
     this.crosshair.toggle(mesh, surfaceId, vertexIndex, options);
+    this.invalidateState(['selection']);
   }
 
   requestRender(): void {
@@ -2358,30 +2583,28 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   animate(): void {
     if (this.initializationFailed) return;
     this.animationId = requestAnimationFrame(this.animate);
-    
-    // Update FPS graph if it exists
-    if (this.fpsGraph) {
-      (this.fpsGraph as any).begin();
+
+    // Update camera interaction controls
+    if (this.cameraControls && this.cameraInteractionEnabled) {
+      this.cameraControls.update();
     }
-    
-    // Update controls
-    if (this.controls && this.controlsEnabled) {
-      this.controls.update();
-    }
-    
+
     // Render only if needed
-    if (this.needsRender || (this.controls as any).enableDamping) {
+    if (this.needsRender || (this.cameraControls as any).enableDamping) {
       this.render();
       this.needsRender = false;
-    }
-    
-    if (this.fpsGraph) {
-      (this.fpsGraph as any).end();
     }
   }
 
   render(): void {
     if (this.initializationFailed) return;
+    // Surface compositing uses its own throttled RAF. Flush pending work here
+    // so this canvas paint always observes layer changes made before the frame.
+    for (const surface of this.surfaces.values()) {
+      if (surface instanceof MultiLayerNeuroSurface) {
+        surface.flushPendingColorUpdate();
+      }
+    }
     // Emit before render event
     this.emit('render:before');
     
@@ -2421,6 +2644,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   }
 
   centerCamera(): void {
+    this.currentAnatomicalView = null;
     // Collect all surface geometries
     const surfaceGeometries: Array<{ vertices: Float32Array }> = [];
     
@@ -2435,12 +2659,13 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
       this.camera.position.set(0, 0, this.config.initialZoom);
       this.camera.up.set(0, 1, 0);
       this.camera.lookAt(0, 0, 0);
-      if (this.controls) {
-        this.controls.target.set(0, 0, 0);
-        (this.controls as any).minDistance = 0.05;
-        (this.controls as any).maxDistance = Infinity;
-        this.controls.update();
+      if (this.cameraControls) {
+        this.cameraControls.target.set(0, 0, 0);
+        (this.cameraControls as any).minDistance = 0.05;
+        (this.cameraControls as any).maxDistance = Infinity;
+        this.cameraControls.update();
       }
+      this.invalidateState(['camera']);
       return;
     }
     
@@ -2479,11 +2704,11 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     this.camera.lookAt(center);
 
     // Update controls target and zoom limits
-    if (this.controls) {
-      this.controls.target.copy(center);
-      (this.controls as any).minDistance = Math.max(radius * 0.6, 0.05);
-      (this.controls as any).maxDistance = Math.max(radius * 20, optimalDistance * 2);
-      this.controls.update();
+    if (this.cameraControls) {
+      this.cameraControls.target.copy(center);
+      (this.cameraControls as any).minDistance = Math.max(radius * 0.6, 0.05);
+      (this.cameraControls as any).maxDistance = Math.max(radius * 20, optimalDistance * 2);
+      this.cameraControls.update();
     }
 
     // Update near/far planes for scene size
@@ -2493,24 +2718,25 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
 
     // Store initial zoom for reset
     this.config.initialZoom = optimalDistance;
-    
+    this.invalidateState(['camera']);
     this.requestRender();
   }
 
   setZoom(distance: number, options: { updateInitial?: boolean } = {}): void {
-    const target = this.controls?.target ?? new THREE.Vector3(0, 0, 0);
+    const target = this.cameraControls?.target ?? new THREE.Vector3(0, 0, 0);
     const dir = new THREE.Vector3().subVectors(this.camera.position, target).normalize();
     const minClamp = this.sceneBoundsRadius > 0 ? Math.max(0.05, this.sceneBoundsRadius * 0.6) : 0.05;
     const maxClamp = this.sceneBoundsRadius > 0 ? Math.max(this.sceneBoundsRadius * 20, distance) : Infinity;
     const safeDistance = Math.min(maxClamp, Math.max(minClamp, distance));
     this.camera.position.copy(target).addScaledVector(dir, safeDistance);
     this.camera.updateProjectionMatrix();
-    if (this.controls?.update) {
-      this.controls.update();
+    if (this.cameraControls?.update) {
+      this.cameraControls.update();
     }
     if (options.updateInitial !== false) {
       this.config.initialZoom = safeDistance;
     }
+    this.invalidateState(['camera']);
     this.requestRender();
   }
 
@@ -2549,13 +2775,13 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   // -------------------------------------------------------------------------
 
   /** Capture the entire viewer state as a JSON-compatible object. */
-  toJSON(): ViewerStateV1 {
+  toJSON(): ViewerStateV2 {
     return serialize(this);
   }
 
   /** Restore viewer state from a serialized object. */
-  fromJSON(state: ViewerStateV1): RestorationReport {
-    return deserialize(this, state);
+  fromJSON(state: ViewerState): RestorationReport {
+    return this.withStateChangeBatch(() => deserialize(this, state));
   }
 
   /** Export viewer state plus provenance as a portable SurfView scene manifest. */
@@ -2834,23 +3060,37 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    if (this.initializationFailed) return;
+    try {
+      super.emit('viewer:disposing');
+    } catch (error) {
+      console.error('surfview: viewer disposal listener failed', error);
+    }
+    this.inspectionSelection = NO_INSPECTION_SELECTION;
+    this.currentAnatomicalView = null;
+    try {
+      this.plugins.dispose();
+    } catch (error) {
+      console.error('surfview: plugin teardown failed during viewer disposal', error);
+    }
+    if (this.initializationFailed) {
+      this.pendingStateDomains?.clear();
+      this.removeAllListeners();
+      return;
+    }
     // Stop animation loop
     if (this.animationId !== null) {
       cancelAnimationFrame(this.animationId);
     }
 
-    this.plugins.dispose();
-    
     // Dispose of all surfaces
     this.clearSurfaces();
     
-    // Dispose of controls
-    if (this.controls) {
-      if ('removeEventListener' in this.controls) {
-        (this.controls as any).removeEventListener('change', this.onControlsChange);
+    // Dispose of camera interaction controls
+    if (this.cameraControls) {
+      if ('removeEventListener' in this.cameraControls) {
+        (this.cameraControls as any).removeEventListener('change', this.onControlsChange);
       }
-      this.controls.dispose();
+      this.cameraControls.dispose();
     }
     
     // Dispose of post-processing
@@ -2874,13 +3114,6 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     if (this.handleMouseMove) {
       this.renderer.domElement.removeEventListener('mousemove', this.handleMouseMove);
     }
-    if (this.handlePanePointerMove) {
-      window.removeEventListener('pointermove', this.handlePanePointerMove);
-    }
-    if (this.handlePanePointerUp) {
-      window.removeEventListener('pointerup', this.handlePanePointerUp);
-      window.removeEventListener('pointercancel', this.handlePanePointerUp);
-    }
 
     // Dispose of crosshair resources
     this.crosshair.dispose();
@@ -2898,14 +3131,8 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     if (this.renderer.domElement.parentNode) {
       this.renderer.domElement.parentNode.removeChild(this.renderer.domElement);
     }
-    
-    // Dispose of Tweakpane
-    if (this.pane) {
-      this.pane.dispose();
-    }
-    if (this.paneContainer && this.paneContainer.parentNode) {
-      this.paneContainer.parentNode.removeChild(this.paneContainer);
-    }
+    this.pendingStateDomains?.clear();
+    this.removeAllListeners();
   }
 
   private hasDOM(): boolean {
@@ -2941,69 +3168,73 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     this.container.appendChild(fallback);
   }
 
-  // Get current visibility state of controls
+  /** @deprecated Pane controls no longer exist. This always returns false. */
   getControlsVisible(): boolean {
+    warnLegacyPaneMember(
+      'getControlsVisible()',
+      'Track application-owned panel visibility in the application.'
+    );
     return false;
   }
 
-  /** @deprecated Tweakpane controls are disabled; use report controls or a plugin. */
+  /** @deprecated Pane controls no longer exist. This no-op is removed in v3. */
   toggleControls(show?: boolean): void {
     void show;
-    warnLegacyControlsDeprecated();
-    this.config.showControls = false;
-    this.config.useControls = false;
+    warnLegacyPaneMember(
+      'toggleControls()',
+      'Track application-owned panel visibility in the application.'
+    );
   }
 
+  /** @deprecated Pane controls no longer exist. This no-op is removed in v3. */
   togglePaneMinimized(): void {
-    this.setPaneMinimized(!this.paneDragState.minimized);
+    warnLegacyPaneMember(
+      'togglePaneMinimized()',
+      'Track application-owned panel disclosure in the application.'
+    );
   }
 
+  /** @deprecated Pane controls no longer exist. This no-op is removed in v3. */
   minimizeControlsPane(): void {
-    this.setPaneMinimized(true);
+    warnLegacyPaneMember(
+      'minimizeControlsPane()',
+      'Track application-owned panel disclosure in the application.'
+    );
   }
 
+  /** @deprecated Pane controls no longer exist. This no-op is removed in v3. */
   restoreControlsPane(): void {
-    this.setPaneMinimized(false);
+    warnLegacyPaneMember(
+      'restoreControlsPane()',
+      'Track application-owned panel disclosure in the application.'
+    );
   }
 
-  private disposePane(): void {
-    if (this.pane) {
-      try {
-        this.pane.dispose();
-      } catch (err) {
-        console.warn('Failed to dispose pane', err);
-      }
-    }
-    if (this.paneContainer && this.paneContainer.parentElement) {
-      this.paneContainer.parentElement.removeChild(this.paneContainer);
-    }
-    this.pane = null;
-    this.paneContainer = null;
-    this.paneContentEl = null;
-    this.paneHandleEl = null;
-    this.paneMinimizeButtonEl = null;
-    this.paneLoading = false;
+  isInteractionEnabled(): boolean {
+    return this.cameraInteractionEnabled;
   }
 
-  private setPaneMinimized(minimized: boolean): void {
-    this.paneDragState.minimized = minimized;
-    if (this.paneContentEl) {
-      this.paneContentEl.style.display = minimized ? 'none' : 'block';
+  setInteractionEnabled(enabled: boolean): void {
+    const next = Boolean(enabled);
+    if (this.cameraInteractionEnabled === next) return;
+    this.cameraInteractionEnabled = next;
+    if (this.cameraControls && 'enabled' in this.cameraControls) {
+      this.cameraControls.enabled = next;
     }
-    if (this.paneMinimizeButtonEl) {
-      this.paneMinimizeButtonEl.textContent = minimized ? '+' : '–';
-      this.paneMinimizeButtonEl.title = minimized ? 'Restore controls' : 'Minimize controls';
-    }
+    this.emit('controls:changed', { enabled: next });
+    this.requestRender();
   }
 
+  /** @deprecated Use setInteractionEnabled(true). */
   enableControls(): void {
-    this.controlsEnabled = true;
-    this.emit('controls:changed', { enabled: true });
+    warnLegacyInteractionMember('enableControls()');
+    this.setInteractionEnabled(true);
   }
 
+  /** @deprecated Use setInteractionEnabled(false). */
   disableControls(): void {
-    this.controlsEnabled = false;
-    this.emit('controls:changed', { enabled: false });
+    warnLegacyInteractionMember('disableControls()');
+    this.setInteractionEnabled(false);
   }
 
   getIntersectionPoint(): THREE.Vector3 {
@@ -3026,10 +3257,11 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   }
 
   updateSurfaceData(surfaceId: string, data: Float32Array, indices?: Uint32Array): void {
+    void indices;
     const surface = this.surfaces.get(surfaceId);
     if (surface instanceof ColorMappedNeuroSurface) {
       surface.setData(data);
-      this.updateDataRange(data);
+      this.invalidateState(['layers']);
       this.requestRender();
     }
   }
@@ -3037,8 +3269,14 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   updateColorMap(surfaceId: string, colormap: ColorMap | string): void {
     const surface = this.surfaces.get(surfaceId);
     if (surface instanceof ColorMappedNeuroSurface) {
-      surface.setColorMap(colormap);
-      this.requestRender();
+      this.withStateChangeBatch(() => {
+        surface.setColorMap(colormap);
+        this.emit('surface:colormap', {
+          surfaceId,
+          colormap: typeof colormap === 'string' ? colormap : 'custom'
+        });
+        this.requestRender();
+      });
     }
   }
 
@@ -3050,43 +3288,95 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     return Array.from(this.surfaces.keys());
   }
 
-  updateConfig(newConfig: Partial<NeuroSurfaceViewerConfig>): void {
-    this.config = { ...this.config, ...newConfig };
-    
-    // Apply relevant updates
-    if (newConfig.ambientLightColor !== undefined) {
-      this.updateAmbientLight(newConfig.ambientLightColor);
-      this.config.ambientLightColor = newConfig.ambientLightColor;
-    }
-    if (newConfig.directionalLightColor !== undefined) {
-      this.updateDirectionalLight(newConfig.directionalLightColor);
-      this.config.directionalLightColor = newConfig.directionalLightColor;
-    }
-    if (newConfig.directionalLightIntensity !== undefined) {
-      this.updateDirectionalLightIntensity(newConfig.directionalLightIntensity);
-      this.config.directionalLightIntensity = newConfig.directionalLightIntensity;
-    }
-    if (newConfig.backgroundColor !== undefined && this.renderer) {
-      this.renderer.setClearColor(newConfig.backgroundColor);
-      this.config.backgroundColor = newConfig.backgroundColor;
-    }
-    if (newConfig.metalness !== undefined || newConfig.roughness !== undefined) {
-      this.updateMaterials();
-    }
-    if (newConfig.ssaoRadius !== undefined && this.ssaoPass) {
-      this.ssaoPass.kernelRadius = newConfig.ssaoRadius;
-    }
-    if (newConfig.rimStrength !== undefined) {
-      this.rimStrengthUniforms.forEach(uniform => {
-        uniform.value = newConfig.rimStrength!;
-      });
-    }
+  /** Return the renderer background without exposing renderer objects. */
+  getFigureBackground(): ViewerFigureBackground {
+    const color = this.renderer && typeof this.renderer.getClearColor === 'function'
+      ? this.renderer.getClearColor(new THREE.Color()).getHex()
+      : this.config?.backgroundColor ?? 0x000000;
+    const alpha = this.renderer && typeof this.renderer.getClearAlpha === 'function'
+      ? this.renderer.getClearAlpha()
+      : this.stylePreset?.background.clearAlpha ?? 1;
+    return Object.freeze({
+      color,
+      transparent: alpha < 1
+    });
+  }
 
-    if (newConfig.preset !== undefined) {
-      this.applyStylePreset(newConfig.preset);
+  /**
+   * Set the interactive and figure-export background as one observable
+   * appearance mutation. Returns false when the requested state is unchanged
+   * or the viewer is unavailable.
+   */
+  setFigureBackground(backgroundColor: number, transparent = false): boolean {
+    if (this.disposed || this.initializationFailed || !this.renderer) return false;
+    if (!Number.isInteger(backgroundColor) || backgroundColor < 0 || backgroundColor > 0xffffff) {
+      throw new RangeError(
+        'Figure background must be an integer RGB value between 0x000000 and 0xffffff.'
+      );
     }
-    
-    this.requestRender();
+    const nextColor = Math.trunc(backgroundColor);
+    const nextTransparent = Boolean(transparent);
+    const current = this.getFigureBackground();
+    if (current.color === nextColor && current.transparent === nextTransparent) return false;
+
+    this.withStateChangeBatch(() => {
+      this.config.backgroundColor = nextColor;
+      this.renderer.setClearColor(nextColor, nextTransparent ? 0 : 1);
+      if (this.container?.style) {
+        this.container.style.background = nextTransparent ? 'transparent' : colorToCSS(nextColor);
+      }
+      this.invalidateState(['appearance']);
+      this.requestRender();
+    });
+    return true;
+  }
+
+  updateConfig(newConfig: Partial<NeuroSurfaceViewerConfig>): void {
+    this.withStateChangeBatch(() => {
+      const normalizedConfig = normalizeLegacyViewerConfig(newConfig);
+      this.config = { ...this.config, ...normalizedConfig };
+
+      // Apply relevant updates
+      if (newConfig.ambientLightColor !== undefined) {
+        this.updateAmbientLight(newConfig.ambientLightColor);
+        this.config.ambientLightColor = newConfig.ambientLightColor;
+      }
+      if (newConfig.directionalLightColor !== undefined) {
+        this.updateDirectionalLight(newConfig.directionalLightColor);
+        this.config.directionalLightColor = newConfig.directionalLightColor;
+      }
+      if (newConfig.directionalLightIntensity !== undefined) {
+        this.updateDirectionalLightIntensity(newConfig.directionalLightIntensity);
+        this.config.directionalLightIntensity = newConfig.directionalLightIntensity;
+      }
+      if (newConfig.backgroundColor !== undefined && this.renderer) {
+        this.renderer.setClearColor(newConfig.backgroundColor);
+        this.config.backgroundColor = newConfig.backgroundColor;
+      }
+      if (newConfig.metalness !== undefined || newConfig.roughness !== undefined) {
+        this.updateMaterials();
+      }
+      if (newConfig.ssaoRadius !== undefined && this.ssaoPass) {
+        this.ssaoPass.kernelRadius = newConfig.ssaoRadius;
+      }
+      if (newConfig.rimStrength !== undefined) {
+        this.rimStrengthUniforms.forEach(uniform => {
+          uniform.value = newConfig.rimStrength!;
+        });
+      }
+
+      if (newConfig.preset !== undefined) {
+        this.applyStylePreset(newConfig.preset);
+      }
+
+      const observableKeys = Object.keys(newConfig).filter(key =>
+        key !== 'showControls' && key !== 'useControls' && key !== 'allowCDNFallback'
+      );
+      if (observableKeys.length > 0) {
+        this.invalidateState(['appearance']);
+      }
+      this.requestRender();
+    });
   }
 
   /**
@@ -3098,72 +3388,75 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
    * as the default palette policy for newly created layers.
    */
   applyStylePreset(preset: SurfViewStylePresetName | SurfViewStylePreset): SurfViewStylePreset {
-    const style = resolveStylePreset(preset);
-    this.stylePreset = style;
-    this.config.preset = style.name;
-    this.config.backgroundColor = style.background.clearColor;
-    this.config.ambientLightColor = style.lighting.ambientColor;
-    this.config.directionalLightColor = style.lighting.directionalColor;
-    this.config.directionalLightIntensity = style.lighting.directionalIntensity;
-    this.config.metalness = style.material.metalness;
-    this.config.roughness = style.material.roughness;
-    this.config.rimStrength = style.lighting.rimStrength;
-    this.config.ssaoRadius = style.lighting.ssaoRadius;
-    this.config.ssaoKernelSize = style.lighting.ssaoKernelSize;
+    return this.withStateChangeBatch(() => {
+      const style = resolveStylePreset(preset);
+      this.stylePreset = style;
+      this.config.preset = style.name;
+      this.config.backgroundColor = style.background.clearColor;
+      this.config.ambientLightColor = style.lighting.ambientColor;
+      this.config.directionalLightColor = style.lighting.directionalColor;
+      this.config.directionalLightIntensity = style.lighting.directionalIntensity;
+      this.config.metalness = style.material.metalness;
+      this.config.roughness = style.material.roughness;
+      this.config.rimStrength = style.lighting.rimStrength;
+      this.config.ssaoRadius = style.lighting.ssaoRadius;
+      this.config.ssaoKernelSize = style.lighting.ssaoKernelSize;
 
-    if (this.container) {
-      this.container.style.background = style.background.css;
-    }
-    if (this.renderer) {
-      this.renderer.setClearColor(style.background.clearColor, style.background.clearAlpha);
-    }
-    if (this.ambientLight) {
-      this.ambientLight.color.setHex(style.lighting.ambientColor);
-      this.ambientLight.intensity = style.lighting.ambientIntensity;
-    }
-    if (this.directionalLight) {
-      this.directionalLight.color.setHex(style.lighting.directionalColor);
-      this.directionalLight.intensity = style.lighting.directionalIntensity;
-      this.directionalLight.position.set(...style.lighting.directionalPosition);
-    }
-    if (this.ssaoPass) {
-      this.ssaoPass.kernelRadius = style.lighting.ssaoRadius;
-      if (typeof (this.ssaoPass as any).generateSampleKernel === 'function') {
-        (this.ssaoPass as any).kernelSize = style.lighting.ssaoKernelSize;
-        (this.ssaoPass as any).generateSampleKernel(style.lighting.ssaoKernelSize);
+      if (this.container) {
+        this.container.style.background = style.background.css;
       }
-    }
-    this.rimStrengthUniforms.forEach(uniform => {
-      uniform.value = style.lighting.rimStrength;
-    });
-    this.annotations.setDefaults({
-      radius: style.annotation.radius,
-      colorOn: style.annotation.colorOn,
-      colorOff: style.annotation.colorOff
-    });
-
-    this.surfaces.forEach(surface => {
-      if (typeof (surface as any).updateConfig === 'function') {
-        (surface as any).updateConfig({
-          color: style.material.baseColor,
-          materialType: style.material.materialType,
-          metalness: style.material.metalness,
-          roughness: style.material.roughness,
-          alpha: style.material.alpha
-        });
+      if (this.renderer) {
+        this.renderer.setClearColor(style.background.clearColor, style.background.clearAlpha);
       }
-      if (surface instanceof MultiLayerNeuroSurface) {
-        const curvature = surface.getCurvatureLayer();
-        if (curvature) {
-          curvature.setBrightness(style.curvature.brightness);
-          curvature.setContrast(style.curvature.contrast);
-          curvature.setSmoothness(style.curvature.smoothness);
+      if (this.ambientLight) {
+        this.ambientLight.color.setHex(style.lighting.ambientColor);
+        this.ambientLight.intensity = style.lighting.ambientIntensity;
+      }
+      if (this.directionalLight) {
+        this.directionalLight.color.setHex(style.lighting.directionalColor);
+        this.directionalLight.intensity = style.lighting.directionalIntensity;
+        this.directionalLight.position.set(...style.lighting.directionalPosition);
+      }
+      if (this.ssaoPass) {
+        this.ssaoPass.kernelRadius = style.lighting.ssaoRadius;
+        if (typeof (this.ssaoPass as any).generateSampleKernel === 'function') {
+          (this.ssaoPass as any).kernelSize = style.lighting.ssaoKernelSize;
+          (this.ssaoPass as any).generateSampleKernel(style.lighting.ssaoKernelSize);
         }
       }
-    });
+      this.rimStrengthUniforms.forEach(uniform => {
+        uniform.value = style.lighting.rimStrength;
+      });
+      this.annotations.setDefaults({
+        radius: style.annotation.radius,
+        colorOn: style.annotation.colorOn,
+        colorOff: style.annotation.colorOff
+      });
 
-    this.requestRender();
-    return style;
+      this.surfaces.forEach(surface => {
+        if (typeof (surface as any).updateConfig === 'function') {
+          (surface as any).updateConfig({
+            color: style.material.baseColor,
+            materialType: style.material.materialType,
+            metalness: style.material.metalness,
+            roughness: style.material.roughness,
+            alpha: style.material.alpha
+          });
+        }
+        if (surface instanceof MultiLayerNeuroSurface) {
+          const curvature = surface.getCurvatureLayer();
+          if (curvature) {
+            curvature.setBrightness(style.curvature.brightness);
+            curvature.setContrast(style.curvature.contrast);
+            curvature.setSmoothness(style.curvature.smoothness);
+          }
+        }
+      });
+
+      this.invalidateState(['appearance']);
+      this.requestRender();
+      return style;
+    });
   }
 
   /**
@@ -3191,11 +3484,12 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     return {
       position: this.camera.position.toArray(),
       rotation: this.camera.rotation.toArray(),
-      target: this.controls.target.toArray()
+      target: this.cameraControls.target.toArray()
     };
   }
 
   setCameraState(state: any): void {
+    this.currentAnatomicalView = null;
     if (state.position) {
       this.camera.position.fromArray(state.position);
     }
@@ -3203,9 +3497,10 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
       this.camera.rotation.fromArray(state.rotation);
     }
     if (state.target) {
-      this.controls.target.fromArray(state.target);
+      this.cameraControls.target.fromArray(state.target);
     }
-    this.controls.update();
+    this.cameraControls.update();
+    this.invalidateState(['camera']);
     this.requestRender();
   }
 }

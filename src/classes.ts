@@ -370,6 +370,8 @@ export abstract class NeuroSurface extends EventEmitter {
         
         // Update colors for the new mesh
         this.updateColors();
+        this.emit('material:updated', { surface: this });
+        this.emit('render:needed', { surface: this });
         return;
       }
       
@@ -704,21 +706,25 @@ export class ColorMappedNeuroSurface extends NeuroSurface {
       debugLog('ColorMappedNeuroSurface: Received rangeChanged event', range);
       this.irange = range;
       this.updateColors();
+      this.emit('material:updated', { surface: this });
     });
     this.thresholdListener = this.colorMap.on('thresholdChanged', (threshold) => {
       debugLog('ColorMappedNeuroSurface: Received thresholdChanged event', threshold);
       this.threshold = threshold;
       this.updateColors();
+      this.emit('material:updated', { surface: this });
     });
     this.alphaListener = this.colorMap.on('alphaChanged', (alpha) => {
       debugLog('ColorMappedNeuroSurface: Received alphaChanged event', alpha);
       this.config.alpha = alpha;
       this.updateColors();
+      this.emit('opacity:changed', { surface: this, opacity: alpha });
     });
 
     if (this.mesh) {
       this.updateColors();
     }
+    this.emit('material:updated', { surface: this });
   }
 
   getColorMapName(): string {
@@ -903,6 +909,7 @@ export class ColorMappedNeuroSurface extends NeuroSurface {
     }
     this.data = dataArray;
     this.updateColors();
+    this.emit('data:updated', { surface: this, data: this.data });
   }
 
   removeColorMapListeners(): void {
@@ -959,6 +966,7 @@ export class VertexColoredNeuroSurface extends NeuroSurface {
       this.colors[i * 3 + 2] = color.b;
     }
     this.updateColors();
+    this.emit('material:updated', { surface: this });
   }
 
   updateColors(): void {

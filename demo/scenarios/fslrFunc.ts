@@ -127,7 +127,6 @@ export const fslrFunc: Scenario = {
     ctx.mount.replaceChildren(mount);
 
     const { viewer, cleanup } = createViewer(mount, {
-      showControls: false,
       backgroundColor: 0x050912,
       ambientLightColor: 0x404040
     });

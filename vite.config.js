@@ -74,7 +74,13 @@ export default defineConfig({
     }
   },
   optimizeDeps: {
-    include: ['three', 'colormap'],
-    exclude: ['react', 'react-dom']
+    include: [
+      'three',
+      'colormap',
+      'react',
+      'react-dom',
+      'react-dom/client',
+      'react/jsx-runtime'
+    ]
   }
 });

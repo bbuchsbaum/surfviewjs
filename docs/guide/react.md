@@ -12,7 +12,7 @@ npm install surfview three react react-dom
 
 ```jsx
 import React, { useRef, useEffect } from 'react';
-import NeuroSurfaceViewerReact, { useNeuroSurface } from 'surfview/react';
+import { NeuroSurfaceViewerReact, useNeuroSurface } from 'surfview/react';
 
 function BrainViewer() {
   const viewerRef = useRef();
@@ -46,6 +46,56 @@ function BrainViewer() {
   );
 }
 ```
+
+## First-Party Scientific Controls
+
+The optional panel is a separate React entry over the same custom element used
+by non-React applications. Keep the viewer instance in state and pass it to the
+panel when `onReady` fires:
+
+```tsx
+import { useState } from 'react';
+import type { NeuroSurfaceViewer } from 'surfview';
+import { NeuroSurfaceViewerReact } from 'surfview/react';
+import { SurfViewControls } from 'surfview/controls/react';
+
+export function BrainWorkspace() {
+  const [viewer, setViewer] = useState<NeuroSurfaceViewer | null>(null);
+
+  return (
+    <main className="brain-workspace">
+      <NeuroSurfaceViewerReact
+        width={900}
+        height={700}
+        onReady={setViewer}
+      />
+      <aside aria-label="Surface settings">
+        <SurfViewControls
+          viewer={viewer}
+          label="Cortical surface controls"
+          theme="auto"
+          density="compact"
+          features={{
+            include: ['view', 'layers', 'layer-inspector', 'selection', 'figure']
+          }}
+        />
+      </aside>
+    </main>
+  );
+}
+```
+
+`viewer={null}` renders an empty host and mounts nothing. The wrapper disposes
+the panel on unmount, viewer replacement, and viewer disposal; React StrictMode
+does not leave duplicate subscriptions or custom elements. Pass `container`
+when an existing application-owned element should host the panel. In that
+form, `SurfViewControls` renders no additional wrapper.
+
+Changes to `label`, `theme`, `density`, and `features` update the mounted panel.
+Changes to `viewer`, `container`, `target`, `session`, or `pluginId` replace only
+the panel mount, never the viewer. Memoize `target` and `session` option objects
+when supplying them. See [First-party controls](./controls.md) for feature and
+lifecycle details.
 
 ## NeuroSurfaceViewer Component
 
@@ -155,7 +205,7 @@ const Viewer = hasDOM() ? NeuroSurfaceViewer : NoopNeuroSurfaceViewer;
 Full TypeScript support is included:
 
 ```tsx
-import NeuroSurfaceViewerReact from 'surfview/react';
+import { NeuroSurfaceViewerReact } from 'surfview/react';
 import type { ViewerConfig, SurfaceClickEvent } from 'surfview';
 
 const config: ViewerConfig = {
@@ -171,7 +221,7 @@ const handleClick = (event: SurfaceClickEvent) => {
 
 ```jsx
 import React, { useRef, useEffect, useState } from 'react';
-import NeuroSurfaceViewerReact, { useNeuroSurface } from 'surfview/react';
+import { NeuroSurfaceViewerReact, useNeuroSurface } from 'surfview/react';
 import { loadSurface } from 'surfview';
 
 function App() {

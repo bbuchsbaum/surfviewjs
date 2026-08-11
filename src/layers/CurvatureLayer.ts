@@ -57,7 +57,11 @@ export class CurvatureLayer extends Layer {
     config: CurvatureConfig = {}
   ) {
     // Curvature layer renders below base layer
-    super(id, { ...config, order: config.order ?? -2 });
+    super(
+      id,
+      { ...config, order: config.order ?? -2 },
+      { role: 'anatomy', pinned: 'bottom', reorderable: false, priority: 0 }
+    );
 
     this.curvature = curvature instanceof Float32Array
       ? curvature

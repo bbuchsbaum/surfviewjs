@@ -124,7 +124,6 @@ export const linkedFlatmap: Scenario = {
     ctx.mount.replaceChildren(layout);
 
     const { viewer, cleanup } = createViewer(viewerMount, {
-      showControls: false,
       hoverCrosshair: true,
       backgroundColor: 0x07101d,
       ambientLightColor: 0xb8c4d6,

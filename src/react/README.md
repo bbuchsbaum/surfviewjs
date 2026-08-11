@@ -2,6 +2,52 @@
 
 This directory contains React components and hooks for integrating the NeuroSurfaceViewer into React applications.
 
+## First-party controls
+
+The tailored control panel is a separate optional entry. It wraps the same
+custom element used by non-React applications; there is no second React
+implementation of the panel.
+
+```tsx
+import { useRef, useState } from 'react';
+import type { NeuroSurfaceViewer } from 'surfview';
+import { NeuroSurfaceViewerReact } from 'surfview/react';
+import { SurfViewControls } from 'surfview/controls/react';
+import type { SurfViewControlsHandle } from 'surfview/controls/react';
+
+function BrainControls() {
+  const [viewer, setViewer] = useState<NeuroSurfaceViewer | null>(null);
+  const controlsRef = useRef<SurfViewControlsHandle>(null);
+
+  return (
+    <>
+      <NeuroSurfaceViewerReact onReady={setViewer} />
+      <SurfViewControls
+        ref={controlsRef}
+        viewer={viewer}
+        theme="auto"
+        density="compact"
+        features={{
+          include: ['view', 'layers', 'layer-inspector', 'selection', 'figure']
+        }}
+        onMount={(handle) => console.log(handle.pluginId)}
+      />
+    </>
+  );
+}
+```
+
+By default the component renders its own application-layout host. Pass an
+existing `HTMLElement` through `container` to mount into an application-owned
+sidebar instead; in that form the React component renders no extra wrapper.
+Its forwarded ref receives the `SurfViewControlsHandle`.
+
+Changes to `label`, `theme`, `density`, and `features` update the existing
+panel. Replacing `viewer`, `container`, `target`, `session`, or `pluginId`
+replaces only the panel mount and never recreates the viewer. Memoize `target`
+and `session` option objects when using them. React StrictMode is supported:
+each acquired handle is disposed exactly once and only one panel remains live.
+
 ## Components
 
 ### `NeuroSurfaceViewerReact`
@@ -20,7 +66,6 @@ function App() {
       width={800}
       height={600}
       config={{
-        showControls: false,
         ambientLightColor: 0x404040
       }}
       viewpoint="lateral"
@@ -36,7 +81,6 @@ function App() {
 - `width` (number): Width of the viewer in pixels
 - `height` (number): Height of the viewer in pixels
 - `config` (object): Configuration options
-  - `showControls` (boolean): Deprecated compatibility no-op
   - `ambientLightColor` (number): Ambient light color (hex)
   - `directionalLightIntensity` (number): Directional light intensity
   - Other Three.js and rendering options
@@ -63,7 +107,7 @@ viewerRef.current.addLayer('surface-1', layer);
 viewerRef.current.updateLayer('surface-1', 'layer-1', { opacity: 0.5 });
 viewerRef.current.setViewpoint('medial');
 viewerRef.current.centerCamera();
-viewerRef.current.toggleControls();
+viewerRef.current.setInteractionEnabled(false);
 viewerRef.current.showCrosshair('surface-1', 123, { size: 2, color: 0xffcc00 });
 viewerRef.current.addAnnotation('surface-1', 123, { note: 'my point' });
 ```
@@ -166,7 +210,6 @@ function BrainViewer() {
       ref={viewerRef}
       width={window.innerWidth}
       height={window.innerHeight}
-      config={{ showControls: false }}
     />
   );
 }

@@ -84,14 +84,19 @@ export class TimelineController extends EventEmitter<TimelineEventMap> {
   }
 
   setSpeed(multiplier: number): void {
-    this.speed = Math.max(0.01, multiplier);
+    const speed = Math.max(0.01, multiplier);
+    if (speed === this.speed) return;
+    this.speed = speed;
+    this.emit('speedchange', { speed });
   }
 
   setLoop(mode: LoopMode): void {
+    if (mode === this.loopMode) return;
     this.loopMode = mode;
     if (mode !== 'bounce') {
       this.direction = 1;
     }
+    this.emit('loopchange', { loopMode: mode });
   }
 
   getState(): TimelineState {

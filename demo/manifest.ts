@@ -21,9 +21,13 @@ import { topologyLens } from './scenarios/topologyLens';
 import { linkedFlatmap } from './scenarios/linkedFlatmap';
 import { alignmentQA } from './scenarios/alignmentQA';
 import { publicationPresets } from './scenarios/publicationPresets';
+import { controlsPanel } from './scenarios/controlsPanel';
+import { controlsGallery } from './scenarios/controlsGallery';
 
 export const scenarios: Scenario[] = [
   quickstart,
+  controlsPanel,
+  controlsGallery,
   multilayer,
   curvature,
   clipping,

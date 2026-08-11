@@ -12,7 +12,7 @@ A modular Three.js-based brain surface visualization library for neuroimaging ap
 - Customizable colormaps for data visualization
 - React component support
 - Temporal playback with frame interpolation and sparkline tooltips
-- Report controls and a plugin API for application-specific controls
+- Optional first-party scientific controls, compact report controls, and a plugin API
 - Support for GIFTI format
 - TypeScript support
 
@@ -25,6 +25,11 @@ npm install surfview three
 # React apps
 npm install react react-dom
 ```
+
+The first-party panel lives at `surfview/controls`, its React adapter at
+`surfview/controls/react`, and portable report mounting at `surfview/report`.
+See the [controls guide](docs/guide/controls.md) for package boundaries and
+integration contracts.
 
 ## Quick Start
 
@@ -53,6 +58,29 @@ viewer.addSurface(surface, 'brain');
 viewer.startRenderLoop();
 ```
 
+### Optional Scientific Controls
+
+Mount the first-party panel into a container owned by your application. It is
+an ordinary DOM sibling of the canvas: mounting it does not add scene objects,
+move the camera, or rearrange the host page.
+
+```javascript
+import { mountSurfViewControls } from 'surfview/controls';
+
+const controls = mountSurfViewControls(
+  viewer,
+  document.getElementById('controls'),
+  { theme: 'auto', density: 'compact' }
+);
+
+// Removes the panel and its subscriptions; safe to call more than once.
+controls.dispose();
+```
+
+Try the [full configuration gallery](https://bbuchsbaum.github.io/surfviewjs/demo/?scenario=controls-gallery)
+or read the [controls guide](docs/guide/controls.md) for feature subsets, React,
+report scenes, lifecycle, and migration from the former pane API.
+
 ## Demo Hub
 
 Run a unified, menu-driven set of visual checks:
@@ -67,7 +95,7 @@ This starts a Vite-powered demo app under `demo/` with scenarios for quick-start
 
 ```jsx
 import React, { useRef } from 'react';
-import NeuroSurfaceViewerReact, { useNeuroSurface } from 'surfview/react';
+import { NeuroSurfaceViewerReact, useNeuroSurface } from 'surfview/react';
 
 function BrainViewer() {
   const viewerRef = useRef();
@@ -154,7 +182,9 @@ surface.updateColors();
 #### Layer management quick hits
 - Add: `surface.addLayer(layer)` where `layer` is `BaseLayer`, `DataLayer`, `RGBALayer`, `VolumeProjectionLayer`, `OutlineLayer`, or `LabelLayer`.
 - Update: `surface.updateLayer(id, updates)` for single-layer tweaks or `surface.updateLayers([{ id, ...updates }])` for batches (no `type` required when updating).
-- Order: `surface.setLayerOrder(['base', 'activation', 'roi'])`.
+- Order: read `surface.getOrderedLayers()`, then use the typed, atomic
+  `surface.setLayerOrder([...])` or `surface.moveLayer(id, index)` commands.
+  Anatomy underlays and outline/connectivity overlays remain pinned.
 - Clear: `surface.clearLayers()` removes all non-base layers; pass `{ includeBase: true }` to drop the base too.
 - CPU vs GPU compositing: pass `useGPUCompositing: true` in `MultiLayerNeuroSurface` config to enable WebGL2-based blending; call `surface.setWideLines(false)` if your platform dislikes wide-line outlines.
 
@@ -264,9 +294,9 @@ const surfaceData = {
 #### Config Options
 ```typescript
 interface ViewerConfig {
-  showControls?: boolean;      // deprecated compatibility no-op
-  useControls?: boolean;       // deprecated compatibility no-op
-  allowCDNFallback?: boolean;  // deprecated compatibility no-op
+  showControls?: boolean;      // deprecated warning-only compatibility flag
+  useControls?: boolean;       // deprecated warning-only compatibility flag
+  allowCDNFallback?: boolean;  // deprecated warning-only compatibility flag
   backgroundColor?: number;
   ambientLightColor?: number;
   directionalLightColor?: number;
@@ -299,8 +329,10 @@ type Viewpoint = 'lateral' | 'medial' | 'ventral' | 'posterior' | 'anterior' | '
 - `resetCamera()`: Reset camera distance/up
 - `setViewpoint(viewpoint)`: Set camera viewpoint
 - `startRenderLoop()`: Begin the animation/render loop
-- `resize(width, height)`: Resize renderer + controls
-- `toggleControls(show?)`: Deprecated compatibility no-op
+- `cameraControls`: Camera/surface interaction controller; preferred over the deprecated `controls` alias
+- `setInteractionEnabled(enabled)`, `isInteractionEnabled()`: Control camera and surface interaction
+- `resize(width, height)`: Resize renderer + camera interaction controls
+- `toggleControls(show?)`: Deprecated warning no-op, scheduled for removal in v3
 - `addLayer(surfaceId, layer)`, `updateLayer(surfaceId, layerId, updates)`, `removeLayer(surfaceId, layerId)`, `clearLayers(surfaceId, { includeBase? })`
 - `pick({ x, y })`: Ray-pick a surface/vertex under screen coordinates
 - `dispose()`: Clean up resources
@@ -322,7 +354,8 @@ if (hit.surfaceId && hit.vertexIndex !== null) {
 - Set `config.hoverCrosshair = true` to show a lightweight hover crosshair (throttled).
 - Set `config.clickToAddAnnotation = true` to drop an annotation + activate it on click.
 - `onSurfaceClick` is now fired from the core viewer after a successful pick.
-- For generated reports, use `mountSurfView(..., { controls: true })`. Applications can build controls against viewer methods and events or package them as a `ViewerPlugin`.
+- For generated reports, import `mountSurfView` from `surfview/report` and use `{ controls: true }`. Applications can mount the scientific panel from `surfview/controls` or package specialized behavior as a `ViewerPlugin`.
+- The former Tweakpane implementation has been deleted. See the [viewer migration table](docs/guide/viewer.md#pane-era-api-migration) for the 2.x compatibility shims and v3 removals.
 
 ### ColorMap
 

@@ -50,6 +50,8 @@ export interface TimelineEventMap {
   pause: void;
   stop: void;
   timechange: TimelineEvent;
+  speedchange: { speed: number };
+  loopchange: { loopMode: LoopMode };
 }
 
 export type LoopMode = 'none' | 'loop' | 'bounce';

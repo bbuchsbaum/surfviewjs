@@ -235,6 +235,8 @@ export class MorphableSurface extends MultiLayerNeuroSurface {
     // Recompute morph normals
     bufferGeometry.computeVertexNormals();
 
+    this.emit('geometry:updated', { surface: this });
+    this.emit('render:needed', { surface: this });
     debugLog(`Added morph target "${name}" at index ${index}`);
   }
 
@@ -273,6 +275,8 @@ export class MorphableSurface extends MultiLayerNeuroSurface {
     // Remove curvature
     delete this.morphTargetCurvatures[name];
 
+    this.emit('geometry:updated', { surface: this });
+    this.emit('render:needed', { surface: this });
     debugLog(`Removed morph target "${name}"`);
     return true;
   }

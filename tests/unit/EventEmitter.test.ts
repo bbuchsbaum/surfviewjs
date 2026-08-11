@@ -30,6 +30,18 @@ describe('EventEmitter', () => {
     expect(fn2).toHaveBeenCalledWith('x');
   });
 
+  it('notifies later listeners before rethrowing the first listener failure', () => {
+    const emitter = new EventEmitter();
+    const later = vi.fn();
+    emitter.on('test', () => {
+      throw new Error('listener failed');
+    });
+    emitter.on('test', later);
+
+    expect(() => emitter.emit('test', 'x')).toThrow('listener failed');
+    expect(later).toHaveBeenCalledWith('x');
+  });
+
   it('does not call listeners for different events', () => {
     const emitter = new EventEmitter();
     const fn = vi.fn();

@@ -108,6 +108,12 @@ describe('lazy scene mount lifecycle', () => {
 
     expect(observations).toBe(1);
     expect(handle.viewer).toBeNull();
+    expect(handle.controlTarget).toBeNull();
+    expect(handle.getAnatomicalViewCapabilities()).toEqual({
+      views: ['lateral', 'medial', 'dorsal', 'ventral', 'anterior', 'posterior'],
+      singleSurfaceIds: ['left'],
+      bilateralGroups: []
+    });
     expect(container.querySelector('canvas')).toBeNull();
     expect(requestFrame).not.toHaveBeenCalled();
 
@@ -115,6 +121,7 @@ describe('lazy scene mount lifecycle', () => {
     handle.dispose();
     await expect(handle.ready).rejects.toMatchObject({ name: 'AbortError' });
     expect(disconnects).toBe(1);
+    expect(handle.controlTarget).toBeNull();
     expect(container.childElementCount).toBe(0);
     expect(requestFrame).not.toHaveBeenCalled();
   });
@@ -146,6 +153,38 @@ describe('lazy scene mount lifecycle', () => {
     handle.dispose();
     await expect(handle.ready).rejects.toMatchObject({ name: 'AbortError' });
     expect(fetchSignal?.aborted).toBe(true);
+    expect(container.childElementCount).toBe(0);
+  });
+
+  it('rejects ready with the mount failure even when the onError observer throws', async () => {
+    const manifest = manifestFixture();
+    for (const asset of Object.values(manifest.assets)) {
+      delete asset.data;
+      delete asset.encoding;
+      asset.uri = `${asset.id}.bin`;
+    }
+    const mountFailure = new Error('fixture asset unavailable');
+    const onError = vi.fn(() => {
+      throw new Error('observer failed');
+    });
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const handle = mountSurfView(container, manifest, {
+      lazy: false,
+      fetcher: vi.fn(async () => {
+        throw mountFailure;
+      }) as typeof fetch,
+      onError
+    });
+
+    await expect(handle.ready).rejects.toBe(mountFailure);
+    expect(onError).toHaveBeenCalledWith(mountFailure);
+    expect(handle.viewer).toBeNull();
+    expect(handle.controlTarget).toBeNull();
+    expect(container.querySelector('[role="alert"]')?.textContent)
+      .toContain('fixture asset unavailable');
+
+    handle.dispose();
     expect(container.childElementCount).toBe(0);
   });
 });

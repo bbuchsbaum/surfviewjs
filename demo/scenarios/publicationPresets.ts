@@ -105,7 +105,6 @@ export const publicationPresets: Scenario = {
 
     const { viewer, cleanup } = createViewer(mount, {
       preset: 'paper-light',
-      showControls: false,
       hoverCrosshair: true
     });
 

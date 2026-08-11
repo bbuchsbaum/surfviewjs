@@ -6,8 +6,18 @@ import { MultiLayerNeuroSurface } from '../../src/MultiLayerNeuroSurface';
 import { NeuroSurfaceViewer } from '../../src/NeuroSurfaceViewer';
 import { SurfaceGeometry } from '../../src/classes';
 import { DataLayer } from '../../src/layers';
+import { PluginHost } from '../../src/PluginHost';
+import { TemporalDataLayer } from '../../src/temporal/TemporalDataLayer';
 import type { TimelineEventMap } from '../../src/temporal';
-import type { AnnotationEvent, LayerEvent, LayerUpdatedEvent, ParcelSelectionEvent, ViewerEventMap } from '../../src/events';
+import type {
+  AnnotationEvent,
+  LayerEvent,
+  LayerReorderedEvent,
+  LayerUpdatedEvent,
+  ParcelSelectionEvent,
+  ViewerEventMap,
+  ViewerStateChangedEvent
+} from '../../src/events';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -23,6 +33,53 @@ function makeSurfaceGeometry(): SurfaceGeometry {
     new Uint32Array([0, 1, 2]),
     'left'
   );
+}
+
+function makeObservableViewer(): NeuroSurfaceViewer {
+  const viewer = new EventEmitter<ViewerEventMap>() as any;
+  Object.setPrototypeOf(viewer, NeuroSurfaceViewer.prototype);
+  viewer.disposed = false;
+  viewer.initializationFailed = false;
+  viewer.stateRevision = 0;
+  viewer.stateChangeBatchDepth = 0;
+  viewer.pendingStateDomains = new Set();
+  viewer.surfaceSubscriptions = new Map();
+  viewer.container = {} as HTMLElement;
+  viewer.surfaces = new Map();
+  viewer.scene = new THREE.Scene();
+  viewer.width = 400;
+  viewer.height = 300;
+  viewer.renderer = { getPixelRatio: () => 1 };
+  viewer.config = {
+    useShaders: false,
+    rimStrength: 0,
+    initialZoom: 12,
+    hoverCrosshairSize: 1.2,
+    hoverCrosshairColor: 0x66ccff
+  };
+  viewer.viewpoint = 'lateral';
+  viewer.rimStrengthUniforms = [];
+  viewer.gpuPicker = null;
+  viewer.selectedLayerId = null;
+  viewer.selectedSurfaceId = null;
+  viewer.cameraInteractionEnabled = true;
+  viewer.cameraControls = { enabled: true };
+  viewer.ambientLight = new THREE.AmbientLight(0xffffff);
+  viewer.crosshair = {
+    visible: false,
+    surfaceId: null,
+    size: 1,
+    color: 0xffffff,
+    show: vi.fn(),
+    hide: vi.fn(),
+    toggle: vi.fn()
+  };
+  viewer.annotations = { removeBySurface: vi.fn() };
+  viewer.centerCamera = vi.fn();
+  viewer.setViewpoint = vi.fn();
+  viewer.requestRender = vi.fn();
+  viewer.plugins = new PluginHost(viewer);
+  return viewer;
 }
 
 describe('typed event maps', () => {
@@ -212,5 +269,225 @@ describe('runtime event flows', () => {
       parcelId: null,
       selected: false
     });
+  });
+});
+
+describe('viewer state revisions', () => {
+  it('forwards canonical layer reorder events and one layers-domain revision', () => {
+    vi.stubGlobal('requestAnimationFrame', () => 1);
+    const viewer = makeObservableViewer();
+    const surface = new MultiLayerNeuroSurface(makeSurfaceGeometry());
+    surface.addLayer(new DataLayer('first', new Float32Array([1, 2, 3]), null, 'viridis'));
+    surface.addLayer(new DataLayer('second', new Float32Array([3, 2, 1]), null, 'viridis'));
+    viewer.addSurface(surface, 'lh');
+
+    const reordered: LayerReorderedEvent[] = [];
+    const revisions: ViewerStateChangedEvent[] = [];
+    viewer.on('layer:reordered', event => reordered.push(event));
+    viewer.on('state:changed', event => revisions.push(event));
+    const previousRevision = viewer.getStateRevision();
+
+    const result = viewer.moveLayer('lh', 'second', 1);
+
+    expect(result).toEqual({
+      ok: true,
+      changed: true,
+      order: ['base', 'second', 'first']
+    });
+    expect(reordered).toEqual([{
+      surfaceId: 'lh',
+      order: ['base', 'second', 'first'],
+      previousOrder: ['base', 'first', 'second'],
+      movedLayerId: 'second'
+    }]);
+    expect(revisions).toEqual([{
+      revision: previousRevision + 1,
+      domains: ['layers']
+    }]);
+  });
+
+  it('covers control-relevant mutation domains without treating render requests as state', () => {
+    vi.stubGlobal('requestAnimationFrame', () => 1);
+    const viewer = makeObservableViewer();
+    const surface = new MultiLayerNeuroSurface(makeSurfaceGeometry());
+    const layer = new DataLayer('activation', new Float32Array([0, 0.5, 1]), null, 'viridis');
+    surface.addLayer(layer);
+    viewer.addSurface(surface, 'lh');
+
+    const changes: ViewerStateChangedEvent[] = [];
+    viewer.on('state:changed', event => changes.push(event));
+    const expectMutation = (operation: () => void, domains: ViewerStateChangedEvent['domains']) => {
+      const previousRevision = viewer.getStateRevision();
+      operation();
+      expect(changes.at(-1)).toEqual({
+        revision: previousRevision + 1,
+        domains
+      });
+    };
+
+    expectMutation(() => viewer.setInteractionEnabled(false), ['camera']);
+    expectMutation(() => viewer.separateHemispheres(10), ['surfaces']);
+    expectMutation(() => surface.setVisible(false), ['surfaces', 'appearance']);
+    expectMutation(() => viewer.updateAmbientLight(0x123456), ['appearance']);
+    expectMutation(() => viewer.showCrosshair('lh', 1), ['selection']);
+    expectMutation(() => layer.setOpacity(0.4), ['layers']);
+
+    const revision = viewer.getStateRevision();
+    viewer.requestRender();
+    viewer.emit('render:needed');
+    expect(viewer.getStateRevision()).toBe(revision);
+  });
+
+  it('forwards direct layer setters with changed properties and monotonic revisions', () => {
+    vi.stubGlobal('requestAnimationFrame', () => 1);
+    const viewer = makeObservableViewer();
+    const surface = new MultiLayerNeuroSurface(makeSurfaceGeometry());
+    const layer = new DataLayer('activation', new Float32Array([0, 0.5, 1]), null, 'viridis');
+    surface.addLayer(layer);
+    viewer.addSurface(surface, 'lh');
+
+    const updates: LayerUpdatedEvent[] = [];
+    const revisions: ViewerStateChangedEvent[] = [];
+    viewer.on('layer:updated', event => updates.push(event));
+    viewer.on('state:changed', event => revisions.push(event));
+
+    layer.setOpacity(0.25);
+    layer.setRange([-2, 2]);
+
+    expect(updates).toHaveLength(2);
+    expect(updates[0]).toMatchObject({
+      surfaceId: 'lh',
+      layerId: 'activation',
+      changes: { opacity: 0.25 }
+    });
+    expect(updates[1]).toMatchObject({
+      surfaceId: 'lh',
+      layerId: 'activation',
+      changes: { range: [-2, 2] }
+    });
+    expect(revisions.map(event => event.domains)).toEqual([['layers'], ['layers']]);
+    expect(revisions[1].revision).toBe(revisions[0].revision + 1);
+  });
+
+  it('coalesces compound layer updates and reports all affected domains deterministically', () => {
+    vi.stubGlobal('requestAnimationFrame', () => 1);
+    const viewer = makeObservableViewer();
+    const surface = new MultiLayerNeuroSurface(makeSurfaceGeometry());
+    const layer = new DataLayer('activation', new Float32Array([0, 0.5, 1]), null, 'viridis');
+    surface.addLayer(layer);
+    viewer.addSurface(surface, 'lh');
+
+    const updates: LayerUpdatedEvent[] = [];
+    const revisions: ViewerStateChangedEvent[] = [];
+    viewer.on('layer:updated', event => updates.push(event));
+    viewer.on('state:changed', event => revisions.push(event));
+    const baseline = viewer.getStateRevision();
+
+    viewer.updateLayer('lh', 'activation', {
+      opacity: 0.5,
+      range: [-1, 1],
+      threshold: [-0.2, 0.2]
+    });
+
+    expect(updates).toHaveLength(1);
+    expect(updates[0].changes).toEqual({
+      range: [-1, 1],
+      threshold: [-0.2, 0.2],
+      opacity: 0.5
+    });
+    expect(revisions).toEqual([{ revision: baseline + 1, domains: ['layers'] }]);
+  });
+
+  it('coalesces compound mutations across domains in canonical order', () => {
+    const viewer = makeObservableViewer() as any;
+    const changes: ViewerStateChangedEvent[] = [];
+    viewer.on('state:changed', (event: ViewerStateChangedEvent) => changes.push(event));
+
+    viewer.withStateChangeBatch(() => {
+      viewer.invalidateState(['appearance', 'selection']);
+      viewer.emit('controls:changed', { enabled: false });
+      viewer.invalidateState(['surfaces']);
+    });
+
+    expect(changes).toEqual([{
+      revision: 1,
+      domains: ['camera', 'surfaces', 'selection', 'appearance']
+    }]);
+  });
+
+  it('still invalidates coarse state when a specific-event subscriber throws', () => {
+    const viewer = makeObservableViewer();
+    const stateChanged = vi.fn();
+    viewer.on('controls:changed', () => {
+      throw new Error('subscriber failed');
+    });
+    viewer.on('state:changed', stateChanged);
+
+    expect(() => viewer.emit('controls:changed', { enabled: false })).toThrow('subscriber failed');
+    expect(stateChanged).toHaveBeenCalledWith({ revision: 1, domains: ['camera'] });
+  });
+
+  it('includes timeline when a temporal layer changes its displayed frame', () => {
+    vi.stubGlobal('requestAnimationFrame', () => 1);
+    const viewer = makeObservableViewer();
+    const surface = new MultiLayerNeuroSurface(makeSurfaceGeometry());
+    const layer = new TemporalDataLayer(
+      'bold',
+      [new Float32Array([0, 1, 2]), new Float32Array([2, 3, 4])],
+      [0, 1],
+      'viridis',
+      {}
+    );
+    surface.addLayer(layer);
+    viewer.addSurface(surface, 'lh');
+
+    const changes: ViewerStateChangedEvent[] = [];
+    viewer.on('state:changed', event => changes.push(event));
+    const baseline = viewer.getStateRevision();
+
+    layer.setTime(0, 1, 0.5);
+
+    expect(changes).toEqual([{
+      revision: baseline + 1,
+      domains: ['layers', 'timeline']
+    }]);
+  });
+
+  it('observes direct surface disposal and removes the stale viewer registration', () => {
+    vi.stubGlobal('requestAnimationFrame', () => 1);
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    const viewer = makeObservableViewer();
+    const surface = new MultiLayerNeuroSurface(makeSurfaceGeometry());
+    surface.addLayer(new DataLayer('activation', new Float32Array([0, 0.5, 1]), null, 'viridis'));
+    viewer.addSurface(surface, 'lh');
+
+    const changes: ViewerStateChangedEvent[] = [];
+    viewer.on('state:changed', event => changes.push(event));
+    const baseline = viewer.getStateRevision();
+
+    surface.dispose();
+
+    expect(viewer.getSurface('lh')).toBeUndefined();
+    expect(changes).toEqual([{
+      revision: baseline + 1,
+      domains: ['surfaces', 'selection']
+    }]);
+  });
+
+  it('stops viewer notifications after disposal', () => {
+    const viewer = makeObservableViewer() as any;
+    viewer.initializationFailed = true;
+    const stateChanged = vi.fn();
+    const controlsChanged = vi.fn();
+    viewer.on('state:changed', stateChanged);
+    viewer.on('controls:changed', controlsChanged);
+
+    viewer.dispose();
+    viewer.emit('controls:changed', { enabled: false });
+    viewer.setInteractionEnabled(false);
+
+    expect(stateChanged).not.toHaveBeenCalled();
+    expect(controlsChanged).not.toHaveBeenCalled();
+    expect(viewer.getStateRevision()).toBe(0);
   });
 });

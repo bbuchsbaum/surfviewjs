@@ -20,8 +20,8 @@ function makeNoise(vertexCount: number): Float32Array {
 export const quickstart: Scenario = {
   id: 'quickstart',
   title: 'Quick start viewer',
-  description: 'Sphere with random data, controls toggle, and colormap sanity check.',
-  tags: ['core', 'controls', 'colormap'],
+  description: 'Sphere with random data, camera interaction, and colormap sanity check.',
+  tags: ['core', 'interaction', 'colormap'],
   run: async (ctx: ScenarioRunContext) => {
     ctx.status('Building viewer');
     const mount = document.createElement('div');
@@ -30,7 +30,6 @@ export const quickstart: Scenario = {
     ctx.mount.replaceChildren(mount);
 
     const { viewer, cleanup } = createViewer(mount, {
-      showControls: false,
       backgroundColor: 0x050912
     });
 
@@ -58,10 +57,10 @@ export const quickstart: Scenario = {
     ctx.panel.innerHTML = `
       <div class="panel-section">
         <h4>What this shows</h4>
-        <p>Baseline viewer setup, control overlay, and colormap updates.</p>
+        <p>Baseline viewer setup, explicit interaction control, and colormap updates.</p>
         <div class="panel-controls">
           <button id="regen-data" class="primary">Regenerate data</button>
-          <button id="toggle-controls" class="ghost">Toggle controls</button>
+          <button id="toggle-interaction" class="ghost">Disable interaction</button>
           <button id="spin-view" class="ghost">Re-center view</button>
         </div>
       </div>
@@ -72,7 +71,7 @@ export const quickstart: Scenario = {
     `;
 
     const regenBtn = ctx.panel.querySelector('#regen-data');
-    const toggleBtn = ctx.panel.querySelector('#toggle-controls');
+    const interactionBtn = ctx.panel.querySelector<HTMLButtonElement>('#toggle-interaction');
     const spinBtn = ctx.panel.querySelector('#spin-view');
     const info = ctx.panel.querySelector('#qs-status');
 
@@ -88,8 +87,10 @@ export const quickstart: Scenario = {
       viewer.requestRender();
     });
 
-    toggleBtn?.addEventListener('click', () => {
-      viewer.toggleControls();
+    interactionBtn?.addEventListener('click', () => {
+      const enabled = !viewer.isInteractionEnabled();
+      viewer.setInteractionEnabled(enabled);
+      interactionBtn.textContent = enabled ? 'Disable interaction' : 'Enable interaction';
     });
 
     spinBtn?.addEventListener('click', () => {

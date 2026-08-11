@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SurfView React controls fixture</title>
+    <style>
+      html, body { margin: 0; min-height: 100%; font-family: system-ui, sans-serif; }
+      main { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr) 22rem; padding: 1rem; }
+      #viewer { height: 32rem; min-width: 0; }
+      #controls { min-width: 0; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div id="viewer" aria-label="Surface viewer"></div>
+      <aside id="controls" aria-label="React controls host"></aside>
+    </main>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>

@@ -71,7 +71,6 @@ export const temporalPlayback: Scenario = {
     ctx.mount.replaceChildren(mount);
 
     const { viewer, cleanup } = createViewer(mount, {
-      showControls: false,
       backgroundColor: 0x0a0a14,
       hoverCrosshair: true
     });

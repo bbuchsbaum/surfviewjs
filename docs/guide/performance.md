@@ -16,9 +16,9 @@ Tips for optimizing SurfView.js performance with large meshes and multiple layer
 ### Quick Wins
 
 ```javascript
-// 1. Disable expensive effects
+// 1. Keep expensive effects disabled unless needed
 const viewer = new NeuroSurfaceViewer(container, width, height, {
-  showControls: false,  // Disable if not needed
+  useShaders: false
 });
 
 // 2. Use basic materials for large meshes

@@ -55,7 +55,7 @@ export default defineConfig({
       { text: 'API', link: '/api/', activeMatch: '/api/' },
       { text: 'Demo', link: 'https://bbuchsbaum.github.io/surfviewjs/demo/' },
       {
-        text: 'v2.1.0',
+        text: 'v2.2.0',
         items: [
           { text: 'Release Notes', link: 'https://github.com/bbuchsbaum/surfviewjs/releases' },
           { text: 'npm', link: 'https://www.npmjs.com/package/surfview' },
@@ -71,6 +71,7 @@ export default defineConfig({
           items: [
             { text: 'Getting Started', link: '/guide/getting-started' },
             { text: 'Quick Start', link: '/guide/quick-start' },
+            { text: 'First-party controls', link: '/guide/controls' },
             { text: 'Portable report scenes', link: '/guide/portable-scenes' },
           ],
         },

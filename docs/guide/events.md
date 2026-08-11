@@ -141,6 +141,30 @@ heatmap.onSelectParcel((parcelId) => {
 
 These methods use a parcelized surface's representative vertex internally, so external tools can synchronize hover and selection without synthesizing mouse events.
 
+### Scientific Selection Events
+
+`selection:changed` is the canonical scientific-selection event. Its payload
+contains immutable current and previous selections and never contains a live
+surface, layer, annotation, or Three.js object.
+
+```javascript
+viewer.on('selection:changed', ({ selection, previous }) => {
+  console.log('Inspection selection:', previous, '→', selection);
+});
+
+viewer.setInspectionSelection({
+  kind: 'parcel',
+  surfaceId: 'parcel-connectivity',
+  parcelId: 17
+});
+```
+
+Successful changes invalidate the `selection` state domain. Repeating the
+same selection is a successful no-op and emits no event. Invalid commands are
+atomic. `parcel:selected` remains as a compatibility interaction event;
+panel-local layer focus and annotation activation are not inspection
+selection.
+
 ### Annotation Events
 
 ```javascript
@@ -199,7 +223,7 @@ viewer.on('resize', ({ width, height }) => {
 });
 
 viewer.on('controls:changed', ({ enabled }) => {
-  console.log(`Controls enabled: ${enabled}`);
+  console.log(`Camera interaction enabled: ${enabled}`);
 });
 
 viewer.on('controls:error', ({ error }) => {
@@ -207,20 +231,49 @@ viewer.on('controls:error', ({ error }) => {
 });
 ```
 
+`controls:changed` retains its 2.x event name for compatibility, but its payload
+describes camera and surface interaction. Prefer `setInteractionEnabled()` when
+changing that state; it is unrelated to optional panel visibility.
+
 ### State Events
 
 ```javascript
+viewer.on('state:changed', ({ revision, domains }) => {
+  console.log(`Viewer state revision ${revision}`, domains);
+});
+
 viewer.on('state:restored', (report) => {
-  console.log('State restored:', report.success, report.warnings);
+  console.log('State restored:', report.success, report.errors, report.warnings);
 });
 ```
+
+`state:restored` is also emitted for rejected input. `report.errors` contains
+validation issues with `code`, `path`, and `message`; validation errors are
+reported before mutation, so a failed restore does not advance the canonical
+state revision. `report.warnings` is reserved for runtime adapter failures that
+occur only after validation succeeds.
+
+`state:changed` is the dependable coarse invalidation contract for external
+controllers. `revision` increases monotonically, and `domains` contains one or
+more of `camera`, `surfaces`, `layers`, `selection`, `appearance`, and
+`timeline`. Compound viewer operations may combine several domains into one
+revision. `viewer.getStateRevision()` returns the most recently issued
+revision. Direct public layer setters are included: for example,
+`layer.setOpacity()` and `layer.setRange()` produce a `layers` invalidation and
+a `layer:updated` event whose `changes` payload identifies the changed
+properties.
+
+The event is synchronous state invalidation, not a render-completed signal.
+Do not infer state mutations from `render:needed`, animation frames, or
+`requestRender()`; render requests can occur without any canonical state
+change. Use `render:after` only when work truly depends on a completed frame.
 
 ## Plugin Panels
 
 Plugins mount into an element and subscribe through the typed viewer event API. Subscriptions made through `api.on()` are removed automatically when the plugin is unregistered.
 
 ```javascript
-viewer.registerPlugin({
+const registration = viewer.registerPlugin({
   id: 'retinotopy-panel',
   mount(container, api) {
     const label = document.createElement('div');
@@ -238,8 +291,16 @@ viewer.registerPlugin({
   }
 });
 
-viewer.unregisterPlugin('retinotopy-panel');
+// Either path deregisters and tears down exactly once.
+registration.dispose();
+viewer.unregisterPlugin('retinotopy-panel'); // false after direct disposal
 ```
+
+Registration disposal is idempotent. Direct handle disposal removes the plugin
+from `getPlugin()` and `listPlugins()` immediately; later unregister, viewer
+disposal, or repeated handle disposal does not invoke teardown again. Viewer
+disposal also removes viewer event listeners, so no further viewer
+notifications are delivered.
 
 ## Temporal Events
 
@@ -260,6 +321,14 @@ timeline.on('pause', () => {
 
 timeline.on('stop', () => {
   console.log('Timeline stopped');
+});
+
+timeline.on('speedchange', ({ speed }) => {
+  console.log('Timeline speed:', speed);
+});
+
+timeline.on('loopchange', ({ loopMode }) => {
+  console.log('Timeline loop mode:', loopMode);
 });
 ```
 

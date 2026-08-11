@@ -10,7 +10,7 @@ import {
 } from '@src/index.js';
 import { createViewer } from '../viewerHarness';
 import type { Scenario, ScenarioRunContext } from '../types';
-import type { ViewerStateV1 } from '@src/serialization';
+import type { ViewerStateV2 } from '@src/serialization';
 
 // ---------------------------------------------------------------------------
 // Synthetic data
@@ -53,7 +53,6 @@ export const stateSerialization: Scenario = {
     ctx.mount.replaceChildren(mount);
 
     const { viewer, cleanup } = createViewer(mount, {
-      showControls: false,
       backgroundColor: 0x0a0f1c,
       preset: 'presentation',
       rimStrength: 0.1
@@ -76,7 +75,7 @@ export const stateSerialization: Scenario = {
     viewer.requestRender();
 
     // --- Saved state slot ---
-    let savedState: ViewerStateV1 | null = null;
+    let savedState: ViewerStateV2 | null = null;
 
     const updateStatus = () => {
       const tag = savedState ? 'State saved' : 'No saved state';

@@ -42,7 +42,19 @@ export class EventEmitter<Events extends object = Record<never, never>> {
   emit<K extends string>(event: K, ...args: EventArgsFor<Events, K>): void {
     if (this._events[event]) {
       // Copy listeners to avoid issues if the array is modified during emit
-      [...this._events[event]].forEach((listener) => listener(...args));
+      let failure: unknown;
+      let failed = false;
+      for (const listener of [...this._events[event]]) {
+        try {
+          listener(...args);
+        } catch (error) {
+          if (!failed) {
+            failed = true;
+            failure = error;
+          }
+        }
+      }
+      if (failed) throw failure;
     }
   }
 

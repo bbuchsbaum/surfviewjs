@@ -205,9 +205,31 @@ surface.clearLayers({ includeBase: true });
 ### Layer Order
 
 ```javascript
-// Set explicit order (bottom to top)
-surface.setLayerOrder(['base', 'activation', 'roi', 'outline']);
+// Read the exact bottom-to-top order used by CPU and GPU compositing.
+const ordered = surface.getOrderedLayers();
+
+// Set a complete legal order atomically.
+const result = surface.setLayerOrder(['base', 'activation', 'roi', 'outline']);
+if (!result.ok) {
+  console.warn(result.code, result.message);
+}
+
+// Or move one reorderable layer to an exact stack index.
+surface.moveLayer('roi', 1);
 ```
+
+The stack owns runtime ordering. `LayerConfig.order` and `layer.order` are
+deprecated initialization hints in SurfViewJS 2.x; changing `layer.order`
+after insertion does not reorder the stack. Use `setLayerOrder()` or
+`moveLayer()` instead.
+
+Orders must contain every current layer exactly once. Base and curvature
+layers are fixed anatomy underlays, while outline and connectivity layers are
+fixed top overlays. Data layers can be reordered within the middle group.
+Invalid commands return a typed failure and leave the existing order intact.
+
+Use `surface.getLayerOrderDescriptors()` to inspect each layer's stable ID,
+index, role, pinned position, and whether it is reorderable.
 
 ### Getting Layers
 
@@ -216,8 +238,63 @@ surface.setLayerOrder(['base', 'activation', 'roi', 'outline']);
 const layer = surface.getLayer('activation');
 
 // Get all layers
-const allLayers = surface.layerStack.getAllLayers();
+const allLayers = surface.getOrderedLayers();
 ```
+
+### Presentation Metadata and Data Summaries
+
+Layer metadata is optional. Layers without metadata use their stable ID as the
+human-facing label.
+
+```typescript
+const layer = new DataLayer('activation', values, indices, 'RdBu', {
+  presentation: {
+    label: 'Task activation',
+    description: 'Language minus control',
+    units: 'z',
+    missingValueLabel: 'Not estimated',
+    provenance: { pipeline: 'fmriprep', contrast: 'language-control' }
+  }
+});
+
+const presentation = layer.getPresentation();
+layer.setPresentation({ label: 'Updated label', units: 'z' });
+```
+
+Presentation snapshots and their plain-object provenance are defensively
+copied and frozen. Consumers should render all fields as text, never as trusted
+HTML.
+
+Scalar `DataLayer` instances provide compact summaries without exposing or
+copying their complete vertex arrays:
+
+```typescript
+const summary = layer.getDataSummary();
+// { finiteCount, missingCount, minimum, maximum }
+
+const withHistogram = layer.getDataSummary({
+  histogram: { bins: 32 }
+});
+// Adds { histogram: { edges, counts } }
+```
+
+Histograms are lazy and cached by data revision, surface-domain size, bin count,
+and requested range. Visibility, opacity, colormap, display-range, threshold,
+and presentation changes do not rebuild them. Sparse layers count unmapped
+surface vertices as missing after they are attached to a surface.
+
+Scalar layers also provide vertex-aware sampling without exposing their dense
+arrays or private sparse index mapping:
+
+```typescript
+const value = layer.sampleValueAtVertex(vertexIndex);
+```
+
+Dense layers index their value vector directly. Indexed sparse layers resolve
+the surface vertex through a lazy lookup; if duplicate mappings exist, the
+later mapping wins, matching rendering and summary semantics. The method
+returns `null` for an invalid or unmapped vertex, a non-finite value, or a
+disposed layer. It does not throw for these expected missing-data cases.
 
 ## Layer Options
 

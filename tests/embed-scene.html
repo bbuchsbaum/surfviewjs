@@ -122,7 +122,17 @@
       window.__surfviewHandle = surfview.mountSurfView(
         document.getElementById('viewer'),
         manifest,
-        { lazy: true, preset: 'paper-light', controls: true, height: 520 }
+        {
+          lazy: true,
+          preset: 'paper-light',
+          controls: true,
+          height: 520,
+          bilateralGroup: {
+            id: 'cortex',
+            leftSurfaceId: 'left',
+            rightSurfaceId: 'right'
+          }
+        }
       );
       await window.__surfviewHandle.ready;
       window.__surfviewReady = true;

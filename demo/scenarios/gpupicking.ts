@@ -15,8 +15,6 @@ export const gpupicking: Scenario = {
     ctx.mount.replaceChildren(mount);
 
     const { viewer, cleanup } = createViewer(mount, {
-      showControls: false,
-      useControls: false,
       hoverCrosshair: false, // we drive crosshair manually for clarity
       backgroundColor: 0x0b1020
     });

@@ -5,7 +5,7 @@ titleTemplate: Brain Surface Visualization for JavaScript
 hero:
   name: SurfView.js
   text: Brain Surface Visualization
-  tagline: GPU-accelerated cortical meshes, multi-layer data overlays, scientific colormaps, and temporal playback — powered by Three.js, in the browser.
+  tagline: GPU-accelerated cortical meshes, multi-layer data overlays, and optional scientific controls — powered by Three.js, in the browser.
   actions:
     - theme: brand
       text: Get Started
@@ -33,6 +33,11 @@ features:
     details: Viridis, plasma, hot, cool, Spectral and more — with explicit threshold semantics and transparent-alpha masking.
     link: /guide/colormaps
     linkText: Colormaps
+  - icon: 🎛️
+    title: Purpose-built controls
+    details: Add an optional, keyboard-accessible scientific panel beside the canvas without changing the Three.js scene or taking over application layout.
+    link: /guide/controls
+    linkText: First-party controls
   - icon: ⏱️
     title: Temporal playback
     details: Animate time-series data with frame interpolation, playback controls, and hover sparkline tooltips.

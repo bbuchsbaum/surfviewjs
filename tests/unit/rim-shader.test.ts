@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { NeuroSurfaceViewer } from '../../src/NeuroSurfaceViewer';
+import { EventEmitter } from '../../src/EventEmitter';
+import type { ViewerEventMap } from '../../src/events';
 
 describe('rim lighting shader patch', () => {
   it('reuses Three shader varyings instead of redeclaring them', () => {
-    const viewer = Object.create(NeuroSurfaceViewer.prototype) as NeuroSurfaceViewer;
+    const viewer = new EventEmitter<ViewerEventMap>() as any;
+    Object.setPrototypeOf(viewer, NeuroSurfaceViewer.prototype);
     (viewer as any).config = { rimStrength: 0.35 };
     (viewer as any).rimStrengthUniforms = [];
 

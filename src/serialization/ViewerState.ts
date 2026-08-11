@@ -1,10 +1,11 @@
 import { deflateSync, inflateSync } from 'fflate';
+import type { InspectionSelection } from '../Inspection';
 
 // ---------------------------------------------------------------------------
 // Schema version
 // ---------------------------------------------------------------------------
 
-export const CURRENT_VERSION = 1;
+export const CURRENT_VERSION = 2;
 
 // ---------------------------------------------------------------------------
 // State interfaces
@@ -45,17 +46,23 @@ export interface LayerState {
   visible: boolean;
   opacity: number;
   blendMode: string;
-  order: number;
+  /** Legacy initialization order. ViewerState v2 uses SurfaceState.layerOrder. */
+  order?: number;
   [key: string]: unknown; // type-specific fields
 }
 
-export interface SurfaceState {
+export interface SurfaceStateV1 {
   id: string;
   type: string;
   hemisphere?: string;
   visible: boolean;
   layers: LayerState[];
   clipPlanes: ClipPlaneState[];
+}
+
+export interface SurfaceState extends SurfaceStateV1 {
+  /** Exact bottom-to-top order used by rendering and compositing. */
+  layerOrder: string[];
 }
 
 export interface CrosshairState {
@@ -74,27 +81,72 @@ export interface TimelineState {
   playing: boolean;
 }
 
+/** @deprecated Legacy ViewerStateV1 pane focus; never scientific selection. */
 export interface SelectionState {
   surfaceId: string | null;
   layerId: string | null;
+}
+
+/** Plain serialized descriptor for an explicitly coordinated surface group. */
+export interface SurfaceGroupState {
+  kind: 'bilateral';
+  id: string;
+  leftSurfaceId: string;
+  rightSurfaceId: string;
 }
 
 export interface ViewerStateV1 {
   version: 1;
   camera: CameraState;
   config: ViewerConfigState;
-  surfaces: Record<string, SurfaceState>;
+  surfaces: Record<string, SurfaceStateV1>;
   crosshair: CrosshairState;
   timeline: TimelineState | null;
   selection: SelectionState;
 }
 
+export interface ViewerStateV2 {
+  version: 2;
+  camera: CameraState;
+  config: ViewerConfigState;
+  surfaces: Record<string, SurfaceState>;
+  surfaceGroups: SurfaceGroupState[];
+  crosshair: CrosshairState;
+  timeline: TimelineState | null;
+  inspectionSelection: InspectionSelection;
+}
+
+export type ViewerState = ViewerStateV1 | ViewerStateV2;
+
 // ---------------------------------------------------------------------------
 // Restoration report
 // ---------------------------------------------------------------------------
 
+export type RestorationIssueCode =
+  | 'invalid-state'
+  | 'unsupported-version'
+  | 'surface-not-found'
+  | 'surface-id-mismatch'
+  | 'layer-not-found'
+  | 'duplicate-layer-id'
+  | 'invalid-layer-order'
+  | 'unsupported-layer-order'
+  | 'invalid-surface-group'
+  | 'unsupported-surface-groups'
+  | 'invalid-selection'
+  | 'unsupported-selection';
+
+export interface RestorationIssue {
+  code: RestorationIssueCode;
+  path: string;
+  message: string;
+}
+
 export interface RestorationReport {
   success: boolean;
+  sourceVersion: 1 | 2 | null;
+  restoredVersion: 2;
+  errors: RestorationIssue[];
   warnings: string[];
   surfacesRestored: string[];
   surfacesSkipped: string[];
@@ -136,10 +188,10 @@ function fromBase64url(str: string): Uint8Array {
 const HASH_PREFIX = 'svjs=';
 
 /**
- * Encode a ViewerStateV1 object into a URL hash fragment string.
+ * Encode a versioned viewer state object into a URL hash fragment string.
  * Pipeline: JSON → UTF-8 → deflate → base64url → "svjs=..."
  */
-export function encode(state: ViewerStateV1): string {
+export function encode(state: ViewerState): string {
   const json = JSON.stringify(state);
   const utf8 = new TextEncoder().encode(json);
   const compressed = deflateSync(utf8);
@@ -147,10 +199,10 @@ export function encode(state: ViewerStateV1): string {
 }
 
 /**
- * Decode a URL hash fragment string back into a ViewerStateV1.
- * Throws on invalid input, corrupted data, or unsupported version.
+ * Decode a URL hash fragment and normalize it to the current ViewerStateV2.
+ * Throws on invalid input, corrupted data, or unsupported versions.
  */
-export function decode(hash: string): ViewerStateV1 {
+export function decode(hash: string): ViewerStateV2 {
   const raw = hash.startsWith('#') ? hash.slice(1) : hash;
   if (!raw.startsWith(HASH_PREFIX)) {
     throw new Error('Invalid state hash: missing "svjs=" prefix');
@@ -170,51 +222,103 @@ export function decode(hash: string): ViewerStateV1 {
   }
 
   const json = new TextDecoder().decode(decompressed);
-  let state: ViewerStateV1;
+  let state: unknown;
   try {
     state = JSON.parse(json);
   } catch {
     throw new Error('State decode failed: invalid JSON');
   }
 
-  if (!state || typeof state !== 'object') {
-    throw new Error('State decode failed: not an object');
-  }
-
-  if (!('version' in state)) {
-    throw new Error('State decode failed: missing version field');
-  }
-
-  if (state.version > CURRENT_VERSION) {
-    throw new Error(
-      `State version ${state.version} is newer than supported (${CURRENT_VERSION}). ` +
-      `Please upgrade surfviewjs to load this state.`
-    );
-  }
-
-  // Apply migrations for older versions
-  if (state.version < CURRENT_VERSION) {
-    return migrate(state);
-  }
-
-  return state;
+  return migrateViewerState(state);
 }
 
 // ---------------------------------------------------------------------------
 // Version migration chain
 // ---------------------------------------------------------------------------
 
-function migrate(state: any): ViewerStateV1 {
-  const current = state;
+export function migrateViewerState(state: unknown): ViewerStateV2 {
+  if (!state || typeof state !== 'object') {
+    throw new Error('State migration failed: not an object');
+  }
+  if (!('version' in state)) {
+    throw new Error('State migration failed: missing version field');
+  }
 
-  // Future: if (current.version === 1) current = migrateV1toV2(current);
-  // Future: if (current.version === 2) current = migrateV2toV3(current);
-
-  return current as ViewerStateV1;
+  const version = (state as { version?: unknown }).version;
+  if (version === 2) return state as ViewerStateV2;
+  if (version === 1) return migrateV1toV2(state as ViewerStateV1);
+  if (typeof version === 'number' && version > CURRENT_VERSION) {
+    throw new Error(
+      `State version ${version} is newer than supported (${CURRENT_VERSION}). ` +
+      'Please upgrade surfviewjs to load this state.'
+    );
+  }
+  throw new Error(`State migration failed: unsupported version ${String(version)}`);
 }
 
-// Stub for future use
-// function migrateV1toV2(state: ViewerStateV1): ViewerStateV2 { ... }
+/**
+ * Deterministically migrate the legacy v1 schema.
+ *
+ * Missing or non-finite LayerState.order values use the legacy default of 0;
+ * source-array position is the stable tie-breaker. Legacy selection contains
+ * pane focus and is never promoted. The sole legacy scientific-selection rule
+ * is a visible crosshair whose mode is exactly "selection", whose surface ID is
+ * non-empty, and whose vertex index is a non-negative integer.
+ */
+export function migrateV1toV2(state: ViewerStateV1): ViewerStateV2 {
+  if (!state.surfaces || typeof state.surfaces !== 'object') {
+    throw new Error('State migration failed: v1 surfaces must be an object');
+  }
+
+  const surfaces: Record<string, SurfaceState> = {};
+  for (const [surfaceId, surface] of Object.entries(state.surfaces)) {
+    const layers = Array.isArray(surface?.layers)
+      ? surface.layers.map(layer => ({
+          ...layer,
+          order: Number.isFinite(layer.order) ? layer.order : 0
+        }))
+      : [];
+    const layerOrder = layers
+      .map((layer, index) => ({ id: layer.id, order: layer.order ?? 0, index }))
+      .sort((left, right) => left.order - right.order || left.index - right.index)
+      .map(layer => layer.id);
+
+    surfaces[surfaceId] = {
+      ...surface,
+      layers,
+      layerOrder
+    };
+  }
+
+  return {
+    version: 2,
+    camera: state.camera,
+    config: state.config,
+    surfaces,
+    surfaceGroups: [],
+    crosshair: state.crosshair,
+    timeline: state.timeline,
+    inspectionSelection: migrateLegacyCrosshairSelection(state.crosshair)
+  };
+}
+
+function migrateLegacyCrosshairSelection(crosshair: CrosshairState): InspectionSelection {
+  if (
+    crosshair?.visible === true &&
+    crosshair.mode === 'selection' &&
+    typeof crosshair.surfaceId === 'string' &&
+    crosshair.surfaceId.length > 0 &&
+    Number.isInteger(crosshair.vertexIndex) &&
+    (crosshair.vertexIndex as number) >= 0
+  ) {
+    return {
+      kind: 'vertex',
+      surfaceId: crosshair.surfaceId,
+      vertexIndex: crosshair.vertexIndex as number
+    };
+  }
+  return { kind: 'none' };
+}
 
 // ---------------------------------------------------------------------------
 // Default state (for delta mode comparison)
@@ -238,6 +342,7 @@ export const DEFAULT_CROSSHAIR: CrosshairState = {
   mode: null
 };
 
+/** @deprecated Legacy ViewerStateV1 pane focus; use inspection selection instead. */
 export const DEFAULT_SELECTION: SelectionState = {
   surfaceId: null,
   layerId: null

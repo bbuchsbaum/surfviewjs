@@ -95,6 +95,10 @@ export class ConnectivityLayer extends Layer {
       opacity: config.opacity ?? 0.85,
       blendMode: config.blendMode,
       order: config.order ?? 15
+    }, {
+      role: 'connectivity',
+      pinned: 'top',
+      reorderable: false
     });
 
     if (!edges || edges.length === 0) {

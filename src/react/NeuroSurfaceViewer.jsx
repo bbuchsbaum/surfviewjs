@@ -22,7 +22,6 @@ import {
  *   ref={viewerRef}
  *   width={800}
  *   height={600}
- *   config={{ showControls: false }}
  *   onReady={(viewer) => console.log('Viewer ready', viewer)}
  * />
  * 
@@ -114,7 +113,14 @@ const NeuroSurfaceViewer = forwardRef(({
       }
     },
 
-    // UI controls
+    // Camera/surface interaction
+    setInteractionEnabled: (enabled) => {
+      if (viewerRef.current) {
+        viewerRef.current.setInteractionEnabled(enabled);
+      }
+    },
+
+    // Deprecated pane-era compatibility no-op
     toggleControls: (show) => {
       if (viewerRef.current) {
         viewerRef.current.toggleControls(show);
@@ -188,17 +194,6 @@ const NeuroSurfaceViewer = forwardRef(({
       viewerRef.current.resize(width, height);
     }
   }, [width, height]);
-
-  // Handle config changes
-  useEffect(() => {
-    if (viewerRef.current && readyRef.current) {
-      // Update relevant config options
-      if (config.showControls !== undefined) {
-        viewerRef.current.toggleControls(config.showControls);
-      }
-      // Add other config updates as needed
-    }
-  }, [config.showControls]);
 
   return (
     <div 

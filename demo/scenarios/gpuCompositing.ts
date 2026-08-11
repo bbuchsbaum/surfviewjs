@@ -32,7 +32,6 @@ export const gpuCompositing: Scenario = {
     ctx.mount.replaceChildren(mount);
 
     const { viewer, cleanup } = createViewer(mount, {
-      showControls: false,
       backgroundColor: 0x1a1a1a,
       ambientLightColor: 0x404040,
       directionalLightIntensity: 0.5

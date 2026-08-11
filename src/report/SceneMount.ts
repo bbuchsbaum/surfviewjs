@@ -1,9 +1,20 @@
-import * as THREE from 'three';
 import { NeuroSurfaceViewer } from '../NeuroSurfaceViewer';
 import { SurfaceGeometry } from '../classes';
 import { MultiLayerNeuroSurface } from '../MultiLayerNeuroSurface';
 import { DataLayer } from '../layers';
 import type { FigureExportOptions, SurfViewStylePresetName } from '../StylePresets';
+import {
+  ANATOMICAL_VIEWS,
+  freezeBilateralSurfaceGroup
+} from '../AnatomicalView';
+import type {
+  AnatomicalView,
+  AnatomicalViewCapabilities,
+  BilateralSurfaceGroup
+} from '../AnatomicalView';
+import type {
+  SurfViewControlTarget
+} from '../controls';
 import {
   loadSceneAsset,
   validateSceneManifest
@@ -12,15 +23,19 @@ import type {
   SceneTypedArray,
   SurfViewSceneManifest
 } from '../scene';
+import {
+  ReportSceneController
+} from './ReportSceneController';
+import {
+  createReportSceneControlTarget,
+  ReportSceneControlTarget
+} from './ReportSceneControlTarget';
+import { ReportControls } from './ReportControls';
 
-export type SurfViewSceneView =
-  | 'lateral'
-  | 'medial'
-  | 'dorsal'
-  | 'ventral'
-  | 'anterior'
-  | 'posterior'
-  | 'reset';
+export { layoutReportAnatomicalMeshes } from './ReportSceneController';
+export type { ReportAnatomicalMesh } from './ReportSceneController';
+
+export type SurfViewSceneView = AnatomicalView | 'reset';
 
 export interface MountSurfViewOptions {
   /** Delay asset loading and WebGL creation until the container intersects the viewport. */
@@ -37,10 +52,15 @@ export interface MountSurfViewOptions {
   height?: number;
   /** Viewer appearance preset. `paper-light` is the report default. */
   preset?: SurfViewStylePresetName;
-  /** Show the small report toolbar. This never loads Tweakpane. */
+  /** Show the small report toolbar. This never loads an external pane UI. */
   controls?: boolean;
-  /** Initial coordinated bilateral view. */
-  initialView?: Exclude<SurfViewSceneView, 'reset'>;
+  /** Initial anatomical view. */
+  initialView?: AnatomicalView;
+  /**
+   * Explicit pair controlled by coordinated report views. Required when a
+   * report contains more than one surface; pairs are never inferred.
+   */
+  bilateralGroup?: BilateralSurfaceGroup;
   /** Gap between recentered hemispheres in scene units. */
   hemisphereGap?: number;
   /** Called after a load or WebGL initialization failure is rendered inline. */
@@ -52,10 +72,16 @@ export interface SurfViewMountHandle {
   readonly ready: Promise<void>;
   /** The viewer after mounting, or null while lazy/unmounted/disposed. */
   readonly viewer: NeuroSurfaceViewer | null;
+  /** The report-aware target after mounting, or null while lazy/unmounted/disposed. */
+  readonly controlTarget: SurfViewControlTarget | null;
   /** The validated manifest used by this mount. */
   readonly manifest: SurfViewSceneManifest;
   selectLayer(layerId: string): void;
+  /** @deprecated Passing "reset" remains supported; prefer resetView(). */
   setView(view: SurfViewSceneView): void;
+  /** Restore the configured initial anatomical view. */
+  resetView(): void;
+  getAnatomicalViewCapabilities(): AnatomicalViewCapabilities;
   resize(width?: number, height?: number): void;
   exportPNG(options?: FigureExportOptions): string;
   dispose(): void;
@@ -66,20 +92,6 @@ interface LoadedSurface {
   hemisphere: 'left' | 'right';
   surface: MultiLayerNeuroSurface;
 }
-
-interface ViewAxes {
-  direction: THREE.Vector3;
-  up: THREE.Vector3;
-}
-
-const VIEW_LABELS: Record<Exclude<SurfViewSceneView, 'reset'>, string> = {
-  lateral: 'Lateral',
-  medial: 'Medial',
-  dorsal: 'Dorsal',
-  ventral: 'Ventral',
-  anterior: 'Anterior',
-  posterior: 'Posterior'
-};
 
 function abortError(message: string): DOMException {
   return new DOMException(message, 'AbortError');
@@ -93,161 +105,6 @@ function finiteSize(value: number | undefined, fallback: number): number {
   return value !== undefined && Number.isFinite(value) && value > 0
     ? value
     : fallback;
-}
-
-function axesForView(
-  hemisphere: 'left' | 'right',
-  view: Exclude<SurfViewSceneView, 'reset'>
-): ViewAxes {
-  switch (view) {
-    case 'lateral':
-      return {
-        direction: new THREE.Vector3(hemisphere === 'left' ? -1 : 1, 0, 0),
-        up: new THREE.Vector3(0, 0, 1)
-      };
-    case 'medial':
-      return {
-        direction: new THREE.Vector3(hemisphere === 'left' ? 1 : -1, 0, 0),
-        up: new THREE.Vector3(0, 0, 1)
-      };
-    case 'dorsal':
-      return { direction: new THREE.Vector3(0, 0, 1), up: new THREE.Vector3(0, 1, 0) };
-    case 'ventral':
-      return { direction: new THREE.Vector3(0, 0, -1), up: new THREE.Vector3(0, 1, 0) };
-    case 'anterior':
-      return { direction: new THREE.Vector3(0, 1, 0), up: new THREE.Vector3(0, 0, 1) };
-    case 'posterior':
-      return { direction: new THREE.Vector3(0, -1, 0), up: new THREE.Vector3(0, 0, 1) };
-  }
-}
-
-function viewQuaternion(axes: ViewAxes): THREE.Quaternion {
-  const sourceForward = axes.direction.clone().normalize();
-  const sourceUp = axes.up.clone().normalize();
-  const sourceRight = sourceUp.clone().cross(sourceForward).normalize();
-  sourceUp.copy(sourceForward).cross(sourceRight).normalize();
-
-  const sourceBasis = new THREE.Matrix4().makeBasis(
-    sourceRight,
-    sourceUp,
-    sourceForward
-  );
-  const sourceInverse = sourceBasis.clone().invert();
-  return new THREE.Quaternion().setFromRotationMatrix(sourceInverse);
-}
-
-class ReportControls {
-  readonly element: HTMLDivElement;
-  private readonly events = new AbortController();
-  private readonly select: HTMLSelectElement;
-  private readonly legend: HTMLSpanElement;
-  private readonly viewButtons = new Map<string, HTMLButtonElement>();
-
-  constructor(
-    manifest: SurfViewSceneManifest,
-    selectedLayer: string,
-    selectedView: Exclude<SurfViewSceneView, 'reset'>,
-    callbacks: {
-      selectLayer: (id: string) => void;
-      setView: (view: SurfViewSceneView) => void;
-      exportPNG: () => void;
-    }
-  ) {
-    this.element = document.createElement('div');
-    this.element.className = 'surfview-report-controls';
-    this.element.setAttribute('role', 'toolbar');
-    this.element.setAttribute('aria-label', 'Surface report controls');
-    Object.assign(this.element.style, {
-      alignItems: 'center',
-      background: '#f8fafc',
-      border: '1px solid #d7dde5',
-      borderRadius: '6px',
-      color: '#111827',
-      display: 'flex',
-      flexWrap: 'wrap',
-      font: '12px/1.4 system-ui, sans-serif',
-      gap: '6px',
-      marginBottom: '8px',
-      padding: '7px'
-    });
-
-    const label = document.createElement('label');
-    label.textContent = 'Map ';
-    this.select = document.createElement('select');
-    this.select.setAttribute('aria-label', 'Displayed surface map');
-    for (const layer of Object.values(manifest.layers)) {
-      const option = document.createElement('option');
-      option.value = layer.id;
-      option.textContent = layer.label ?? layer.id;
-      this.select.appendChild(option);
-    }
-    this.select.value = selectedLayer;
-    this.select.addEventListener(
-      'change',
-      () => callbacks.selectLayer(this.select.value),
-      { signal: this.events.signal }
-    );
-    label.appendChild(this.select);
-    this.element.appendChild(label);
-
-    for (const [view, text] of Object.entries(VIEW_LABELS)) {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.textContent = text;
-      button.dataset.view = view;
-      button.setAttribute('aria-pressed', String(view === selectedView));
-      button.addEventListener(
-        'click',
-        () => callbacks.setView(view as SurfViewSceneView),
-        { signal: this.events.signal }
-      );
-      this.viewButtons.set(view, button);
-      this.element.appendChild(button);
-    }
-
-    const reset = document.createElement('button');
-    reset.type = 'button';
-    reset.textContent = 'Reset';
-    reset.addEventListener('click', () => callbacks.setView('reset'), {
-      signal: this.events.signal
-    });
-    this.element.appendChild(reset);
-
-    const download = document.createElement('button');
-    download.type = 'button';
-    download.textContent = 'PNG';
-    download.setAttribute('aria-label', 'Export surface view as PNG');
-    download.addEventListener('click', callbacks.exportPNG, {
-      signal: this.events.signal
-    });
-    this.element.appendChild(download);
-
-    this.legend = document.createElement('span');
-    this.legend.setAttribute('aria-live', 'polite');
-    this.legend.style.marginLeft = 'auto';
-    this.element.appendChild(this.legend);
-    this.updateLegend(manifest.layers[selectedLayer]);
-  }
-
-  updateLegend(layer: SurfViewSceneManifest['layers'][string]): void {
-    this.select.value = layer.id;
-    const title = layer.legend?.title ?? layer.label ?? layer.id;
-    const unitLabel = layer.legend?.units ?? layer.units;
-    const units = unitLabel ? ` ${unitLabel}` : '';
-    this.legend.textContent = `${title}: ${layer.limits[0]} to ${layer.limits[1]}${units}`;
-    this.legend.hidden = layer.legend?.visible === false;
-  }
-
-  updateView(view: Exclude<SurfViewSceneView, 'reset'>): void {
-    this.viewButtons.forEach((button, key) => {
-      button.setAttribute('aria-pressed', String(key === view));
-    });
-  }
-
-  dispose(): void {
-    this.events.abort();
-    this.element.remove();
-  }
 }
 
 class SceneMount implements SurfViewMountHandle {
@@ -267,11 +124,14 @@ class SceneMount implements SurfViewMountHandle {
   private resizeObserver: ResizeObserver | null = null;
   private reportControls: ReportControls | null = null;
   private currentViewer: NeuroSurfaceViewer | null = null;
+  private reportController: ReportSceneController | null = null;
+  private reportTarget: ReportSceneControlTarget | null = null;
   private mounted = false;
   private mounting = false;
   private disposed = false;
   private selectedLayer: string;
-  private selectedView: Exclude<SurfViewSceneView, 'reset'>;
+  private selectedView: AnatomicalView;
+  private viewGroup: BilateralSurfaceGroup | null = null;
   private resolveReady!: () => void;
   private rejectReady!: (error: Error) => void;
 
@@ -289,7 +149,10 @@ class SceneMount implements SurfViewMountHandle {
       preset: options.preset ?? 'paper-light',
       controls: options.controls ?? true,
       initialView: options.initialView ?? 'lateral',
-      hemisphereGap: options.hemisphereGap ?? 8
+      hemisphereGap: options.hemisphereGap ?? 8,
+      bilateralGroup: options.bilateralGroup
+        ? freezeBilateralSurfaceGroup(options.bilateralGroup)
+        : undefined
     };
     this.selectedLayer = manifest.selectedLayer ??
       Object.values(manifest.layers).find(layer => layer.visible)?.id ??
@@ -366,55 +229,54 @@ class SceneMount implements SurfViewMountHandle {
     return this.currentViewer;
   }
 
+  get controlTarget(): SurfViewControlTarget | null {
+    return this.reportTarget;
+  }
+
   selectLayer(layerId: string): void {
     const layer = this.manifest.layers[layerId];
     if (!layer) throw new Error(`Unknown scene layer: ${layerId}`);
     this.selectedLayer = layerId;
-    if (!this.mounted || !this.currentViewer) return;
-    for (const { id, surface } of this.surfaces) {
-      for (const candidate of Object.keys(this.manifest.layers)) {
-        if (surface.layerStack.getLayer(candidate)) {
-          this.currentViewer.updateLayerVisibility(id, candidate, candidate === layerId);
-        }
-      }
+    if (!this.mounted || !this.reportTarget) return;
+    const result = this.reportTarget.setDisplayedLayer(layerId);
+    if (!result.ok) {
+      throw new Error(result.message);
     }
-    this.currentViewer.selectedLayerId = layerId;
-    this.reportControls?.updateLegend(layer);
   }
 
   setView(view: SurfViewSceneView): void {
-    const resolved = view === 'reset' ? this.options.initialView : view;
-    this.selectedView = resolved;
-    if (!this.mounted || !this.currentViewer) return;
-
-    const dimensions = new Map<string, THREE.Vector3>();
-    for (const loaded of this.surfaces) {
-      const mesh = loaded.surface.mesh;
-      if (!mesh) continue;
-      mesh.position.set(0, 0, 0);
-      mesh.quaternion.copy(viewQuaternion(axesForView(loaded.hemisphere, resolved)));
-      mesh.updateMatrixWorld(true);
-      dimensions.set(loaded.id, new THREE.Box3().setFromObject(mesh).getSize(new THREE.Vector3()));
+    if (view === 'reset') {
+      this.resetView();
+      return;
     }
-
-    const left = this.surfaces.find(surface => surface.hemisphere === 'left');
-    const right = this.surfaces.find(surface => surface.hemisphere === 'right');
-    for (const loaded of this.surfaces) {
-      const mesh = loaded.surface.mesh;
-      if (!mesh) continue;
-      const center = new THREE.Box3().setFromObject(mesh).getCenter(new THREE.Vector3());
-      mesh.position.sub(center);
-      if (left && right) {
-        const ownWidth = dimensions.get(loaded.id)?.x ?? 0;
-        mesh.position.x += loaded.hemisphere === 'left'
-          ? -(ownWidth / 2 + this.options.hemisphereGap / 2)
-          : ownWidth / 2 + this.options.hemisphereGap / 2;
-      }
-      mesh.updateMatrixWorld(true);
+    this.selectedView = view;
+    if (!this.mounted || !this.reportTarget || !this.reportController) return;
+    const target = this.reportController.getViewTarget();
+    if (!target) {
+      throw new Error('Multiple report surfaces require an explicit bilateralGroup option');
     }
-    this.fitCamera();
-    this.currentViewer.requestRender();
-    this.reportControls?.updateView(resolved);
+    const result = this.reportTarget.setAnatomicalView({
+      view,
+      target,
+      fit: true
+    });
+    if (!result.ok) throw new Error(result.message);
+  }
+
+  resetView(): void {
+    this.setView(this.options.initialView);
+  }
+
+  getAnatomicalViewCapabilities(): AnatomicalViewCapabilities {
+    if (this.currentViewer) return this.currentViewer.getAnatomicalViewCapabilities();
+    const surfaceIds = Object.keys(this.manifest.geometries).sort();
+    return Object.freeze({
+      views: ANATOMICAL_VIEWS,
+      singleSurfaceIds: Object.freeze(surfaceIds),
+      bilateralGroups: Object.freeze(
+        this.options.bilateralGroup ? [this.options.bilateralGroup] : []
+      )
+    });
   }
 
   resize(width?: number, height?: number): void {
@@ -424,7 +286,7 @@ class SceneMount implements SurfViewMountHandle {
     this.stage.style.minHeight = `${nextHeight}px`;
     if (this.currentViewer) {
       this.currentViewer.resize(nextWidth, nextHeight);
-      this.fitCamera();
+      this.reportController?.resizeFit();
     }
   }
 
@@ -445,6 +307,10 @@ class SceneMount implements SurfViewMountHandle {
     this.resizeObserver = null;
     this.reportControls?.dispose();
     this.reportControls = null;
+    this.reportTarget?.dispose();
+    this.reportTarget = null;
+    this.reportController?.dispose();
+    this.reportController = null;
     this.currentViewer?.dispose();
     this.currentViewer = null;
     this.surfaces.length = 0;
@@ -471,10 +337,7 @@ class SceneMount implements SurfViewMountHandle {
         width,
         height,
         {
-          preset: this.options.preset,
-          showControls: false,
-          useControls: false,
-          allowCDNFallback: false
+          preset: this.options.preset
         },
         'lateral'
       );
@@ -484,24 +347,25 @@ class SceneMount implements SurfViewMountHandle {
       }
       this.currentViewer = viewer;
       this.buildSurfaces(assets);
+      this.reportController = new ReportSceneController(viewer, this.manifest, {
+        ...(this.viewGroup ? { bilateralGroup: this.viewGroup } : {}),
+        initialView: this.options.initialView,
+        hemisphereGap: this.options.hemisphereGap
+      });
+      this.reportTarget = createReportSceneControlTarget(this.reportController);
       this.mounted = true;
       this.status.remove();
 
+      this.selectLayer(this.selectedLayer);
+      this.setView(this.selectedView);
+
       if (this.options.controls) {
         this.reportControls = new ReportControls(
-          this.manifest,
-          this.selectedLayer,
-          this.selectedView,
-          {
-            selectLayer: layerId => this.selectLayer(layerId),
-            setView: view => this.setView(view),
-            exportPNG: () => this.downloadPNG()
-          }
+          this.reportTarget,
+          { filename: `${this.manifest.id}.png` }
         );
         this.root.insertBefore(this.reportControls.element, this.stage);
       }
-      this.selectLayer(this.selectedLayer);
-      this.setView(this.selectedView);
       this.resolveReady();
     } catch (error) {
       if (this.disposed && asError(error).name === 'AbortError') return;
@@ -590,6 +454,27 @@ class SceneMount implements SurfViewMountHandle {
         surface
       });
     }
+
+    if (this.surfaces.length > 1) {
+      if (!this.options.bilateralGroup) {
+        throw new Error('Multiple report surfaces require an explicit bilateralGroup option');
+      }
+      const registration = this.currentViewer.registerBilateralSurfaceGroup(
+        this.options.bilateralGroup
+      );
+      if (!registration.ok) {
+        throw new Error(`Invalid report bilateralGroup: ${registration.message}`);
+      }
+      this.viewGroup = registration.group;
+    } else if (this.options.bilateralGroup) {
+      const registration = this.currentViewer.registerBilateralSurfaceGroup(
+        this.options.bilateralGroup
+      );
+      if (!registration.ok) {
+        throw new Error(`Invalid report bilateralGroup: ${registration.message}`);
+      }
+      this.viewGroup = registration.group;
+    }
   }
 
   private requireFloat32(
@@ -614,50 +499,28 @@ class SceneMount implements SurfViewMountHandle {
     return values;
   }
 
-  private fitCamera(): void {
-    const viewer = this.currentViewer;
-    if (!viewer) return;
-    const bounds = new THREE.Box3();
-    for (const { surface } of this.surfaces) {
-      if (surface.mesh) bounds.expandByObject(surface.mesh);
-    }
-    if (bounds.isEmpty()) return;
-    const center = bounds.getCenter(new THREE.Vector3());
-    const size = bounds.getSize(new THREE.Vector3());
-    const verticalFov = THREE.MathUtils.degToRad(viewer.camera.fov);
-    const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * viewer.camera.aspect);
-    const distance = Math.max(
-      size.y / (2 * Math.tan(verticalFov / 2)),
-      size.x / (2 * Math.tan(horizontalFov / 2))
-    ) + size.z / 2;
-    const paddedDistance = Math.max(distance * 1.12, 1);
-    viewer.camera.position.copy(center).add(new THREE.Vector3(0, 0, paddedDistance));
-    viewer.camera.up.set(0, 1, 0);
-    viewer.camera.lookAt(center);
-    viewer.camera.near = Math.max(paddedDistance / 1000, 0.001);
-    viewer.camera.far = Math.max(paddedDistance * 10, 100);
-    viewer.camera.updateProjectionMatrix();
-    viewer.controls.target.copy(center);
-    viewer.controls.update();
-  }
-
-  private downloadPNG(): void {
-    const dataUrl = this.exportPNG({ preset: this.options.preset });
-    const anchor = document.createElement('a');
-    anchor.href = dataUrl;
-    anchor.download = `${this.manifest.id}.png`;
-    anchor.click();
-  }
-
   private renderError(error: Error): void {
+    this.reportControls?.dispose();
+    this.reportControls = null;
+    this.reportTarget?.dispose();
+    this.reportTarget = null;
+    this.reportController?.dispose();
+    this.reportController = null;
     this.currentViewer?.dispose();
     this.currentViewer = null;
+    this.surfaces.length = 0;
+    this.viewGroup = null;
+    this.mounted = false;
     this.status.setAttribute('role', 'alert');
     this.status.style.color = '#991b1b';
     this.status.style.background = '#fef2f2';
     this.status.textContent = `Surface view unavailable: ${error.message}`;
     if (!this.status.isConnected) this.stage.appendChild(this.status);
-    this.options.onError?.(error);
+    try {
+      this.options.onError?.(error);
+    } catch {
+      // Observer failures must not replace the mount failure or leave ready pending.
+    }
   }
 }
 

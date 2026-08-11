@@ -18,7 +18,6 @@ export function createViewer(
     width,
     height,
     {
-      showControls: false,
       backgroundColor: 0x050912,
       ambientLightColor: 0x404040,
       ...config

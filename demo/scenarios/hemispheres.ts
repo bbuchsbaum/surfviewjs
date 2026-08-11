@@ -20,7 +20,6 @@ export const hemispheres: Scenario = {
     ctx.mount.replaceChildren(mount);
 
     const { viewer, cleanup } = createViewer(mount, {
-      showControls: false,
       preset: 'presentation',
       backgroundColor: 0x0a0f1e
     });

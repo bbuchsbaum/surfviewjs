@@ -1,4 +1,4 @@
-import type { ViewerStateV1 } from './serialization';
+import type { ViewerState } from './serialization';
 
 export type SubjectHemisphere = 'left' | 'right' | 'both' | 'unknown';
 
@@ -111,7 +111,7 @@ export interface SceneManifest {
   label?: string;
   surfaces?: SceneSurfaceManifest[];
   layers?: SceneLayerManifest[];
-  viewerState?: ViewerStateV1;
+  viewerState?: ViewerState;
 }
 
 export interface SubjectPackageManifest {

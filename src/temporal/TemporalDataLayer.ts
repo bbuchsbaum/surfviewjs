@@ -72,7 +72,8 @@ export class TemporalDataLayer extends DataLayer {
       visible: config.visible,
       opacity: config.opacity,
       blendMode: config.blendMode,
-      order: config.order
+      order: config.order,
+      presentation: config.presentation
     });
 
     this.frames = frames;
@@ -105,7 +106,11 @@ export class TemporalDataLayer extends DataLayer {
       target[v] = fa[v] * oneMinusAlpha + fb[v] * alpha;
     }
 
-    this.needsUpdate = true;
+    this._markDataChanged();
+    this._notifyChange({
+      data: true,
+      timeline: { frameA, frameB, alpha }
+    });
   }
 
   /**

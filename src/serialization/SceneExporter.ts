@@ -1,6 +1,6 @@
 import type { SubjectPackageManifest } from '../SubjectPackage';
 import { serialize } from './StateSerializer';
-import type { ViewerStateV1 } from './ViewerState';
+import type { ViewerStateV2 } from './ViewerState';
 
 export const SURFVIEW_EXPORT_SCHEMA = 'surfview.scene.v1';
 export const SURFVIEW_VERSION = '2.2.0';
@@ -34,7 +34,7 @@ export interface SceneExportManifest {
   id: string;
   createdAt: string;
   surfviewVersion: string;
-  state: ViewerStateV1;
+  state: ViewerStateV2;
   assets: SceneAssetManifest[];
   provenance: SceneExportProvenance;
   subject?: SubjectPackageManifest;
@@ -48,7 +48,7 @@ export interface SceneExportOptions {
   assets?: SceneAssetManifest[];
   subject?: SubjectPackageManifest | { manifest: SubjectPackageManifest };
   provenance?: Partial<SceneExportProvenance> & Record<string, unknown>;
-  state?: ViewerStateV1;
+  state?: ViewerStateV2;
   pretty?: boolean;
 }
 

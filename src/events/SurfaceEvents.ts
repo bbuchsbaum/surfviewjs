@@ -5,6 +5,13 @@
 import { NeuroSurface } from '../classes';
 import { Layer } from '../layers';
 
+export interface SurfaceLayerReorderedEvent {
+  surface: NeuroSurface;
+  order: readonly string[];
+  previousOrder: readonly string[];
+  movedLayerId?: string;
+}
+
 export interface SurfaceEventMap {
   'visibility:changed': { surface: NeuroSurface; visible: boolean };
   'opacity:changed': { surface: NeuroSurface; opacity: number };
@@ -12,6 +19,7 @@ export interface SurfaceEventMap {
   'layer:added': { surface: NeuroSurface; layer: Layer };
   'layer:removed': { surface: NeuroSurface; layerId: string };
   'layer:updated': { surface: NeuroSurface; layer?: Layer | null; changes?: Record<string, unknown> };
+  'layer:reordered': SurfaceLayerReorderedEvent;
   'data:updated': { surface: NeuroSurface; data: Float32Array };
   'geometry:updated': { surface: NeuroSurface };
   'geometry:smoothed': { surface: NeuroSurface; iterations: number; lambda: number; method: string };

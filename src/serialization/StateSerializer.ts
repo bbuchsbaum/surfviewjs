@@ -1,18 +1,18 @@
 import type {
-  ViewerStateV1,
+  ViewerStateV2,
   CameraState,
   ViewerConfigState,
   SurfaceState,
+  SurfaceGroupState,
   LayerState,
-  ClipPlaneState,
   CrosshairState,
-  TimelineState,
-  SelectionState
+  TimelineState
 } from './ViewerState';
+import type { InspectionSelection } from '../Inspection';
 import { CURRENT_VERSION } from './ViewerState';
 
 // ---------------------------------------------------------------------------
-// StateSerializer — extracts a ViewerStateV1 from a live viewer
+// StateSerializer — extracts the current ViewerStateV2 from a live viewer
 // ---------------------------------------------------------------------------
 
 /**
@@ -22,15 +22,16 @@ import { CURRENT_VERSION } from './ViewerState';
  * Components that implement `toStateJSON()` are preferred; otherwise
  * the serializer reads public fields directly.
  */
-export function serialize(viewer: any): ViewerStateV1 {
+export function serialize(viewer: any): ViewerStateV2 {
   return {
     version: CURRENT_VERSION,
     camera: serializeCamera(viewer),
     config: serializeConfig(viewer),
     surfaces: serializeSurfaces(viewer),
+    surfaceGroups: serializeSurfaceGroups(viewer),
     crosshair: serializeCrosshair(viewer),
     timeline: serializeTimeline(viewer),
-    selection: serializeSelection(viewer)
+    inspectionSelection: serializeInspectionSelection(viewer)
   };
 }
 
@@ -51,7 +52,7 @@ function serializeCamera(viewer: any): CameraState {
     };
   }
 
-  const target = viewer.controls?.target ?? { x: 0, y: 0, z: 0 };
+  const target = viewer.cameraControls?.target ?? { x: 0, y: 0, z: 0 };
 
   return {
     position: [cam.position.x, cam.position.y, cam.position.z],
@@ -102,31 +103,34 @@ function serializeSurfaces(viewer: any): Record<string, SurfaceState> {
   if (!surfaces) return result;
 
   for (const [id, surface] of surfaces) {
-    // Prefer toStateJSON if available
-    if (typeof surface.toStateJSON === 'function') {
-      result[id] = surface.toStateJSON();
-      result[id].id = id;
-      continue;
-    }
+    const custom = typeof surface.toStateJSON === 'function'
+      ? surface.toStateJSON() as Partial<SurfaceState>
+      : {};
+    const orderedLayers = surface.layerStack?.getOrderedLayers?.()
+      ?? surface.layerStack?.getAllLayers?.()
+      ?? [];
+    const layers: LayerState[] = orderedLayers.length > 0
+      ? orderedLayers.map((layer: any, index: number) => ({
+          ...serializeLayer(layer),
+          order: index
+        }))
+      : (custom.layers ?? []);
+    const layerOrder = orderedLayers.length > 0
+      ? orderedLayers.map((layer: any) => layer.id)
+      : (custom.layerOrder ?? layers.map(layer => layer.id));
 
     const state: SurfaceState = {
+      ...custom,
       id,
-      type: surface.constructor?.name ?? 'unknown',
-      visible: surface.mesh?.visible ?? true,
-      layers: [],
-      clipPlanes: []
+      type: custom.type ?? surface.constructor?.name ?? 'unknown',
+      visible: custom.visible ?? surface.mesh?.visible ?? true,
+      layers,
+      layerOrder,
+      clipPlanes: custom.clipPlanes ?? []
     };
 
     if (surface.hemisphere) {
       state.hemisphere = surface.hemisphere;
-    }
-
-    // Layers
-    if (surface.layerStack) {
-      const layers = surface.layerStack.getAllLayers?.() ?? [];
-      for (const layer of layers) {
-        state.layers.push(serializeLayer(layer));
-      }
     }
 
     // Clip planes
@@ -138,6 +142,18 @@ function serializeSurfaces(viewer: any): Record<string, SurfaceState> {
   }
 
   return result;
+}
+
+function serializeSurfaceGroups(viewer: any): SurfaceGroupState[] {
+  const groups = viewer.getBilateralSurfaceGroups?.() ?? [];
+  return [...groups]
+    .map((group: any) => ({
+      kind: 'bilateral' as const,
+      id: group.id,
+      leftSurfaceId: group.leftSurfaceId,
+      rightSurfaceId: group.rightSurfaceId
+    }))
+    .sort((left, right) => left.id.localeCompare(right.id));
 }
 
 function serializeLayer(layer: any): LayerState {
@@ -216,12 +232,26 @@ function serializeTimeline(viewer: any): TimelineState | null {
 }
 
 // ---------------------------------------------------------------------------
-// Selection
+// Scientific inspection selection
 // ---------------------------------------------------------------------------
 
-function serializeSelection(viewer: any): SelectionState {
+function serializeInspectionSelection(viewer: any): InspectionSelection {
+  const selection = viewer.getInspectionSelection?.();
+  if (!selection || selection.kind === 'none') return { kind: 'none' };
+  if (selection.kind === 'vertex') {
+    return {
+      kind: 'vertex',
+      surfaceId: selection.surfaceId,
+      vertexIndex: selection.vertexIndex
+    };
+  }
   return {
-    surfaceId: viewer.selectedSurfaceId ?? null,
-    layerId: viewer.selectedLayerId ?? null
+    kind: 'parcel',
+    surfaceId: selection.surfaceId,
+    parcelId: selection.parcelId,
+    ...(selection.representativeVertexIndex !== undefined
+      ? { representativeVertexIndex: selection.representativeVertexIndex }
+      : {}),
+    ...(selection.atlasId !== undefined ? { atlasId: selection.atlasId } : {})
   };
 }

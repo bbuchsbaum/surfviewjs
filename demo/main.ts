@@ -129,9 +129,13 @@ function bootstrap() {
     }
   });
 
-  // Start with the first scenario for quick sanity checks
-  if (scenarios.length > 0) {
-    runScenario(scenarios[0].id);
+  // A stable query route lets visual-review tools open one scenario directly.
+  const requestedScenario = new URLSearchParams(window.location.search).get('scenario');
+  const initialScenario = requestedScenario && scenarioMap.has(requestedScenario)
+    ? requestedScenario
+    : scenarios[0]?.id;
+  if (initialScenario) {
+    runScenario(initialScenario);
   }
 }
 

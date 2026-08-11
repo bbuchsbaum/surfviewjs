@@ -269,8 +269,11 @@ describe('TimelineController', () => {
 
   it('setSpeed updates speed', () => {
     const tc = new TimelineController(times);
+    const changed = vi.fn();
+    tc.on('speedchange', changed);
     tc.setSpeed(2.5);
     expect(tc.getState().speed).toBe(2.5);
+    expect(changed).toHaveBeenCalledWith({ speed: 2.5 });
   });
 
   it('setSpeed clamps to minimum', () => {
@@ -281,10 +284,16 @@ describe('TimelineController', () => {
 
   it('setLoop changes loop mode', () => {
     const tc = new TimelineController(times);
+    const changed = vi.fn();
+    tc.on('loopchange', changed);
     tc.setLoop('bounce');
     expect(tc.getState().loopMode).toBe('bounce');
     tc.setLoop('none');
     expect(tc.getState().loopMode).toBe('none');
+    expect(changed.mock.calls).toEqual([
+      [{ loopMode: 'bounce' }],
+      [{ loopMode: 'none' }]
+    ]);
   });
 
   it('resolves frame boundaries correctly', () => {

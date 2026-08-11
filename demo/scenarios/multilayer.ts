@@ -55,7 +55,6 @@ export const multilayer: Scenario = {
     ctx.mount.replaceChildren(mount);
 
     const { viewer, cleanup } = createViewer(mount, {
-      showControls: false,
       backgroundColor: 0x060b16,
       preset: 'presentation',
       rimStrength: 0.12

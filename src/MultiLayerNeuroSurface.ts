@@ -13,7 +13,9 @@ import {
   VolumeProjectionMode,
   VolumeSamplingMode,
   VolumeProjectionQuality,
-  RibbonSamplingConfig
+  RibbonSamplingConfig,
+  LayerOrderDescriptor,
+  LayerOrderResult
 } from './layers';
 import ColorMap2D, { ColorMap2DPreset } from './ColorMap2D';
 import { CurvatureLayer, CurvatureConfig } from './layers/CurvatureLayer';
@@ -250,6 +252,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     if (this.mesh.material) {
       (this.mesh.material as any).visible = !enabled ? true : (this.mesh.material as any).visible;
     }
+    this.emit('material:updated', { surface: this });
     this.requestColorUpdate();
   }
 
@@ -470,22 +473,39 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
       // Use requestAnimationFrame for smooth updates
       this._updateFrameId = requestAnimationFrame(() => {
         this._updateFrameId = null;
-        this._updatePending = false;
-        this.updateColors();
-        this.emit('render:needed', { surface: this });
+        this.flushPendingColorUpdate();
       });
     }
+  }
+
+  /**
+   * Composite a queued layer change immediately before a viewer paint.
+   *
+   * The viewer calls this at the start of render() so its already-scheduled
+   * animation frame cannot paint stale vertex colors ahead of this surface's
+   * independently queued compositing callback.
+   */
+  flushPendingColorUpdate(): boolean {
+    if (!this._updatePending && !this.layerStack.needsComposite) return false;
+    if (this._updateFrameId !== null) {
+      cancelAnimationFrame(this._updateFrameId);
+      this._updateFrameId = null;
+    }
+    this._updatePending = false;
+    this.updateColors();
+    this.emit('render:needed', { surface: this });
+    return true;
   }
 
   /**
    * Add a layer to the surface
    */
   addLayer(layer: Layer): void {
+    layer._setDataSummaryDomainSize(this.vertexCount);
     this.layerStack.addLayer(layer);
     this.emit('layer:added', { surface: this, layer });
 
-    // Wire up change notification so the layer can trigger re-compositing
-    layer._onChangeCallback = () => this.requestColorUpdate();
+    this.wireLayerChange(layer);
 
     const maybeAttach = (layer as any).attach;
     if (typeof maybeAttach === 'function') {
@@ -501,6 +521,17 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     } else {
       this.requestColorUpdate();
     }
+  }
+
+  private wireLayerChange(layer: Layer): void {
+    layer._onChangeCallback = (changes) => {
+      const requiresComposite = Object.keys(changes).some(key => key !== 'presentation');
+      try {
+        this.emit('layer:updated', { surface: this, layer, changes: { ...changes } });
+      } finally {
+        if (requiresComposite) this.requestColorUpdate();
+      }
+    };
   }
 
   /**
@@ -578,6 +609,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     }
     if (layer) {
       layer._onChangeCallback = null;
+      layer._setDataSummaryDomainSize(null);
       const maybeDetach = (layer as any).detach;
       if (typeof maybeDetach === 'function') {
         try {
@@ -617,9 +649,6 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
   updateLayer(id: string, updates: Record<string, any>): void {
     this.layerStack.updateLayer(id, updates);
     const layer = this.layerStack.getLayer(id);
-    if (layer) {
-      this.emit('layer:updated', { surface: this, layer, changes: updates });
-    }
     if (layer instanceof OutlineLayer && layer.needsUpdate) {
       this.layerStack.needsComposite = false;
       this.applyOutlineLayer(layer);
@@ -729,6 +758,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
   ): void {
     this.clipPlanes.setClipPlane(axis, distance, enabled, flip);
     this._syncClipPlanes();
+    this.emit('material:updated', { surface: this });
     this.requestColorUpdate();
   }
 
@@ -738,6 +768,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
   enableClipPlane(axis: ClipAxis): void {
     this.clipPlanes.enableClipPlane(axis);
     this._syncClipPlanes();
+    this.emit('material:updated', { surface: this });
     this.requestColorUpdate();
   }
 
@@ -747,6 +778,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
   disableClipPlane(axis: ClipAxis): void {
     this.clipPlanes.disableClipPlane(axis);
     this._syncClipPlanes();
+    this.emit('material:updated', { surface: this });
     this.requestColorUpdate();
   }
 
@@ -756,6 +788,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
   clearClipPlanes(): void {
     this.clipPlanes.clearClipPlanes();
     this._syncClipPlanes();
+    this.emit('material:updated', { surface: this });
     this.requestColorUpdate();
   }
 
@@ -800,11 +833,51 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
   }
 
   /**
-   * Set the order of layers (bottom to top)
+   * Return the exact bottom-to-top layer order used by compositing.
    */
-  setLayerOrder(ids: string[]): void {
-    this.layerStack.setLayerOrder(ids);
+  getOrderedLayers(): readonly Layer[] {
+    return this.layerStack.getOrderedLayers();
+  }
+
+  getLayerOrderDescriptors(): readonly LayerOrderDescriptor[] {
+    return this.layerStack.getLayerOrderDescriptors();
+  }
+
+  /** Validate a complete bottom-to-top order without mutating the surface. */
+  validateLayerOrder(ids: readonly string[]): LayerOrderResult {
+    return this.layerStack.validateLayerOrder(ids);
+  }
+
+  /**
+   * Atomically set the complete bottom-to-top layer order.
+   */
+  setLayerOrder(ids: readonly string[]): LayerOrderResult {
+    const previousOrder = this.layerStack.getOrderedLayers().map(layer => layer.id);
+    const result = this.layerStack.setLayerOrder(ids);
+    if (!result.ok || !result.changed) return result;
+
+    this.emit('layer:reordered', {
+      surface: this,
+      order: result.order,
+      previousOrder: Object.freeze(previousOrder)
+    });
     this.requestColorUpdate();
+    return result;
+  }
+
+  moveLayer(layerId: string, destinationIndex: number): LayerOrderResult {
+    const previousOrder = this.layerStack.getOrderedLayers().map(layer => layer.id);
+    const result = this.layerStack.moveLayer(layerId, destinationIndex);
+    if (!result.ok || !result.changed) return result;
+
+    this.emit('layer:reordered', {
+      surface: this,
+      order: result.order,
+      previousOrder: Object.freeze(previousOrder),
+      movedLayerId: layerId
+    });
+    this.requestColorUpdate();
+    return result;
   }
 
   /**
@@ -954,7 +1027,9 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
         }
         
         if (layer) {
+          layer._setDataSummaryDomainSize(this.vertexCount);
           this.layerStack.addLayer(layer);
+          this.wireLayerChange(layer);
           const maybeAttach = (layer as any).attach;
           if (typeof maybeAttach === 'function') {
             try {
@@ -1361,6 +1436,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     
     // Update colors with new method
     this.updateColors();
+    this.emit('material:updated', { surface: this });
   }
 
   setWideLines(useWide: boolean): void {
@@ -1374,6 +1450,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
       }
     });
 
+    this.emit('material:updated', { surface: this });
     this.requestColorUpdate();
   }
 

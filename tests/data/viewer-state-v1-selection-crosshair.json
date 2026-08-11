@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "camera": {
+    "position": [0, 0, 200],
+    "quaternion": [0, 0, 0, 1],
+    "target": [0, 0, 0],
+    "up": [0, 1, 0],
+    "zoom": 1,
+    "fov": 45
+  },
+  "config": {},
+  "surfaces": {
+    "lh": {
+      "id": "lh",
+      "type": "MultiLayerNeuroSurface",
+      "hemisphere": "left",
+      "visible": true,
+      "layers": [],
+      "clipPlanes": []
+    }
+  },
+  "crosshair": {
+    "visible": true,
+    "surfaceId": "lh",
+    "vertexIndex": 1,
+    "size": 1.5,
+    "color": 16763904,
+    "mode": "selection"
+  },
+  "timeline": null,
+  "selection": {
+    "surfaceId": "pane-surface",
+    "layerId": "pane-layer"
+  }
+}

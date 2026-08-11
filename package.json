@@ -6,7 +6,12 @@
   "main": "./dist/surfview.umd.js",
   "module": "./dist/surfview.es.js",
   "types": "./dist/types/index.d.ts",
-  "sideEffects": false,
+  "sideEffects": [
+    "./dist/surfview.es.js",
+    "./dist/surfview.umd.js",
+    "./dist/surfview.embed.iife.js",
+    "./dist/surfview.report.es.js"
+  ],
   "exports": {
     ".": {
       "types": "./dist/types/index.d.ts",
@@ -17,6 +22,21 @@
       "types": "./dist/types/index.react.d.ts",
       "import": "./dist/surfview.react.es.js",
       "default": "./dist/surfview.react.es.js"
+    },
+    "./report": {
+      "types": "./dist/types/index.report.d.ts",
+      "import": "./dist/surfview.report.es.js",
+      "default": "./dist/surfview.report.es.js"
+    },
+    "./controls": {
+      "types": "./dist/types/controls-ui/index.d.ts",
+      "import": "./dist/surfview.controls.es.js",
+      "default": "./dist/surfview.controls.es.js"
+    },
+    "./controls/react": {
+      "types": "./dist/types/controls-ui/react.d.ts",
+      "import": "./dist/surfview.controls.react.es.js",
+      "default": "./dist/surfview.controls.react.es.js"
     }
   },
   "files": [
@@ -26,7 +46,7 @@
   "scripts": {
     "dev": "vite",
     "demo": "vite --config vite.demo.config.ts --open",
-    "build": "npm run clean && vite build && vite build --config vite.config.embed.js && vite build --config vite.config.react.js && npm run build:types",
+    "build": "npm run clean && vite build && vite build --config vite.config.embed.js && vite build --config vite.config.react.js && vite build --config vite.config.report.js && vite build --config vite.config.controls.js && vite build --config vite.config.controls-react.js && npm run build:types && npm run test:package-types && npm run check:controls-artifacts",
     "demo:build": "vite build --config vite.demo.config.ts",
     "build:types": "tsc --emitDeclarationOnly",
     "clean": "rm -rf dist",
@@ -34,6 +54,10 @@
     "preview:ci": "vite preview --host 0.0.0.0 --port 4173",
     "build:legacy": "gulp",
     "type-check": "tsc --noEmit",
+    "test:types": "tsc -p tsconfig.contracts.json",
+    "test:package-types": "tsc -p tests/types/package/tsconfig.json",
+    "test:react-fixture:build": "vite build --config tests/fixtures/react-controls/vite.config.ts",
+    "check:controls-artifacts": "node scripts/check-controls-artifacts.mjs",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
     "test": "vitest run",
@@ -91,7 +115,10 @@
     "globals": "^15.15.0",
     "gulp": "^4.0.2",
     "jsdom": "^26.1.0",
+    "lit": "3.3.3",
     "node-fetch": "^3.3.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "rollup": "^2.79.1",
     "rollup-plugin-terser": "^7.0.2",
     "size-limit": "^11.2.0",
@@ -129,6 +156,21 @@
       "name": "ESM bundle",
       "path": "dist/surfview.es.js",
       "limit": "320 KB"
+    },
+    {
+      "name": "Controls ESM bundle",
+      "path": "dist/surfview.controls.es.js",
+      "limit": "80 KB"
+    },
+    {
+      "name": "Report ESM adapter",
+      "path": "dist/surfview.report.es.js",
+      "limit": "2 KB"
+    },
+    {
+      "name": "Controls React ESM bundle",
+      "path": "dist/surfview.controls.react.es.js",
+      "limit": "8 KB"
     }
   ]
 }
