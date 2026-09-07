@@ -5,6 +5,127 @@ import { EventEmitter, UnsubscribeFn } from './EventEmitter';
 import { LaplacianSmoothing } from './utils/LaplacianSmoothing';
 import { MeshAdjacency, buildVertexAdjacency } from './utils/meshAdjacency';
 
+export type SurfaceGeometryErrorCode =
+  | 'empty-vertices'
+  | 'invalid-vertex-layout'
+  | 'non-finite-vertex'
+  | 'too-many-vertices'
+  | 'empty-faces'
+  | 'invalid-face-layout'
+  | 'invalid-face-index'
+  | 'too-many-faces'
+  | 'curvature-length-mismatch'
+  | 'non-finite-curvature';
+
+export class SurfaceGeometryError extends Error {
+  readonly code: SurfaceGeometryErrorCode;
+
+  constructor(code: SurfaceGeometryErrorCode, message: string) {
+    super(message);
+    this.name = 'SurfaceGeometryError';
+    this.code = code;
+  }
+}
+
+export const MAX_SURFACE_VERTICES = 10_000_000;
+export const MAX_SURFACE_FACES = 20_000_000;
+
+/** Validate raw mesh arrays before integer coercion or Three.js construction. */
+export function validateSurfaceGeometryData(
+  vertices: ArrayLike<number>,
+  faces: ArrayLike<number>,
+  vertexCurv: ArrayLike<number> | null = null
+): void {
+  if (!vertices || !Number.isSafeInteger(vertices.length) || vertices.length < 0) {
+    throw new SurfaceGeometryError(
+      'invalid-vertex-layout',
+      'Surface vertices must be an array-like value with a finite integer length'
+    );
+  }
+  if (vertices.length === 0) {
+    throw new SurfaceGeometryError('empty-vertices', 'Surface vertices must not be empty');
+  }
+  if (vertices.length % 3 !== 0) {
+    throw new SurfaceGeometryError(
+      'invalid-vertex-layout',
+      `Surface vertex coordinate length must be divisible by 3 (received ${vertices.length})`
+    );
+  }
+  const vertexCount = vertices.length / 3;
+  if (vertexCount > MAX_SURFACE_VERTICES) {
+    throw new SurfaceGeometryError(
+      'too-many-vertices',
+      `Surface vertex count exceeds ${MAX_SURFACE_VERTICES} (received ${vertexCount})`
+    );
+  }
+  for (let index = 0; index < vertices.length; index += 1) {
+    if (!Number.isFinite(vertices[index])) {
+      throw new SurfaceGeometryError(
+        'non-finite-vertex',
+        `Surface coordinate at index ${index} must be finite`
+      );
+    }
+  }
+
+  if (!faces || !Number.isSafeInteger(faces.length) || faces.length < 0) {
+    throw new SurfaceGeometryError(
+      'invalid-face-layout',
+      'Surface faces must be an array-like value with a finite integer length'
+    );
+  }
+  if (faces.length === 0) {
+    throw new SurfaceGeometryError('empty-faces', 'Surface faces must not be empty');
+  }
+  if (faces.length % 3 !== 0) {
+    throw new SurfaceGeometryError(
+      'invalid-face-layout',
+      `Surface face index length must be divisible by 3 (received ${faces.length})`
+    );
+  }
+  const faceCount = faces.length / 3;
+  if (faceCount > MAX_SURFACE_FACES) {
+    throw new SurfaceGeometryError(
+      'too-many-faces',
+      `Surface face count exceeds ${MAX_SURFACE_FACES} (received ${faceCount})`
+    );
+  }
+  for (let index = 0; index < faces.length; index += 1) {
+    // `index` is bounded by the validated array-like length.
+    const vertexIndex = faces[index]!;
+    if (!Number.isInteger(vertexIndex) || vertexIndex < 0 || vertexIndex >= vertexCount) {
+      throw new SurfaceGeometryError(
+        'invalid-face-index',
+        `Surface face index at position ${index} must be an integer in [0, ${vertexCount - 1}] ` +
+        `(received ${String(vertexIndex)})`
+      );
+    }
+  }
+
+  if (vertexCurv) {
+    if (!Number.isSafeInteger(vertexCurv.length) || vertexCurv.length < 0) {
+      throw new SurfaceGeometryError(
+        'curvature-length-mismatch',
+        'Surface curvature must be an array-like value with a finite integer length'
+      );
+    }
+    if (vertexCurv.length !== vertexCount) {
+      throw new SurfaceGeometryError(
+        'curvature-length-mismatch',
+        `Surface curvature length must equal vertex count ${vertexCount} ` +
+        `(received ${vertexCurv.length})`
+      );
+    }
+    for (let index = 0; index < vertexCurv.length; index += 1) {
+      if (!Number.isFinite(vertexCurv[index])) {
+        throw new SurfaceGeometryError(
+          'non-finite-curvature',
+          `Surface curvature value at index ${index} must be finite`
+        );
+      }
+    }
+  }
+}
+
 /**
  * Configuration options for surface material properties and appearance
  * @interface SurfaceConfig

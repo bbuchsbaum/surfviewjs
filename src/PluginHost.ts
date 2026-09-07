@@ -126,7 +126,6 @@ export class PluginHost {
       throw err;
     }
 
-    let registration: StoredPluginRegistration;
     const dispose = (): void => {
       if (this.registrations.get(plugin.id) === registration) {
         this.registrations.delete(plugin.id);
@@ -134,7 +133,7 @@ export class PluginHost {
       cleanup();
     };
 
-    registration = {
+    const registration: StoredPluginRegistration = {
       id: plugin.id,
       plugin,
       container,

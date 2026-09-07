@@ -10,6 +10,17 @@
  */
 
 import * as THREE from 'three';
+export { buildAtlasPlate } from './atlas/buildAtlasPlate';
+export { AtlasPlateView, renderAtlasPlateSVG } from './atlas/AtlasPlateView';
+export { emptyAtlasLayout, parseAtlasPlateLayout } from './atlas/atlasLayout';
+export type { AtlasPlateLayout, AtlasPlatePresentation, AtlasViewport } from './atlas/atlasLayout';
+export { parseAtlasFigureSpec, renderAtlasFigureSVG } from './atlas/AtlasFigure';
+export type { AtlasFigureSpec, AtlasFigureSource } from './atlas/AtlasFigure';
+export type { AtlasPlateStyle, AtlasPlateViewOptions } from './atlas/AtlasPlateView';
+export type {
+  AtlasPlate, AtlasPlateInput, AtlasPlateOptions, AtlasPlateOrientation,
+  AtlasPlateRegion, AtlasPlateLabel, AtlasPlateProvenance, AtlasPoint, AtlasBounds
+} from './atlas/types';
 import { NeuroSurfaceViewer } from './NeuroSurfaceViewer';
 import { SurfaceControls } from './SurfaceControls';
 import { SurfaceGeometry, NeuroSurface, ColorMappedNeuroSurface, VertexColoredNeuroSurface } from './classes';

@@ -81,6 +81,7 @@ export default defineConfig({
           items: [
             { text: 'Viewer', link: '/guide/viewer' },
             { text: 'Surfaces', link: '/guide/surfaces' },
+            { text: 'Atlas illustration', link: '/guide/atlas-illustration' },
             { text: 'Layers', link: '/guide/layers' },
             { text: 'Colormaps', link: '/guide/colormaps' },
           ],

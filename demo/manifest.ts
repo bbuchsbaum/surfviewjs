@@ -1,4 +1,5 @@
 import type { Scenario } from './types';
+import { atlasIllustration } from './scenarios/atlasIllustration';
 import { quickstart } from './scenarios/quickstart';
 import { multilayer } from './scenarios/multilayer';
 import { hemispheres } from './scenarios/hemispheres';
@@ -26,6 +27,7 @@ import { controlsGallery } from './scenarios/controlsGallery';
 
 export const scenarios: Scenario[] = [
   quickstart,
+  atlasIllustration,
   controlsPanel,
   controlsGallery,
   multilayer,
