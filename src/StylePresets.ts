@@ -1,6 +1,7 @@
 import type * as THREE from 'three';
 
 export type SurfViewStylePresetName =
+  | 'freesurfer'
   | 'default'
   | 'presentation'
   | 'paper-light'
@@ -165,6 +166,30 @@ const defaultFigure: StylePresetFigure = {
 };
 
 export const STYLE_PRESETS: Record<SurfViewStylePresetName, SurfViewStylePreset> = {
+  freesurfer: {
+    name: 'freesurfer',
+    label: 'Cortical Contrast',
+    background: { css: '#000000', clearColor: 0x000000, clearAlpha: 1 },
+    lighting: {
+      ambientColor: 0xffffff, ambientIntensity: 0.65,
+      directionalColor: 0xffffff, directionalIntensity: 0.65,
+      directionalPosition: [1, 1.25, 1.4],
+      rimStrength: 0, ssaoRadius: 4, ssaoKernelSize: 32
+    },
+    material: {
+      baseColor: 0xffffff, materialType: 'phong',
+      metalness: 0, roughness: 1, alpha: 1
+    },
+    curvature: { brightness: 0.5, contrast: 0.5, smoothness: 1 },
+    roi: {
+      strokeColor: '#ffffff', strokeWidth: 1.8, labelDensity: 'sparse',
+      labelColor: '#ffffff', labelFont: '11px sans-serif'
+    },
+    annotation: { radius: 0.72, colorOn: 0x00ff00, colorOff: 0xff0000, style: 'minimal' },
+    colormaps: { sequential: 'surface-heat-positive', diverging: 'surface-heat', label: 'glasbey', curvature: 'gray' },
+    figure: { ...defaultFigure },
+    labelDensity: 'sparse', fontScale: 1
+  },
   default: {
     name: 'default',
     label: 'Default',

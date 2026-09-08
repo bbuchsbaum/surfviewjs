@@ -412,7 +412,13 @@ class SceneMount implements SurfViewMountHandle {
         curvature,
         false
       );
+      const style = this.currentViewer.stylePreset;
       const surface = new MultiLayerNeuroSurface(geometry, {
+        baseColor: style.material.baseColor,
+        materialType: style.material.materialType,
+        metalness: style.material.metalness,
+        roughness: style.material.roughness,
+        curvatureOptions: style.curvature,
         curvature: curvature ?? undefined,
         showCurvature: Boolean(curvature),
         useGPUCompositing: false

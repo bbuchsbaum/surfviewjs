@@ -44,12 +44,13 @@ describe('DataLayer', () => {
     expect(rgba1).toBe(rgba2);
   });
 
-  it('respects opacity setting', () => {
+  it('keeps intrinsic alpha independent from compositor opacity', () => {
     const layer = makeDataLayer();
     layer.setOpacity(0.5);
     const rgba = layer.getRGBAData(5);
-    // Vertex 0 alpha should be scaled by 0.5
-    expect(rgba[0 * 4 + 3]).toBeLessThanOrEqual(0.5);
+    // The compositor, not this intrinsic buffer, applies layer opacity.
+    expect(rgba[0 * 4 + 3]).toBe(1);
+    expect(layer.opacity).toBe(0.5);
   });
 
   it('preserves explicit transparent alpha from the colormap', () => {

@@ -184,6 +184,23 @@ export class ColorMap extends EventEmitter {
   static generatePreset(name: string, nshades: number = 256): ColorArray[] {
     debugLog(`ColorMap: Generating preset colormap: ${name} with ${nshades} shades`);
 
+    // Dense signed heat ramps, matching neurosurf::surface_heat_colors().
+    // Naming these maps keeps report palette switching and reset reversible.
+    if (name === 'surface-heat' || name === 'surface-heat-positive') {
+      const positiveCount = name === 'surface-heat' ? Math.ceil(nshades / 2) : nshades;
+      const negativeCount = nshades - positiveCount;
+      const colors: ColorArray[] = [];
+      for (let i = 0; i < negativeCount; i++) {
+        const t = i / Math.max(1, negativeCount - 1);
+        colors.push([0, Math.max(0, 1 - 2 * t), 1]);
+      }
+      for (let i = 0; i < positiveCount; i++) {
+        const t = i / Math.max(1, positiveCount - 1);
+        colors.push([1, Math.max(0, 2 * t - 1), 0]);
+      }
+      return colors;
+    }
+
     const customKey = name.toLowerCase();
     if (CUSTOM_PRESET_ANCHORS[customKey]) {
       debugLog(`ColorMap: Using custom preset for ${name}`);
@@ -272,6 +289,7 @@ export class ColorMap extends EventEmitter {
       
       // List of all possible colormaps to try
       const candidateMaps = [
+        'surface-heat', 'surface-heat-positive',
         'jet', 'hsv', 'hot', 'cool', 'spring', 'summer', 'autumn', 'winter',
         'bone', 'copper', 'greys', 'greens', 'bluered', 'RdBu', 'picnic',
         'rainbow', 'portland', 'blackbody', 'earth', 'electric',
