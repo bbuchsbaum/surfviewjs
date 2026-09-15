@@ -11,6 +11,14 @@
 
 import * as THREE from 'three';
 export { buildAtlasPlate } from './atlas/buildAtlasPlate';
+export { buildParcelPuzzle } from './puzzle/buildParcelPuzzle';
+export type { ParcelPuzzleInput, ParcelPuzzleGeometryOptions, ParcelPuzzleGeometry, ParcelPieceGeometry } from './puzzle/buildParcelPuzzle';
+export { ParcelPuzzle } from './puzzle/ParcelPuzzle';
+export type { ParcelPuzzleOptions, ParcelPuzzleSelection, ParcelPuzzleEvents } from './puzzle/ParcelPuzzle';
+export { ParcelPuzzleView } from './puzzle/ParcelPuzzleView';
+export type { ParcelPuzzleViewOptions, ParcelPuzzleViewEvents, ParcelDetailRenderer, ParcelDetailContext } from './puzzle/ParcelPuzzleView';
+export { buildParcelMapMesh, flattenParcelMap, ParcelMapOptimizer, DEFAULT_PARCEL_MAP_PARAMETERS } from './puzzle/ParcelMap';
+export type { ParcelMapMesh, ParcelMapParameters, ParcelMapMetrics, ParcelMapStep, ParcelMapSolveOptions } from './puzzle/ParcelMap';
 export { AtlasPlateView, renderAtlasPlateSVG } from './atlas/AtlasPlateView';
 export { emptyAtlasLayout, parseAtlasPlateLayout } from './atlas/atlasLayout';
 export type { AtlasPlateLayout, AtlasPlatePresentation, AtlasViewport } from './atlas/atlasLayout';

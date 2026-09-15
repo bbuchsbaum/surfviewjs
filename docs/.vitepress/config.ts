@@ -80,6 +80,8 @@ export default defineConfig({
           collapsed: false,
           items: [
             { text: 'Viewer', link: '/guide/viewer' },
+            { text: 'Cortical parcel puzzle', link: '/guide/parcel-puzzle' },
+            { text: 'Parcel map laboratory', link: '/guide/parcel-map-lab' },
             { text: 'Surfaces', link: '/guide/surfaces' },
             { text: 'Atlas illustration', link: '/guide/atlas-illustration' },
             { text: 'Layers', link: '/guide/layers' },

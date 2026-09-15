@@ -2591,8 +2591,8 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
 
     // Render only if needed
     if (this.needsRender || (this.cameraControls as any).enableDamping) {
-      this.render();
       this.needsRender = false;
+      this.render();
     }
   }
 

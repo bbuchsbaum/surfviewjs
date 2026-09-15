@@ -13,5 +13,6 @@ export interface Scenario {
   title: string;
   description: string;
   tags: string[];
+  layout?: 'standard' | 'wide';
   run: (ctx: ScenarioRunContext) => ScenarioCleanup | Promise<ScenarioCleanup>;
 }

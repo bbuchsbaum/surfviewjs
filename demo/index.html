@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>NeuroSurface Demo Hub</title>
+  <title>SurfView demonstration gallery</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='1' y='1' width='30' height='30' rx='3' fill='%2320272b' stroke='%2371818a'/%3E%3Cpath d='M16 8v16M8 16h16' stroke='%238eb8c6' stroke-width='2'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
@@ -12,33 +13,24 @@
       <div class="brand">
         <div class="mark"></div>
         <div>
-          <div class="label">NeuroSurface</div>
-          <div class="sub">Demo Tour</div>
+          <div class="label">SurfView</div>
+          <div class="sub">Demonstration gallery</div>
         </div>
       </div>
       <div class="nav-search">
-        <input id="scenario-search" type="search" placeholder="Search scenarios" />
+        <label class="sr-only" for="scenario-search">Search demonstrations</label>
+        <input id="scenario-search" type="search" placeholder="Search demonstrations" />
       </div>
-      <div class="nav-section">
-        <div class="nav-section-title">Scenarios</div>
+      <div class="nav-section nav-scenarios">
+        <div class="nav-section-title">Explore</div>
         <div id="scenario-list" class="scenario-list"></div>
-      </div>
-      <div class="nav-section nav-hint">
-        <div class="nav-section-title">What this covers</div>
-        <ul>
-          <li>Core rendering & controls</li>
-          <li>Multi-layer compositing</li>
-          <li>Lighting / materials</li>
-          <li>Hemisphere + set handling</li>
-          <li>File and sample loading</li>
-        </ul>
       </div>
     </aside>
     <main class="main">
       <header class="topbar">
         <div>
           <div class="crumb" id="active-title">Pick a scenario</div>
-          <div class="subtitle" id="active-desc">Load a scenario from the left menu to spin up a viewer.</div>
+          <div class="subtitle" id="active-desc">Choose a demonstration from the navigation.</div>
         </div>
         <div class="top-actions">
           <span class="tag" id="active-tags"></span>

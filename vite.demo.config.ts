@@ -24,7 +24,7 @@ export default defineConfig({
     outDir: resolve(__dirname, 'demo-dist'),
     emptyOutDir: true,
     rollupOptions: {
-      input: resolve(demoRoot, 'index.html')
+      input: { gallery: resolve(demoRoot, 'index.html'), puzzle: resolve(demoRoot, 'puzzle.html'), mapLab: resolve(demoRoot, 'map-lab.html') }
     }
   }
 });

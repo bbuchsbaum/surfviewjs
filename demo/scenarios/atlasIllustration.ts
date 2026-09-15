@@ -87,7 +87,6 @@ export const atlasIllustration: Scenario = {
     <footer class="atlas-sheet-footer"><span id="atlas-source-note">${choice.description} · fsLR 32k · inflated surface</span>
       <span>Click a region or its label to select it.</span></footer>`;
     ctx.mount.replaceChildren(sheet);
-    document.body.classList.add('atlas-demo-active');
     const views: AtlasPlateView[] = [];
     let mode = choice.id === 'glasser' ? 'highlights' : 'muted';
     let palette = 'viridis';
@@ -243,6 +242,9 @@ export const atlasIllustration: Scenario = {
     }
     datasetSelector.addEventListener('change', () => {
       choice = atlasChoices.find(a => a.id === datasetSelector.value)!;
+      const url = new URL(location.href);
+      url.searchParams.set('atlas', choice.id);
+      history.replaceState(history.state, '', url);
       data = datasets[atlasChoices.indexOf(choice)]!;
       overrides.clear(); select(null);
       labelMode = choice.id === 'glasser' ? 'names' : 'ids'; labelSelector.value = labelMode;
@@ -309,6 +311,6 @@ export const atlasIllustration: Scenario = {
     });
     sheet.dataset.ready = 'true';
     ctx.perf(`${plates.reduce((n, plate) => n + plate.labels.length, 0)} labels in two views`);
-    return () => { composer?.dispose(); for (const view of views) view.dispose(); sheet.remove(); document.body.classList.remove('atlas-demo-active'); };
+    return () => { composer?.dispose(); for (const view of views) view.dispose(); sheet.remove(); };
   }
 };

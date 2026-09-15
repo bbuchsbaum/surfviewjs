@@ -1,0 +1,107 @@
+import { test, expect } from '@playwright/test';
+
+test.use({ launchOptions: {
+  ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}),
+  args: ['--enable-unsafe-swiftshader']
+} });
+
+test('real parcels lift under the pointer, rotate independently, return, and clean up custom details', async ({ page }, testInfo) => {
+  test.setTimeout(60000);
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/tests/test-parcel-puzzle.html');
+  await expect(page.locator('.sv-parcel-puzzle[data-ready="true"]')).toBeVisible();
+  await page.waitForFunction(() => Boolean((window as any).puzzleFixture));
+  const point = await page.evaluate(() => (window as any).puzzleFixture.findPoint()) as { x: number; y: number; id: number };
+  const original = await page.evaluate(id => (window as any).puzzleFixture.position(id), point.id);
+  await page.mouse.move(point.x, point.y);
+  await expect(page.locator('.sv-parcel-puzzle')).toHaveAttribute('data-hovered-parcel', String(point.id));
+  await expect.poll(() => page.evaluate(id => (window as any).puzzleFixture.position(id), point.id)).not.toEqual(original);
+  await page.waitForTimeout(700);
+  await page.mouse.move(point.x + 0.5, point.y + 0.5);
+  await expect(page.locator('.sv-parcel-puzzle')).toHaveAttribute('data-hovered-parcel', String(point.id));
+  await page.mouse.click(point.x, point.y);
+  await expect(page.locator('.sv-parcel-puzzle')).toHaveAttribute('data-selected-parcel', String(point.id));
+  await expect(page.locator(`[data-application-detail="${point.id}"]`)).toBeVisible();
+  await expect(page.locator('[data-puzzle-detail-canvas]')).toBeVisible();
+  const camera = await page.evaluate(() => (window as any).puzzleFixture.camera());
+  const otherId = point.id === 1 ? 2 : 1;
+  const otherRotation = await page.evaluate(id => (window as any).puzzleFixture.rotation(id), otherId);
+  const preview = page.locator('[data-puzzle-detail-canvas]');
+  const before = await preview.screenshot();
+  const box = (await preview.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 45, box.y + box.height / 2 + 25, { steps: 10 });
+  await page.mouse.up();
+  await expect.poll(() => page.evaluate(id => (window as any).puzzleFixture.rotation(id), point.id)).not.toEqual([0, 0, 0, 1]);
+  expect(await page.evaluate(() => (window as any).puzzleFixture.camera())).toEqual(camera);
+  expect(await page.evaluate(id => (window as any).puzzleFixture.rotation(id), otherId)).toEqual(otherRotation);
+  expect((await preview.screenshot()).equals(before)).toBe(false);
+  await preview.focus(); await page.keyboard.press('ArrowRight');
+  const floating = await page.evaluate(() => (window as any).puzzleFixture.findSelectedPoint());
+  const rotationBeforeMainDrag = await page.evaluate(id => (window as any).puzzleFixture.rotation(id), point.id);
+  await page.mouse.move(floating.x, floating.y); await page.mouse.down();
+  await page.mouse.move(floating.x + 20, floating.y + 10, { steps: 6 }); await page.mouse.up();
+  expect(await page.evaluate(id => (window as any).puzzleFixture.rotation(id), point.id)).not.toEqual(rotationBeforeMainDrag);
+  expect(await page.evaluate(() => (window as any).puzzleFixture.camera())).toEqual(camera);
+  await page.screenshot({ path: testInfo.outputPath('puzzle-rotated-detail.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Return piece', exact: true }).click();
+  await expect(page.locator('[data-puzzle-detail-canvas]')).toHaveCount(0);
+  await expect(page.locator('.sv-parcel-puzzle')).toHaveAttribute('data-selected-parcel', '');
+  await expect.poll(() => page.evaluate(id => (window as any).puzzleFixture.rotation(id), point.id)).toEqual([0, 0, 0, 1]);
+  await expect.poll(() => page.evaluate(({ id, original }) => {
+    const current = (window as any).puzzleFixture.position(id);
+    return Math.hypot(...current.map((v: number, i: number) => v - original[i]));
+  }, { id: point.id, original })).toBeLessThan(0.002);
+  expect(await page.evaluate(() => (window as any).puzzleFixture.signals[0].aborted)).toBe(true);
+  expect(await page.evaluate(() => (window as any).puzzleFixture.cleanups)).toEqual([point.id]);
+  await page.locator('#mount').evaluate(element => { element.style.width = '390px'; });
+  await expect.poll(() => page.evaluate(() => (window as any).puzzleFixture.sourceFits())).toBeLessThan(1);
+  await page.getByLabel('Inspect a parcel', { exact: true }).selectOption(String(otherId));
+  await expect(page.locator('[data-puzzle-detail-canvas]')).toHaveCount(1);
+  await page.evaluate(() => { (window as any).puzzleFixture.view.dispose(); (window as any).puzzleFixture.view.dispose(); });
+  await expect(page.locator('canvas')).toHaveCount(0);
+  expect(await page.evaluate(() => (window as any).puzzleFixture.signals.every((signal: AbortSignal) => signal.aborted))).toBe(true);
+  expect(await page.evaluate(() => (window as any).puzzleFixture.cleanups)).toEqual([point.id, otherId]);
+  expect(errors).toEqual([]);
+});
+
+test('demo switches real atlases, changes spacing and relief, and remains usable on a small screen', async ({ page }, testInfo) => {
+  test.setTimeout(60000);
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.setViewportSize({ width: 1500, height: 940 });
+  await page.goto('/demo/puzzle.html');
+  await expect(page.locator('.sv-parcel-puzzle[data-ready="true"]')).toBeVisible();
+  await expect(page.getByLabel('Inspect a parcel', { exact: true }).locator('option')).toHaveCount(201);
+  const canvas = page.locator('[data-puzzle-canvas]');
+  const assembled = await canvas.screenshot();
+  await page.getByLabel('Parcel separation', { exact: true }).fill('0.22');
+  await expect(page.locator('[data-gap-value]')).toHaveText('22%');
+  await page.getByLabel('Parcel curvature relief', { exact: true }).fill('0.65');
+  await page.waitForTimeout(700);
+  expect((await canvas.screenshot()).equals(assembled)).toBe(false);
+  await page.getByLabel('Inspect a parcel', { exact: true }).selectOption('101');
+  await expect(page.locator('[data-puzzle-detail-canvas]')).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('schaefer-puzzle-separated.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Reassemble', exact: true }).click();
+  await expect(page.getByLabel('Parcel separation', { exact: true })).toHaveValue('0');
+  await expect(page.getByLabel('Parcel curvature relief', { exact: true })).toHaveValue('1');
+  await expect(page.locator('[data-puzzle-detail-canvas]')).toHaveCount(0);
+  await page.getByLabel('Puzzle atlas', { exact: true }).selectOption('glasser');
+  await expect(page.getByLabel('Inspect a parcel', { exact: true }).locator('option')).toHaveCount(181);
+  await page.getByRole('button', { name: 'Medial', exact: true }).click();
+  await page.getByLabel('Inspect a parcel', { exact: true }).selectOption('1');
+  await expect(page.locator('.sv-parcel-puzzle-detail h2')).toHaveText('V1');
+  await page.screenshot({ path: testInfo.outputPath('glasser-puzzle-medial.png'), fullPage: true });
+  await page.getByLabel('Puzzle atlas', { exact: true }).selectOption('schaefer400-17');
+  await expect(page.getByLabel('Inspect a parcel', { exact: true }).locator('option')).toHaveCount(201);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByLabel('Inspect a parcel', { exact: true }).selectOption('65');
+  await expect(page.locator('[data-puzzle-detail-canvas]')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await page.screenshot({ path: testInfo.outputPath('puzzle-mobile.png'), fullPage: true });
+  expect(errors).toEqual([]);
+});

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cortical parcel puzzle · SurfView</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='1' y='1' width='30' height='30' rx='3' fill='%2320272b' stroke='%2371818a'/%3E%3Cpath d='M16 8v16M8 16h16' stroke='%238eb8c6' stroke-width='2'/%3E%3C/svg%3E">
+    <style>
+      *{box-sizing:border-box}body{margin:0;background:#e5ecee;color:#253843;font:14px/1.5 system-ui,-apple-system,sans-serif}
+      .puzzle-page{max-width:1800px;margin:auto;padding:24px 28px}.puzzle-header{display:flex;align-items:baseline;justify-content:space-between;gap:20px;margin-bottom:22px}.puzzle-header h1{margin:0;font-size:25px;font-weight:600;letter-spacing:-.5px}.puzzle-header p{margin:0;color:#536671}.puzzle-layout{display:grid;grid-template-columns:minmax(0,1fr) 240px;gap:24px}#puzzle-mount{height:calc(100vh - 130px);min-height:600px;min-width:0;box-shadow:0 8px 35px #2a485215;border-radius:12px}#puzzle-panel{padding:12px 0}#puzzle-status{color:#536671;font-size:12px;margin-top:12px}
+      @media(max-width:1000px){.puzzle-layout{grid-template-columns:minmax(0,1fr)}#puzzle-panel{max-width:700px}#puzzle-mount{height:700px}.puzzle-header{display:block}.puzzle-page{padding:18px}}
+      @media(max-width:720px){#puzzle-mount{height:auto;min-height:620px}.puzzle-header h1{font-size:22px}}
+    </style>
+  </head>
+  <body>
+    <main class="puzzle-page">
+      <header class="puzzle-header"><h1>Cortical parcel puzzle</h1><p>Surface anatomy, one piece at a time. <a href="./?scenario=parcel-puzzle&amp;atlas=glasser">Gallery</a> · <a href="./map-lab.html">Explore a 2D map ↗</a></p></header>
+      <div class="puzzle-layout"><div id="puzzle-mount"></div><aside id="puzzle-panel" aria-label="Puzzle settings"></aside></div>
+      <div id="puzzle-status" role="status">Loading cortical geometry…</div>
+    </main>
+    <script type="module" src="./puzzle.ts"></script>
+  </body>
+</html>

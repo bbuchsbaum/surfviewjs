@@ -1,5 +1,7 @@
 import type { Scenario } from './types';
 import { atlasIllustration } from './scenarios/atlasIllustration';
+import { parcelPuzzle } from './scenarios/parcelPuzzle';
+import { parcelMapLab } from './scenarios/parcelMapLab';
 import { quickstart } from './scenarios/quickstart';
 import { multilayer } from './scenarios/multilayer';
 import { hemispheres } from './scenarios/hemispheres';
@@ -28,6 +30,8 @@ import { controlsGallery } from './scenarios/controlsGallery';
 export const scenarios: Scenario[] = [
   quickstart,
   atlasIllustration,
+  parcelPuzzle,
+  parcelMapLab,
   controlsPanel,
   controlsGallery,
   multilayer,

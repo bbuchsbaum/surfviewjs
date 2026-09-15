@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Parcel puzzle browser fixture</title>
+<style>body{margin:0}#mount{height:760px;width:1200px}</style></head>
+<body><div id="mount"></div>
+<script type="module">
+import { ParcelPuzzleView } from '../src/puzzle/ParcelPuzzleView.ts';
+import { loadSurface } from '../src/loaders.ts';
+import * as THREE from 'three';
+const geometry = await loadSurface('/tests/data/fs_LR.32k.L.inflated.surf.gii', 'gifti', 'left', 30000, false);
+const data = await (await fetch('/demo/data/schaefer/left-fslr32k-7networks.json')).json();
+const mounts = [], cleanups = [], signals = [];
+const view = new ParcelPuzzleView(document.getElementById('mount'), {
+  vertices: geometry.vertices, faces: geometry.faces, vertexLabels: data.vertexLabels, parcelData: data
+}, {
+  separation: 0.06,
+  renderDetail(container, { parcel, signal }) {
+    mounts.push(parcel.id); signals.push(signal);
+    const text = document.createElement('p'); text.dataset.applicationDetail = String(parcel.id);
+    text.textContent = `Application detail for parcel ${parcel.id}`; container.append(text);
+    return () => cleanups.push(parcel.id);
+  }
+});
+window.puzzleFixture = {
+  view, mounts, cleanups, signals,
+  camera() { return view.viewer.camera.position.toArray().concat(view.viewer.camera.quaternion.toArray()); },
+  rotation(id) { return view.puzzle.getParcelRotation(id).toArray(); },
+  position(id) { return view.puzzle.getParcelPosition(id).toArray(); },
+  sourceFits() {
+    const bounds = view.puzzle.geometry.bounds, center = bounds.getCenter(new THREE.Vector3());
+    view.viewer.camera.updateMatrixWorld();
+    let maximum = 0;
+    for (const x of [bounds.min.x, bounds.max.x]) for (const y of [bounds.min.y, bounds.max.y]) for (const z of [bounds.min.z, bounds.max.z]) {
+      const p = new THREE.Vector3(x, y, z).sub(center).multiplyScalar(1 + view.puzzle.getSeparation()).project(view.viewer.camera);
+      maximum = Math.max(maximum, Math.abs(p.x), Math.abs(p.y));
+    }
+    return maximum;
+  },
+  findSelectedPoint() {
+    const rect = view.viewer.renderer.domElement.getBoundingClientRect();
+    const center = view.getParcelScreenPosition(view.puzzle.selectedParcelId);
+    view.viewer.camera.updateMatrixWorld();
+    const ray = new THREE.Raycaster();
+    for (let radius = 0; radius < 90; radius += 8) for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 6) {
+      const x = center.x + radius * Math.cos(angle), y = center.y + radius * Math.sin(angle);
+      if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) continue;
+      ray.setFromCamera(new THREE.Vector2((x - rect.x) / rect.width * 2 - 1, 1 - (y - rect.y) / rect.height * 2), view.viewer.camera);
+      if (view.puzzle.pick(ray) === view.puzzle.selectedParcelId) return { x, y };
+    }
+    throw new Error('Selected piece is not pickable in the main view');
+  },
+  findPoint() {
+    const canvas = view.viewer.renderer.domElement, rect = canvas.getBoundingClientRect();
+    view.viewer.camera.updateMatrixWorld();
+    const ray = new THREE.Raycaster();
+    for (let y = 0.35; y < 0.7; y += 0.06) for (let x = 0.35; x < 0.75; x += 0.05) {
+      ray.setFromCamera(new THREE.Vector2(x * 2 - 1, 1 - y * 2), view.viewer.camera);
+      const id = view.puzzle.pick(ray);
+      if (id !== null) {
+        // Stay away from true atlas boundaries when testing hover stability.
+        const interior = [[-3, 0], [3, 0], [0, -3], [0, 3]].every(([dx, dy]) => {
+          ray.setFromCamera(new THREE.Vector2((x + dx / rect.width) * 2 - 1, 1 - (y + dy / rect.height) * 2), view.viewer.camera);
+          return view.puzzle.pick(ray) === id;
+        });
+        if (interior) return { x: rect.x + x * rect.width, y: rect.y + y * rect.height, id };
+      }
+    }
+    throw new Error('No cortical piece was pickable in the visible viewport');
+  }
+};
+</script></body></html>
