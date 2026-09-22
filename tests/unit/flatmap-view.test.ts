@@ -156,6 +156,38 @@ describe('FlatMapView', () => {
 
     flatmap.dispose();
   });
+
+  it('rejects invalid dimensions, indices, and time before observable mutation', () => {
+    const flatmap = new FlatMapView(document.createElement('div'), makeGeometry(), {
+      width: 100,
+      height: 100,
+      padding: 0,
+      autoRender: false
+    });
+    const timeChanged = vi.fn();
+    const hoverChanged = vi.fn();
+    const renderNeeded = vi.fn();
+    flatmap.on('time:changed', timeChanged);
+    flatmap.on('vertex:hover', hoverChanged);
+    flatmap.on('render:needed', renderNeeded);
+
+    expect(() => flatmap.resize(Number.NaN, 50)).toThrow(/finite/);
+    expect(flatmap.canvas.width).toBe(100);
+    expect(flatmap.canvas.height).toBe(100);
+    expect(() => flatmap.setHover(4)).toThrow(/at most 3/);
+    expect(flatmap.hoverVertexIndex).toBeNull();
+    expect(() => flatmap.setTime(Number.POSITIVE_INFINITY)).toThrow(/finite/);
+    expect(flatmap.currentTime).toBeNull();
+    const vertices = flatmap.vertices;
+    expect(() => flatmap.setGeometry({
+      vertices: new Float32Array([0, 0, 0, Number.NaN, 1, 0])
+    })).toThrow(/finite/);
+    expect(flatmap.vertices).toBe(vertices);
+    expect(timeChanged).not.toHaveBeenCalled();
+    expect(hoverChanged).not.toHaveBeenCalled();
+    expect(renderNeeded).not.toHaveBeenCalled();
+    flatmap.dispose();
+  });
 });
 
 describe('LinkedBrainWorkspace', () => {

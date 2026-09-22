@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite';
-import { resolve } from 'path';
+import { resolve } from 'node:path';
 
 // Thin React adapter for `surfview/controls/react`. React and the complete
 // controls implementation remain external; this artifact owns lifecycle glue
@@ -25,14 +25,14 @@ export default defineConfig({
   build: {
     emptyOutDir: false,
     lib: {
-      entry: resolve(__dirname, 'src/controls-ui/react.tsx'),
+      entry: resolve(import.meta.dirname, 'src/controls-ui/react.tsx'),
       fileName: () => 'surfview.controls.react.es.js',
       formats: ['es']
     },
     rollupOptions: {
       external: ['react', 'react-dom', 'react/jsx-runtime']
     },
-    sourcemap: true,
+    sourcemap: false,
     minify: 'terser',
     terserOptions: {
       compress: {

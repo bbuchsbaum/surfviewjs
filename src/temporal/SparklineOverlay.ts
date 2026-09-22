@@ -1,4 +1,5 @@
 import type { SparklineOptions, FactorDescriptor } from './types';
+import { finiteNumber } from '../utils/validation';
 
 const DEFAULTS: Required<SparklineOptions> = {
   width: 200,
@@ -30,7 +31,16 @@ export class SparklineOverlay {
 
   constructor(container: HTMLElement, options?: SparklineOptions) {
     this.container = container;
-    this.opts = { ...DEFAULTS, ...options };
+    const merged = { ...DEFAULTS, ...options };
+    this.opts = {
+      ...merged,
+      width: finiteNumber(merged.width, 'width', { minimum: 1, integer: true }),
+      height: finiteNumber(merged.height, 'height', { minimum: 1, integer: true }),
+      padding: finiteNumber(merged.padding, 'padding', { minimum: 0 })
+    };
+    if (this.opts.padding * 2 >= Math.min(this.opts.width, this.opts.height)) {
+      throw new RangeError('padding must leave a positive sparkline drawing area.');
+    }
 
     this.canvas = document.createElement('canvas');
     this.canvas.width = this.opts.width;
@@ -59,13 +69,41 @@ export class SparklineOverlay {
     screenY: number,
     factor?: FactorDescriptor
   ): void {
+    if (timeSeries.length !== times.length) {
+      throw new RangeError('timeSeries and times must have the same length.');
+    }
+    let previousTime = Number.NEGATIVE_INFINITY;
+    const normalizedTimes = times.map((time, index) => {
+      const normalized = finiteNumber(time, `times[${index}]`);
+      if (normalized <= previousTime) {
+        throw new RangeError('times must be strictly increasing.');
+      }
+      previousTime = normalized;
+      return normalized;
+    });
+    const nextCurrentTime = finiteNumber(currentTime, 'currentTime');
+    const nextScreenX = finiteNumber(screenX, 'screenX');
+    const nextScreenY = finiteNumber(screenY, 'screenY');
+    if (factor && factor.assignment.length !== timeSeries.length) {
+      throw new RangeError('factor.assignment must match the time-series length.');
+    }
+    if (factor) {
+      if (factor.levels.length === 0) {
+        throw new RangeError('factor.levels must contain at least one level.');
+      }
+      factor.assignment.forEach((level, index) => finiteNumber(
+        level,
+        `factor.assignment[${index}]`,
+        { minimum: 0, maximum: factor.levels.length - 1, integer: true }
+      ));
+    }
     this.lastTimeSeries = timeSeries;
-    this.lastTimes = times;
-    this.lastCurrentTime = currentTime;
+    this.lastTimes = normalizedTimes;
+    this.lastCurrentTime = nextCurrentTime;
     this.lastFactor = factor ?? null;
 
-    this.drawFull(timeSeries, times, currentTime, factor ?? null);
-    this.position(screenX, screenY);
+    this.drawFull(timeSeries, normalizedTimes, nextCurrentTime, factor ?? null);
+    this.position(nextScreenX, nextScreenY);
     this.canvas.style.display = 'block';
   }
 
@@ -82,9 +120,10 @@ export class SparklineOverlay {
    * Efficient redraw: update only the time marker without a full repaint.
    */
   updateTimeMarker(currentTime: number): void {
+    const nextTime = finiteNumber(currentTime, 'currentTime');
     if (!this.lastTimeSeries || !this.lastTimes) return;
-    this.lastCurrentTime = currentTime;
-    this.drawFull(this.lastTimeSeries, this.lastTimes, currentTime, this.lastFactor);
+    this.lastCurrentTime = nextTime;
+    this.drawFull(this.lastTimeSeries, this.lastTimes, nextTime, this.lastFactor);
   }
 
   dispose(): void {
@@ -147,7 +186,8 @@ export class SparklineOverlay {
     let minVal = Infinity;
     let maxVal = -Infinity;
     for (let i = 0; i < timeSeries.length; i++) {
-      const v = timeSeries[i];
+      // `i` is bounded by the typed array's captured length.
+      const v = timeSeries[i]!;
       if (isFinite(v)) {
         if (v < minVal) minVal = v;
         if (v > maxVal) maxVal = v;
@@ -156,8 +196,9 @@ export class SparklineOverlay {
     if (!isFinite(minVal)) { minVal = 0; maxVal = 1; }
     if (maxVal === minVal) { maxVal = minVal + 1; }
 
-    const tMin = times[0];
-    const tMax = times[times.length - 1];
+    // Empty inputs returned above, so both temporal endpoints are present.
+    const tMin = times[0]!;
+    const tMax = times[times.length - 1]!;
     const tRange = tMax - tMin || 1;
     const vRange = maxVal - minVal;
 
@@ -168,10 +209,11 @@ export class SparklineOverlay {
     if (factor && factor.levels.length > 1) {
       const palette = ['rgba(70,130,180,0.2)', 'rgba(180,100,70,0.2)', 'rgba(70,180,100,0.2)', 'rgba(180,70,180,0.2)'];
       for (let i = 0; i < times.length - 1; i++) {
-        const level = factor.assignment[i];
-        ctx.fillStyle = palette[level % palette.length];
-        const x1 = toX(times[i]);
-        const x2 = toX(times[i + 1]);
+        // `show()` validated aligned assignment length and non-negative level indices.
+        const level = factor.assignment[i]!;
+        ctx.fillStyle = palette[level % palette.length]!;
+        const x1 = toX(times[i]!);
+        const x2 = toX(times[i + 1]!);
         ctx.fillRect(x1, plotY, x2 - x1, plotH);
       }
     }
@@ -183,9 +225,10 @@ export class SparklineOverlay {
     ctx.beginPath();
     let started = false;
     for (let i = 0; i < timeSeries.length; i++) {
-      const v = timeSeries[i];
+      const v = timeSeries[i]!;
       if (!isFinite(v)) continue;
-      const px = toX(times[i]);
+      // `show()` established equal time-series and time lengths.
+      const px = toX(times[i]!);
       const py = toY(v);
       if (!started) {
         ctx.moveTo(px, py);

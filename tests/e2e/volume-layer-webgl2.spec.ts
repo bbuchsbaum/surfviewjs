@@ -8,7 +8,7 @@ test('VolumeProjectionLayer renders via WebGL2 (CPU vs GPU match)', async ({ pag
   });
 
   const result = await handle.jsonValue() as any;
-  test.skip(!!result?.skipped, result?.reason || 'WebGL2 not available');
+  expect(result?.skipped, result?.reason || 'WebGL2 must be available').not.toBe(true);
 
   expect(result?.pass).toBe(true);
   expect(Array.isArray(result?.cases)).toBe(true);

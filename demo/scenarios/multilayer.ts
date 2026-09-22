@@ -90,7 +90,7 @@ export const multilayer: Scenario = {
         })
       );
       ctx.status('Added activation data layer');
-      ctx.perf(`Mode: ${surface.getCompositingMode()} | Layers: ${surface.layerStack.layerOrder.length}`);
+      ctx.perf(`Mode: ${surface.getCompositingMode()} | Layers: ${surface.getOrderedLayers().length}`);
     };
 
     const resetLayers = () => {
@@ -104,7 +104,7 @@ export const multilayer: Scenario = {
       const useGPU = surface.getCompositingMode() === 'CPU';
       surface.setCompositingMode(useGPU);
       ctx.status(`Switched compositing to ${surface.getCompositingMode()}`);
-      ctx.perf(`Mode: ${surface.getCompositingMode()} | Layers: ${surface.layerStack.layerOrder.length}`);
+      ctx.perf(`Mode: ${surface.getCompositingMode()} | Layers: ${surface.getOrderedLayers().length}`);
       viewer.requestRender();
     };
 
@@ -130,7 +130,7 @@ export const multilayer: Scenario = {
     ctx.panel.querySelector('#add-rgba')?.addEventListener('click', () => {
       addRGBA();
       viewer.requestRender();
-      ctx.perf(`Mode: ${surface.getCompositingMode()} | Layers: ${surface.layerStack.layerOrder.length}`);
+      ctx.perf(`Mode: ${surface.getCompositingMode()} | Layers: ${surface.getOrderedLayers().length}`);
     });
 
     ctx.panel.querySelector('#add-activation')?.addEventListener('click', () => {

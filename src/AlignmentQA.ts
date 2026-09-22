@@ -263,7 +263,7 @@ function drawSlice(canvas: HTMLCanvasElement, config: AlignmentQAConfig, axis: A
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   for (let y = 0; y < yCount; y++) {
     for (let x = 0; x < xCount; x++) {
-      const ijk = sliceCoords(axis, sliceIndex, x, y, config.volume.dims);
+      const ijk = sliceCoords(axis, sliceIndex, x, y);
       const value = getVoxel(config.volume, ijk[0], ijk[1], ijk[2]);
       const gray = Math.round(255 * normalize(value, range.min, range.max));
       ctx.fillStyle = `rgb(${gray}, ${gray}, ${gray})`;
@@ -275,7 +275,7 @@ function drawSlice(canvas: HTMLCanvasElement, config: AlignmentQAConfig, axis: A
   sampleSurfacePoints(config)
     .filter(point => Math.abs(axisValue(axis, point.ijk) - sliceIndex) <= thickness)
     .forEach(point => {
-      const projected = slicePoint(axis, point.ijk, config.volume.dims);
+      const projected = slicePoint(axis, point.ijk);
       ctx.fillStyle = point.surface.color ?? surfaceColor(point.surface.kind);
       ctx.beginPath();
       ctx.arc(projected.x * scaleX, canvas.height - projected.y * scaleY, 2.2, 0, Math.PI * 2);
@@ -336,8 +336,12 @@ function gradientMagnitude(volume: AlignmentVolume, ijk: THREE.Vector3): number 
 }
 
 function centralDiff(volume: AlignmentVolume, i: number, j: number, k: number, axis: 0 | 1 | 2): number {
-  const a = axis === 0 ? [i - 1, j, k] : axis === 1 ? [i, j - 1, k] : [i, j, k - 1];
-  const b = axis === 0 ? [i + 1, j, k] : axis === 1 ? [i, j + 1, k] : [i, j, k + 1];
+  const a: [number, number, number] = axis === 0
+    ? [i - 1, j, k]
+    : axis === 1 ? [i, j - 1, k] : [i, j, k - 1];
+  const b: [number, number, number] = axis === 0
+    ? [i + 1, j, k]
+    : axis === 1 ? [i, j + 1, k] : [i, j, k + 1];
   const va = getVoxel(volume, a[0], a[1], a[2]);
   const vb = getVoxel(volume, b[0], b[1], b[2]);
   if (!Number.isFinite(va) || !Number.isFinite(vb)) return 0;
@@ -357,16 +361,17 @@ function sampleNearest(volume: AlignmentVolume, ijk: THREE.Vector3): number | nu
 function getVoxel(volume: AlignmentVolume, i: number, j: number, k: number): number {
   const [nx, ny, nz] = volume.dims;
   if (i < 0 || j < 0 || k < 0 || i >= nx || j >= ny || k >= nz) return NaN;
-  return volume.data[i + nx * j + nx * ny * k];
+  // Bounds and volume shape validation prove this voxel is present.
+  return volume.data[i + nx * j + nx * ny * k]!;
 }
 
-function sliceCoords(axis: AlignmentSliceAxis, sliceIndex: number, x: number, y: number, dims: [number, number, number]): [number, number, number] {
+function sliceCoords(axis: AlignmentSliceAxis, sliceIndex: number, x: number, y: number): [number, number, number] {
   if (axis === 'sagittal') return [sliceIndex, x, y];
   if (axis === 'coronal') return [x, sliceIndex, y];
   return [x, y, sliceIndex];
 }
 
-function slicePoint(axis: AlignmentSliceAxis, ijk: THREE.Vector3, dims: [number, number, number]): { x: number; y: number } {
+function slicePoint(axis: AlignmentSliceAxis, ijk: THREE.Vector3): { x: number; y: number } {
   if (axis === 'sagittal') return { x: ijk.y, y: ijk.z };
   if (axis === 'coronal') return { x: ijk.x, y: ijk.z };
   return { x: ijk.x, y: ijk.y };
@@ -380,7 +385,7 @@ function dataRange(data: ArrayLike<number>): { min: number; max: number } {
   let min = Infinity;
   let max = -Infinity;
   for (let i = 0; i < data.length; i++) {
-    const value = data[i];
+    const value = data[i]!;
     if (!Number.isFinite(value)) continue;
     min = Math.min(min, value);
     max = Math.max(max, value);

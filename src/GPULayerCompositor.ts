@@ -3,23 +3,103 @@ import { Layer, VolumeProjectionLayer } from './layers';
 import { ClipPlaneSet, ClipPlane } from './utils/ClipPlane';
 import { debugLog } from './debug';
 
+type ShaderUniforms = THREE.ShaderMaterial['uniforms'];
+
+export interface GPUCompositorUpdateStats {
+  readonly visibleLayers: number;
+  readonly renderedLayers: number;
+  readonly regeneratedLayerSlices: number;
+  readonly clearedLayerSlices: number;
+  readonly textureBytesMarkedForUpload: number;
+}
+
+export interface GPUCompositorCapacity {
+  readonly supported: boolean;
+  readonly reason: string | null;
+  readonly requiredVertexTextureUnits: number;
+  readonly availableVertexTextureUnits: number;
+  readonly requiredTextureSize: number;
+  readonly availableTextureSize: number;
+}
+
+function requireUniform<T>(uniforms: ShaderUniforms, name: string): THREE.IUniform<T> {
+  const uniform = uniforms[name];
+  if (!uniform) {
+    throw new Error(`GPULayerCompositor: shader uniform ${name} is not registered`);
+  }
+  return uniform as THREE.IUniform<T>;
+}
+
 /**
  * GPU-accelerated layer compositor using custom shaders
  * Performs layer blending on the GPU for massive performance improvements
  */
 export class GPULayerCompositor {
+  static readonly SHADER_LAYER_CAPACITY = 8;
   private vertexCount: number;
   private maxLayers: number;
   private layerTextureSize!: number;
   private layerTexture!: THREE.DataArrayTexture;
   private volumeColormapsTexture!: THREE.DataArrayTexture;
   private material: THREE.ShaderMaterial | null = null;
+  private readonly layerSlots: Array<Layer | null>;
+  private lastUpdateStats: GPUCompositorUpdateStats = Object.freeze({
+    visibleLayers: 0,
+    renderedLayers: 0,
+    regeneratedLayerSlices: 0,
+    clearedLayerSlices: 0,
+    textureBytesMarkedForUpload: 0
+  });
+
+  static assessCapacity(
+    renderer: Pick<THREE.WebGLRenderer, 'capabilities'>,
+    vertexCount: number,
+    maxLayers: number = 8
+  ): GPUCompositorCapacity {
+    if (!Number.isInteger(maxLayers) || maxLayers < 1 ||
+        maxLayers > GPULayerCompositor.SHADER_LAYER_CAPACITY) {
+      throw new RangeError(
+        `GPULayerCompositor: maxLayers must be an integer in [1, ${GPULayerCompositor.SHADER_LAYER_CAPACITY}], got ${maxLayers}`
+      );
+    }
+    // The fixed shader declares eight volume samplers plus the layer and
+    // colormap arrays even when a compositor instance renders fewer slots.
+    const requiredVertexTextureUnits = GPULayerCompositor.SHADER_LAYER_CAPACITY + 2;
+    const availableVertexTextureUnits = renderer.capabilities.maxVertexTextures ?? 0;
+    const requiredTextureSize = Math.ceil(Math.sqrt(vertexCount));
+    const availableTextureSize = renderer.capabilities.maxTextureSize ?? 0;
+    const isWebGL2 = renderer.capabilities.isWebGL2;
+    let reason: string | null = null;
+    if (!isWebGL2) {
+      reason = 'WebGL2 is required for sampler2DArray and sampler3D';
+    } else if (availableVertexTextureUnits < requiredVertexTextureUnits) {
+      reason = `requires ${requiredVertexTextureUnits} vertex texture units, found ${availableVertexTextureUnits}`;
+    } else if (availableTextureSize < requiredTextureSize) {
+      reason = `requires texture size ${requiredTextureSize}, found ${availableTextureSize}`;
+    }
+    return Object.freeze({
+      supported: reason === null,
+      reason,
+      requiredVertexTextureUnits,
+      availableVertexTextureUnits,
+      requiredTextureSize,
+      availableTextureSize
+    });
+  }
+
   constructor(vertexCount: number, maxLayers: number = 8) {
     if (vertexCount <= 0) {
       throw new Error(`GPULayerCompositor: vertexCount must be positive, got ${vertexCount}`);
     }
+    if (!Number.isInteger(maxLayers) || maxLayers < 1 ||
+        maxLayers > GPULayerCompositor.SHADER_LAYER_CAPACITY) {
+      throw new RangeError(
+        `GPULayerCompositor: maxLayers must be an integer in [1, ${GPULayerCompositor.SHADER_LAYER_CAPACITY}], got ${maxLayers}`
+      );
+    }
     this.vertexCount = vertexCount;
     this.maxLayers = maxLayers;
+    this.layerSlots = Array.from({ length: maxLayers }, () => null);
     this.initializeTextures();
     this.createShaderMaterial();
   }
@@ -110,6 +190,7 @@ export class GPULayerCompositor {
       uniform int layerCount;
       uniform float textureSize;
       uniform vec3 baseColor;
+      uniform float baseAlpha;
 
       vec4 sampleLayerTexture(int layerIndex, vec2 texCoord) {
         return texture(layerTextures, vec3(texCoord, float(layerIndex)));
@@ -167,19 +248,33 @@ export class GPULayerCompositor {
       }
 
       vec4 blendColors(vec4 base, vec4 overlay, int blendMode, float opacity) {
-        vec4 result = base;
-        if (blendMode == 0) { // Normal
-          result = mix(base, overlay, overlay.a * opacity);
-        } else if (blendMode == 1) { // Additive
-          result = base + overlay * opacity;
-          result = clamp(result, 0.0, 1.0);
-        } else if (blendMode == 2) { // Multiply
-          result = mix(base, base * overlay, overlay.a * opacity);
-        } else if (blendMode == 3) { // Screen
-          vec4 screen = vec4(1.0) - (vec4(1.0) - base) * (vec4(1.0) - overlay);
-          result = mix(base, screen, overlay.a * opacity);
+        vec3 destination = clamp(base.rgb, 0.0, 1.0);
+        vec3 source = clamp(overlay.rgb, 0.0, 1.0);
+        float destinationAlpha = clamp(base.a, 0.0, 1.0);
+        float sourceAlpha = clamp(overlay.a, 0.0, 1.0) * clamp(opacity, 0.0, 1.0);
+        if (sourceAlpha == 0.0) return base;
+
+        if (blendMode == 1) { // Porter-Duff plus-lighter
+          float outputAlpha = min(1.0, destinationAlpha + sourceAlpha);
+          vec3 premultiplied = min(
+            vec3(1.0),
+            destination * destinationAlpha + source * sourceAlpha
+          );
+          return outputAlpha > 0.0
+            ? vec4(clamp(premultiplied / outputAlpha, 0.0, 1.0), outputAlpha)
+            : vec4(0.0);
         }
-        return result;
+
+        // W3C separable blend followed by Porter-Duff source-over.
+        float outputAlpha = sourceAlpha + destinationAlpha * (1.0 - sourceAlpha);
+        vec3 blended = blendMode == 2 ? destination * source : source;
+        vec3 premultiplied =
+          (1.0 - sourceAlpha) * destinationAlpha * destination +
+          (1.0 - destinationAlpha) * sourceAlpha * source +
+          destinationAlpha * sourceAlpha * blended;
+        return outputAlpha > 0.0
+          ? vec4(clamp(premultiplied / outputAlpha, 0.0, 1.0), outputAlpha)
+          : vec4(0.0);
       }
 
       void main() {
@@ -194,7 +289,7 @@ export class GPULayerCompositor {
         vec2 texCoord = vec2(x + 0.5, y + 0.5) / textureSize;
 
         // Composite layers in vertex shader to avoid interpolation issues
-        vec4 finalColor = vec4(baseColor, 1.0);
+        vec4 finalColor = vec4(baseColor, baseAlpha);
         for (int i = 0; i < 8; i++) {
           if (i >= layerCount) break;
           vec4 layerColor = getLayerColor(i, texCoord, vWorldPosition);
@@ -277,6 +372,7 @@ export class GPULayerCompositor {
     // Create uniforms
     const uniforms: any = {
       baseColor: { value: new THREE.Color(0xcccccc) },
+      baseAlpha: { value: 0.0 },
       textureSize: { value: textureSize },
       layerCount: { value: 0 },
       layerOpacity: { value: new Float32Array(8).fill(1.0) },
@@ -318,6 +414,10 @@ export class GPULayerCompositor {
       glslVersion: THREE.GLSL3,
       vertexColors: true,
       transparent: true,
+      depthTest: true,
+      depthWrite: false,
+      blending: THREE.NormalBlending,
+      premultipliedAlpha: false,
       side: THREE.DoubleSide
     });
   }
@@ -330,35 +430,77 @@ export class GPULayerCompositor {
 
     const visibleLayers = layers.filter(l => l.visible);
     const layerCount = Math.min(visibleLayers.length, this.maxLayers);
+    if (visibleLayers.length > this.maxLayers) {
+      console.warn(
+        `GPULayerCompositor: ${visibleLayers.length} visible layers exceed the ` +
+        `${this.maxLayers}-layer GPU limit; remaining layers are not rendered`
+      );
+    }
     
-    debugLog(`GPULayerCompositor: Updating ${layerCount} layers`);
+    debugLog('GPULayerCompositor: Updating', layerCount, 'layers');
 
     // Update layer count
-    this.material.uniforms.layerCount.value = layerCount;
+    const uniforms = this.material.uniforms;
+    requireUniform<number>(uniforms, 'layerCount').value = layerCount;
+    const layerOpacity = requireUniform<Float32Array>(uniforms, 'layerOpacity').value;
+    const layerBlendMode = requireUniform<Int32Array>(uniforms, 'layerBlendMode').value;
+    const layerKind = requireUniform<Int32Array>(uniforms, 'layerKind').value;
+    let regeneratedLayerSlices = 0;
+    let clearedLayerSlices = 0;
+    let textureBytesMarkedForUpload = 0;
+    const layerSliceBytes = this.layerTextureSize * this.layerTextureSize * 4 * Float32Array.BYTES_PER_ELEMENT;
 
     // Update each layer's texture and properties
     for (let i = 0; i < layerCount; i++) {
-      const layer = visibleLayers[i];
+      // `layerCount` is capped by both `visibleLayers.length` and `maxLayers`.
+      const layer = visibleLayers[i]!;
+      const previousLayer = this.layerSlots[i];
+      const contentChanged = previousLayer !== layer || layer.needsUpdate;
       
       // Update layer properties
-      this.material.uniforms.layerOpacity.value[i] = layer.opacity;
-      this.material.uniforms.layerBlendMode.value[i] = this.getBlendModeIndex(layer.blendMode);
+      layerOpacity[i] = layer.opacity;
+      layerBlendMode[i] = this.getBlendModeIndex(layer.blendMode);
 
       if (layer instanceof VolumeProjectionLayer && layer.usesGPUVertexProjection()) {
-        this.material.uniforms.layerKind.value[i] = 1;
-        this.updateVolumeLayerUniforms(i, layer);
+        layerKind[i] = 1;
+        if (contentChanged) {
+          this.updateVolumeLayerUniforms(i, layer);
+          regeneratedLayerSlices += 1;
+          textureBytesMarkedForUpload += 256 * 4 * Uint8Array.BYTES_PER_ELEMENT;
+        }
       } else {
-        this.material.uniforms.layerKind.value[i] = 0;
-        this.updateLayerTexture(i, layer);
+        layerKind[i] = 0;
+        if (previousLayer instanceof VolumeProjectionLayer && previousLayer.usesGPUVertexProjection()) {
+          requireUniform<THREE.Data3DTexture | null>(uniforms, `volume${i}`).value = null;
+        }
+        if (contentChanged) {
+          this.updateLayerTexture(i, layer);
+          regeneratedLayerSlices += 1;
+          textureBytesMarkedForUpload += layerSliceBytes;
+        }
       }
+      this.layerSlots[i] = layer;
     }
 
     // Clear unused layer textures
     for (let i = layerCount; i < this.maxLayers; i++) {
-      this.material.uniforms.layerKind.value[i] = 0;
-      this.clearLayerTexture(i);
-      this.material.uniforms[`volume${i}`].value = null;
+      layerKind[i] = 0;
+      if (this.layerSlots[i]) {
+        this.clearLayerTexture(i);
+        requireUniform<THREE.Data3DTexture | null>(uniforms, `volume${i}`).value = null;
+        this.layerSlots[i] = null;
+        clearedLayerSlices += 1;
+        textureBytesMarkedForUpload += layerSliceBytes;
+      }
     }
+
+    this.lastUpdateStats = Object.freeze({
+      visibleLayers: visibleLayers.length,
+      renderedLayers: layerCount,
+      regeneratedLayerSlices,
+      clearedLayerSlices,
+      textureBytesMarkedForUpload
+    });
   }
 
   /**
@@ -367,6 +509,12 @@ export class GPULayerCompositor {
   private updateLayerTexture(textureIndex: number, layer: Layer): void {
     // Get RGBA data from layer
     const layerData = layer.getRGBAData(this.vertexCount);
+    const expectedLength = this.vertexCount * 4;
+    if (layerData.length !== expectedLength) {
+      throw new RangeError(
+        `GPULayerCompositor: layer RGBA length must be ${expectedLength}, got ${layerData.length}`
+      );
+    }
     
     // Copy to texture data (need to pad to texture size)
     const textureSize = this.layerTextureSize;
@@ -375,7 +523,7 @@ export class GPULayerCompositor {
     const sliceOffset = textureIndex * sliceSize;
     
     // Copy vertex data to texture using bulk TypedArray copy
-    textureData.set(layerData.subarray(0, this.vertexCount * 4), sliceOffset);
+    textureData.set(layerData, sliceOffset);
     
     // Clear any padding
     const paddingStart = sliceOffset + this.vertexCount * 4;
@@ -383,35 +531,54 @@ export class GPULayerCompositor {
       textureData[i] = 0;
     }
     
+    this.layerTexture.addLayerUpdate(textureIndex);
     this.layerTexture.needsUpdate = true;
   }
 
   private updateVolumeLayerUniforms(textureIndex: number, layer: VolumeProjectionLayer): void {
     if (!this.material) return;
-    const uniforms = this.material.uniforms as any;
+    const uniforms = this.material.uniforms;
 
-    uniforms[`volume${textureIndex}`].value = layer.getVolumeTexture().texture;
+    requireUniform<THREE.Data3DTexture | null>(uniforms, `volume${textureIndex}`).value =
+      layer.getVolumeTexture().texture;
     this.updateVolumeColormapSlice(textureIndex, layer.getColormapTexture());
 
-    uniforms.volumeWorldToIJK.value[textureIndex].copy(layer.getWorldToIJK());
-    uniforms.volumeDims.value[textureIndex].copy(layer.getVolumeDims());
+    const worldToIJK = requireUniform<THREE.Matrix4[]>(uniforms, 'volumeWorldToIJK').value;
+    const volumeDims = requireUniform<THREE.Vector3[]>(uniforms, 'volumeDims').value;
+    const intensityRanges = requireUniform<THREE.Vector2[]>(uniforms, 'volumeIntensityRange').value;
+    const thresholds = requireUniform<THREE.Vector2[]>(uniforms, 'volumeThreshold').value;
+    const fillValues = requireUniform<Float32Array>(uniforms, 'volumeFillValue').value;
+    const worldToIJKSlot = worldToIJK[textureIndex];
+    const volumeDimsSlot = volumeDims[textureIndex];
+    const intensityRangeSlot = intensityRanges[textureIndex];
+    const thresholdSlot = thresholds[textureIndex];
+    if (!worldToIJKSlot || !volumeDimsSlot || !intensityRangeSlot || !thresholdSlot) {
+      throw new RangeError(`GPULayerCompositor: volume layer slot ${textureIndex} is unavailable`);
+    }
+
+    worldToIJKSlot.copy(layer.getWorldToIJK());
+    volumeDimsSlot.copy(layer.getVolumeDims());
 
     const range = layer.getRange();
-    uniforms.volumeIntensityRange.value[textureIndex].set(range[0], range[1]);
+    intensityRangeSlot.set(range[0], range[1]);
 
     const threshold = layer.getThreshold();
-    uniforms.volumeThreshold.value[textureIndex].set(threshold[0], threshold[1]);
+    thresholdSlot.set(threshold[0], threshold[1]);
 
-    uniforms.volumeFillValue.value[textureIndex] = layer.getFillValue();
+    fillValues[textureIndex] = layer.getFillValue();
   }
 
   private updateVolumeColormapSlice(textureIndex: number, texture: THREE.DataTexture): void {
-    const image: any = texture.image;
-    const src = image?.data as Uint8Array | undefined;
-    if (!src) return;
+    const image = texture.image as { data?: unknown };
+    if (!(image.data instanceof Uint8Array)) return;
+    const src = image.data;
 
-    const cmapImage: any = this.volumeColormapsTexture.image;
-    const dst = cmapImage.data as Uint8Array;
+    const cmapImage = this.volumeColormapsTexture.image as {
+      data: Uint8Array;
+      width: number;
+      height: number;
+    };
+    const dst = cmapImage.data;
     const sliceSize = cmapImage.width * cmapImage.height * 4;
     const offset = textureIndex * sliceSize;
 
@@ -420,10 +587,12 @@ export class GPULayerCompositor {
     } else {
       // Best-effort copy for unexpected sizes.
       const n = Math.min(src.length, sliceSize);
-      for (let i = 0; i < n; i++) dst[offset + i] = src[i];
+      // The source and destination spans are bounded by `n` and `sliceSize`.
+      for (let i = 0; i < n; i++) dst[offset + i] = src[i]!;
       for (let i = n; i < sliceSize; i++) dst[offset + i] = 0;
     }
 
+    this.volumeColormapsTexture.addLayerUpdate(textureIndex);
     this.volumeColormapsTexture.needsUpdate = true;
   }
 
@@ -436,7 +605,26 @@ export class GPULayerCompositor {
     const sliceOffset = textureIndex * sliceSize;
     const textureData = this.layerTexture.image.data as unknown as Float32Array;
     textureData.fill(0, sliceOffset, sliceOffset + sliceSize);
+    this.layerTexture.addLayerUpdate(textureIndex);
     this.layerTexture.needsUpdate = true;
+  }
+
+  public getLastUpdateStats(): GPUCompositorUpdateStats {
+    return this.lastUpdateStats;
+  }
+
+  public getTextureMemoryUsage(): {
+    readonly layerTextureBytes: number;
+    readonly volumeColormapBytes: number;
+    readonly totalBytes: number;
+  } {
+    const layerTextureBytes = (this.layerTexture.image.data as unknown as Float32Array).byteLength;
+    const volumeColormapBytes = (this.volumeColormapsTexture.image.data as Uint8Array).byteLength;
+    return Object.freeze({
+      layerTextureBytes,
+      volumeColormapBytes,
+      totalBytes: layerTextureBytes + volumeColormapBytes
+    });
   }
 
   /**
@@ -447,7 +635,6 @@ export class GPULayerCompositor {
       case 'normal': return 0;
       case 'additive': return 1;
       case 'multiply': return 2;
-      case 'screen': return 3;
       default: return 0;
     }
   }
@@ -464,7 +651,15 @@ export class GPULayerCompositor {
    */
   public setBaseColor(color: THREE.ColorRepresentation): void {
     if (this.material) {
-      this.material.uniforms.baseColor.value = new THREE.Color(color);
+      requireUniform<THREE.Color>(this.material.uniforms, 'baseColor').value = new THREE.Color(color);
+      requireUniform<number>(this.material.uniforms, 'baseAlpha').value = 1;
+    }
+  }
+
+  /** Remove the optional implicit base so an empty GPU stack is transparent. */
+  public clearBaseColor(): void {
+    if (this.material) {
+      requireUniform<number>(this.material.uniforms, 'baseAlpha').value = 0;
     }
   }
 
@@ -478,21 +673,21 @@ export class GPULayerCompositor {
 
     // X plane
     const xPlane = clipPlanes.x;
-    uniforms.clipPlaneNormalX.value.copy(xPlane.normal);
-    uniforms.clipPlanePointX.value.copy(xPlane.point);
-    uniforms.clipPlaneEnabledX.value = xPlane.enabled;
+    requireUniform<THREE.Vector3>(uniforms, 'clipPlaneNormalX').value.copy(xPlane.normal);
+    requireUniform<THREE.Vector3>(uniforms, 'clipPlanePointX').value.copy(xPlane.point);
+    requireUniform<boolean>(uniforms, 'clipPlaneEnabledX').value = xPlane.enabled;
 
     // Y plane
     const yPlane = clipPlanes.y;
-    uniforms.clipPlaneNormalY.value.copy(yPlane.normal);
-    uniforms.clipPlanePointY.value.copy(yPlane.point);
-    uniforms.clipPlaneEnabledY.value = yPlane.enabled;
+    requireUniform<THREE.Vector3>(uniforms, 'clipPlaneNormalY').value.copy(yPlane.normal);
+    requireUniform<THREE.Vector3>(uniforms, 'clipPlanePointY').value.copy(yPlane.point);
+    requireUniform<boolean>(uniforms, 'clipPlaneEnabledY').value = yPlane.enabled;
 
     // Z plane
     const zPlane = clipPlanes.z;
-    uniforms.clipPlaneNormalZ.value.copy(zPlane.normal);
-    uniforms.clipPlanePointZ.value.copy(zPlane.point);
-    uniforms.clipPlaneEnabledZ.value = zPlane.enabled;
+    requireUniform<THREE.Vector3>(uniforms, 'clipPlaneNormalZ').value.copy(zPlane.normal);
+    requireUniform<THREE.Vector3>(uniforms, 'clipPlanePointZ').value.copy(zPlane.point);
+    requireUniform<boolean>(uniforms, 'clipPlaneEnabledZ').value = zPlane.enabled;
   }
 
   /**
@@ -504,9 +699,9 @@ export class GPULayerCompositor {
     const uniforms = this.material.uniforms;
     const suffix = axis.toUpperCase();
 
-    uniforms[`clipPlaneNormal${suffix}`].value.copy(plane.normal);
-    uniforms[`clipPlanePoint${suffix}`].value.copy(plane.point);
-    uniforms[`clipPlaneEnabled${suffix}`].value = plane.enabled;
+    requireUniform<THREE.Vector3>(uniforms, `clipPlaneNormal${suffix}`).value.copy(plane.normal);
+    requireUniform<THREE.Vector3>(uniforms, `clipPlanePoint${suffix}`).value.copy(plane.point);
+    requireUniform<boolean>(uniforms, `clipPlaneEnabled${suffix}`).value = plane.enabled;
   }
 
   /**
@@ -516,9 +711,9 @@ export class GPULayerCompositor {
     if (!this.material) return;
 
     const uniforms = this.material.uniforms;
-    uniforms.clipPlaneEnabledX.value = false;
-    uniforms.clipPlaneEnabledY.value = false;
-    uniforms.clipPlaneEnabledZ.value = false;
+    requireUniform<boolean>(uniforms, 'clipPlaneEnabledX').value = false;
+    requireUniform<boolean>(uniforms, 'clipPlaneEnabledY').value = false;
+    requireUniform<boolean>(uniforms, 'clipPlaneEnabledZ').value = false;
   }
 
   /**

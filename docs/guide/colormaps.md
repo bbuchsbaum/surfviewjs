@@ -144,6 +144,12 @@ layer.setThreshold([-1, 1]);
 surface.updateColors();
 ```
 
+Ranges and thresholds must contain exactly two finite ascending values. Equal
+bounds are valid: for thresholds they mean that no interval is hidden. Alpha
+must be finite and in `[0, 1]`, including transparent zero. Setters validate and
+copy their input before changing state or emitting an event; invalid values
+throw `NumericValidationError` and leave the previous mapping intact.
+
 ## Colormap Tips
 
 1. **Use perceptually uniform maps** (`viridis`, `plasma`) for accurate data representation

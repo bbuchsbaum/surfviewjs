@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite';
-import { resolve } from 'path';
+import { resolve } from 'node:path';
 
 // Dedicated optional ESM build for `surfview/controls`. Lit is bundled here;
 // the already-built SurfView core remains an external sibling import.
@@ -74,11 +74,11 @@ export default defineConfig({
   build: {
     emptyOutDir: false,
     lib: {
-      entry: resolve(__dirname, 'src/controls-ui/index.ts'),
+      entry: resolve(import.meta.dirname, 'src/controls-ui/index.ts'),
       fileName: () => 'surfview.controls.es.js',
       formats: ['es']
     },
-    sourcemap: true,
+    sourcemap: false,
     minify: 'terser',
     terserOptions: {
       compress: {

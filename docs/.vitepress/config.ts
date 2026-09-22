@@ -19,6 +19,24 @@ function apiSidebar(): DefaultTheme.SidebarItem[] {
   }
 }
 
+function assuranceSidebar(): DefaultTheme.SidebarItem[] {
+  return [
+    {
+      text: 'Assurance',
+      collapsed: false,
+      items: [
+        { text: 'Reliability and contracts', link: '/guide/reliability' },
+        { text: 'Responsibility map', link: '/architecture/responsibility-map' },
+        { text: 'Computational assurance', link: '/testing/computational-assurance' },
+        { text: 'Benchmark report', link: '/performance/benchmark-report' },
+        { text: 'Tooling and supply chain', link: '/testing/tooling-and-supply-chain' },
+        { text: 'CI policy', link: '/testing/ci-policy' },
+        { text: 'Certification report', link: '/testing/final-certification' },
+      ],
+    },
+  ]
+}
+
 export default defineConfig({
   base,
   lang: 'en-US',
@@ -52,6 +70,11 @@ export default defineConfig({
 
     nav: [
       { text: 'Guide', link: '/guide/getting-started', activeMatch: '/guide/' },
+      {
+        text: 'Assurance',
+        link: '/guide/reliability',
+        activeMatch: '/(architecture|performance|testing|guide/reliability)/',
+      },
       { text: 'API', link: '/api/', activeMatch: '/api/' },
       { text: 'Demo', link: 'https://bbuchsbaum.github.io/surfviewjs/demo/' },
       {
@@ -98,7 +121,23 @@ export default defineConfig({
             { text: 'Performance', link: '/guide/performance' },
           ],
         },
+        {
+          text: 'Assurance',
+          collapsed: false,
+          items: [
+            { text: 'Reliability and contracts', link: '/guide/reliability' },
+            { text: 'Responsibility map', link: '/architecture/responsibility-map' },
+            { text: 'Computational assurance', link: '/testing/computational-assurance' },
+            { text: 'Benchmark report', link: '/performance/benchmark-report' },
+            { text: 'Tooling and supply chain', link: '/testing/tooling-and-supply-chain' },
+            { text: 'CI policy', link: '/testing/ci-policy' },
+            { text: 'Certification report', link: '/testing/final-certification' },
+          ],
+        },
       ],
+      '/architecture/': assuranceSidebar(),
+      '/performance/': assuranceSidebar(),
+      '/testing/': assuranceSidebar(),
       '/api/': [{ text: 'API Reference', items: apiSidebar() }],
     },
 
@@ -120,6 +159,11 @@ export default defineConfig({
   },
 
   vite: {
+    // The local-search index covers the generated API and is lazy-loaded by
+    // VitePress. The docs demo also carries Three.js in a separate async chunk.
+    // Their sizes are audited as documentation assets, not confused with the
+    // independently enforced `surfview` package bundle budgets.
+    build: { chunkSizeWarningLimit: 3000 },
     resolve: {
       alias: {
         // The live demos import the library straight from source.

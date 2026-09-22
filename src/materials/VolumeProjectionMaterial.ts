@@ -2,6 +2,18 @@ import * as THREE from 'three';
 import { VOLUME_PROJECTION_FRAGMENT_SHADER, VOLUME_PROJECTION_VERTEX_SHADER } from '../shaders/volumeProjection';
 import { VolumeTexture3D } from '../textures/VolumeTexture3D';
 import type { RibbonReducer, VolumeProjectionMode } from '../layers';
+import { finiteNumber, finitePair, opacity as validateOpacity } from '../utils/validation';
+
+function requireUniform<T>(
+  uniforms: THREE.ShaderMaterial['uniforms'],
+  name: string
+): THREE.IUniform<T> {
+  const uniform = uniforms[name];
+  if (!uniform) {
+    throw new Error(`VolumeProjectionMaterial: shader uniform ${name} is not registered`);
+  }
+  return uniform as THREE.IUniform<T>;
+}
 
 export interface VolumeProjectionMaterialConfig {
   intensityRange?: [number, number];
@@ -54,6 +66,19 @@ export class VolumeProjectionMaterial extends THREE.ShaderMaterial {
       ribbonSamples = 7,
       ribbonReducer = 'mean'
     } = config;
+    const normalizedIntensityRange = finitePair(intensityRange, 'intensityRange');
+    const normalizedThreshold = finitePair(threshold, 'threshold');
+    const normalizedOpacity = validateOpacity(overlayOpacity, 'overlayOpacity');
+    const normalizedFillValue = finiteNumber(fillValue, 'fillValue');
+    const normalizedAmbient = finiteNumber(ambientIntensity, 'ambientIntensity', { minimum: 0 });
+    const normalizedDiffuse = finiteNumber(diffuseIntensity, 'diffuseIntensity', { minimum: 0 });
+    const normalizedSpecular = finiteNumber(specularIntensity, 'specularIntensity', { minimum: 0 });
+    const normalizedShininess = finiteNumber(shininess, 'shininess', { minimum: 0 });
+    const normalizedRibbonSamples = finiteNumber(ribbonSamples, 'ribbonSamples', {
+      minimum: 1,
+      maximum: 16,
+      integer: true
+    });
 
     const base = new THREE.Color(baseColor);
 
@@ -65,18 +90,18 @@ export class VolumeProjectionMaterial extends THREE.ShaderMaterial {
         uVolumeSampler: { value: volumeTexture.texture },
         uWorldToIJK: { value: worldToIJK.clone() },
         uVolumeDims: { value: volumeTexture.dims.clone() },
-        uFillValue: { value: fillValue },
+        uFillValue: { value: normalizedFillValue },
         uColormapSampler: { value: colormapTexture },
-        uIntensityRange: { value: new THREE.Vector2(intensityRange[0], intensityRange[1]) },
-        uThreshold: { value: new THREE.Vector2(threshold[0], threshold[1]) },
-        uOverlayOpacity: { value: overlayOpacity },
+        uIntensityRange: { value: new THREE.Vector2(...normalizedIntensityRange) },
+        uThreshold: { value: new THREE.Vector2(...normalizedThreshold) },
+        uOverlayOpacity: { value: normalizedOpacity },
         uBaseColor: { value: new THREE.Vector3(base.r, base.g, base.b) },
-        uAmbientIntensity: { value: ambientIntensity },
-        uDiffuseIntensity: { value: diffuseIntensity },
-        uSpecularIntensity: { value: specularIntensity },
-        uShininess: { value: shininess },
+        uAmbientIntensity: { value: normalizedAmbient },
+        uDiffuseIntensity: { value: normalizedDiffuse },
+        uSpecularIntensity: { value: normalizedSpecular },
+        uShininess: { value: normalizedShininess },
         uProjectionMode: { value: projectionModeToUniform(projectionMode) },
-        uRibbonSamples: { value: Math.max(1, Math.min(16, Math.round(ribbonSamples))) },
+        uRibbonSamples: { value: normalizedRibbonSamples },
         uRibbonReducer: { value: ribbonReducerToUniform(ribbonReducer) }
       },
       side: THREE.DoubleSide
@@ -84,42 +109,49 @@ export class VolumeProjectionMaterial extends THREE.ShaderMaterial {
   }
 
   set intensityRange(range: [number, number]) {
-    (this.uniforms.uIntensityRange.value as THREE.Vector2).set(range[0], range[1]);
+    const normalized = finitePair(range, 'intensityRange');
+    requireUniform<THREE.Vector2>(this.uniforms, 'uIntensityRange').value.set(...normalized);
   }
 
   set threshold(range: [number, number]) {
-    (this.uniforms.uThreshold.value as THREE.Vector2).set(range[0], range[1]);
+    const normalized = finitePair(range, 'threshold');
+    requireUniform<THREE.Vector2>(this.uniforms, 'uThreshold').value.set(...normalized);
   }
 
   set overlayOpacity(opacity: number) {
-    this.uniforms.uOverlayOpacity.value = opacity;
+    requireUniform<number>(this.uniforms, 'uOverlayOpacity').value =
+      validateOpacity(opacity, 'overlayOpacity');
   }
 
   set baseColor(color: THREE.ColorRepresentation) {
     const c = new THREE.Color(color);
-    (this.uniforms.uBaseColor.value as THREE.Vector3).set(c.r, c.g, c.b);
+    requireUniform<THREE.Vector3>(this.uniforms, 'uBaseColor').value.set(c.r, c.g, c.b);
   }
 
   set colormap(texture: THREE.Texture) {
-    this.uniforms.uColormapSampler.value = texture;
+    requireUniform<THREE.Texture>(this.uniforms, 'uColormapSampler').value = texture;
   }
 
   setVolumeTexture(volumeTexture: VolumeTexture3D): void {
-    this.uniforms.uVolumeSampler.value = volumeTexture.texture;
-    (this.uniforms.uVolumeDims.value as THREE.Vector3).copy(volumeTexture.dims);
+    requireUniform<THREE.Data3DTexture>(this.uniforms, 'uVolumeSampler').value = volumeTexture.texture;
+    requireUniform<THREE.Vector3>(this.uniforms, 'uVolumeDims').value.copy(volumeTexture.dims);
   }
 
   setWorldToIJK(matrix: THREE.Matrix4): void {
-    (this.uniforms.uWorldToIJK.value as THREE.Matrix4).copy(matrix);
+    requireUniform<THREE.Matrix4>(this.uniforms, 'uWorldToIJK').value.copy(matrix);
   }
 
   setProjectionMode(mode: VolumeProjectionMode): void {
-    this.uniforms.uProjectionMode.value = projectionModeToUniform(mode);
+    requireUniform<number>(this.uniforms, 'uProjectionMode').value = projectionModeToUniform(mode);
   }
 
   setRibbonSampling(samples: number, reducer: RibbonReducer = 'mean'): void {
-    this.uniforms.uRibbonSamples.value = Math.max(1, Math.min(16, Math.round(samples)));
-    this.uniforms.uRibbonReducer.value = ribbonReducerToUniform(reducer);
+    requireUniform<number>(this.uniforms, 'uRibbonSamples').value = finiteNumber(samples, 'ribbonSamples', {
+      minimum: 1,
+      maximum: 16,
+      integer: true
+    });
+    requireUniform<number>(this.uniforms, 'uRibbonReducer').value = ribbonReducerToUniform(reducer);
   }
 }
 

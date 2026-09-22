@@ -1,7 +1,14 @@
 import colormap from 'colormap';
 import * as THREE from 'three';
 import { EventEmitter } from './EventEmitter';
-import { debugLog } from './debug';
+import { debugLog, isDebugEnabled } from './debug';
+import { finiteNumber, finitePair, opacity } from './utils/validation';
+
+export interface ColorMapEventMap {
+  rangeChanged: [number, number];
+  thresholdChanged: [number, number];
+  alphaChanged: number;
+}
 
 export interface ColorMapOptions {
   range?: [number, number];
@@ -27,7 +34,7 @@ const CUSTOM_PRESET_ANCHORS: Record<string, number[]> = {
   seismic: [0x0000ff, 0x00bfbf, 0xffffff, 0xff7f7f, 0xff0000]
 };
 
-export class ColorMap extends EventEmitter {
+export class ColorMap extends EventEmitter<ColorMapEventMap> {
   private colors: ColorArray[];
   private _hasAlpha: boolean;
   private range: [number, number];
@@ -42,7 +49,7 @@ export class ColorMap extends EventEmitter {
     }
 
     this.colors = colors.map(color => this.parseColor(color));
-    this._hasAlpha = this.colors[0].length === 4;
+    this._hasAlpha = this.colors[0]!.length === 4;
     this.range = [0, 1];
     this.threshold = [0, 0];
     this.alpha = 1;
@@ -52,23 +59,19 @@ export class ColorMap extends EventEmitter {
   }
 
   setRange(range?: [number, number]): void {
-    if (Array.isArray(range) && range.length === 2 && range.every(v => typeof v === 'number')) {
-      this.range = range;
-      debugLog('ColorMap: Emitting rangeChanged event', this.range);
-      this.emit('rangeChanged', this.range);
-    } else {
-      this.range = [0, 1];
-    }
+    const next = range === undefined ? [0, 1] as [number, number] : finitePair(range, 'range');
+    this.range = next;
+    debugLog('ColorMap: Emitting rangeChanged event', this.range);
+    this.emit('rangeChanged', [...this.range] as [number, number]);
   }
 
   setThreshold(threshold?: [number, number]): void {
-    if (Array.isArray(threshold) && threshold.length === 2 && threshold.every(v => typeof v === 'number')) {
-      this.threshold = threshold;
-      debugLog('ColorMap: Emitting thresholdChanged event', this.threshold);
-      this.emit('thresholdChanged', this.threshold);
-    } else {
-      this.threshold = [0, 0];
-    }
+    const next = threshold === undefined
+      ? [0, 0] as [number, number]
+      : finitePair(threshold, 'threshold');
+    this.threshold = next;
+    debugLog('ColorMap: Emitting thresholdChanged event', this.threshold);
+    this.emit('thresholdChanged', [...this.threshold] as [number, number]);
   }
 
   /**
@@ -90,7 +93,7 @@ export class ColorMap extends EventEmitter {
     }
 
     return color.map(component => {
-      if (typeof component !== 'number' || component < 0 || component > 1) {
+      if (typeof component !== 'number' || !Number.isFinite(component) || component < 0 || component > 1) {
         throw new TypeError(`Color components must be numbers in the range [0, 1], got ${component}`);
       }
       return component;
@@ -103,9 +106,9 @@ export class ColorMap extends EventEmitter {
       throw new TypeError(`Invalid hex color: ${hex}`);
     }
     return [
-      parseInt(result[1], 16) / 255,
-      parseInt(result[2], 16) / 255,
-      parseInt(result[3], 16) / 255
+      parseInt(result[1]!, 16) / 255,
+      parseInt(result[2]!, 16) / 255,
+      parseInt(result[3]!, 16) / 255
     ];
   }
 
@@ -159,21 +162,17 @@ export class ColorMap extends EventEmitter {
   }
 
   setAlpha(alpha?: number): void {
-    if (typeof alpha === 'number' && alpha >= 0 && alpha <= 1) {
-      this.alpha = alpha;
-      debugLog('ColorMap: Emitting alphaChanged event', this.alpha);
-      this.emit('alphaChanged', this.alpha);
-    } else {
-      this.alpha = 1;
-    }
+    this.alpha = alpha === undefined ? 1 : opacity(alpha, 'alpha');
+    debugLog('ColorMap: Emitting alphaChanged event', this.alpha);
+    this.emit('alphaChanged', this.alpha);
   }
 
   getRange(): [number, number] {
-    return this.range;
+    return [...this.range] as [number, number];
   }
 
   getThreshold(): [number, number] {
-    return this.threshold;
+    return [...this.threshold] as [number, number];
   }
 
   getAlpha(): number {
@@ -182,7 +181,8 @@ export class ColorMap extends EventEmitter {
 
   // Generate colormap using the colormap library
   static generatePreset(name: string, nshades: number = 256): ColorArray[] {
-    debugLog(`ColorMap: Generating preset colormap: ${name} with ${nshades} shades`);
+    finiteNumber(nshades, 'nshades', { minimum: 2, maximum: 65_536, integer: true });
+    debugLog('ColorMap: Generating preset colormap:', name, 'with', nshades, 'shades');
 
     // Dense signed heat ramps, matching neurosurf::surface_heat_colors().
     // Naming these maps keeps report palette switching and reset reversible.
@@ -203,7 +203,7 @@ export class ColorMap extends EventEmitter {
 
     const customKey = name.toLowerCase();
     if (CUSTOM_PRESET_ANCHORS[customKey]) {
-      debugLog(`ColorMap: Using custom preset for ${name}`);
+      debugLog('ColorMap: Using custom preset for', name);
       return ColorMap.buildGradient(CUSTOM_PRESET_ANCHORS[customKey], nshades);
     }
 
@@ -231,11 +231,11 @@ export class ColorMap extends EventEmitter {
         throw new Error(`Colormap "${name}" has no valid color entries after filtering`);
       }
 
-      debugLog(`ColorMap: Generated ${validColors.length} colors for ${name}`);
+      debugLog('ColorMap: Generated', validColors.length, 'colors for', name);
       return validColors;
     } catch (error) {
-      debugLog(`ColorMap: Failed to generate colormap ${name}:`, error);
-      throw new Error(`Colormap "${name}" is not supported`);
+      debugLog('ColorMap: Failed to generate colormap', name, ':', error);
+      throw new Error(`Colormap "${name}" is not supported`, { cause: error });
     }
   }
 
@@ -271,8 +271,9 @@ export class ColorMap extends EventEmitter {
       const scaled = t * segments;
       const idx = Math.min(Math.floor(scaled), segments - 1);
       const localT = scaled - idx;
-      const c0 = anchorColors[idx];
-      const c1 = anchorColors[idx + 1];
+      // `segments > 0` and `idx` is clamped to a complete adjacent pair.
+      const c0 = anchorColors[idx]!;
+      const c1 = anchorColors[idx + 1]!;
       result.push([
         ColorMap.lerp(c0.r, c1.r, localT),
         ColorMap.lerp(c0.g, c1.g, localT),
@@ -308,7 +309,7 @@ export class ColorMap extends EventEmitter {
           if (colors && colors.length > 0) {
             ColorMap.presetMaps[name] = colors;
           }
-        } catch (e) {
+        } catch {
           // Silently skip unsupported colormaps
         }
       }
@@ -411,7 +412,9 @@ export class ColorMap extends EventEmitter {
         ColorMap.presetMaps.grey = ColorMap.presetMaps.gray;
       }
       
-      debugLog('ColorMap: Available presets:', Object.keys(ColorMap.presetMaps));
+      if (isDebugEnabled()) {
+        debugLog('ColorMap: Available presets:', Object.keys(ColorMap.presetMaps));
+      }
     }
     
     return ColorMap.presetMaps;
@@ -434,7 +437,7 @@ export class ColorMap extends EventEmitter {
     }
 
     if (!presetColors) {
-      debugLog(`ColorMap.fromPreset: Preset "${name}" not found, falling back to viridis`);
+      debugLog('ColorMap.fromPreset: Preset', name, 'not found, falling back to viridis');
       presetColors = presets['viridis'] || presets['jet'];
       if (!presetColors) {
         throw new Error(`Preset "${name}" not found and no fallback available`);
@@ -452,7 +455,7 @@ export class ColorMap extends EventEmitter {
       throw new Error(`Preset "${name}" has no valid color entries`);
     }
 
-    debugLog(`ColorMap.fromPreset: Created ${name} colormap with ${validColors.length} colors`);
+    debugLog('ColorMap.fromPreset: Created', name, 'colormap with', validColors.length, 'colors');
     return new ColorMap(validColors, options);
   }
 }

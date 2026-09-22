@@ -1,6 +1,11 @@
 import * as THREE from 'three';
-import { Layer, LayerConfig } from './layers';
+import { assertLayerUpdateFields, Layer, LayerConfig, LayerUpdateData } from './layers';
 import ColorMap from './ColorMap';
+import {
+  finiteNumber,
+  finitePair,
+  opacity as validateOpacity
+} from './utils/validation';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -28,14 +33,82 @@ export interface ConnectivityLayerConfig extends LayerConfig {
   regionFilter?: number[] | null;
 }
 
-export interface ConnectivityLayerUpdate extends Partial<ConnectivityLayerConfig> {
+export interface ConnectivityLayerUpdate extends LayerUpdateData {
   edges?: ConnectivityEdge[];
+  colorMap?: string;
+  weightRange?: [number, number];
+  threshold?: number;
+  renderMode?: RenderMode;
+  tubeRadius?: number;
+  tubeRadiusScale?: boolean;
+  showNodes?: boolean;
+  nodeRadius?: number;
+  nodeColor?: THREE.ColorRepresentation;
+  topN?: number;
+  regionFilter?: number[] | null;
 }
 
 export interface CSRData {
   indptr: ArrayLike<number>;
   indices: ArrayLike<number>;
   data: ArrayLike<number>;
+}
+
+function validateEdges(edges: ConnectivityEdge[], parameter = 'edges'): ConnectivityEdge[] {
+  if (!Array.isArray(edges) || edges.length === 0) {
+    throw new Error('ConnectivityLayer requires a non-empty edges array');
+  }
+  return edges.map((edge, index) => {
+    if (edge.source < 0 || edge.target < 0) {
+      throw new Error(
+        `ConnectivityLayer: negative vertex index (source=${edge.source}, target=${edge.target})`
+      );
+    }
+    return {
+      source: finiteNumber(edge.source, `${parameter}[${index}].source`, {
+      minimum: 0,
+      integer: true
+      }),
+      target: finiteNumber(edge.target, `${parameter}[${index}].target`, {
+      minimum: 0,
+      integer: true
+      }),
+      weight: finiteNumber(edge.weight, `${parameter}[${index}].weight`)
+    };
+  });
+}
+
+function validateRegionFilter(regionFilter: number[] | null | undefined): Set<number> | null {
+  if (!regionFilter) return null;
+  return new Set(regionFilter.map((value, index) => finiteNumber(
+    value,
+    `regionFilter[${index}]`,
+    { minimum: 0, integer: true }
+  )));
+}
+
+function validateRenderMode(mode: RenderMode): RenderMode {
+  if (mode !== 'line' && mode !== 'tube') {
+    throw new TypeError(`renderMode must be "line" or "tube"; received ${String(mode)}.`);
+  }
+  return mode;
+}
+
+function validateVertexIndices(
+  vertexIndices: number[] | undefined,
+  count: number
+): readonly number[] | null {
+  if (vertexIndices === undefined) return null;
+  if (vertexIndices.length !== count) {
+    throw new RangeError(
+      `vertexIndices length must match matrix row count ${count} (received ${vertexIndices.length})`
+    );
+  }
+  return vertexIndices.map((value, index) => finiteNumber(
+    value,
+    `vertexIndices[${index}]`,
+    { minimum: 0, integer: true }
+  ));
 }
 
 // ---------------------------------------------------------------------------
@@ -91,43 +164,38 @@ export class ConnectivityLayer extends Layer {
     config: ConnectivityLayerConfig = {}
   ) {
     super(id, {
-      visible: config.visible,
       opacity: config.opacity ?? 0.85,
-      blendMode: config.blendMode,
-      order: config.order ?? 15
+      order: config.order ?? 15,
+      ...(config.visible === undefined ? {} : { visible: config.visible }),
+      ...(config.blendMode === undefined ? {} : { blendMode: config.blendMode })
     }, {
       role: 'connectivity',
       pinned: 'top',
       reorderable: false
     });
 
-    if (!edges || edges.length === 0) {
-      throw new Error('ConnectivityLayer requires a non-empty edges array');
-    }
-    for (const e of edges) {
-      if (e.source < 0 || e.target < 0) {
-        throw new Error(
-          `ConnectivityLayer: negative vertex index (source=${e.source}, target=${e.target})`
-        );
-      }
-    }
-
-    this._edges = edges;
+    this._edges = validateEdges(edges);
     this._colorMapName = config.colorMap ?? 'hot';
     this._colorMap = ConnectivityLayer._resolveColorMap(this._colorMapName);
-    this._weightRange = config.weightRange ?? ConnectivityLayer._inferRange(edges);
+    this._weightRange = config.weightRange === undefined
+      ? ConnectivityLayer._inferRange(this._edges)
+      : finitePair(config.weightRange, 'weightRange');
     this._colorMap.setRange(this._weightRange);
-    this._threshold = config.threshold ?? 0;
-    this._renderMode = config.renderMode ?? 'tube';
-    this._tubeRadius = config.tubeRadius ?? 0.25;
+    this._threshold = finiteNumber(config.threshold ?? 0, 'threshold', { minimum: 0 });
+    this._renderMode = validateRenderMode(config.renderMode ?? 'tube');
+    this._tubeRadius = finiteNumber(config.tubeRadius ?? 0.25, 'tubeRadius', {
+      minimum: 0,
+      minimumExclusive: true
+    });
     this._tubeRadiusScale = config.tubeRadiusScale ?? true;
     this._showNodes = config.showNodes ?? true;
-    this._nodeRadius = config.nodeRadius ?? 0.8;
+    this._nodeRadius = finiteNumber(config.nodeRadius ?? 0.8, 'nodeRadius', {
+      minimum: 0,
+      minimumExclusive: true
+    });
     this._nodeColor = new THREE.Color(config.nodeColor ?? 0x2196f3);
-    this._topN = config.topN ?? 0;
-    this._regionFilter = config.regionFilter
-      ? new Set(config.regionFilter)
-      : null;
+    this._topN = finiteNumber(config.topN ?? 0, 'topN', { minimum: 0, integer: true });
+    this._regionFilter = validateRegionFilter(config.regionFilter);
 
     this._group = new THREE.Group();
     this._group.name = `connectivity-${id}`;
@@ -149,17 +217,21 @@ export class ConnectivityLayer extends Layer {
     config: ConnectivityLayerConfig & { vertexIndices?: number[] } = {}
   ): ConnectivityLayer {
     const edges: ConnectivityEdge[] = [];
-    const vIdx = config.vertexIndices;
 
     if (Array.isArray(matrix) && Array.isArray(matrix[0])) {
       const N = matrix.length;
+      const vIdx = validateVertexIndices(config.vertexIndices, N);
       for (let i = 0; i < N; i++) {
+        const row = matrix[i];
+        if (!Array.isArray(row) || row.length !== N) {
+          throw new RangeError(`fromMatrix: row ${i} must contain exactly ${N} values`);
+        }
         for (let j = i + 1; j < N; j++) {
-          const w = (matrix as number[][])[i][j];
+          const w = finiteNumber(row[j], `matrix[${i}][${j}]`);
           if (w !== 0) {
             edges.push({
-              source: vIdx ? vIdx[i] : i,
-              target: vIdx ? vIdx[j] : j,
+              source: vIdx ? vIdx[i]! : i,
+              target: vIdx ? vIdx[j]! : j,
               weight: w
             });
           }
@@ -171,13 +243,14 @@ export class ConnectivityLayer extends Layer {
       if (N * N !== flat.length) {
         throw new Error('fromMatrix: flat array length must be a perfect square');
       }
+      const vIdx = validateVertexIndices(config.vertexIndices, N);
       for (let i = 0; i < N; i++) {
         for (let j = i + 1; j < N; j++) {
-          const w = flat[i * N + j];
+          const w = finiteNumber(flat[i * N + j], `matrix[${i}][${j}]`);
           if (w !== 0) {
             edges.push({
-              source: vIdx ? vIdx[i] : i,
-              target: vIdx ? vIdx[j] : j,
+              source: vIdx ? vIdx[i]! : i,
+              target: vIdx ? vIdx[j]! : j,
               weight: w
             });
           }
@@ -201,19 +274,45 @@ export class ConnectivityLayer extends Layer {
     config: ConnectivityLayerConfig & { vertexIndices?: number[] } = {}
   ): ConnectivityLayer {
     const edges: ConnectivityEdge[] = [];
-    const vIdx = config.vertexIndices;
     const N = csr.indptr.length - 1;
+    if (N < 1) {
+      throw new RangeError('fromSparse: indptr must describe at least one row');
+    }
+    if (csr.indices.length !== csr.data.length) {
+      throw new RangeError('fromSparse: indices and data must have matching lengths');
+    }
+    const vIdx = validateVertexIndices(config.vertexIndices, N);
+    const rowPointers = new Array<number>(N + 1);
+    for (let row = 0; row <= N; row++) {
+      rowPointers[row] = finiteNumber(csr.indptr[row], `indptr[${row}]`, {
+        minimum: 0,
+        integer: true
+      });
+      if (row > 0 && rowPointers[row]! < rowPointers[row - 1]!) {
+        throw new RangeError('fromSparse: indptr must be monotonically non-decreasing');
+      }
+    }
+    if (rowPointers[0] !== 0 || rowPointers[N] !== csr.indices.length) {
+      throw new RangeError(
+        'fromSparse: indptr must start at 0 and end at indices/data length'
+      );
+    }
 
     for (let i = 0; i < N; i++) {
-      const start = csr.indptr[i];
-      const end = csr.indptr[i + 1];
+      const start = rowPointers[i]!;
+      const end = rowPointers[i + 1]!;
       for (let k = start; k < end; k++) {
-        const j = csr.indices[k];
+        const j = finiteNumber(csr.indices[k], `indices[${k}]`, {
+          minimum: 0,
+          maximum: N - 1,
+          integer: true
+        });
+        const weight = finiteNumber(csr.data[k], `data[${k}]`);
         if (j > i) {
           edges.push({
-            source: vIdx ? vIdx[i] : i,
-            target: vIdx ? vIdx[j] : j,
-            weight: csr.data[k]
+            source: vIdx ? vIdx[i]! : i,
+            target: vIdx ? vIdx[j]! : j,
+            weight
           });
         }
       }
@@ -235,46 +334,77 @@ export class ConnectivityLayer extends Layer {
   }
 
   update(config: ConnectivityLayerUpdate): void {
+    assertLayerUpdateFields(config, 'ConnectivityLayer', [
+      'edges', 'colorMap', 'weightRange', 'threshold', 'renderMode',
+      'tubeRadius', 'tubeRadiusScale', 'showNodes', 'nodeRadius', 'nodeColor',
+      'topN', 'regionFilter'
+    ]);
+    // Resolve every throwing numeric/configuration path before changing live state.
+    const nextEdges = config.edges === undefined
+      ? undefined
+      : validateEdges(config.edges, 'edges');
+    const nextThreshold = config.threshold === undefined
+      ? undefined
+      : finiteNumber(config.threshold, 'threshold', { minimum: 0 });
+    const nextTopN = config.topN === undefined
+      ? undefined
+      : finiteNumber(config.topN, 'topN', { minimum: 0, integer: true });
+    const nextRegionFilter = config.regionFilter === undefined
+      ? undefined
+      : validateRegionFilter(config.regionFilter);
+    const nextWeightRange = config.weightRange === undefined
+      ? undefined
+      : finitePair(config.weightRange, 'weightRange');
+    const nextRenderMode = config.renderMode === undefined
+      ? undefined
+      : validateRenderMode(config.renderMode);
+    const nextColorMap = config.colorMap === undefined || config.colorMap === this._colorMapName
+      ? undefined
+      : ConnectivityLayer._resolveColorMap(config.colorMap);
+    const nextTubeRadius = config.tubeRadius === undefined
+      ? undefined
+      : finiteNumber(config.tubeRadius, 'tubeRadius', { minimum: 0, minimumExclusive: true });
+    const nextNodeRadius = config.nodeRadius === undefined
+      ? undefined
+      : finiteNumber(config.nodeRadius, 'nodeRadius', { minimum: 0, minimumExclusive: true });
+    if (config.opacity !== undefined) validateOpacity(config.opacity);
+    if (nextEdges) this.validateEdgeVertexBounds(nextEdges);
+
     let needsRebuild = false;
 
-    if (config.edges !== undefined) {
-      if (!config.edges || config.edges.length === 0) {
-        throw new Error('ConnectivityLayer.update: edges must be non-empty');
-      }
-      this._edges = config.edges;
+    if (nextEdges !== undefined) {
+      this._edges = nextEdges;
       needsRebuild = true;
     }
-    if (config.threshold !== undefined) {
-      this._threshold = config.threshold;
+    if (nextThreshold !== undefined) {
+      this._threshold = nextThreshold;
       needsRebuild = true;
     }
-    if (config.topN !== undefined) {
-      this._topN = config.topN;
+    if (nextTopN !== undefined) {
+      this._topN = nextTopN;
       needsRebuild = true;
     }
-    if (config.regionFilter !== undefined) {
-      this._regionFilter = config.regionFilter
-        ? new Set(config.regionFilter)
-        : null;
+    if (nextRegionFilter !== undefined) {
+      this._regionFilter = nextRegionFilter;
       needsRebuild = true;
     }
-    if (config.weightRange !== undefined) {
-      this._weightRange = config.weightRange;
+    if (nextWeightRange !== undefined) {
+      this._weightRange = nextWeightRange;
       this._colorMap.setRange(this._weightRange);
       needsRebuild = true;
     }
-    if (config.renderMode !== undefined && config.renderMode !== this._renderMode) {
-      this._renderMode = config.renderMode;
+    if (nextRenderMode !== undefined && nextRenderMode !== this._renderMode) {
+      this._renderMode = nextRenderMode;
       needsRebuild = true;
     }
-    if (config.colorMap !== undefined && config.colorMap !== this._colorMapName) {
+    if (nextColorMap !== undefined && config.colorMap !== undefined) {
       this._colorMapName = config.colorMap;
-      this._colorMap = ConnectivityLayer._resolveColorMap(config.colorMap);
+      this._colorMap = nextColorMap;
       this._colorMap.setRange(this._weightRange);
       needsRebuild = true;
     }
-    if (config.tubeRadius !== undefined) {
-      this._tubeRadius = config.tubeRadius;
+    if (nextTubeRadius !== undefined) {
+      this._tubeRadius = nextTubeRadius;
       needsRebuild = true;
     }
     if (config.tubeRadiusScale !== undefined) {
@@ -285,8 +415,8 @@ export class ConnectivityLayer extends Layer {
       this._showNodes = config.showNodes;
       needsRebuild = true;
     }
-    if (config.nodeRadius !== undefined) {
-      this._nodeRadius = config.nodeRadius;
+    if (nextNodeRadius !== undefined) {
+      this._nodeRadius = nextNodeRadius;
       needsRebuild = true;
     }
     if (config.nodeColor !== undefined) {
@@ -300,6 +430,9 @@ export class ConnectivityLayer extends Layer {
     if (config.visible !== undefined) {
       this.setVisible(config.visible);
       this._group.visible = config.visible;
+    }
+    if (config.blendMode !== undefined) {
+      this.setBlendMode(config.blendMode);
     }
 
     if (needsRebuild) {
@@ -315,6 +448,7 @@ export class ConnectivityLayer extends Layer {
   // -------------------------------------------------------------------------
 
   attach(surface: any): void {
+    this.validateEdgeVertexBounds(this._edges, surface);
     this._surface = surface;
     if (surface.mesh) {
       surface.mesh.add(this._group);
@@ -335,7 +469,7 @@ export class ConnectivityLayer extends Layer {
   // -------------------------------------------------------------------------
 
   getEdgeCount(): number { return this._filteredEdges.length; }
-  getFilteredEdges(): ConnectivityEdge[] { return [...this._filteredEdges]; }
+  getFilteredEdges(): ConnectivityEdge[] { return this._filteredEdges.map(edge => ({ ...edge })); }
   getRenderMode(): RenderMode { return this._renderMode; }
   getShowNodes(): boolean { return this._showNodes; }
   getThreshold(): number { return this._threshold; }
@@ -350,8 +484,8 @@ export class ConnectivityLayer extends Layer {
    */
   getEdgeColors(): Float32Array {
     const out = new Float32Array(this._filteredEdges.length * 4);
-    for (let i = 0; i < this._filteredEdges.length; i++) {
-      const c = this._colorMap.getColor(Math.abs(this._filteredEdges[i].weight));
+    for (const [i, edge] of this._filteredEdges.entries()) {
+      const c = this._colorMap.getColor(Math.abs(edge.weight));
       out[i * 4] = c[0];
       out[i * 4 + 1] = c[1];
       out[i * 4 + 2] = c[2];
@@ -454,6 +588,20 @@ export class ConnectivityLayer extends Layer {
     return geo.vertices ?? null;
   }
 
+  private validateEdgeVertexBounds(edges: ConnectivityEdge[], surface: any = this._surface): void {
+    if (!surface) return;
+    const vertices = (surface.geometry ?? surface).vertices as ArrayLike<number> | undefined;
+    if (!vertices) return;
+    const vertexCount = vertices.length / 3;
+    for (const [index, edge] of edges.entries()) {
+      if (edge.source >= vertexCount || edge.target >= vertexCount) {
+        throw new RangeError(
+          `edges[${index}] references a vertex outside the attached surface (${vertexCount} vertices).`
+        );
+      }
+    }
+  }
+
   // --- Line mode -----------------------------------------------------------
 
   private _buildLines(vertices: Float32Array): void {
@@ -461,18 +609,19 @@ export class ConnectivityLayer extends Layer {
     const positions = new Float32Array(edges.length * 6);
     const colors = new Float32Array(edges.length * 6);
 
-    for (let i = 0; i < edges.length; i++) {
-      const { source, target, weight } = edges[i];
+    for (const [i, edge] of edges.entries()) {
+      const { source, target, weight } = edge;
       const s3 = source * 3;
       const t3 = target * 3;
       const i6 = i * 6;
 
-      positions[i6]     = vertices[s3];
-      positions[i6 + 1] = vertices[s3 + 1];
-      positions[i6 + 2] = vertices[s3 + 2];
-      positions[i6 + 3] = vertices[t3];
-      positions[i6 + 4] = vertices[t3 + 1];
-      positions[i6 + 5] = vertices[t3 + 2];
+      // Edge bounds are validated against the attached surface before rebuilding.
+      positions[i6]     = vertices[s3]!;
+      positions[i6 + 1] = vertices[s3 + 1]!;
+      positions[i6 + 2] = vertices[s3 + 2]!;
+      positions[i6 + 3] = vertices[t3]!;
+      positions[i6 + 4] = vertices[t3 + 1]!;
+      positions[i6 + 5] = vertices[t3 + 2]!;
 
       const [r, g, b] = this._colorMap.getColor(Math.abs(weight));
       colors[i6]     = r;
@@ -532,13 +681,14 @@ export class ConnectivityLayer extends Layer {
     const color = new THREE.Color();
 
     let validCount = 0;
-    for (let i = 0; i < edges.length; i++) {
-      const { source, target, weight } = edges[i];
+    for (const edge of edges) {
+      const { source, target, weight } = edge;
       const s3 = source * 3;
       const t3 = target * 3;
 
-      start.set(vertices[s3], vertices[s3 + 1], vertices[s3 + 2]);
-      end.set(vertices[t3], vertices[t3 + 1], vertices[t3 + 2]);
+      // Edge bounds are validated against the attached surface before rebuilding.
+      start.set(vertices[s3]!, vertices[s3 + 1]!, vertices[s3 + 2]!);
+      end.set(vertices[t3]!, vertices[t3 + 1]!, vertices[t3 + 2]!);
       dir.subVectors(end, start);
       const length = dir.length();
       if (length === 0) continue;
@@ -604,9 +754,10 @@ export class ConnectivityLayer extends Layer {
     mesh.frustumCulled = false;
 
     const dummy = new THREE.Object3D();
-    for (let i = 0; i < nodeIndices.length; i++) {
-      const vi = nodeIndices[i] * 3;
-      dummy.position.set(vertices[vi], vertices[vi + 1], vertices[vi + 2]);
+    for (const [i, nodeIndex] of nodeIndices.entries()) {
+      const vi = nodeIndex * 3;
+      // Node indices are derived from the same prevalidated edge endpoints.
+      dummy.position.set(vertices[vi]!, vertices[vi + 1]!, vertices[vi + 2]!);
       dummy.scale.setScalar(this._nodeRadius);
       dummy.updateMatrix();
       mesh.setMatrixAt(i, dummy.matrix);
@@ -698,32 +849,3 @@ export class ConnectivityLayer extends Layer {
     this._filteredEdges = [];
   }
 }
-
-// ---------------------------------------------------------------------------
-// Layer.fromConfig registration (monkey-patch chain)
-// ---------------------------------------------------------------------------
-
-const _origFromConfig = Layer.fromConfig.bind(Layer);
-Layer.fromConfig = (config: Record<string, any>): Layer => {
-  if (config.type === 'connectivity') {
-    if (!config.edges) throw new Error('ConnectivityLayer requires edges');
-    return new ConnectivityLayer(config.id, config.edges, {
-      visible: config.visible,
-      opacity: config.opacity,
-      blendMode: config.blendMode,
-      order: config.order,
-      colorMap: config.cmap ?? config.colorMap ?? 'hot',
-      weightRange: config.weightRange,
-      threshold: config.threshold,
-      renderMode: config.renderMode,
-      tubeRadius: config.tubeRadius,
-      tubeRadiusScale: config.tubeRadiusScale,
-      showNodes: config.showNodes,
-      nodeRadius: config.nodeRadius,
-      nodeColor: config.nodeColor,
-      topN: config.topN,
-      regionFilter: config.regionFilter
-    });
-  }
-  return _origFromConfig(config);
-};

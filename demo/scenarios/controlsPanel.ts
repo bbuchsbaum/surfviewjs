@@ -148,7 +148,8 @@ export const controlsPanel: Scenario = {
     };
     fixtureWindow.__surfviewControlsFixture = {
       getLayerOpacity(surfaceId, layerId) {
-        return viewer.getSurface(surfaceId)?.getLayer(layerId)?.opacity ?? null;
+        return viewer.getOrderedLayers(surfaceId)
+          .find(layer => layer.id === layerId)?.opacity ?? null;
       }
     };
 

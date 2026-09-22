@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ConnectivityLayer } from '../../src/ConnectivityLayer';
 import type { ConnectivityEdge, CSRData } from '../../src/ConnectivityLayer';
 import { Layer } from '../../src/layers';
+import '../../src/LayerRegistry';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -61,6 +62,21 @@ describe('ConnectivityLayer', () => {
       expect(() => new ConnectivityLayer('bad', [
         { source: -1, target: 2, weight: 1 }
       ])).toThrow('negative');
+    });
+
+    it('rejects non-finite edges and invalid numeric configuration', () => {
+      expect(() => new ConnectivityLayer('bad-weight', [
+        { source: 0, target: 1, weight: Number.NaN }
+      ])).toThrow(/finite/);
+      expect(() => new ConnectivityLayer('bad-threshold', makeEdges(1), {
+        threshold: -1
+      })).toThrow(/at least 0/);
+      expect(() => new ConnectivityLayer('bad-top', makeEdges(1), {
+        topN: 1.5
+      })).toThrow(/integer/);
+      expect(() => new ConnectivityLayer('bad-radius', makeEdges(1), {
+        tubeRadius: 0
+      })).toThrow(/greater than 0/);
     });
 
     it('infers weight range from edges', () => {
@@ -198,6 +214,37 @@ describe('ConnectivityLayer', () => {
       const layer = new ConnectivityLayer('bad', makeEdges(3));
       expect(() => layer.update({ edges: [] })).toThrow('non-empty');
     });
+
+    it('prevalidates compound updates before state, filters, or events change', () => {
+      const layer = new ConnectivityLayer('transaction', makeEdges(5), {
+        threshold: 0.1
+      });
+      const beforeEdges = layer.getFilteredEdges();
+      const onChange = vi.fn();
+      layer._onChangeCallback = onChange;
+      layer.needsUpdate = false;
+
+      expect(() => layer.update({
+        threshold: 0.4,
+        weightRange: [0, Number.NaN]
+      })).toThrow(/finite/);
+      expect(layer.getThreshold()).toBe(0.1);
+      expect(layer.getFilteredEdges()).toEqual(beforeEdges);
+      expect(layer.needsUpdate).toBe(false);
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it('rejects edges outside an attached surface before replacing live edges', () => {
+      const layer = new ConnectivityLayer('bounds', makeEdges(2));
+      layer.attach(makeMockSurface(3));
+      const before = layer.getFilteredEdges();
+
+      expect(() => layer.update({
+        edges: [{ source: 0, target: 9, weight: 1 }]
+      })).toThrow(/outside the attached surface/);
+      expect(layer.getFilteredEdges()).toEqual(before);
+      layer.dispose();
+    });
   });
 
   // --- Static factories -----------------------------------------------------
@@ -246,6 +293,17 @@ describe('ConnectivityLayer', () => {
       const flat = new Float32Array([1, 2, 3, 4, 5]);
       expect(() => ConnectivityLayer.fromMatrix('ns', flat)).toThrow('perfect square');
     });
+
+    it('rejects ragged matrices and misaligned vertex mappings', () => {
+      expect(() => ConnectivityLayer.fromMatrix('ragged', [
+        [0, 1],
+        [1]
+      ])).toThrow(/row 1/);
+      expect(() => ConnectivityLayer.fromMatrix('mapping', [
+        [0, 1],
+        [1, 0]
+      ], { vertexIndices: [10] })).toThrow(/vertexIndices length/);
+    });
   });
 
   describe('fromSparse', () => {
@@ -276,6 +334,24 @@ describe('ConnectivityLayer', () => {
       const edges = layer.getFilteredEdges();
       expect(edges[0].source).toBe(100);
       expect(edges[0].target).toBe(200);
+    });
+
+    it('rejects malformed CSR row pointers and column indices', () => {
+      expect(() => ConnectivityLayer.fromSparse('csr-order', {
+        indptr: [0, 2, 1],
+        indices: [1],
+        data: [0.5]
+      })).toThrow(/monotonically/);
+      expect(() => ConnectivityLayer.fromSparse('csr-column', {
+        indptr: [0, 1, 1],
+        indices: [2],
+        data: [0.5]
+      })).toThrow(/at most 1/);
+      expect(() => ConnectivityLayer.fromSparse('csr-length', {
+        indptr: [0, 1, 1],
+        indices: [1],
+        data: []
+      })).toThrow(/matching lengths/);
     });
   });
 
@@ -344,7 +420,7 @@ describe('ConnectivityLayer', () => {
       expect(() => Layer.fromConfig({
         type: 'connectivity',
         id: 'bad'
-      })).toThrow('requires edges');
+      })).toThrow('non-empty edges');
     });
 
     it('still handles other types', () => {

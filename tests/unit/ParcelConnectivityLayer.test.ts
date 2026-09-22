@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ParcelConnectivityLayer } from '../../src/layers/ParcelConnectivityLayer';
 import type { ParcelData } from '../../src/parcellation';
 
@@ -98,5 +98,66 @@ describe('ParcelConnectivityLayer', () => {
     layer.setSeedFromVertex(2);
     expect(layer.getSeedParcelId()).toBe(3);
     expect(layer.getConnectivityValue(2)).toBeCloseTo(0.9, 6);
+  });
+
+  it('defensively owns matrix and numeric range inputs', () => {
+    const matrix = new Float32Array([
+      1, 0.2, 0.3,
+      0.2, 1, 0.4,
+      0.3, 0.4, 1
+    ]);
+    const range: [number, number] = [-1, 1];
+    const layer = new ParcelConnectivityLayer(
+      'owned', matrix, makeParcelData(), [1, 2, 3], 'viridis', { range }
+    );
+    matrix[1] = 99;
+    range[0] = -99;
+    layer.setSeedParcel(1);
+
+    expect(layer.getConnectivityValue(2)).toBeCloseTo(0.2, 6);
+    expect(layer.getRange()).toEqual([-1, 1]);
+  });
+
+  it('rejects invalid compound numeric updates without mutation or notification', () => {
+    const layer = new ParcelConnectivityLayer(
+      'transaction',
+      [[1, 0.2, 0.3], [0.2, 1, 0.4], [0.3, 0.4, 1]],
+      makeParcelData(),
+      [1, 2, 3],
+      'viridis',
+      { range: [0, 1], alphaRange: [0, 1], seedParcelId: 1 }
+    );
+    const onChange = vi.fn();
+    layer._onChangeCallback = onChange;
+    layer.needsUpdate = false;
+
+    expect(() => layer.update({
+      range: [0.2, 0.8],
+      alphaRange: [0, Number.NaN]
+    })).toThrow(/finite/);
+    expect(layer.getRange()).toEqual([0, 1]);
+    expect(layer.getSeedParcelId()).toBe(1);
+    expect(layer.needsUpdate).toBe(false);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('keeps matrix state intact when replacement parcel ids are invalid', () => {
+    const layer = new ParcelConnectivityLayer(
+      'matrix-transaction',
+      [[1, 0.2, 0.3], [0.2, 1, 0.4], [0.3, 0.4, 1]],
+      makeParcelData(),
+      [1, 2, 3],
+      'viridis',
+      { seedParcelId: 1 }
+    );
+    const beforeIds = layer.getParcelIds();
+    const beforeValue = layer.getConnectivityValue(2);
+
+    expect(() => layer.setMatrix(
+      [[1, 0.9, 0.8], [0.9, 1, 0.7], [0.8, 0.7, 1]],
+      [1, 1, 3]
+    )).toThrow(/Duplicate parcel id/);
+    expect(layer.getParcelIds()).toEqual(beforeIds);
+    expect(layer.getConnectivityValue(2)).toBe(beforeValue);
   });
 });

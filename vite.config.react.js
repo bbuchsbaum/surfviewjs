@@ -1,9 +1,9 @@
 import { defineConfig } from 'vite';
-import { resolve } from 'path';
+import { resolve } from 'node:path';
 
 // Dedicated build for the React subpath export (`surfview/react`).
 //
-// This bundles the React wrapper components (JSX) into a single ESM file and
+// This bundles the React wrapper components (TSX) into a single ESM file and
 // externalizes the core library so the main bundle is not duplicated: the
 // emitted bundle re-exports from the sibling `./surfview.es.js`.
 //
@@ -15,7 +15,11 @@ const PEER_EXTERNALS = [
   'three'
 ];
 
-// The core index is imported as `./index` (from src/index.react.js) and
+function isPeerExternal(id) {
+  return PEER_EXTERNALS.some(peer => id === peer || id.startsWith(`${peer}/`));
+}
+
+// The core index is imported as `./index` (from src/index.react.ts) and
 // `../index` (from src/react/*). Rewrite both to the built main bundle and keep
 // them external so the core is not inlined a second time. (Rollup ignores
 // `output.paths` for relative external specifiers, so this must be done in
@@ -42,12 +46,12 @@ export default defineConfig({
     // Do not wipe the main bundle produced by the primary build step.
     emptyOutDir: false,
     lib: {
-      entry: resolve(__dirname, 'src/index.react.js'),
+      entry: resolve(import.meta.dirname, 'src/index.react.ts'),
       fileName: (format) => `surfview.react.${format}.js`,
       formats: ['es']
     },
     rollupOptions: {
-      external: PEER_EXTERNALS
+      external: isPeerExternal
     },
     sourcemap: false,
     minify: 'terser',

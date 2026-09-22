@@ -13,7 +13,12 @@
  * @module StatisticalMapLayer
  */
 
-import { Layer, DataLayer, DataLayerConfig, DataLayerUpdateData } from '../layers';
+import {
+  assertLayerUpdateFields,
+  DataLayer,
+  DataLayerConfig,
+  DataLayerUpdateData
+} from '../layers';
 import ColorMap, { Color, ColorArray } from '../ColorMap';
 import { SurfaceGeometry } from '../classes';
 import { MeshAdjacency, buildVertexAdjacency } from '../utils/meshAdjacency';
@@ -26,6 +31,7 @@ import {
   pToZ,
   tToZ
 } from '../utils/statistics';
+import { finiteNumber, finitePair } from '../utils/validation';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -72,7 +78,42 @@ export interface StatisticalMapLayerUpdateData extends DataLayerUpdateData {
   degreesOfFreedom?: number;
 }
 
-type CorrectionMethod = 'none' | 'fdr' | 'bonferroni' | 'cluster';
+export type CorrectionMethod = 'none' | 'fdr' | 'bonferroni' | 'cluster';
+const STAT_TYPES: readonly StatType[] = ['tstat', 'zstat', 'fstat', 'generic'];
+
+function validateStatType(value: unknown): StatType {
+  if (!STAT_TYPES.includes(value as StatType)) {
+    throw new TypeError(`statType must be one of ${STAT_TYPES.join(', ')}.`);
+  }
+  return value as StatType;
+}
+
+function validateDegreesOfFreedom(value: unknown): number {
+  return finiteNumber(value, 'degreesOfFreedom', {
+    minimum: 0,
+    minimumExclusive: true
+  });
+}
+
+function validatePValues(
+  pValues: Float32Array | null,
+  dataLength: number
+): Float32Array | null {
+  if (pValues === null) return null;
+  if (!(pValues instanceof Float32Array)) {
+    throw new TypeError('pValues must be a Float32Array.');
+  }
+  if (pValues.length !== dataLength) {
+    throw new RangeError(
+      `pValues length (${pValues.length}) must match data length (${dataLength}).`
+    );
+  }
+  const copy = new Float32Array(pValues);
+  for (let index = 0; index < copy.length; index += 1) {
+    finiteNumber(copy[index], `pValues[${index}]`, { minimum: 0, maximum: 1 });
+  }
+  return copy;
+}
 
 // ---------------------------------------------------------------------------
 // StatisticalMapLayer
@@ -136,16 +177,9 @@ export class StatisticalMapLayer extends DataLayer {
     this._positiveColorMap.setThreshold(config.threshold || [0, 0]);
 
     // Statistical metadata
-    this._pValues = config.pValues ?? null;
-    this._statType = config.statType ?? 'generic';
-    this._degreesOfFreedom = config.degreesOfFreedom ?? 1;
-
-    // Validate p-values alignment
-    if (this._pValues && this._pValues.length !== dataArr.length) {
-      throw new Error(
-        `pValues length (${this._pValues.length}) must match data length (${dataArr.length})`
-      );
-    }
+    this._pValues = validatePValues(config.pValues ?? null, dataArr.length);
+    this._statType = validateStatType(config.statType ?? 'generic');
+    this._degreesOfFreedom = validateDegreesOfFreedom(config.degreesOfFreedom ?? 1);
   }
 
   // ---------------------------------------------------------------------------
@@ -187,12 +221,13 @@ export class StatisticalMapLayer extends DataLayer {
     if (!this._pValues) {
       throw new Error('Cannot apply FDR: p-values not provided. Pass pValues in config.');
     }
-    const result = computeFDRThreshold(this._pValues, q);
+    const nextQ = finiteNumber(q, 'q', { minimum: 0, minimumExclusive: true, maximum: 1 });
+    const result = computeFDRThreshold(this._pValues, nextQ);
     this._correctionMethod = 'fdr';
     this._correctionMask = result.survivingMask;
     this._clusterMask = null;
     this._clusterResult = null;
-    this._fdrQ = q;
+    this._fdrQ = nextQ;
     this._invalidateRGBA();
   }
 
@@ -207,12 +242,17 @@ export class StatisticalMapLayer extends DataLayer {
     if (!this._pValues) {
       throw new Error('Cannot apply Bonferroni: p-values not provided. Pass pValues in config.');
     }
-    const result = computeBonferroniThreshold(this._pValues, alpha);
+    const nextAlpha = finiteNumber(
+      alpha,
+      'alpha',
+      { minimum: 0, minimumExclusive: true, maximum: 1 }
+    );
+    const result = computeBonferroniThreshold(this._pValues, nextAlpha);
     this._correctionMethod = 'bonferroni';
     this._correctionMask = result.survivingMask;
     this._clusterMask = null;
     this._clusterResult = null;
-    this._bonferroniAlpha = alpha;
+    this._bonferroniAlpha = nextAlpha;
     this._invalidateRGBA();
   }
 
@@ -229,6 +269,11 @@ export class StatisticalMapLayer extends DataLayer {
     threshold: number,
     opts: { minClusterSize: number }
   ): void {
+    const nextThreshold = finiteNumber(threshold, 'threshold', { minimum: 0 });
+    const nextMinimumSize = finiteNumber(opts?.minClusterSize, 'minClusterSize', {
+      minimum: 1,
+      integer: true
+    });
     if (!this._adjacency) {
       throw new Error(
         'Cannot apply cluster threshold: mesh adjacency not set. Call setMeshAdjacency() first.'
@@ -245,9 +290,12 @@ export class StatisticalMapLayer extends DataLayer {
     const activeMask = new Uint8Array(V);
     const indices = this._statIndices;
 
-    for (let i = 0; i < indices.length && i < data.length; i++) {
-      const v = indices[i];
-      if (v >= 0 && v < V && isFinite(data[i]) && Math.abs(data[i]) > threshold) {
+    const mappedCount = Math.min(indices.length, data.length);
+    for (let i = 0; i < mappedCount; i++) {
+      // `mappedCount` establishes aligned bounds once before this hot loop.
+      const v = indices[i]!;
+      const value = data[i]!;
+      if (v < V && isFinite(value) && Math.abs(value) > nextThreshold) {
         activeMask[v] = 1;
       }
     }
@@ -259,7 +307,7 @@ export class StatisticalMapLayer extends DataLayer {
     const clusterMask = filterClustersBySize(
       clusterResult.clusterIds,
       clusterResult.clusterSizes,
-      opts.minClusterSize
+      nextMinimumSize
     );
 
     this._correctionMethod = 'cluster';
@@ -268,8 +316,8 @@ export class StatisticalMapLayer extends DataLayer {
     this._bonferroniAlpha = 0;
     this._clusterMask = clusterMask;
     this._clusterResult = clusterResult;
-    this._clusterThreshold = threshold;
-    this._clusterMinSize = opts.minClusterSize;
+    this._clusterThreshold = nextThreshold;
+    this._clusterMinSize = nextMinimumSize;
     this._invalidateRGBA();
   }
 
@@ -300,17 +348,34 @@ export class StatisticalMapLayer extends DataLayer {
    * - Values between the two ranges (dead zone) are transparent
    */
   setDualThreshold(config: DualThresholdConfig): void {
-    this._dualThreshold = config;
+    const positiveRange = finitePair(config.positiveRange, 'positiveRange');
+    const negativeRange = finitePair(config.negativeRange, 'negativeRange');
+    if (positiveRange[0] < 0) {
+      throw new RangeError('positiveRange must not contain negative values.');
+    }
+    if (negativeRange[1] > 0) {
+      throw new RangeError('negativeRange must not contain positive values.');
+    }
+
+    // Resolve every fallible input before replacing any live statistical state.
+    const positiveColorMap = ColorMap.fromPreset(config.positiveColorMap);
+    positiveColorMap.setRange(positiveRange);
+    positiveColorMap.setThreshold([0, 0]);
+    const negativeColorMap = ColorMap.fromPreset(config.negativeColorMap);
+    negativeColorMap.setRange(negativeRange);
+    negativeColorMap.setThreshold([0, 0]);
+
+    this._dualThreshold = {
+      ...config,
+      positiveRange,
+      negativeRange
+    };
 
     // Update positive colormap
-    this._positiveColorMap = ColorMap.fromPreset(config.positiveColorMap);
-    this._positiveColorMap.setRange(config.positiveRange);
-    this._positiveColorMap.setThreshold([0, 0]); // no hide zone — ranges define visibility
+    this._positiveColorMap = positiveColorMap;
 
     // Create negative colormap
-    this._negativeColorMap = ColorMap.fromPreset(config.negativeColorMap);
-    this._negativeColorMap.setRange(config.negativeRange);
-    this._negativeColorMap.setThreshold([0, 0]);
+    this._negativeColorMap = negativeColorMap;
 
     this._invalidateRGBA();
   }
@@ -369,11 +434,12 @@ export class StatisticalMapLayer extends DataLayer {
     if (!data) return null;
 
     // Find data index for this vertex (identity mapping is the common case)
-    const dataIndex = this._findDataIndex(vertexIndex);
+    const dataIndex = this._findDataIndex(vertexIndex, data.length);
     if (dataIndex === -1) return null;
 
-    const value = data[dataIndex];
-    const pValue = this._pValues ? this._pValues[dataIndex] : null;
+    // `_findDataIndex` only returns an index inside the current data length.
+    const value = data[dataIndex]!;
+    const pValue = this._pValues ? this._pValues[dataIndex]! : null;
 
     // Compute z-score
     let zScore: number | null = null;
@@ -462,11 +528,12 @@ export class StatisticalMapLayer extends DataLayer {
     const threshold = this.getThreshold();
     const thresholdActive = threshold[0] !== threshold[1];
     const isDual = this._dualThreshold !== null;
-    const opacity = this.opacity;
 
-    for (let i = 0; i < indices.length && i < data.length; i++) {
-      const vertexIndex = indices[i];
-      const value = data[i];
+    const mappedCount = Math.min(indices.length, data.length);
+    for (let i = 0; i < mappedCount; i++) {
+      // `mappedCount` establishes aligned bounds once before this hot loop.
+      const vertexIndex = indices[i]!;
+      const value = data[i]!;
 
       // Skip invalid
       if (vertexIndex < 0 || vertexIndex >= vertexCount || !isFinite(value)) {
@@ -474,12 +541,12 @@ export class StatisticalMapLayer extends DataLayer {
       }
 
       // FDR / Bonferroni mask (per-data-point)
-      if (this._correctionMask && this._correctionMask[i] === 0) {
+      if (this._correctionMask && this._correctionMask[i] !== 1) {
         continue;
       }
 
       // Cluster mask (per-vertex)
-      if (this._clusterMask && this._clusterMask[vertexIndex] === 0) {
+      if (this._clusterMask && this._clusterMask[vertexIndex] !== 1) {
         continue;
       }
 
@@ -506,7 +573,7 @@ export class StatisticalMapLayer extends DataLayer {
       rgba[offset] = color[0];
       rgba[offset + 1] = color[1];
       rgba[offset + 2] = color[2];
-      rgba[offset + 3] = ((color[3] as number) ?? 1) * opacity;
+      rgba[offset + 3] = (color[3] as number) ?? 1;
     }
 
     return rgba;
@@ -517,16 +584,39 @@ export class StatisticalMapLayer extends DataLayer {
   // ---------------------------------------------------------------------------
 
   update(updates: StatisticalMapLayerUpdateData): void {
-    if (updates.pValues !== undefined) {
-      this._pValues = updates.pValues;
-    }
-    if (updates.statType !== undefined) {
-      this._statType = updates.statType;
-    }
-    if (updates.degreesOfFreedom !== undefined) {
-      this._degreesOfFreedom = updates.degreesOfFreedom;
-    }
-    super.update(updates);
+    assertLayerUpdateFields(updates, 'StatisticalMapLayer', [
+      'data', 'indices', 'colorMap', 'range', 'threshold',
+      'pValues', 'statType', 'degreesOfFreedom'
+    ]);
+    const candidateDataLength = updates.data?.length ?? this.getData()?.length ?? 0;
+    const candidatePValues = validatePValues(
+      updates.pValues !== undefined ? updates.pValues : this._pValues,
+      candidateDataLength
+    );
+    const candidateStatType = validateStatType(updates.statType ?? this._statType);
+    const candidateDegreesOfFreedom = validateDegreesOfFreedom(
+      updates.degreesOfFreedom ?? this._degreesOfFreedom
+    );
+
+    // Parent receives only fields in its own update contract.
+    const dataUpdates: DataLayerUpdateData = {};
+    if (updates.data !== undefined) dataUpdates.data = updates.data;
+    if (updates.indices !== undefined) dataUpdates.indices = updates.indices;
+    if (updates.colorMap !== undefined) dataUpdates.colorMap = updates.colorMap;
+    if (updates.range !== undefined) dataUpdates.range = updates.range;
+    if (updates.threshold !== undefined) dataUpdates.threshold = updates.threshold;
+    if (updates.opacity !== undefined) dataUpdates.opacity = updates.opacity;
+    if (updates.visible !== undefined) dataUpdates.visible = updates.visible;
+    if (updates.blendMode !== undefined) dataUpdates.blendMode = updates.blendMode;
+    super.update(dataUpdates);
+    const statisticalMetadataChanged =
+      updates.pValues !== undefined ||
+      updates.statType !== undefined ||
+      updates.degreesOfFreedom !== undefined;
+    this._pValues = candidatePValues;
+    this._statType = candidateStatType;
+    this._degreesOfFreedom = candidateDegreesOfFreedom;
+    if (statisticalMetadataChanged) this.clearCorrection();
   }
 
   toStateJSON(): Record<string, unknown> {
@@ -565,17 +655,19 @@ export class StatisticalMapLayer extends DataLayer {
   }
 
   /** Find the data-array index that maps to a given vertex index. */
-  private _findDataIndex(vertexIndex: number): number {
+  private _findDataIndex(vertexIndex: number, dataLength: number): number {
+    if (!Number.isSafeInteger(vertexIndex) || vertexIndex < 0) return -1;
     const indices = this._statIndices;
+    const mappedCount = Math.min(indices.length, dataLength);
     // Fast path: identity mapping (most common in neuroimaging)
     if (
-      indices.length > vertexIndex &&
+      mappedCount > vertexIndex &&
       indices[vertexIndex] === vertexIndex
     ) {
       return vertexIndex;
     }
     // Slow path: linear scan
-    for (let i = 0; i < indices.length; i++) {
+    for (let i = 0; i < mappedCount; i++) {
       if (indices[i] === vertexIndex) return i;
     }
     return -1;
@@ -588,32 +680,3 @@ export class StatisticalMapLayer extends DataLayer {
     return new ColorMap(colorMap);
   }
 }
-
-// ---------------------------------------------------------------------------
-// Layer.fromConfig registration
-// ---------------------------------------------------------------------------
-
-const _origFromConfig = Layer.fromConfig.bind(Layer);
-Layer.fromConfig = (config: Record<string, any>): Layer => {
-  if (config.type === 'statistical') {
-    if (!config.data) throw new Error('StatisticalMapLayer requires data');
-    return new StatisticalMapLayer(
-      config.id,
-      config.data,
-      config.indices ?? null,
-      config.cmap ?? config.colorMap ?? 'hot',
-      {
-        visible: config.visible,
-        opacity: config.opacity,
-        blendMode: config.blendMode,
-        order: config.order,
-        range: config.range,
-        threshold: config.threshold,
-        pValues: config.pValues,
-        statType: config.statType,
-        degreesOfFreedom: config.degreesOfFreedom
-      }
-    );
-  }
-  return _origFromConfig(config);
-};

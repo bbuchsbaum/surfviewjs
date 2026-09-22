@@ -25,7 +25,9 @@ export function encodeFloat32LE(values: ArrayLike<number>): Uint8Array {
   const buffer = new ArrayBuffer(values.length * 4);
   const view = new DataView(buffer);
   for (let index = 0; index < values.length; index += 1) {
-    view.setFloat32(index * 4, values[index], true);
+    const value = values[index];
+    if (value === undefined) throw new RangeError(`float32 value missing at index ${index}`);
+    view.setFloat32(index * 4, value, true);
   }
   return new Uint8Array(buffer);
 }
@@ -35,7 +37,7 @@ export function encodeUint32LE(values: ArrayLike<number>): Uint8Array {
   const view = new DataView(buffer);
   for (let index = 0; index < values.length; index += 1) {
     const value = values[index];
-    if (!Number.isInteger(value) || value < 0 || value > 0xffffffff) {
+    if (value === undefined || !Number.isInteger(value) || value < 0 || value > 0xffffffff) {
       throw new RangeError(`uint32 value out of range at index ${index}: ${value}`);
     }
     view.setUint32(index * 4, value, true);
@@ -138,7 +140,10 @@ export async function loadSceneAsset(
     const url = options.baseUrl
       ? new URL(descriptor.uri, options.baseUrl).toString()
       : descriptor.uri;
-    const response = await fetcher(url, { signal: options.signal });
+    const response = await fetcher(
+      url,
+      options.signal === undefined ? {} : { signal: options.signal }
+    );
     if (!response.ok) {
       throw new Error(`Failed to load ${descriptor.id}: HTTP ${response.status}`);
     }

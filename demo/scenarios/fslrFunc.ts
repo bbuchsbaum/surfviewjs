@@ -20,6 +20,12 @@ function base64ToUint8(text: string): Uint8Array {
   return bytes;
 }
 
+function copyToArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return buffer;
+}
+
 function toTypedArray(buffer: ArrayBuffer, dataType: string, littleEndian: boolean): Float32Array | Uint32Array | null {
   switch (dataType) {
     case 'NIFTI_TYPE_FLOAT32':
@@ -49,7 +55,7 @@ function parseGiiDataArray(dataArray: Element): Float32Array | Uint32Array | nul
   }
 
   if (encoding === 'Base64Binary') {
-    const buffer = base64ToUint8(text).buffer;
+    const buffer = copyToArrayBuffer(base64ToUint8(text));
     return toTypedArray(buffer, dataType, littleEndian);
   }
 
@@ -61,8 +67,7 @@ function parseGiiDataArray(dataArray: Element): Float32Array | Uint32Array | nul
     } catch (gzipError) {
       unzipped = unzlibSync(compressed);
     }
-    const buffer = new ArrayBuffer(unzipped.byteLength);
-    new Uint8Array(buffer).set(unzipped);
+    const buffer = copyToArrayBuffer(unzipped);
     return toTypedArray(buffer, dataType, littleEndian);
   }
 

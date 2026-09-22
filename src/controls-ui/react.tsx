@@ -158,10 +158,10 @@ export const SurfViewControls = forwardRef<
         label,
         theme,
         density,
-        features,
-        target,
-        session,
-        pluginId
+        ...(features === undefined ? {} : { features }),
+        ...(target === undefined ? {} : { target }),
+        ...(session === undefined ? {} : { session }),
+        ...(pluginId === undefined ? {} : { pluginId })
       });
     } catch (error) {
       reportLifecycleError(error);

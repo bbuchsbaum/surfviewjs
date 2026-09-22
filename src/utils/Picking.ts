@@ -12,14 +12,17 @@ export interface PickInfo {
   */
 export function computePickInfo(raycaster: THREE.Raycaster, mesh: THREE.Mesh): PickInfo {
   const hits = raycaster.intersectObject(mesh, false);
-  if (!hits || hits.length === 0) {
+  if (hits.length === 0) {
     return { point: null, faceIndex: null, distance: null };
   }
   const hit = hits[0];
+  if (!hit) {
+    return { point: null, faceIndex: null, distance: null };
+  }
   return {
     point: hit.point ? hit.point.clone() : null,
     faceIndex: hit.faceIndex ?? null,
     distance: hit.distance ?? null,
-    uv: hit.uv ? hit.uv.clone() : undefined
+    ...(hit.uv ? { uv: hit.uv.clone() } : {})
   };
 }

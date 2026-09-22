@@ -90,7 +90,7 @@ export class LabeledNeuroSurface extends NeuroSurface {
     const defaultColor = new THREE.Color(0x999999);
 
     for (let i = 0, v = 0; i < labels.length; i++, v += 3) {
-      const entry = this.labelMap.get(labels[i]);
+      const entry = this.labelMap.get(labels[i]!);
       const c = entry?.color || defaultColor;
       colors[v] = c.r;
       colors[v + 1] = c.g;

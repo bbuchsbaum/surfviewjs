@@ -664,6 +664,7 @@ export const controlsGallery: Scenario = {
     ));
     sparseHandle.viewer.addSurface(sparseSurface, 'lh-sparse');
     sparseHandle.viewer.setAnatomicalView('lateral', {
+      layout: 'single',
       surfaceId: 'lh-sparse',
       fit: true
     });

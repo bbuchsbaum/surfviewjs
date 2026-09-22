@@ -1,5 +1,12 @@
 import { deflateSync, inflateSync } from 'fflate';
 import type { InspectionSelection } from '../Inspection';
+import {
+  assertFiniteJSONNumbers,
+  finiteNumber,
+  finitePair,
+  opacity,
+  rgbInteger
+} from '../utils/validation';
 
 // ---------------------------------------------------------------------------
 // Schema version
@@ -118,6 +125,105 @@ export interface ViewerStateV2 {
 
 export type ViewerState = ViewerStateV1 | ViewerStateV2;
 
+/**
+ * Reject numeric state that cannot be restored without producing invalid camera,
+ * layer, correction, or timeline values. This also prevents JSON.stringify from
+ * silently converting NaN or infinities to null.
+ */
+export function assertValidViewerStateNumbers(state: ViewerState): void {
+  assertFiniteJSONNumbers(state);
+  const camera = state.camera;
+  finiteTuple(camera.position, '$.camera.position', 3);
+  finiteTuple(camera.quaternion, '$.camera.quaternion', 4);
+  finiteTuple(camera.target, '$.camera.target', 3);
+  finiteTuple(camera.up, '$.camera.up', 3);
+  finiteNumber(camera.zoom, '$.camera.zoom', { minimum: 0, minimumExclusive: true });
+  finiteNumber(camera.fov, '$.camera.fov', {
+    minimum: 0,
+    minimumExclusive: true,
+    maximum: 180,
+    maximumExclusive: true
+  });
+
+  if (state.config.background !== undefined) {
+    rgbInteger(state.config.background, '$.config.background');
+  }
+  if (state.config.rimStrength !== undefined) {
+    finiteNumber(state.config.rimStrength, '$.config.rimStrength', { minimum: 0 });
+  }
+  const lighting = state.config.lighting;
+  if (lighting?.ambientIntensity !== undefined) {
+    finiteNumber(lighting.ambientIntensity, '$.config.lighting.ambientIntensity', { minimum: 0 });
+  }
+  if (lighting?.directionalIntensity !== undefined) {
+    finiteNumber(
+      lighting.directionalIntensity,
+      '$.config.lighting.directionalIntensity',
+      { minimum: 0 }
+    );
+  }
+  if (lighting?.directionalPosition !== undefined) {
+    finiteTuple(lighting.directionalPosition, '$.config.lighting.directionalPosition', 3);
+  }
+
+  for (const [surfaceId, surface] of Object.entries(state.surfaces ?? {})) {
+    for (const [index, layer] of (surface.layers ?? []).entries()) {
+      const path = `$.surfaces.${surfaceId}.layers[${index}]`;
+      opacity(layer.opacity, `${path}.opacity`);
+      if (layer.order !== undefined) finiteNumber(layer.order, `${path}.order`);
+      for (const key of [
+        'range', 'threshold', 'rangeX', 'rangeY', 'thresholdX', 'thresholdY',
+        'positiveRange', 'negativeRange'
+      ]) {
+        const value = layer[key];
+        if (value !== undefined) finitePair(value, `${path}.${key}`);
+      }
+      if (layer.degreesOfFreedom !== undefined) {
+        finiteNumber(layer.degreesOfFreedom, `${path}.degreesOfFreedom`, {
+          minimum: 0,
+          minimumExclusive: true
+        });
+      }
+      for (const key of ['fdrQ', 'bonferroniAlpha']) {
+        const value = layer[key];
+        if (value !== undefined) {
+          finiteNumber(value, `${path}.${key}`, { minimum: 0, maximum: 1 });
+        }
+      }
+    }
+    for (const [index, clip] of (surface.clipPlanes ?? []).entries()) {
+      finiteTuple(clip.normal, `$.surfaces.${surfaceId}.clipPlanes[${index}].normal`, 3);
+      finiteNumber(clip.distance, `$.surfaces.${surfaceId}.clipPlanes[${index}].distance`);
+    }
+  }
+
+  finiteNumber(state.crosshair.size, '$.crosshair.size', {
+    minimum: 0,
+    minimumExclusive: true
+  });
+  rgbInteger(state.crosshair.color, '$.crosshair.color');
+  if (state.crosshair.vertexIndex !== null) {
+    finiteNumber(state.crosshair.vertexIndex, '$.crosshair.vertexIndex', {
+      minimum: 0,
+      integer: true
+    });
+  }
+  if (state.timeline) {
+    finiteNumber(state.timeline.currentTime, '$.timeline.currentTime');
+    finiteNumber(state.timeline.speed, '$.timeline.speed', {
+      minimum: 0,
+      minimumExclusive: true
+    });
+  }
+}
+
+function finiteTuple(value: unknown, parameter: string, length: number): void {
+  if (!Array.isArray(value) || value.length !== length) {
+    throw new RangeError(`${parameter} must contain exactly ${length} finite values.`);
+  }
+  value.forEach((item, index) => finiteNumber(item, `${parameter}[${index}]`));
+}
+
 // ---------------------------------------------------------------------------
 // Restoration report
 // ---------------------------------------------------------------------------
@@ -159,7 +265,8 @@ export interface RestorationReport {
 function toBase64url(bytes: Uint8Array): string {
   let binary = '';
   for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
+    // `i` is bounded by the captured typed-array length.
+    binary += String.fromCharCode(bytes[i]!);
   }
   return btoa(binary)
     .replace(/\+/g, '-')
@@ -192,6 +299,7 @@ const HASH_PREFIX = 'svjs=';
  * Pipeline: JSON → UTF-8 → deflate → base64url → "svjs=..."
  */
 export function encode(state: ViewerState): string {
+  assertValidViewerStateNumbers(state);
   const json = JSON.stringify(state);
   const utf8 = new TextEncoder().encode(json);
   const compressed = deflateSync(utf8);
@@ -218,7 +326,10 @@ export function decode(hash: string): ViewerStateV2 {
     const compressed = fromBase64url(b64);
     decompressed = inflateSync(compressed);
   } catch (err) {
-    throw new Error(`State decode failed: corrupted or invalid data (${(err as Error).message})`);
+    throw new Error(
+      `State decode failed: corrupted or invalid data (${(err as Error).message})`,
+      { cause: err }
+    );
   }
 
   const json = new TextDecoder().decode(decompressed);
@@ -273,10 +384,13 @@ export function migrateV1toV2(state: ViewerStateV1): ViewerStateV2 {
   const surfaces: Record<string, SurfaceState> = {};
   for (const [surfaceId, surface] of Object.entries(state.surfaces)) {
     const layers = Array.isArray(surface?.layers)
-      ? surface.layers.map(layer => ({
-          ...layer,
-          order: Number.isFinite(layer.order) ? layer.order : 0
-        }))
+      ? surface.layers.map(layer => {
+          const order = layer.order;
+          return {
+            ...layer,
+            order: typeof order === 'number' && Number.isFinite(order) ? order : 0
+          };
+        })
       : [];
     const layerOrder = layers
       .map((layer, index) => ({ id: layer.id, order: layer.order ?? 0, index }))

@@ -1,9 +1,17 @@
 import { describe, it, expect, vi } from 'vitest';
-import { EventEmitter } from '../../src/EventEmitter';
+import { DynamicEventEmitter, EventEmitter } from '../../src/EventEmitter';
 
 describe('EventEmitter', () => {
+  it('delivers a declared event payload', () => {
+    const emitter = new EventEmitter<{ value: number }>();
+    const fn = vi.fn();
+    emitter.on('value', fn);
+    emitter.emit('value', 42);
+    expect(fn).toHaveBeenCalledWith(42);
+  });
+
   it('calls listeners on emit', () => {
-    const emitter = new EventEmitter();
+    const emitter = new DynamicEventEmitter();
     const fn = vi.fn();
     emitter.on('test', fn);
     emitter.emit('test', 42);
@@ -11,7 +19,7 @@ describe('EventEmitter', () => {
   });
 
   it('returns an unsubscribe function from on()', () => {
-    const emitter = new EventEmitter();
+    const emitter = new DynamicEventEmitter();
     const fn = vi.fn();
     const unsub = emitter.on('test', fn);
     unsub();
@@ -20,7 +28,7 @@ describe('EventEmitter', () => {
   });
 
   it('supports multiple listeners', () => {
-    const emitter = new EventEmitter();
+    const emitter = new DynamicEventEmitter();
     const fn1 = vi.fn();
     const fn2 = vi.fn();
     emitter.on('test', fn1);
@@ -31,7 +39,7 @@ describe('EventEmitter', () => {
   });
 
   it('notifies later listeners before rethrowing the first listener failure', () => {
-    const emitter = new EventEmitter();
+    const emitter = new DynamicEventEmitter();
     const later = vi.fn();
     emitter.on('test', () => {
       throw new Error('listener failed');
@@ -43,7 +51,7 @@ describe('EventEmitter', () => {
   });
 
   it('does not call listeners for different events', () => {
-    const emitter = new EventEmitter();
+    const emitter = new DynamicEventEmitter();
     const fn = vi.fn();
     emitter.on('a', fn);
     emitter.emit('b', 'data');
@@ -51,7 +59,7 @@ describe('EventEmitter', () => {
   });
 
   it('off() removes a specific listener', () => {
-    const emitter = new EventEmitter();
+    const emitter = new DynamicEventEmitter();
     const fn = vi.fn();
     emitter.on('test', fn);
     emitter.off('test', fn);
@@ -60,7 +68,7 @@ describe('EventEmitter', () => {
   });
 
   it('removeAllListeners() clears all events', () => {
-    const emitter = new EventEmitter();
+    const emitter = new DynamicEventEmitter();
     const fn1 = vi.fn();
     const fn2 = vi.fn();
     emitter.on('a', fn1);
@@ -73,7 +81,7 @@ describe('EventEmitter', () => {
   });
 
   it('removeAllListeners(event) clears only that event', () => {
-    const emitter = new EventEmitter();
+    const emitter = new DynamicEventEmitter();
     const fn1 = vi.fn();
     const fn2 = vi.fn();
     emitter.on('a', fn1);
@@ -86,12 +94,12 @@ describe('EventEmitter', () => {
   });
 
   it('emitting with no listeners does not throw', () => {
-    const emitter = new EventEmitter();
+    const emitter = new DynamicEventEmitter();
     expect(() => emitter.emit('nonexistent', 'data')).not.toThrow();
   });
 
   it('once() fires listener only once', () => {
-    const emitter = new EventEmitter();
+    const emitter = new DynamicEventEmitter();
     const fn = vi.fn();
     emitter.once('test', fn);
     emitter.emit('test', 'a');
@@ -101,7 +109,7 @@ describe('EventEmitter', () => {
   });
 
   it('once() returns an unsubscribe function', () => {
-    const emitter = new EventEmitter();
+    const emitter = new DynamicEventEmitter();
     const fn = vi.fn();
     const unsub = emitter.once('test', fn);
     unsub();

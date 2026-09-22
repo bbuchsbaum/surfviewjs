@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { StatisticalMapLayer } from '../../src/layers/StatisticalMapLayer';
 import { Layer } from '../../src/layers';
-import type { DualThresholdConfig } from '../../src/layers/StatisticalMapLayer';
+import '../../src/LayerRegistry';
 
 /**
  * Helper: build a small triangle mesh adjacency for cluster tests.
@@ -57,6 +57,50 @@ describe('StatisticalMapLayer', () => {
       expect(() => {
         new StatisticalMapLayer('bad', data, null, 'hot', { pValues });
       }).toThrow(/pValues length/);
+    });
+
+    it('rejects out-of-domain p-values and non-positive degrees of freedom', () => {
+      const data = new Float32Array([1, 2]);
+      expect(() => new StatisticalMapLayer('bad-p', data, null, 'hot', {
+        pValues: new Float32Array([0.1, 1.1])
+      })).toThrow(/pValues\[1\]/);
+      expect(() => new StatisticalMapLayer('bad-df', data, null, 'hot', {
+        statType: 'tstat',
+        degreesOfFreedom: 0
+      })).toThrow(/degreesOfFreedom/);
+    });
+
+    it('validates a compound update before changing data, metadata, correction, or events', () => {
+      const data = new Float32Array([3, 2]);
+      const layer = new StatisticalMapLayer('transaction', data, null, 'hot', {
+        pValues: new Float32Array([0.01, 0.2]),
+        statType: 'tstat',
+        degreesOfFreedom: 12
+      });
+      layer.applyFDR(0.05);
+      const revision = layer.getDataRevision();
+      const onChange = vi.fn();
+      layer._onChangeCallback = onChange;
+      layer.needsUpdate = false;
+
+      expect(() => layer.update({
+        data: new Float32Array([9, 9]),
+        pValues: new Float32Array([0.01, Number.NaN]),
+        degreesOfFreedom: 20
+      })).toThrow(/pValues\[1\]/);
+      expect(layer.getData()).toBe(data);
+      expect(layer.getDataRevision()).toBe(revision);
+      expect(layer.getCorrectionMethod()).toBe('fdr');
+      expect(layer.toStateJSON()).toMatchObject({
+        statType: 'tstat',
+        degreesOfFreedom: 12
+      });
+      expect(layer.needsUpdate).toBe(false);
+      expect(onChange).not.toHaveBeenCalled();
+
+      expect(() => layer.update({ data: new Float32Array([1, 2, 3]) }))
+        .toThrow(/pValues length/);
+      expect(layer.getData()).toBe(data);
     });
   });
 
@@ -132,16 +176,20 @@ describe('StatisticalMapLayer', () => {
       expect(rgba[3 * 4 + 3]).toBeGreaterThan(0);
     });
 
-    it('should apply opacity', () => {
+    it('should leave opacity for the compositor to apply exactly once', () => {
       const data = new Float32Array([5.0]);
+      const reference = new StatisticalMapLayer('reference', data, null, 'hot', {
+        range: [0, 10],
+        threshold: [0, 0]
+      });
       const layer = new StatisticalMapLayer('t', data, null, 'hot', {
         range: [0, 10],
         threshold: [0, 0],
         opacity: 0.5
       });
       const rgba = layer.getRGBAData(1);
-      expect(rgba[3]).toBeLessThanOrEqual(0.5);
-      expect(rgba[3]).toBeGreaterThan(0);
+      expect(rgba[3]).toBeCloseTo(reference.getRGBAData(1)[3]);
+      expect(layer.opacity).toBe(0.5);
     });
 
     it('should handle empty data (0 vertices)', () => {
@@ -414,6 +462,29 @@ describe('StatisticalMapLayer', () => {
       expect(info!.zScore).toBeGreaterThan(0); // p=0.0003 → high z
       expect(info!.clusterIndex).toBe(-1); // no clusters computed
       expect(info!.clusterSize).toBe(0);
+    });
+
+    it('uses the Student-t oracle fallback when valid p-values are absent', () => {
+      const data = new Float32Array([0, 2, -2]);
+      const layer = new StatisticalMapLayer('t-fallback', data, null, 'hot', {
+        statType: 'tstat',
+        degreesOfFreedom: 5
+      });
+
+      expect(layer.getVertexStatInfo(0)!.zScore).toBe(0);
+      expect(layer.getVertexStatInfo(1)!.zScore).toBeCloseTo(1.63552289670035, 7);
+      expect(layer.getVertexStatInfo(2)!.zScore).toBeCloseTo(-1.63552289670035, 7);
+    });
+
+    it('uses a valid supplied p-value before the Student-t fallback', () => {
+      const data = new Float32Array([2]);
+      const layer = new StatisticalMapLayer('p-precedence', data, null, 'hot', {
+        pValues: new Float32Array([0.05]),
+        statType: 'tstat',
+        degreesOfFreedom: 5
+      });
+
+      expect(layer.getVertexStatInfo(0)!.zScore).toBeCloseTo(1.959963986, 7);
     });
 
     it('should return null for out-of-range vertex', () => {

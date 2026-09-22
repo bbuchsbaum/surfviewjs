@@ -281,7 +281,7 @@ export class SurfaceControls extends EventDispatcher {
   }
   
   update(): void {
-    // This method is called by the render loop
+    // This method is called by the viewer's on-demand frame scheduler.
     // All actual updates happen in the mouse move handlers
     (this as any).dispatchEvent({ type: 'change' });
   }
@@ -354,7 +354,7 @@ export class SurfaceControls extends EventDispatcher {
     }
   }
   
-  onMouseUp(event: MouseEvent): void {
+  onMouseUp(_event: MouseEvent): void {
     if (!this.enabled) return;
     
     document.removeEventListener('mousemove', this.onMouseMove);
@@ -383,22 +383,27 @@ export class SurfaceControls extends EventDispatcher {
     switch (event.touches.length) {
       case 1: // Single finger - rotate
         if (this.enableRotate) {
+          const touch = event.touches.item(0);
+          if (!touch) break;
           this.currentState = this.state.TOUCH_ROTATE;
-          this.rotateStart.set(event.touches[0].pageX, event.touches[0].pageY);
+          this.rotateStart.set(touch.pageX, touch.pageY);
         }
         break;
         
       case 2: // Two fingers - zoom/pan
         if (this.enableZoom || this.enablePan) {
-          const dx = event.touches[0].pageX - event.touches[1].pageX;
-          const dy = event.touches[0].pageY - event.touches[1].pageY;
+          const firstTouch = event.touches.item(0);
+          const secondTouch = event.touches.item(1);
+          if (!firstTouch || !secondTouch) break;
+          const dx = firstTouch.pageX - secondTouch.pageX;
+          const dy = firstTouch.pageY - secondTouch.pageY;
           const distance = Math.sqrt(dx * dx + dy * dy);
           
           this.currentState = this.state.TOUCH_DOLLY_PAN;
           this.dollyStart.set(0, distance);
           
-          const x = 0.5 * (event.touches[0].pageX + event.touches[1].pageX);
-          const y = 0.5 * (event.touches[0].pageY + event.touches[1].pageY);
+          const x = 0.5 * (firstTouch.pageX + secondTouch.pageX);
+          const y = 0.5 * (firstTouch.pageY + secondTouch.pageY);
           this.panStart.set(x, y);
         }
         break;
@@ -414,7 +419,9 @@ export class SurfaceControls extends EventDispatcher {
     switch (this.currentState) {
       case this.state.TOUCH_ROTATE:
         if (this.enableRotate) {
-          this.rotateEnd.set(event.touches[0].pageX, event.touches[0].pageY);
+          const touch = event.touches.item(0);
+          if (!touch) break;
+          this.rotateEnd.set(touch.pageX, touch.pageY);
           this.rotateCamera();
           this.update();
         }
@@ -422,8 +429,11 @@ export class SurfaceControls extends EventDispatcher {
         
       case this.state.TOUCH_DOLLY_PAN:
         if (this.enableZoom || this.enablePan) {
-          const dx = event.touches[0].pageX - event.touches[1].pageX;
-          const dy = event.touches[0].pageY - event.touches[1].pageY;
+          const firstTouch = event.touches.item(0);
+          const secondTouch = event.touches.item(1);
+          if (!firstTouch || !secondTouch) break;
+          const dx = firstTouch.pageX - secondTouch.pageX;
+          const dy = firstTouch.pageY - secondTouch.pageY;
           const distance = Math.sqrt(dx * dx + dy * dy);
           
           if (this.enableZoom) {
@@ -433,8 +443,8 @@ export class SurfaceControls extends EventDispatcher {
           }
           
           if (this.enablePan) {
-            const x = 0.5 * (event.touches[0].pageX + event.touches[1].pageX);
-            const y = 0.5 * (event.touches[0].pageY + event.touches[1].pageY);
+            const x = 0.5 * (firstTouch.pageX + secondTouch.pageX);
+            const y = 0.5 * (firstTouch.pageY + secondTouch.pageY);
             this.panEnd.set(x, y);
             this.panCamera();
           }
@@ -445,7 +455,7 @@ export class SurfaceControls extends EventDispatcher {
     }
   }
   
-  onTouchEnd(event: TouchEvent): void {
+  onTouchEnd(_event: TouchEvent): void {
     if (!this.enabled) return;
     
     this.currentState = this.state.NONE;

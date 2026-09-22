@@ -11,8 +11,7 @@ export default tseslint.config(
       'coverage/**',
       'node_modules/**',
       'cruft/**',
-      '**/*.d.ts',
-      'gulpfile.js'
+      '**/*.d.ts'
     ]
   },
   js.configs.recommended,

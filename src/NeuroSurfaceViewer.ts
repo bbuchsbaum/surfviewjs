@@ -4,19 +4,19 @@ import { SurfaceControls } from './SurfaceControls';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { SSAOPass } from 'three/examples/jsm/postprocessing/SSAOPass.js';
-import { NeuroSurface, ColorMappedNeuroSurface, VertexColoredNeuroSurface, SurfaceGeometry } from './classes';
+import { NeuroSurface, ColorMappedNeuroSurface, SurfaceGeometry } from './classes';
 import { MultiLayerNeuroSurface, ClearLayersOptions } from './MultiLayerNeuroSurface';
 import { VariantSurface } from './VariantSurface';
-import { RGBALayer, DataLayer, Layer } from './layers';
-import { OutlineLayer } from './OutlineLayer';
+import { Layer } from './layers';
 import { debugLog } from './debug';
 import ColorMap from './ColorMap';
 import { EventEmitter } from './EventEmitter';
-import type { EventArgsFor, UnsubscribeFn } from './EventEmitter';
+import type { EventArgsFor, TypedEventListener, UnsubscribeFn } from './EventEmitter';
+import type { SurfaceEventMap, SurfaceEventType } from './events/SurfaceEvents';
 import { BoundingBoxHelper } from './utils/BoundingBox';
 import { detectCapabilities, ViewerCapabilities } from './utils/capabilities';
 import { AnnotationManager, AnnotationRecord } from './annotations';
-import { GPUPicker, GPUPickResult } from './utils/GPUPicker';
+import { GPUPicker } from './utils/GPUPicker';
 import { VolumeProjectedSurface } from './surfaces/VolumeProjectedSurface';
 import type {
   LayerOrderDescriptor,
@@ -42,13 +42,10 @@ import type { SceneExportManifest, SceneExportOptions, StaticHTMLExportOptions }
 import type {
   FigureExportLabel,
   FigureExportOptions,
-  ResolvedFigureExportOptions,
   SurfViewStylePreset,
   SurfViewStylePresetName
 } from './StylePresets';
 import {
-  ANATOMICAL_VIEWS,
-  freezeBilateralSurfaceGroup,
   getAnatomicalViewAxes,
   normalizeAnatomicalHemisphere
 } from './AnatomicalView';
@@ -84,8 +81,23 @@ import type {
   VertexHoverEvent,
   ViewerEventMap,
   ViewerEventType,
-  ControlDomain
+  ControlDomain,
+  ViewerStateChangedEvent
 } from './events/ViewerEvents';
+import {
+  controlDomainsForViewerEvent,
+  ViewerStateChangeTracker
+} from './viewer/ViewerStateChangeTracker';
+import { BilateralSurfaceGroupRegistry } from './viewer/BilateralSurfaceGroupRegistry';
+import { ViewerRenderScheduler } from './viewer/ViewerRenderScheduler';
+import { drawFigureOverlays } from './viewer/FigureOverlayRenderer';
+import { WebGLContextLifecycle } from './viewer/WebGLContextLifecycle';
+import { ViewerPickingController } from './viewer/ViewerPickingController';
+import {
+  devicePixelRatio as normalizeDevicePixelRatio,
+  finiteNumber,
+  rgbInteger
+} from './utils/validation';
 
 export interface NeuroSurfaceViewerConfig {
   ambientLightColor?: number;
@@ -117,6 +129,9 @@ export interface NeuroSurfaceViewerConfig {
   useGPUPicking?: boolean;
 }
 
+/** Fully normalized runtime viewer configuration; no required value is undefined. */
+export type ResolvedNeuroSurfaceViewerConfig = Required<NeuroSurfaceViewerConfig>;
+
 export interface ParcelFocusOptions {
   showCrosshair?: boolean;
   emitEvent?: boolean;
@@ -130,16 +145,16 @@ export interface ViewerFigureBackground {
   readonly transparent: boolean;
 }
 
-type Viewpoint = 'lateral' | 'medial' | 'ventral' | 'posterior' | 'anterior' | 'unknown_lateral';
+export type Viewpoint = 'lateral' | 'medial' | 'ventral' | 'posterior' | 'anterior' | 'unknown_lateral';
 
-interface ViewpointConfig {
+export interface ViewpointConfig {
   /** Unit vector from origin toward camera position */
   direction: THREE.Vector3;
   /** Camera up vector for this view */
   up: THREE.Vector3;
 }
 
-interface ViewpointState {
+export interface ViewpointState {
   rotation: THREE.Quaternion;
   position: THREE.Vector3;
   target: THREE.Vector3;
@@ -150,15 +165,6 @@ function colorToCSS(color: number): string {
 }
 
 const legacyPaneWarnings = new Set<string>();
-const CONTROL_DOMAIN_ORDER: readonly ControlDomain[] = [
-  'camera',
-  'surfaces',
-  'layers',
-  'selection',
-  'appearance',
-  'timeline'
-];
-
 function warnLegacyPaneMember(member: string, replacement: string): void {
   if (legacyPaneWarnings.has(member)) return;
   legacyPaneWarnings.add(member);
@@ -197,11 +203,85 @@ function normalizeLegacyViewerConfig(
   return normalized;
 }
 
+const DEFAULT_VIEWER_CONFIG: Readonly<ResolvedNeuroSurfaceViewerConfig> = Object.freeze({
+  ambientLightColor: 0xb5b5b5,
+  directionalLightColor: 0xffffff,
+  directionalLightIntensity: 1.6,
+  rotationSpeed: 2,
+  initialZoom: 12,
+  ssaoRadius: 4,
+  ssaoKernelSize: 32,
+  rimStrength: 0,
+  metalness: 0.1,
+  roughness: 0.6,
+  useShaders: false,
+  showControls: false,
+  useControls: false,
+  allowCDNFallback: false,
+  backgroundColor: 0x000000,
+  controlType: 'trackball',
+  preset: 'default',
+  linkHemispheres: false,
+  hoverCrosshair: false,
+  hoverCrosshairColor: 0x66ccff,
+  hoverCrosshairSize: 1.2,
+  clickToAddAnnotation: false,
+  useGPUPicking: false
+});
+
+function normalizeViewerConfig(
+  input: Partial<NeuroSurfaceViewerConfig>,
+  base: Partial<ResolvedNeuroSurfaceViewerConfig> = DEFAULT_VIEWER_CONFIG
+): ResolvedNeuroSurfaceViewerConfig {
+  const legacyNormalized = normalizeLegacyViewerConfig(input);
+  const merged: ResolvedNeuroSurfaceViewerConfig = {
+    ...DEFAULT_VIEWER_CONFIG,
+    ...base
+  };
+  for (const [key, value] of Object.entries(legacyNormalized)) {
+    if (value !== undefined) {
+      (merged as Record<string, unknown>)[key] = value;
+    }
+  }
+
+  merged.ambientLightColor = rgbInteger(merged.ambientLightColor, 'ambientLightColor');
+  merged.directionalLightColor = rgbInteger(merged.directionalLightColor, 'directionalLightColor');
+  merged.backgroundColor = rgbInteger(merged.backgroundColor, 'backgroundColor');
+  merged.hoverCrosshairColor = rgbInteger(merged.hoverCrosshairColor, 'hoverCrosshairColor');
+  merged.directionalLightIntensity = finiteNumber(
+    merged.directionalLightIntensity,
+    'directionalLightIntensity',
+    { minimum: 0 }
+  );
+  merged.rotationSpeed = finiteNumber(merged.rotationSpeed, 'rotationSpeed', {
+    minimum: 0,
+    minimumExclusive: true
+  });
+  merged.initialZoom = finiteNumber(merged.initialZoom, 'initialZoom', {
+    minimum: 0,
+    minimumExclusive: true
+  });
+  merged.ssaoRadius = finiteNumber(merged.ssaoRadius, 'ssaoRadius', { minimum: 0 });
+  merged.ssaoKernelSize = finiteNumber(merged.ssaoKernelSize, 'ssaoKernelSize', {
+    minimum: 1,
+    maximum: 64,
+    integer: true
+  });
+  merged.rimStrength = finiteNumber(merged.rimStrength, 'rimStrength', { minimum: 0 });
+  merged.metalness = finiteNumber(merged.metalness, 'metalness', { minimum: 0, maximum: 1 });
+  merged.roughness = finiteNumber(merged.roughness, 'roughness', { minimum: 0, maximum: 1 });
+  merged.hoverCrosshairSize = finiteNumber(merged.hoverCrosshairSize, 'hoverCrosshairSize', {
+    minimum: 0,
+    minimumExclusive: true
+  });
+  return merged;
+}
+
 export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   container: HTMLElement;
   width!: number;
   height!: number;
-  config!: Required<NeuroSurfaceViewerConfig>;
+  config!: ResolvedNeuroSurfaceViewerConfig;
   viewpoint!: string;
   scene!: THREE.Scene;
   environmentMap!: THREE.Texture | null;
@@ -215,8 +295,8 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   raycaster!: THREE.Raycaster;
   mouse!: THREE.Vector2;
   intersectionPoint!: THREE.Vector3;
-  animationId!: number | null;
-  needsRender!: boolean;
+  private renderScheduler?: ViewerRenderScheduler;
+  private pickingController?: ViewerPickingController;
   ambientLight!: THREE.AmbientLight;
   directionalLight!: THREE.DirectionalLight;
   viewpoints!: Record<string, ViewpointConfig>;
@@ -231,22 +311,38 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   initializationFailed: boolean;
   selectedLayerId: string | null = null;
   selectedSurfaceId: string | null = null;
-  onSurfaceClick?: (event: any) => void;
+  onSurfaceClick: ((event: any) => void) | undefined = undefined;
   /** GPU-based picker for fast vertex selection */
   gpuPicker: GPUPicker | null = null;
   crosshair!: CrosshairManager;
   handleSurfaceClick!: (event: MouseEvent) => void;
-  private handleMouseMove?: (event: MouseEvent) => void;
+  private handleMouseMove!: (event: MouseEvent) => void;
+  private contextLifecycle?: WebGLContextLifecycle;
   private cameraInteractionEnabled = true;
   private disposed = false;
-  private stateRevision = 0;
-  private stateChangeBatchDepth = 0;
-  private pendingStateDomains = new Set<ControlDomain>();
+  private stateChanges?: ViewerStateChangeTracker;
   private surfaceSubscriptions = new Map<string, UnsubscribeFn[]>();
-  private bilateralSurfaceGroups = new Map<string, BilateralSurfaceGroup>();
-  private surfaceGroupMembership = new Map<string, string>();
+  private surfaceGroups?: BilateralSurfaceGroupRegistry;
   private inspectionSelection: InspectionSelection = NO_INSPECTION_SELECTION;
   private currentAnatomicalView: AnatomicalViewChangedEvent | null = null;
+
+  /** Pending requestAnimationFrame id retained for backward compatibility. */
+  get animationId(): number | null {
+    return this.ensureRenderScheduler().pendingFrameId;
+  }
+
+  set animationId(value: number | null) {
+    this.ensureRenderScheduler().pendingFrameId = value;
+  }
+
+  /** Whether a canvas paint is queued; retained for backward compatibility. */
+  get needsRender(): boolean {
+    return this.ensureRenderScheduler().needsRender;
+  }
+
+  set needsRender(value: boolean) {
+    this.ensureRenderScheduler().needsRender = value;
+  }
 
   /** @deprecated Use cameraControls. This alias will be removed in SurfView 3. */
   get controls(): TrackballControls | SurfaceControls {
@@ -279,6 +375,10 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     viewpoint: string = 'lateral'
   ) {
     super(); // Initialize EventEmitter
+    this.stateChanges = new ViewerStateChangeTracker(event => this.emitStateChange(event));
+    const normalizedWidth = finiteNumber(width, 'width', { minimum: 0, minimumExclusive: true });
+    const normalizedHeight = finiteNumber(height, 'height', { minimum: 0, minimumExclusive: true });
+    const normalizedConfig = normalizeViewerConfig(config);
     this.initializationFailed = false;
     this.container = container;
     this.plugins = new PluginHost(this);
@@ -292,41 +392,15 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
       this.initializationFailed = true;
       return;
     }
-    this.width = width;
-    this.height = height;
-    this.config = {
-      ambientLightColor: 0xb5b5b5,  // Brighter ambient light
-      directionalLightColor: 0xffffff,
-      directionalLightIntensity: 1.6,  // Brighter directional light
-      rotationSpeed: 2,
-      initialZoom: 12,
-      ssaoRadius: 4,
-      ssaoKernelSize: 32,
-      rimStrength: 0,
-      metalness: 0.1,
-      roughness: 0.6,
-      useShaders: false,
-      showControls: false,
-      useControls: false,
-      allowCDNFallback: false,
-      backgroundColor: 0x000000,
-      controlType: 'trackball', // 'trackball' or 'surface' - new natural controls
-      preset: 'default',
-      linkHemispheres: false,
-      hoverCrosshair: false,
-      hoverCrosshairColor: 0x66ccff,
-      hoverCrosshairSize: 1.2,
-      clickToAddAnnotation: false,
-      useGPUPicking: false,
-      ...normalizeLegacyViewerConfig(config)
-    };
+    this.width = normalizedWidth;
+    this.height = normalizedHeight;
+    this.config = normalizedConfig;
     this.stylePreset = resolveStylePreset(this.config.preset);
     this.viewpoint = viewpoint;
 
     // Initialize core state before any setup functions that rely on it
     this.surfaces = new Map(); // Store multiple surfaces
-    this.bilateralSurfaceGroups = new Map();
-    this.surfaceGroupMembership = new Map();
+    this.surfaceGroups = this.createSurfaceGroupRegistry();
     this.rimStrengthUniforms = [];
     this.options = new Map();
     this.sceneBoundsRadius = 0;
@@ -334,9 +408,20 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     this.selectedSurfaceId = null;
     this.inspectionSelection = NO_INSPECTION_SELECTION;
 
-    this.raycaster = new THREE.Raycaster();
-    this.mouse = new THREE.Vector2();
-    this.intersectionPoint = new THREE.Vector3();
+    this.pickingController = this.createPickingController();
+    this.raycaster = this.pickingController.raycaster;
+    this.mouse = this.pickingController.mouse;
+    this.intersectionPoint = this.pickingController.intersectionPoint;
+
+    // Establish callback identity and scheduling state before setup methods can
+    // invalidate the viewer or attach listeners.
+    this.renderScheduler = this.createRenderScheduler(true);
+    this.animate = this.animate.bind(this);
+    this.handleSurfaceClick = this.onSurfaceClickHandler.bind(this);
+    this.handleMouseMove = this.onMouseMoveHandler.bind(this);
+    this.onControlsChange = this.onControlsChange.bind(this);
+    this.onControlsStart = this.onControlsStart.bind(this);
+    this.onControlsEnd = this.onControlsEnd.bind(this);
 
     this.scene = new THREE.Scene();
     this.environmentMap = null;
@@ -367,16 +452,9 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
       this.applyStylePreset(this.config.preset);
     }
 
-    this.handleSurfaceClick = this.onSurfaceClickHandler.bind(this);
-
-    this.animationId = null; // Store animation frame id for cleanup
-    this.needsRender = true; // Flag for on-demand rendering
     this.cameraInteractionEnabled = true;
     this.viewpointState = null;
     this.currentViewpointKey = '';
-
-    // Bind methods to preserve context
-    this.animate = this.animate.bind(this);
 
     // Viewpoint directions are expressed in RAS space (x=Left-Right, y=Posterior-Anterior, z=Inferior-Superior).
     // Camera 'up' is chosen per view to keep Superior at the top of the screen where possible and avoid
@@ -399,11 +477,10 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
 
     // Construction establishes revision zero; only post-construction mutations
     // are observable by callers.
-    this.stateRevision = 0;
-    this.pendingStateDomains.clear();
+    this.stateChanges.reset();
 
-    // Start the animation loop
-    this.animate();
+    // Setup invalidations coalesce into a single initial frame.
+    this.requestRender();
   }
 
   registerPlugin(plugin: ViewerPlugin, options?: RegisterPluginOptions): PluginRegistration {
@@ -424,7 +501,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
 
   /** Current monotonic revision of observable control-relevant state. */
   getStateRevision(): number {
-    return this.stateRevision ?? 0;
+    return this.ensureStateChanges().getRevision();
   }
 
   /** Whether this viewer has completed its idempotent disposal lifecycle. */
@@ -432,9 +509,9 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     return this.disposed;
   }
 
-  emit<K extends string>(event: K, ...args: EventArgsFor<ViewerEventMap, K>): void {
+  emit<K extends ViewerEventType>(event: K, ...args: EventArgsFor<ViewerEventMap, K>): void {
     if (this.disposed) return;
-    const domains = this.domainsForEvent(event as ViewerEventType, args[0]);
+    const domains = controlDomainsForViewerEvent(event, args[0]);
     try {
       super.emit(event, ...args);
     } finally {
@@ -444,107 +521,34 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     }
   }
 
-  private domainsForEvent(event: ViewerEventType, payload: unknown): readonly ControlDomain[] {
-    switch (event) {
-      case 'camera:changed':
-      case 'viewpoint:changed':
-      case 'controls:changed':
-        return ['camera'];
-      case 'surface:added':
-      case 'surface:removed':
-      case 'surface:variant':
-      case 'surface-group:registered':
-      case 'surface-group:removed':
-        return ['surfaces'];
-      case 'anatomical-view:changed':
-        return (payload as { layout?: string } | undefined)?.layout === 'paired'
-          ? ['camera', 'surfaces']
-          : ['camera'];
-      case 'anatomical-view:reset':
-        return ['camera'];
-      case 'surface:colormap':
-        return ['appearance'];
-      case 'surface:selected':
-      case 'parcel:selected':
-      case 'selection:changed':
-        return ['selection'];
-      case 'layer:added':
-      case 'layer:removed':
-      case 'layer:reordered':
-      case 'layer:colormap':
-      case 'layer:intensity':
-      case 'layer:threshold':
-      case 'layer:opacity':
-        return ['layers'];
-      case 'layer:updated': {
-        const changes = (payload as { changes?: Record<string, unknown> } | undefined)?.changes;
-        return changes && 'timeline' in changes ? ['layers', 'timeline'] : ['layers'];
-      }
-      case 'annotation:added':
-      case 'annotation:moved':
-      case 'annotation:removed':
-      case 'annotation:activated':
-      case 'annotation:reset':
-        return ['selection', 'appearance'];
-      case 'resize':
-        return ['camera', 'appearance'];
-      case 'context:restored':
-        return ['appearance'];
-      case 'state:restored':
-        return (payload as RestorationReport | undefined)?.success
-          ? CONTROL_DOMAIN_ORDER
-          : [];
-      default:
-        return [];
-    }
+  private ensureStateChanges(): ViewerStateChangeTracker {
+    this.stateChanges ??= new ViewerStateChangeTracker(event => this.emitStateChange(event));
+    return this.stateChanges;
+  }
+
+  private emitStateChange(event: ViewerStateChangedEvent): void {
+    super.emit('state:changed', event);
   }
 
   private invalidateState(domains: readonly ControlDomain[]): void {
     if (this.disposed) return;
-    this.pendingStateDomains ??= new Set<ControlDomain>();
-    for (const domain of domains) {
-      this.pendingStateDomains.add(domain);
-    }
-    if ((this.stateChangeBatchDepth ?? 0) > 0) return;
-    this.flushStateChange();
+    this.ensureStateChanges().invalidate(domains);
   }
 
   private beginStateChangeBatch(): void {
-    this.stateChangeBatchDepth = (this.stateChangeBatchDepth ?? 0) + 1;
+    this.ensureStateChanges().beginBatch();
   }
 
   private endStateChangeBatch(): void {
-    if ((this.stateChangeBatchDepth ?? 0) === 0) return;
-    this.stateChangeBatchDepth -= 1;
-    if (this.stateChangeBatchDepth === 0) {
-      this.flushStateChange();
-    }
+    this.ensureStateChanges().endBatch();
   }
 
   private withStateChangeBatch<T>(operation: () => T): T {
-    this.beginStateChangeBatch();
-    try {
-      return operation();
-    } finally {
-      this.endStateChangeBatch();
-    }
-  }
-
-  private flushStateChange(): void {
-    if (this.disposed || !this.pendingStateDomains || this.pendingStateDomains.size === 0) return;
-    const domains = Object.freeze(
-      CONTROL_DOMAIN_ORDER.filter(domain => this.pendingStateDomains.has(domain))
-    );
-    this.pendingStateDomains.clear();
-    this.stateRevision = (this.stateRevision ?? 0) + 1;
-    super.emit('state:changed', {
-      revision: this.stateRevision,
-      domains
-    });
+    return this.ensureStateChanges().runBatch(operation);
   }
 
   setupRenderer(): void {
-    this.renderer.setPixelRatio(window.devicePixelRatio);
+    this.renderer.setPixelRatio(normalizeDevicePixelRatio(window.devicePixelRatio || 1));
     this.renderer.setSize(this.width, this.height);
     this.renderer.setClearColor(this.config.backgroundColor);
     const rendererAny = this.renderer as any;
@@ -564,24 +568,60 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
    * Context loss can happen due to GPU driver resets, resource pressure, or tab throttling.
    */
   private setupContextLossHandling(): void {
-    const canvas = this.renderer.domElement;
+    this.ensureContextLifecycle().attach();
+  }
 
-    canvas.addEventListener('webglcontextlost', (event) => {
-      event.preventDefault();
-      console.warn('surfviewjs: WebGL context lost. Rendering paused.');
-      if (this.animationId !== null) {
-        cancelAnimationFrame(this.animationId);
-        this.animationId = null;
+  private teardownContextLossHandling(): void {
+    this.contextLifecycle?.dispose();
+  }
+
+  private ensureContextLifecycle(): WebGLContextLifecycle {
+    this.contextLifecycle ??= new WebGLContextLifecycle(this.renderer.domElement, {
+      onLost: () => {
+        this.cancelPendingFrame();
+        console.warn('surfviewjs: WebGL context lost. Rendering paused.');
+        this.emit('context:lost');
+      },
+      onRestored: () => {
+        console.info('surfviewjs: WebGL context restored. Rendering resumed.');
+        this.requestRender();
+        this.emit('context:restored');
       }
-      this.emit('context:lost');
     });
+    return this.contextLifecycle;
+  }
 
-    canvas.addEventListener('webglcontextrestored', () => {
-      console.info('surfviewjs: WebGL context restored. Resuming rendering.');
-      this.needsRender = true;
-      this.animate();
-      this.emit('context:restored');
+  private createPickingController(): ViewerPickingController {
+    return new ViewerPickingController({
+      getCanvas: () => this.renderer.domElement,
+      getCamera: () => this.camera,
+      getSurfaces: () => this.surfaces,
+      getGPUPicker: () => this.gpuPicker,
+      setGPUPicker: picker => { this.gpuPicker = picker; }
     });
+  }
+
+  private ensurePickingController(): ViewerPickingController {
+    if (!this.pickingController) {
+      this.pickingController = this.createPickingController();
+      this.raycaster = this.pickingController.raycaster;
+      this.mouse = this.pickingController.mouse;
+      this.intersectionPoint = this.pickingController.intersectionPoint;
+    } else {
+      // These fields have historically been public. Honor advanced consumers
+      // that replace one of the Three.js helpers after viewer construction.
+      if (this.raycaster && this.raycaster !== this.pickingController.raycaster) {
+        this.pickingController.raycaster = this.raycaster;
+      }
+      if (this.mouse && this.mouse !== this.pickingController.mouse) {
+        this.pickingController.mouse = this.mouse;
+      }
+      if (this.intersectionPoint &&
+          this.intersectionPoint !== this.pickingController.intersectionPoint) {
+        this.pickingController.intersectionPoint = this.intersectionPoint;
+      }
+    }
+    return this.pickingController;
   }
 
   setupCamera(): void {
@@ -644,14 +684,27 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
       this.cameraControls.update();
     }
 
-    // Add event listener for controls change
-    if (this.cameraControls.addEventListener) {
-      (this.cameraControls as any).addEventListener('change', this.onControlsChange);
-    }
+    this.attachControlListeners();
     this.invalidateState(['camera']);
   }
 
-  onControlsChange = (): void => {
+  private attachControlListeners(): void {
+    if (!this.cameraControls?.addEventListener) return;
+    (this.cameraControls as any).addEventListener('change', this.onControlsChange);
+    (this.cameraControls as any).addEventListener('start', this.onControlsStart);
+    (this.cameraControls as any).addEventListener('end', this.onControlsEnd);
+  }
+
+  private detachControlListeners(): void {
+    if (!this.cameraControls?.removeEventListener) return;
+    (this.cameraControls as any).removeEventListener('change', this.onControlsChange);
+    (this.cameraControls as any).removeEventListener('start', this.onControlsStart);
+    (this.cameraControls as any).removeEventListener('end', this.onControlsEnd);
+  }
+
+  onControlsChange(): void {
+    if (this.disposed) return;
+    this.ensureRenderScheduler().noteControlsChanged();
     this.currentAnatomicalView = null;
     const target = this.cameraControls && 'target' in this.cameraControls
       ? ((this.cameraControls as any).target as THREE.Vector3).clone()
@@ -662,6 +715,16 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
       target
     });
     this.requestRender();
+  }
+
+  private onControlsStart(): void {
+    if (this.disposed) return;
+    this.ensureRenderScheduler().beginControlsInteraction();
+  }
+
+  private onControlsEnd(): void {
+    if (this.disposed) return;
+    this.ensureRenderScheduler().endControlsInteraction();
   }
 
   setupPostProcessing(): void {
@@ -684,133 +747,48 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     return normalizeAnatomicalHemisphere(hemi) ?? hemi.toLowerCase();
   }
 
+  private createSurfaceGroupRegistry(): BilateralSurfaceGroupRegistry {
+    return new BilateralSurfaceGroupRegistry({
+      isDisposed: () => this.disposed,
+      getSurface: id => this.surfaces?.get(id),
+      surfaceEntries: () => this.surfaces?.entries() ?? []
+    });
+  }
+
+  private ensureSurfaceGroups(): BilateralSurfaceGroupRegistry {
+    this.surfaceGroups ??= this.createSurfaceGroupRegistry();
+    return this.surfaceGroups;
+  }
+
   /** Register a deliberate left/right coordination group. No group is inferred from loaded surfaces. */
   registerBilateralSurfaceGroup(group: BilateralSurfaceGroup): BilateralSurfaceGroupResult {
-    if (this.disposed) {
-      return Object.freeze({
-        ok: false,
-        code: 'disposed',
-        message: 'The viewer has been disposed.'
-      });
-    }
-    this.bilateralSurfaceGroups ??= new Map();
-    this.surfaceGroupMembership ??= new Map();
-
-    const id = group.id.trim();
-    if (!id) {
-      return Object.freeze({
-        ok: false,
-        code: 'invalid-group-id',
-        message: 'A bilateral surface group requires a non-empty id.'
-      });
-    }
-    if (this.bilateralSurfaceGroups.has(id)) {
-      return Object.freeze({
-        ok: false,
-        code: 'group-id-exists',
-        message: `Bilateral surface group "${id}" already exists.`
-      });
-    }
-    if (group.leftSurfaceId === group.rightSurfaceId) {
-      return Object.freeze({
-        ok: false,
-        code: 'duplicate-surface',
-        message: 'The left and right members must be different surfaces.'
-      });
-    }
-
-    const left = this.surfaces?.get(group.leftSurfaceId);
-    const right = this.surfaces?.get(group.rightSurfaceId);
-    if (!left || !right) {
-      const missing = !left ? group.leftSurfaceId : group.rightSurfaceId;
-      return Object.freeze({
-        ok: false,
-        code: 'surface-not-found',
-        message: `Surface "${missing}" was not found.`
-      });
-    }
-    if (normalizeAnatomicalHemisphere(left.hemisphere) !== 'left') {
-      return Object.freeze({
-        ok: false,
-        code: 'invalid-hemisphere',
-        message: `Surface "${group.leftSurfaceId}" is not marked as the left hemisphere.`
-      });
-    }
-    if (normalizeAnatomicalHemisphere(right.hemisphere) !== 'right') {
-      return Object.freeze({
-        ok: false,
-        code: 'invalid-hemisphere',
-        message: `Surface "${group.rightSurfaceId}" is not marked as the right hemisphere.`
-      });
-    }
-    const occupiedSurfaceId = [group.leftSurfaceId, group.rightSurfaceId]
-      .find(surfaceId => this.surfaceGroupMembership.has(surfaceId));
-    if (occupiedSurfaceId) {
-      return Object.freeze({
-        ok: false,
-        code: 'surface-already-grouped',
-        message: `Surface "${occupiedSurfaceId}" already belongs to bilateral surface group ` +
-          `"${this.surfaceGroupMembership.get(occupiedSurfaceId)}".`
-      });
-    }
-
-    const registered = freezeBilateralSurfaceGroup({
-      id,
-      leftSurfaceId: group.leftSurfaceId,
-      rightSurfaceId: group.rightSurfaceId
+    return this.withStateChangeBatch(() => {
+      const result = this.ensureSurfaceGroups().register(group);
+      if (result.ok) this.emit('surface-group:registered', { group: result.group });
+      return result;
     });
-    this.withStateChangeBatch(() => {
-      this.bilateralSurfaceGroups.set(id, registered);
-      this.surfaceGroupMembership.set(registered.leftSurfaceId, id);
-      this.surfaceGroupMembership.set(registered.rightSurfaceId, id);
-      this.emit('surface-group:registered', { group: registered });
-    });
-    return Object.freeze({ ok: true, group: registered });
   }
 
   unregisterBilateralSurfaceGroup(groupId: string): BilateralSurfaceGroupResult {
-    if (this.disposed) {
-      return Object.freeze({
-        ok: false,
-        code: 'disposed',
-        message: 'The viewer has been disposed.'
-      });
-    }
-    const group = this.bilateralSurfaceGroups?.get(groupId);
-    if (!group) {
-      return Object.freeze({
-        ok: false,
-        code: 'group-not-found',
-        message: `Bilateral surface group "${groupId}" was not found.`
-      });
-    }
-    this.withStateChangeBatch(() => {
-      this.removeBilateralSurfaceGroup(groupId, 'explicit');
+    return this.withStateChangeBatch(() => {
+      const result = this.ensureSurfaceGroups().unregister(groupId);
+      if (result.ok) {
+        this.emit('surface-group:removed', { group: result.group, reason: 'explicit' });
+      }
+      return result;
     });
-    return Object.freeze({ ok: true, group });
   }
 
   getBilateralSurfaceGroup(groupId: string): BilateralSurfaceGroup | null {
-    return this.bilateralSurfaceGroups?.get(groupId) ?? null;
+    return this.ensureSurfaceGroups().get(groupId);
   }
 
   getBilateralSurfaceGroups(): readonly BilateralSurfaceGroup[] {
-    return Object.freeze(
-      [...(this.bilateralSurfaceGroups?.values() ?? [])]
-        .sort((left, right) => left.id.localeCompare(right.id))
-    );
+    return this.ensureSurfaceGroups().getAll();
   }
 
   getAnatomicalViewCapabilities(): AnatomicalViewCapabilities {
-    const singleSurfaceIds = [...(this.surfaces?.entries() ?? [])]
-      .filter(([, surface]) => normalizeAnatomicalHemisphere(surface.hemisphere) !== null)
-      .map(([surfaceId]) => surfaceId)
-      .sort();
-    return Object.freeze({
-      views: ANATOMICAL_VIEWS,
-      singleSurfaceIds: Object.freeze(singleSurfaceIds),
-      bilateralGroups: this.getBilateralSurfaceGroups()
-    });
+    return this.ensureSurfaceGroups().getCapabilities();
   }
 
   /** Last explicit anatomical orientation, or null after a free camera mutation. */
@@ -849,7 +827,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
           message: 'hemisphereGap must be a finite, non-negative number.'
         });
       }
-      const group = this.bilateralSurfaceGroups?.get(options.groupId);
+      const group = this.ensureSurfaceGroups().get(options.groupId);
       if (!group) {
         return Object.freeze({
           ok: false,
@@ -991,11 +969,8 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     reason: BilateralSurfaceGroupRemovalReason,
     removedSurfaceId?: string
   ): BilateralSurfaceGroup | null {
-    const group = this.bilateralSurfaceGroups?.get(groupId);
+    const group = this.ensureSurfaceGroups().remove(groupId);
     if (!group) return null;
-    this.bilateralSurfaceGroups.delete(groupId);
-    this.surfaceGroupMembership?.delete(group.leftSurfaceId);
-    this.surfaceGroupMembership?.delete(group.rightSurfaceId);
     this.emit('surface-group:removed', {
       group,
       reason,
@@ -1008,8 +983,9 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     surfaceId: string,
     reason: BilateralSurfaceGroupRemovalReason
   ): void {
-    const groupId = this.surfaceGroupMembership?.get(surfaceId);
-    if (groupId) this.removeBilateralSurfaceGroup(groupId, reason, surfaceId);
+    const group = this.ensureSurfaceGroups().removeForSurface(surfaceId);
+    if (!group) return;
+    this.emit('surface-group:removed', { group, reason, removedSurfaceId: surfaceId });
   }
 
   setViewpoint(viewpoint: string): void {
@@ -1027,13 +1003,13 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     
     if (!this.viewpoints[fullViewpoint]) {
       const fallbackKey = this.viewpoints[viewpoint] ? viewpoint : 'unknown_lateral';
-      debugLog(`Viewpoint ${fullViewpoint} not found, falling back to ${fallbackKey}`);
+      debugLog('Viewpoint', fullViewpoint, 'not found, falling back to', fallbackKey);
       fullViewpoint = fallbackKey;
     }
 
     const viewConfig = this.viewpoints[fullViewpoint];
     if (!viewConfig) {
-      debugLog(`Viewpoint ${fullViewpoint} still unavailable; skipping update`);
+      debugLog('Viewpoint', fullViewpoint, 'still unavailable; skipping update');
       return;
     }
 
@@ -1096,7 +1072,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
    * Offset left/right hemispheres apart for clarity. Uses surface.hemisphere metadata.
    */
   separateHemispheres(offset = 20): void {
-    const half = offset / 2;
+    const half = finiteNumber(offset, 'offset', { minimum: 0 }) / 2;
     this.surfaces.forEach(surface => {
       if (!surface.mesh) return;
       if (surface.hemisphere === 'left') {
@@ -1164,24 +1140,27 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   }
 
   updateAmbientLight(color: number): void {
+    const nextColor = rgbInteger(color, 'ambientLightColor');
     if (this.ambientLight) {
-      this.ambientLight.color.setHex(color);
+      this.ambientLight.color.setHex(nextColor);
       this.invalidateState(['appearance']);
       this.requestRender();
     }
   }
 
   updateDirectionalLight(color: number): void {
+    const nextColor = rgbInteger(color, 'directionalLightColor');
     if (this.directionalLight) {
-      this.directionalLight.color.setHex(color);
+      this.directionalLight.color.setHex(nextColor);
       this.invalidateState(['appearance']);
       this.requestRender();
     }
   }
 
   updateDirectionalLightIntensity(intensity: number): void {
+    const nextIntensity = finiteNumber(intensity, 'directionalLightIntensity', { minimum: 0 });
     if (this.directionalLight) {
-      this.directionalLight.intensity = intensity;
+      this.directionalLight.intensity = nextIntensity;
       this.invalidateState(['appearance']);
       this.requestRender();
     }
@@ -1285,6 +1264,10 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
         return;
       }
 
+      if (surface instanceof MultiLayerNeuroSurface) {
+        surface.activateConfiguredCompositor();
+      }
+
       if (surface.mesh && surface.mesh.material) {
         if (this.config.useShaders && this.config.rimStrength > 0) {
           // Add rim lighting shader if enabled
@@ -1314,7 +1297,10 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
       
       // Subscribe to surface events for rendering and observable state propagation.
       const subscriptions: UnsubscribeFn[] = [];
-      const subscribe = (event: string, listener: (payload: any) => void): void => {
+      const subscribe = <K extends SurfaceEventType>(
+        event: K,
+        listener: TypedEventListener<SurfaceEventMap[K]>
+      ): void => {
         subscriptions.push(surface.on(event, listener));
       };
       subscribe('render:needed', () => this.requestRender());
@@ -1425,7 +1411,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
           if (surface.mesh) {
             this.scene.remove(surface.mesh);
           }
-          this.gpuPicker?.removeSurface(surfaceId);
+          this.ensurePickingController().removeSurface(surfaceId);
           this.annotations.removeBySurface(surfaceId);
           this.surfaces.delete(surfaceId);
           if (this.selectedSurfaceId === surfaceId) {
@@ -1448,17 +1434,16 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
       }
       if (surface instanceof MultiLayerNeuroSurface && !this.selectedLayerId) {
         const layers = surface.layerStack.getAllLayers();
-        if (layers.length) {
-          this.selectedLayerId = layers[0].id;
+        const firstLayer = layers[0];
+        if (firstLayer) {
+          this.selectedLayerId = firstLayer.id;
           this.selectedSurfaceId = id;
           this.invalidateState(['selection']);
         }
       }
 
       // Register with GPU picker if enabled
-      if (this.gpuPicker && surface.mesh) {
-        this.gpuPicker.addSurface(id, surface.mesh);
-      }
+      this.ensurePickingController().addSurface(id, surface.mesh);
 
       this.requestRender();
     } catch (error) {
@@ -1506,7 +1491,9 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   ): VolumeProjectedSurface | null {
     const supported = VolumeProjectedSurface.isSupported(this.renderer, {
       requireLinearFiltering: true,
-      useHalfFloat: volumeConfig.useHalfFloat
+      ...(volumeConfig.useHalfFloat === undefined
+        ? {}
+        : { useHalfFloat: volumeConfig.useHalfFloat })
     });
 
     if (!supported) {
@@ -1517,22 +1504,22 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     const surface = new VolumeProjectedSurface(geometry, {
       volumeData: volumeConfig.data,
       volumeDims: volumeConfig.dims,
-      affineMatrix: volumeConfig.affineMatrix,
-      worldToIJK: volumeConfig.worldToIJK,
-      voxelSize: volumeConfig.voxelSize,
-      volumeOrigin: volumeConfig.volumeOrigin,
-      useHalfFloat: volumeConfig.useHalfFloat,
       fillValue: volumeConfig.fillValue ?? 0.0,
-      projectionMode: volumeConfig.projectionMode,
-      pialPositions: volumeConfig.pialPositions,
-      whitePositions: volumeConfig.whitePositions,
-      ribbonSamples: volumeConfig.ribbonSamples,
-      ribbonReducer: volumeConfig.ribbonReducer,
       colormap: displayConfig.colormap ?? 'viridis',
       intensityRange: displayConfig.range ?? [0, 1],
       threshold: displayConfig.threshold ?? [0, 0],
       overlayOpacity: displayConfig.opacity ?? 1.0,
-      baseColor: displayConfig.baseColor ?? 0x888888
+      baseColor: displayConfig.baseColor ?? 0x888888,
+      ...(volumeConfig.affineMatrix === undefined ? {} : { affineMatrix: volumeConfig.affineMatrix }),
+      ...(volumeConfig.worldToIJK === undefined ? {} : { worldToIJK: volumeConfig.worldToIJK }),
+      ...(volumeConfig.voxelSize === undefined ? {} : { voxelSize: volumeConfig.voxelSize }),
+      ...(volumeConfig.volumeOrigin === undefined ? {} : { volumeOrigin: volumeConfig.volumeOrigin }),
+      ...(volumeConfig.useHalfFloat === undefined ? {} : { useHalfFloat: volumeConfig.useHalfFloat }),
+      ...(volumeConfig.projectionMode === undefined ? {} : { projectionMode: volumeConfig.projectionMode }),
+      ...(volumeConfig.pialPositions === undefined ? {} : { pialPositions: volumeConfig.pialPositions }),
+      ...(volumeConfig.whitePositions === undefined ? {} : { whitePositions: volumeConfig.whitePositions }),
+      ...(volumeConfig.ribbonSamples === undefined ? {} : { ribbonSamples: volumeConfig.ribbonSamples }),
+      ...(volumeConfig.ribbonReducer === undefined ? {} : { ribbonReducer: volumeConfig.ribbonReducer })
     });
 
     this.addSurface(surface, handle);
@@ -1574,9 +1561,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
         this.clearInspectionSelection();
       }
       this.detachSurfaceSubscriptions(id);
-      if (this.gpuPicker) {
-        this.gpuPicker.removeSurface(id);
-      }
+      this.ensurePickingController().removeSurface(id);
       if (surface.mesh) {
         this.scene.remove(surface.mesh);
       }
@@ -1593,7 +1578,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     });
   }
 
-  addLayer(surfaceId: string, layer: RGBALayer | DataLayer | OutlineLayer): void {
+  addLayer(surfaceId: string, layer: Layer): void {
     const surface = this.surfaces.get(surfaceId);
     if (surface && surface instanceof MultiLayerNeuroSurface) {
       surface.addLayer(layer);
@@ -1687,7 +1672,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
       if (this.getInspectionSelection().kind !== 'none') {
         this.clearInspectionSelection();
       }
-      for (const groupId of [...(this.bilateralSurfaceGroups?.keys() ?? [])]) {
+      for (const groupId of this.getBilateralSurfaceGroups().map(group => group.id)) {
         this.removeBilateralSurfaceGroup(groupId, 'surfaces-cleared');
       }
       this.surfaces.forEach((surface, id) => {
@@ -1751,35 +1736,30 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   }
 
   setupPicking(): void {
-    // Initialize GPU picker if enabled and supported
-    if (this.config.useGPUPicking && GPUPicker.isSupported(this.renderer)) {
-      this.gpuPicker = new GPUPicker(this.renderer);
+    if (this.ensurePickingController().initializeGPU(this.renderer, this.config.useGPUPicking)) {
       debugLog('GPU picking enabled');
     }
 
-    // Mouse event handlers
-    this.handleMouseMove = (event: MouseEvent) => {
-      const rect = this.renderer.domElement.getBoundingClientRect();
-      this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-      this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-      this.emit('mouse:move', {
-        position: this.mouse.clone(),
-        intersection: this.getIntersectionPoint().clone()
-      });
-      this.updateHoverCrosshair(event);
-    };
     this.renderer.domElement.addEventListener('mousemove', this.handleMouseMove);
     this.invalidateState(['selection']);
   }
 
+  private onMouseMoveHandler(event: MouseEvent): void {
+    if (this.disposed) return;
+    this.ensurePickingController().updateScreenPosition(event.clientX, event.clientY);
+    this.emit('mouse:move', {
+      position: this.mouse.clone(),
+      intersection: this.getIntersectionPoint().clone()
+    });
+    this.updateHoverCrosshair(event);
+  }
+
   private setupSurfaceClick(): void {
-    if (!this.handleSurfaceClick) {
-      this.handleSurfaceClick = this.onSurfaceClickHandler.bind(this);
-    }
     this.renderer.domElement.addEventListener('click', this.handleSurfaceClick);
   }
 
   private onSurfaceClickHandler(event: MouseEvent): void {
+    if (this.disposed) return;
     const hit = this.pick({ x: event.clientX, y: event.clientY });
     const rect = this.renderer.domElement.getBoundingClientRect();
     const position = new THREE.Vector2(
@@ -1995,7 +1975,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
             });
           }
           if (typeof parcelSurface.getParcelIdForVertex === 'function') {
-            let representativeParcelId: number | null = null;
+            let representativeParcelId: number | null;
             try {
               representativeParcelId = parcelSurface.getParcelIdForVertex(representativeVertexIndex);
             } catch {
@@ -2083,7 +2063,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
       }).sampleValueAtVertex;
       if (typeof sampler !== 'function') continue;
 
-      let sampled: number | string | null = null;
+      let sampled: number | string | null;
       try {
         const value = sampler.call(layer, vertexIndex);
         sampled = typeof value === 'number'
@@ -2243,87 +2223,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   }
 
   pick(options: { x?: number; y?: number; opacityThreshold?: number; useGPU?: boolean } = {}): { surfaceId: string | null; vertexIndex: number | null; point: THREE.Vector3 | null } {
-    // Allow callers to override the last mouse position with screen coordinates
-    if (options.x !== undefined && options.y !== undefined) {
-      const rect = this.renderer.domElement.getBoundingClientRect();
-      this.mouse.x = ((options.x - rect.left) / rect.width) * 2 - 1;
-      this.mouse.y = -((options.y - rect.top) / rect.height) * 2 + 1;
-    }
-
-    // Use GPU picking if enabled and available
-    const useGPU = options.useGPU ?? true;
-    if (useGPU && this.gpuPicker && options.x !== undefined && options.y !== undefined) {
-      const result = this.gpuPicker.pick(options.x, options.y, this.camera);
-      return {
-        surfaceId: result.surfaceId,
-        vertexIndex: result.vertexIndex,
-        point: result.point
-      };
-    }
-
-    const opacityThreshold = options.opacityThreshold ?? 0.1;
-
-    // Update the raycaster
-    this.raycaster.setFromCamera(this.mouse, this.camera);
-
-    // Collect intersections (Three.js sorts by distance)
-    const intersects: THREE.Intersection[] = [];
-    this.surfaces.forEach((surface, id) => {
-      if (!surface.mesh) return;
-      const material = surface.mesh.material as THREE.Material | THREE.Material[];
-
-      const isTransparent = Array.isArray(material)
-        ? material.every(mat => (mat as any).opacity !== undefined && (mat as any).opacity < opacityThreshold)
-        : ((material as any).opacity !== undefined && (material as any).opacity < opacityThreshold);
-      if (isTransparent) return;
-
-      const surfaceIntersects = this.raycaster.intersectObject(surface.mesh, false);
-      surfaceIntersects.forEach(intersect => {
-        (intersect as any).surfaceId = id;
-      });
-      intersects.push(...surfaceIntersects);
-    });
-
-    if (intersects.length === 0) {
-      return { surfaceId: null, vertexIndex: null, point: null };
-    }
-
-    const hit = intersects[0];
-    const face = hit.face;
-    const mesh = hit.object as THREE.Mesh;
-    const geometry = mesh.geometry as THREE.BufferGeometry;
-    const positionAttr = geometry.getAttribute('position') as THREE.BufferAttribute | undefined;
-
-    if (!face || !positionAttr) {
-      return { surfaceId: (hit as any).surfaceId || null, vertexIndex: null, point: hit.point.clone() };
-    }
-
-    // Find the closest vertex of the intersected face in world space
-    const faceIndices = [face.a, face.b, face.c];
-    const worldMatrix = mesh.matrixWorld;
-    let closestIndex = faceIndices[0];
-    let closestDist = Infinity;
-    const tmp = new THREE.Vector3();
-
-    for (const idx of faceIndices) {
-      tmp.set(
-        positionAttr.getX(idx),
-        positionAttr.getY(idx),
-        positionAttr.getZ(idx)
-      ).applyMatrix4(worldMatrix);
-
-      const dist = tmp.distanceToSquared(hit.point);
-      if (dist < closestDist) {
-        closestDist = dist;
-        closestIndex = idx;
-      }
-    }
-
-    return {
-      surfaceId: (hit as any).surfaceId || null,
-      vertexIndex: closestIndex,
-      point: hit.point.clone()
-    };
+    return this.ensurePickingController().pick(options);
   }
 
   // Lightweight option bag for embed environments (e.g. R HTML widgets)
@@ -2341,22 +2241,10 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
    * Automatically registers all existing surfaces with the GPU picker.
    */
   enableGPUPicking(): boolean {
-    if (this.gpuPicker) {
-      this.gpuPicker.setEnabled(true);
-      this.invalidateState(['selection']);
-      return true;
-    }
-    if (!GPUPicker.isSupported(this.renderer)) {
+    if (!this.ensurePickingController().enableGPU(this.renderer)) {
       console.warn('GPU picking not supported on this device');
       return false;
     }
-    this.gpuPicker = new GPUPicker(this.renderer);
-    // Register all existing surfaces
-    this.surfaces.forEach((surface, id) => {
-      if (surface.mesh) {
-        this.gpuPicker!.addSurface(id, surface.mesh);
-      }
-    });
     debugLog('GPU picking enabled');
     this.invalidateState(['selection']);
     return true;
@@ -2366,8 +2254,8 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
    * Disable GPU-based picking. Falls back to raycasting.
    */
   disableGPUPicking(): void {
-    if (this.gpuPicker) {
-      this.gpuPicker.setEnabled(false);
+    if (this.ensurePickingController().isGPUEnabled()) {
+      this.ensurePickingController().disableGPU();
       this.invalidateState(['selection']);
     }
   }
@@ -2376,7 +2264,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
    * Check if GPU picking is currently enabled and available.
    */
   isGPUPickingEnabled(): boolean {
-    return this.gpuPicker !== null && this.gpuPicker.isEnabled();
+    return this.ensurePickingController().isGPUEnabled();
   }
 
   /**
@@ -2572,32 +2460,56 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     this.invalidateState(['selection']);
   }
 
+  /** Coalesce an invalidation into the next animation frame. */
   requestRender(): void {
-    const shouldEmit = this.needsRender !== true;
-    this.needsRender = true;
-    if (shouldEmit) {
-      this.emit('render:needed');
-    }
+    this.ensureRenderScheduler().requestRender();
   }
 
   animate(): void {
-    if (this.initializationFailed) return;
-    this.animationId = requestAnimationFrame(this.animate);
+    this.ensureRenderScheduler().runFrame();
+  }
 
-    // Update camera interaction controls
-    if (this.cameraControls && this.cameraInteractionEnabled) {
-      this.cameraControls.update();
-    }
+  private cancelPendingFrame(): void {
+    this.renderScheduler?.cancelPendingFrame();
+  }
 
-    // Render only if needed
-    if (this.needsRender || (this.cameraControls as any).enableDamping) {
-      this.needsRender = false;
-      this.render();
+  private createRenderScheduler(initiallyDirty = false): ViewerRenderScheduler {
+    return new ViewerRenderScheduler({
+      canInvalidate: () => !this.disposed && !this.initializationFailed,
+      canRun: () => !this.disposed && !this.initializationFailed &&
+        !(this.contextLifecycle?.isLost() ?? false),
+      updateControls: () => {
+        if (this.cameraControls && this.cameraInteractionEnabled) {
+          this.cameraControls.update();
+        }
+      },
+      render: () => this.render(),
+      controlsHaveDamping: () => this.controlsHaveDamping(),
+      onRenderNeeded: () => this.emit('render:needed')
+    }, { initiallyDirty });
+  }
+
+  private ensureRenderScheduler(): ViewerRenderScheduler {
+    this.renderScheduler ??= this.createRenderScheduler(false);
+    return this.renderScheduler;
+  }
+
+  private controlsHaveDamping(): boolean {
+    if (!this.cameraControls) return false;
+    if ('staticMoving' in this.cameraControls) {
+      return this.cameraControls.staticMoving === false;
     }
+    // SurfaceControls exposes the legacy flag for compatibility but performs
+    // its camera updates synchronously in input handlers.
+    return false;
   }
 
   render(): void {
-    if (this.initializationFailed) return;
+    if (
+      this.disposed ||
+      this.initializationFailed ||
+      (this.contextLifecycle?.isLost() ?? false)
+    ) return;
     // Surface compositing uses its own throttled RAF. Flush pending work here
     // so this canvas paint always observes layer changes made before the frame.
     for (const surface of this.surfaces.values()) {
@@ -2618,12 +2530,15 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     this.emit('render:after');
   }
 
+  /** Enable automatic on-demand rendering and request one frame. */
   startRenderLoop(): void {
-    // Prevent multiple animation loops
-    if (this.animationId) return;
-    
-    // Start the animation loop
-    this.animate();
+    if (this.disposed || this.initializationFailed) return;
+    this.ensureRenderScheduler().start();
+  }
+
+  /** Stop automatic on-demand rendering until startRenderLoop() is called. */
+  stopRenderLoop(): void {
+    this.stop();
   }
 
   /**
@@ -2633,14 +2548,9 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     this.startRenderLoop();
   }
 
-  /**
-   * Stop the animation loop if running.
-   */
+  /** Pause automatic rendering and cancel the currently pending frame. */
   stop(): void {
-    if (this.animationId !== null) {
-      cancelAnimationFrame(this.animationId);
-      this.animationId = null;
-    }
+    this.ensureRenderScheduler().stop();
   }
 
   centerCamera(): void {
@@ -2723,11 +2633,17 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   }
 
   setZoom(distance: number, options: { updateInitial?: boolean } = {}): void {
+    const requestedDistance = finiteNumber(distance, 'distance', {
+      minimum: 0,
+      minimumExclusive: true
+    });
     const target = this.cameraControls?.target ?? new THREE.Vector3(0, 0, 0);
     const dir = new THREE.Vector3().subVectors(this.camera.position, target).normalize();
     const minClamp = this.sceneBoundsRadius > 0 ? Math.max(0.05, this.sceneBoundsRadius * 0.6) : 0.05;
-    const maxClamp = this.sceneBoundsRadius > 0 ? Math.max(this.sceneBoundsRadius * 20, distance) : Infinity;
-    const safeDistance = Math.min(maxClamp, Math.max(minClamp, distance));
+    const maxClamp = this.sceneBoundsRadius > 0
+      ? Math.max(this.sceneBoundsRadius * 20, requestedDistance)
+      : Infinity;
+    const safeDistance = Math.min(maxClamp, Math.max(minClamp, requestedDistance));
     this.camera.position.copy(target).addScaledVector(dir, safeDistance);
     this.camera.updateProjectionMatrix();
     if (this.cameraControls?.update) {
@@ -2741,33 +2657,37 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   }
 
   resize(width: number, height: number, options: { dpr?: number } = {}): { width: number; height: number; dpr: number } {
-    const dpr = options.dpr ?? (typeof window !== 'undefined' ? window.devicePixelRatio : 1);
+    const nextWidth = finiteNumber(width, 'width', { minimum: 0, minimumExclusive: true });
+    const nextHeight = finiteNumber(height, 'height', { minimum: 0, minimumExclusive: true });
+    const dpr = normalizeDevicePixelRatio(
+      options.dpr ?? (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1)
+    );
     this.renderer.setPixelRatio(dpr);
-    this.width = width;
-    this.height = height;
+    this.width = nextWidth;
+    this.height = nextHeight;
     
-    this.camera.aspect = width / height;
+    this.camera.aspect = nextWidth / nextHeight;
     this.camera.updateProjectionMatrix();
     
-    this.renderer.setSize(width, height);
+    this.renderer.setSize(nextWidth, nextHeight);
     
     if (this.composer) {
-      this.composer.setSize(width, height);
+      this.composer.setSize(nextWidth, nextHeight);
     }
     
     if (this.ssaoPass) {
-      this.ssaoPass.setSize(width, height);
+      this.ssaoPass.setSize(nextWidth, nextHeight);
     }
 
     this.surfaces.forEach(surface => {
       if (surface instanceof MultiLayerNeuroSurface) {
-        surface.updateOutlineResolution(width, height, dpr);
+        surface.updateOutlineResolution(nextWidth, nextHeight, dpr);
       }
     });
     
-    this.emit('resize', { width, height });
+    this.emit('resize', { width: nextWidth, height: nextHeight });
     this.requestRender();
-    return { width, height, dpr };
+    return { width: nextWidth, height: nextHeight, dpr };
   }
 
   // -------------------------------------------------------------------------
@@ -2856,7 +2776,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
       ctx.drawImage(this.renderer.domElement, 0, 0, canvas.width, canvas.height);
-      this.drawFigureOverlays(ctx, exportOptions);
+      drawFigureOverlays(ctx, exportOptions, this.annotationLabelsForExport());
 
       const dataUrl = canvas.toDataURL('image/png');
       if (exportOptions.downloadFilename) {
@@ -2869,146 +2789,6 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
       this.resize(previousSize.x, previousSize.y, { dpr: previousPixelRatio });
       this.render();
     }
-  }
-
-  private drawFigureOverlays(ctx: CanvasRenderingContext2D, options: ResolvedFigureExportOptions): void {
-    const width = ctx.canvas.width;
-    const height = ctx.canvas.height;
-    const fontScale = options.fontScale;
-
-    if (options.title) {
-      ctx.save();
-      ctx.fillStyle = options.transparent ? '#111827' : this.readableTextColor(options.backgroundColor);
-      ctx.font = `${Math.round(24 * fontScale)}px sans-serif`;
-      ctx.textBaseline = 'top';
-      ctx.fillText(options.title, 28 * fontScale, 24 * fontScale);
-      if (options.subtitle) {
-        ctx.font = `${Math.round(14 * fontScale)}px sans-serif`;
-        ctx.fillText(options.subtitle, 28 * fontScale, 56 * fontScale);
-      }
-      ctx.restore();
-    }
-
-    if (options.colorbar) {
-      this.drawExportColorbar(ctx, options);
-    }
-    if (options.scaleBar) {
-      this.drawExportScaleBar(ctx, options);
-    }
-    if (options.roiLabels) {
-      this.drawExportLabels(ctx, options.roiLabels, options);
-    }
-
-    // Keep exports visibly bounded when transparent output is requested.
-    if (options.transparent) {
-      ctx.save();
-      ctx.strokeStyle = 'rgba(15, 23, 42, 0.12)';
-      ctx.lineWidth = Math.max(1, width / 1600);
-      ctx.strokeRect(0.5, 0.5, width - 1, height - 1);
-      ctx.restore();
-    }
-  }
-
-  private drawExportColorbar(ctx: CanvasRenderingContext2D, options: ResolvedFigureExportOptions): void {
-    const width = ctx.canvas.width;
-    const height = ctx.canvas.height;
-    const fontScale = options.fontScale;
-    const barWidth = Math.max(16, Math.round(width * 0.018));
-    const barHeight = Math.max(140, Math.round(height * 0.28));
-    const x = width - barWidth - Math.round(40 * fontScale);
-    const y = height - barHeight - Math.round(44 * fontScale);
-    const gradient = ctx.createLinearGradient(0, y + barHeight, 0, y);
-
-    const colors = options.colorbarColors.length > 0 ? options.colorbarColors : ['#000000', '#ffffff'];
-    colors.forEach((color, index) => {
-      gradient.addColorStop(colors.length === 1 ? 0 : index / (colors.length - 1), color);
-    });
-
-    ctx.save();
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.78)';
-    ctx.fillRect(x - 8, y - 8, barWidth + 58 * fontScale, barHeight + 36 * fontScale);
-    ctx.fillStyle = gradient;
-    ctx.fillRect(x, y, barWidth, barHeight);
-    ctx.strokeStyle = 'rgba(15, 23, 42, 0.55)';
-    ctx.lineWidth = Math.max(1, fontScale);
-    ctx.strokeRect(x, y, barWidth, barHeight);
-
-    ctx.fillStyle = '#111827';
-    ctx.font = `${Math.round(12 * fontScale)}px sans-serif`;
-    ctx.textBaseline = 'middle';
-    ctx.fillText(options.colorbarLabel, x + barWidth + 10 * fontScale, y + barHeight / 2);
-    if (options.colorbarRange) {
-      const [min, max] = options.colorbarRange;
-      ctx.font = `${Math.round(10 * fontScale)}px sans-serif`;
-      ctx.textBaseline = 'top';
-      ctx.fillText(String(max), x + barWidth + 10 * fontScale, y - 1);
-      ctx.textBaseline = 'bottom';
-      ctx.fillText(String(min), x + barWidth + 10 * fontScale, y + barHeight + 1);
-    }
-    ctx.restore();
-  }
-
-  private drawExportScaleBar(ctx: CanvasRenderingContext2D, options: ResolvedFigureExportOptions): void {
-    const width = ctx.canvas.width;
-    const height = ctx.canvas.height;
-    const fontScale = options.fontScale;
-    const barWidth = Math.max(64, Math.round(width * options.scaleBarLength));
-    const x = Math.round(44 * fontScale);
-    const y = height - Math.round(48 * fontScale);
-    const color = options.transparent ? '#111827' : this.readableTextColor(options.backgroundColor);
-
-    ctx.save();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = Math.max(2, Math.round(3 * fontScale));
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + barWidth, y);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(x, y - 7 * fontScale);
-    ctx.lineTo(x, y + 7 * fontScale);
-    ctx.moveTo(x + barWidth, y - 7 * fontScale);
-    ctx.lineTo(x + barWidth, y + 7 * fontScale);
-    ctx.stroke();
-    if (options.scaleBarLabel) {
-      ctx.fillStyle = color;
-      ctx.font = `${Math.round(12 * fontScale)}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'bottom';
-      ctx.fillText(options.scaleBarLabel, x + barWidth / 2, y - 10 * fontScale);
-    }
-    ctx.restore();
-  }
-
-  private drawExportLabels(
-    ctx: CanvasRenderingContext2D,
-    labels: boolean | FigureExportLabel[],
-    options: ResolvedFigureExportOptions
-  ): void {
-    const fontScale = options.fontScale;
-    const resolvedLabels = Array.isArray(labels)
-      ? labels
-      : this.annotationLabelsForExport();
-    if (resolvedLabels.length === 0) return;
-
-    ctx.save();
-    ctx.font = `${Math.round(12 * fontScale)}px sans-serif`;
-    ctx.textBaseline = 'middle';
-    resolvedLabels.forEach(label => {
-      const x = label.normalized ? label.x * ctx.canvas.width : label.x;
-      const y = label.normalized ? label.y * ctx.canvas.height : label.y;
-      const text = label.text;
-      const paddingX = 5 * fontScale;
-      const paddingY = 3 * fontScale;
-      const metrics = ctx.measureText(text);
-      const boxWidth = metrics.width + paddingX * 2;
-      const boxHeight = 16 * fontScale + paddingY * 2;
-      ctx.fillStyle = label.background ?? 'rgba(255, 255, 255, 0.82)';
-      ctx.fillRect(x - paddingX, y - boxHeight / 2, boxWidth, boxHeight);
-      ctx.fillStyle = label.color ?? options.preset.roi.labelColor;
-      ctx.fillText(text, x, y);
-    });
-    ctx.restore();
   }
 
   private annotationLabelsForExport(): FigureExportLabel[] {
@@ -3025,14 +2805,6 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
         y: (-projected.y * 0.5 + 0.5) * this.height
       };
     });
-  }
-
-  private readableTextColor(backgroundColor: number): string {
-    const r = (backgroundColor >> 16) & 255;
-    const g = (backgroundColor >> 8) & 255;
-    const b = backgroundColor & 255;
-    const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-    return luminance > 0.55 ? '#111827' : '#f8fafc';
   }
 
   private downloadDataURL(dataUrl: string, filename: string): void {
@@ -3060,6 +2832,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.renderScheduler?.dispose();
     try {
       super.emit('viewer:disposing');
     } catch (error) {
@@ -3073,23 +2846,16 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
       console.error('surfview: plugin teardown failed during viewer disposal', error);
     }
     if (this.initializationFailed) {
-      this.pendingStateDomains?.clear();
+      this.stateChanges?.dispose();
       this.removeAllListeners();
       return;
     }
-    // Stop animation loop
-    if (this.animationId !== null) {
-      cancelAnimationFrame(this.animationId);
-    }
-
     // Dispose of all surfaces
     this.clearSurfaces();
     
     // Dispose of camera interaction controls
     if (this.cameraControls) {
-      if ('removeEventListener' in this.cameraControls) {
-        (this.cameraControls as any).removeEventListener('change', this.onControlsChange);
-      }
+      this.detachControlListeners();
       this.cameraControls.dispose();
     }
     
@@ -3098,11 +2864,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
       this.composer.dispose();
     }
 
-    // Dispose of GPU picker
-    if (this.gpuPicker) {
-      this.gpuPicker.dispose();
-      this.gpuPicker = null;
-    }
+    this.pickingController?.dispose();
 
     // Dispose of environment map
     if (this.environmentMap) {
@@ -3110,10 +2872,9 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     }
 
     // Detach listeners
+    this.teardownContextLossHandling();
     this.renderer.domElement.removeEventListener('click', this.handleSurfaceClick);
-    if (this.handleMouseMove) {
-      this.renderer.domElement.removeEventListener('mousemove', this.handleMouseMove);
-    }
+    this.renderer.domElement.removeEventListener('mousemove', this.handleMouseMove);
 
     // Dispose of crosshair resources
     this.crosshair.dispose();
@@ -3131,7 +2892,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     if (this.renderer.domElement.parentNode) {
       this.renderer.domElement.parentNode.removeChild(this.renderer.domElement);
     }
-    this.pendingStateDomains?.clear();
+    this.stateChanges?.dispose();
     this.removeAllListeners();
   }
 
@@ -3238,22 +2999,11 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   }
 
   getIntersectionPoint(): THREE.Vector3 {
-    this.raycaster.setFromCamera(this.mouse, this.camera);
-    
-    // Create a plane at origin facing the camera
-    const planeNormal = new THREE.Vector3(0, 0, 1);
-    planeNormal.applyQuaternion(this.camera.quaternion);
-    const plane = new THREE.Plane(planeNormal, 0);
-    
-    // Get intersection with plane
-    this.raycaster.ray.intersectPlane(plane, this.intersectionPoint);
-    
-    return this.intersectionPoint;
+    return this.ensurePickingController().getIntersectionPoint();
   }
 
   getRayDirection(): THREE.Vector3 {
-    this.raycaster.setFromCamera(this.mouse, this.camera);
-    return this.raycaster.ray.direction.clone();
+    return this.ensurePickingController().getRayDirection();
   }
 
   updateSurfaceData(surfaceId: string, data: Float32Array, indices?: Uint32Array): void {
@@ -3332,41 +3082,40 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   }
 
   updateConfig(newConfig: Partial<NeuroSurfaceViewerConfig>): void {
+    const normalizedConfig = normalizeViewerConfig(newConfig, this.config);
+    const resolvedPreset = newConfig.preset !== undefined
+      ? resolveStylePreset(newConfig.preset)
+      : null;
     this.withStateChangeBatch(() => {
-      const normalizedConfig = normalizeLegacyViewerConfig(newConfig);
-      this.config = { ...this.config, ...normalizedConfig };
+      this.config = normalizedConfig;
 
       // Apply relevant updates
       if (newConfig.ambientLightColor !== undefined) {
-        this.updateAmbientLight(newConfig.ambientLightColor);
-        this.config.ambientLightColor = newConfig.ambientLightColor;
+        this.updateAmbientLight(normalizedConfig.ambientLightColor);
       }
       if (newConfig.directionalLightColor !== undefined) {
-        this.updateDirectionalLight(newConfig.directionalLightColor);
-        this.config.directionalLightColor = newConfig.directionalLightColor;
+        this.updateDirectionalLight(normalizedConfig.directionalLightColor);
       }
       if (newConfig.directionalLightIntensity !== undefined) {
-        this.updateDirectionalLightIntensity(newConfig.directionalLightIntensity);
-        this.config.directionalLightIntensity = newConfig.directionalLightIntensity;
+        this.updateDirectionalLightIntensity(normalizedConfig.directionalLightIntensity);
       }
       if (newConfig.backgroundColor !== undefined && this.renderer) {
-        this.renderer.setClearColor(newConfig.backgroundColor);
-        this.config.backgroundColor = newConfig.backgroundColor;
+        this.renderer.setClearColor(normalizedConfig.backgroundColor);
       }
       if (newConfig.metalness !== undefined || newConfig.roughness !== undefined) {
         this.updateMaterials();
       }
       if (newConfig.ssaoRadius !== undefined && this.ssaoPass) {
-        this.ssaoPass.kernelRadius = newConfig.ssaoRadius;
+        this.ssaoPass.kernelRadius = normalizedConfig.ssaoRadius;
       }
       if (newConfig.rimStrength !== undefined) {
         this.rimStrengthUniforms.forEach(uniform => {
-          uniform.value = newConfig.rimStrength!;
+          uniform.value = normalizedConfig.rimStrength;
         });
       }
 
-      if (newConfig.preset !== undefined) {
-        this.applyStylePreset(newConfig.preset);
+      if (resolvedPreset) {
+        this.applyStylePreset(resolvedPreset);
       }
 
       const observableKeys = Object.keys(newConfig).filter(key =>
@@ -3489,15 +3238,41 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   }
 
   setCameraState(state: any): void {
+    const finiteTuple = (value: unknown, parameter: string): [number, number, number] => {
+      if (!Array.isArray(value) || value.length < 3) {
+        throw new RangeError(`${parameter} must contain at least three numeric components.`);
+      }
+      return [
+        finiteNumber(value[0], `${parameter}[0]`),
+        finiteNumber(value[1], `${parameter}[1]`),
+        finiteNumber(value[2], `${parameter}[2]`)
+      ];
+    };
+    const nextPosition = state.position === undefined
+      ? null
+      : finiteTuple(state.position, 'position');
+    const nextTarget = state.target === undefined
+      ? null
+      : finiteTuple(state.target, 'target');
+    let nextRotation: [number, number, number, THREE.EulerOrder?] | null = null;
+    if (state.rotation !== undefined) {
+      const tuple = finiteTuple(state.rotation, 'rotation');
+      const order = state.rotation[3];
+      if (order !== undefined && !['XYZ', 'YZX', 'ZXY', 'XZY', 'YXZ', 'ZYX'].includes(order)) {
+        throw new TypeError(`rotation[3] must be a valid Euler order; received ${String(order)}.`);
+      }
+      nextRotation = order === undefined ? tuple : [...tuple, order];
+    }
+
     this.currentAnatomicalView = null;
-    if (state.position) {
-      this.camera.position.fromArray(state.position);
+    if (nextPosition) {
+      this.camera.position.fromArray(nextPosition);
     }
-    if (state.rotation) {
-      this.camera.rotation.fromArray(state.rotation);
+    if (nextRotation) {
+      this.camera.rotation.fromArray(nextRotation);
     }
-    if (state.target) {
-      this.cameraControls.target.fromArray(state.target);
+    if (nextTarget) {
+      this.cameraControls.target.fromArray(nextTarget);
     }
     this.cameraControls.update();
     this.invalidateState(['camera']);

@@ -1643,8 +1643,8 @@ export class SurfViewControlsElement extends LitElement {
         histogram.edges.length !== histogram.counts.length + 1) {
       return null;
     }
-    const domainMinimum = histogram.edges[0];
-    const domainMaximum = histogram.edges[histogram.edges.length - 1];
+    const domainMinimum = histogram.edges[0]!;
+    const domainMaximum = histogram.edges[histogram.edges.length - 1]!;
     const mask = this.maskBand(
       scalar.maskInterval.value,
       domainMinimum,
@@ -2549,7 +2549,11 @@ export class SurfViewControlsElement extends LitElement {
     if (!availability?.enabled) return;
     const ids = surface.layers.map(layer => layer.id);
     const destination = index + offset;
-    [ids[index], ids[destination]] = [ids[destination], ids[index]];
+    const sourceId = ids[index];
+    const destinationId = ids[destination];
+    if (sourceId === undefined || destinationId === undefined) return;
+    ids[index] = destinationId;
+    ids[destination] = sourceId;
     this.runCommand(this.currentSession?.setLayerOrder(surface.id, ids));
   }
 

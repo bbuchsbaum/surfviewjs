@@ -7,7 +7,9 @@
     "types": ["vite/client"]
   },
   "include": [
+    "core-consumer.ts",
     "controls-react-consumer.tsx",
+    "react-consumer.tsx",
     "report-consumer.ts"
   ]
 }

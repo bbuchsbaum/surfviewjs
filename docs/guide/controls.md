@@ -261,7 +261,7 @@ failure semantics.
 ## Runtime and packaging guarantees
 
 The release gate is executable rather than inferred from a successful build.
-The repository certifies:
+Its required jobs exercise:
 
 - source and published-subpath type contracts;
 - unit laws for two sessions, disposal, sparse inspection, canonical reorder
@@ -278,10 +278,10 @@ public artifact:
 
 | Artifact | Enforced limit |
 |---|---:|
-| Core ESM | 320 kB |
-| Report ESM adapter | 2 kB |
-| Controls ESM | 80 kB |
-| Controls React adapter | 8 kB |
+| Core ESM | 180 kB |
+| Report ESM adapter | 1 kB |
+| Controls ESM | 30 kB |
+| Controls React adapter | 3 kB |
 
 Core grew to support control-neutral domain behavior such as canonical views
 and layer order, inspection, state invalidation, target/session protocols, and
@@ -295,6 +295,7 @@ npm run type-check
 npm run test:types
 npm test
 npm run build
+npm run test:package-consumers
 npm run docs:build
 npm run test:react-fixture:build
 npm run demo:build
@@ -303,6 +304,9 @@ npx start-server-and-test dev:ci http://localhost:4173/tests/test-gifti.html \
   "npx playwright test tests/e2e/controls-panel.spec.ts tests/e2e/controls-react.spec.ts"
 git diff --check
 ```
+
+A local pass is candidate evidence. Hosted CI on the exact commit and a
+published archive are separate release evidence; see the [CI policy](../testing/ci-policy.md).
 
 The build-time artifact audit rejects Lit or controls CSS in core, duplicated
 core code in `surfview/report`, duplicate panel/Lit code in the React adapter,

@@ -34,7 +34,7 @@ describe('surfview/controls package boundary', () => {
     expect(packageJson.exports['.']).toEqual({
       types: './dist/types/index.d.ts',
       import: './dist/surfview.es.js',
-      require: './dist/surfview.umd.js'
+      require: './dist/surfview.umd.cjs'
     });
     expect(packageJson.exports['./react']).toEqual({
       types: './dist/types/index.react.d.ts',
@@ -61,10 +61,13 @@ describe('surfview/controls package boundary', () => {
     expect(packageJson.exports['./report']).not.toHaveProperty('require');
     expect(packageJson.sideEffects).toEqual([
       './dist/surfview.es.js',
+      './dist/surfview.umd.cjs',
       './dist/surfview.umd.js',
       './dist/surfview.embed.iife.js',
       './dist/surfview.report.es.js'
     ]);
+    expect(packageJson.main).toBe('./dist/surfview.umd.cjs');
+    expect(packageJson.module).toBe('./dist/surfview.es.js');
     // The controls build contains audited, version-specific DOM-less import
     // transforms for Lit. Upgrades must be deliberate rather than semver-drifted.
     expect(packageJson.dependencies).not.toHaveProperty('lit');
@@ -98,7 +101,9 @@ describe('surfview/controls package boundary', () => {
     expect(reportEntry).toMatch(/from ['"]\.\/index['"]/);
     expect(reportEntry).not.toMatch(/controls-ui|\bfrom ['"]lit/);
     expect(buildSource).toContain("id: './surfview.es.js', external: true");
-    expect(buildSource).toContain("entry: resolve(__dirname, 'src/index.report.ts')");
+    expect(buildSource).toContain(
+      "entry: resolve(import.meta.dirname, 'src/index.report.ts')"
+    );
   });
 
   it('keeps the React adapter thin and free of import-time registration', async () => {
@@ -131,7 +136,9 @@ describe('surfview/controls package boundary', () => {
     );
 
     expect(rootSource).not.toMatch(/controls-ui|SurfViewControlsElement|mountSurfViewControls/);
-    expect(buildSource).toContain("entry: resolve(__dirname, 'src/controls-ui/index.ts')");
+    expect(buildSource).toContain(
+      "entry: resolve(import.meta.dirname, 'src/controls-ui/index.ts')"
+    );
     expect(buildSource).toContain("id: './surfview.es.js', external: true");
     expect(buildSource).not.toMatch(/external:\s*\[[^\]]*['"]lit['"]/);
   });

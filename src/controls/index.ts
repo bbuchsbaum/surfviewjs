@@ -29,6 +29,7 @@ export type {
   ControlCommandFailure,
   ControlCommandSuccess,
   ControlCommandResult,
+  ControlQueryResult,
   SetAnatomicalViewRequest,
   LayerControlAddress,
   ScalarMappingUpdate,

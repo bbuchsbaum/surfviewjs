@@ -1,5 +1,15 @@
 import { EventEmitter } from '../EventEmitter';
 import type { TimelineState, TimelineEvent, TimelineEventMap, LoopMode } from './types';
+import { finiteNumber } from '../utils/validation';
+
+const LOOP_MODES: readonly LoopMode[] = ['none', 'loop', 'bounce'];
+
+function validateLoopMode(mode: unknown): LoopMode {
+  if (!LOOP_MODES.includes(mode as LoopMode)) {
+    throw new TypeError(`loop mode must be one of ${LOOP_MODES.join(', ')}.`);
+  }
+  return mode as LoopMode;
+}
 
 /**
  * Playback state machine for temporal data.
@@ -10,6 +20,8 @@ import type { TimelineState, TimelineEvent, TimelineEventMap, LoopMode } from '.
  */
 export class TimelineController extends EventEmitter<TimelineEventMap> {
   private times: number[];
+  private readonly minTime: number;
+  private readonly maxTime: number;
   private currentTime: number;
   private playing: boolean;
   private speed: number;
@@ -17,6 +29,7 @@ export class TimelineController extends EventEmitter<TimelineEventMap> {
   private direction: 1 | -1; // for bounce mode
   private rafId: number | null;
   private lastTimestamp: number;
+  private disposed: boolean;
 
   constructor(
     times: number[],
@@ -28,14 +41,26 @@ export class TimelineController extends EventEmitter<TimelineEventMap> {
       throw new Error('TimelineController requires a non-empty times array');
     }
 
-    this.times = times.slice();
-    this.currentTime = times[0];
+    this.times = times.map((time, index) => finiteNumber(time, `times[${index}]`));
+    for (let index = 1; index < this.times.length; index += 1) {
+      if (this.times[index]! < this.times[index - 1]!) {
+        throw new RangeError('times must be sorted in ascending order.');
+      }
+    }
+    // The non-empty check above proves both endpoints are present.
+    this.minTime = this.times[0]!;
+    this.maxTime = this.times[this.times.length - 1]!;
+    this.currentTime = this.minTime;
     this.playing = false;
-    this.speed = options.speed ?? 1;
-    this.loopMode = options.loop ?? 'loop';
+    this.speed = finiteNumber(options.speed ?? 1, 'speed', {
+      minimum: 0,
+      minimumExclusive: true
+    });
+    this.loopMode = validateLoopMode(options.loop ?? 'loop');
     this.direction = 1;
     this.rafId = null;
     this.lastTimestamp = 0;
+    this.disposed = false;
 
     if (options.autoPlay) {
       this.play();
@@ -43,10 +68,10 @@ export class TimelineController extends EventEmitter<TimelineEventMap> {
   }
 
   play(): void {
-    if (this.playing) return;
+    if (this.disposed || this.playing) return;
     this.playing = true;
     this.lastTimestamp = 0;
-    this.rafId = requestAnimationFrame((ts) => this.tick(ts));
+    this.scheduleFrame();
     this.emit('play');
   }
 
@@ -62,7 +87,7 @@ export class TimelineController extends EventEmitter<TimelineEventMap> {
 
   stop(): void {
     this.pause();
-    this.currentTime = this.times[0];
+    this.currentTime = this.minTime;
     this.direction = 1;
     this.emitTimeChange();
     this.emit('stop');
@@ -77,26 +102,29 @@ export class TimelineController extends EventEmitter<TimelineEventMap> {
   }
 
   seek(time: number): void {
-    const minT = this.times[0];
-    const maxT = this.times[this.times.length - 1];
-    this.currentTime = Math.max(minT, Math.min(maxT, time));
+    const requestedTime = finiteNumber(time, 'time');
+    this.currentTime = Math.max(this.minTime, Math.min(this.maxTime, requestedTime));
     this.emitTimeChange();
   }
 
   setSpeed(multiplier: number): void {
-    const speed = Math.max(0.01, multiplier);
+    const speed = finiteNumber(multiplier, 'speed', {
+      minimum: 0,
+      minimumExclusive: true
+    });
     if (speed === this.speed) return;
     this.speed = speed;
     this.emit('speedchange', { speed });
   }
 
   setLoop(mode: LoopMode): void {
-    if (mode === this.loopMode) return;
-    this.loopMode = mode;
-    if (mode !== 'bounce') {
+    const nextMode = validateLoopMode(mode);
+    if (nextMode === this.loopMode) return;
+    this.loopMode = nextMode;
+    if (nextMode !== 'bounce') {
       this.direction = 1;
     }
-    this.emit('loopchange', { loopMode: mode });
+    this.emit('loopchange', { loopMode: nextMode });
   }
 
   getState(): TimelineState {
@@ -122,10 +150,10 @@ export class TimelineController extends EventEmitter<TimelineEventMap> {
       return { frameA: 0, frameB: 0, alpha: 0 };
     }
 
-    if (time <= this.times[0]) {
+    if (time <= this.minTime) {
       return { frameA: 0, frameB: 0, alpha: 0 };
     }
-    if (time >= this.times[T - 1]) {
+    if (time >= this.maxTime) {
       return { frameA: T - 1, frameB: T - 1, alpha: 0 };
     }
 
@@ -134,15 +162,16 @@ export class TimelineController extends EventEmitter<TimelineEventMap> {
     let hi = T - 1;
     while (hi - lo > 1) {
       const mid = (lo + hi) >>> 1;
-      if (this.times[mid] <= time) {
+      if (this.times[mid]! <= time) {
         lo = mid;
       } else {
         hi = mid;
       }
     }
 
-    const tA = this.times[lo];
-    const tB = this.times[hi];
+    // Binary-search bounds stay inside this non-empty array.
+    const tA = this.times[lo]!;
+    const tB = this.times[hi]!;
     const span = tB - tA;
     const alpha = span > 0 ? (time - tA) / span : 0;
 
@@ -155,7 +184,8 @@ export class TimelineController extends EventEmitter<TimelineEventMap> {
   }
 
   private tick(timestamp: number): void {
-    if (!this.playing) return;
+    this.rafId = null;
+    if (this.disposed || !this.playing) return;
 
     if (this.lastTimestamp === 0) {
       this.lastTimestamp = timestamp;
@@ -166,17 +196,17 @@ export class TimelineController extends EventEmitter<TimelineEventMap> {
 
     // Convert speed to time-units per second.
     // "1x" plays through the entire time range in (range / 1) seconds.
-    const range = this.times[this.times.length - 1] - this.times[0];
+    const range = this.maxTime - this.minTime;
     if (range <= 0) {
-      this.rafId = requestAnimationFrame((ts) => this.tick(ts));
+      this.scheduleFrame();
       return;
     }
 
     const dtTime = (dtMs / 1000) * this.speed * range * this.direction;
     this.currentTime += dtTime;
 
-    const minT = this.times[0];
-    const maxT = this.times[this.times.length - 1];
+    const minT = this.minTime;
+    const maxT = this.maxTime;
 
     // Handle boundaries
     if (this.currentTime > maxT) {
@@ -212,8 +242,17 @@ export class TimelineController extends EventEmitter<TimelineEventMap> {
     this.emitTimeChange();
 
     if (this.playing) {
-      this.rafId = requestAnimationFrame((ts) => this.tick(ts));
+      this.scheduleFrame();
     }
+  }
+
+  private readonly onAnimationFrame = (timestamp: number): void => {
+    this.tick(timestamp);
+  };
+
+  private scheduleFrame(): void {
+    if (this.disposed || !this.playing || this.rafId !== null) return;
+    this.rafId = requestAnimationFrame(this.onAnimationFrame);
   }
 
   private emitTimeChange(): void {
@@ -237,15 +276,26 @@ export class TimelineController extends EventEmitter<TimelineEventMap> {
   }
 
   fromStateJSON(state: { currentTime?: number; speed?: number; loopMode?: string; playing?: boolean }): void {
-    if (state.currentTime !== undefined) this.seek(state.currentTime);
-    if (state.speed !== undefined) this.setSpeed(state.speed);
-    if (state.loopMode !== undefined) this.setLoop(state.loopMode as any);
+    const currentTime = state.currentTime === undefined
+      ? undefined
+      : finiteNumber(state.currentTime, 'currentTime');
+    const speed = state.speed === undefined
+      ? undefined
+      : finiteNumber(state.speed, 'speed', { minimum: 0, minimumExclusive: true });
+    const loopMode = state.loopMode === undefined
+      ? undefined
+      : validateLoopMode(state.loopMode);
+    if (currentTime !== undefined) this.seek(currentTime);
+    if (speed !== undefined) this.setSpeed(speed);
+    if (loopMode !== undefined) this.setLoop(loopMode);
     if (state.playing === true) this.play();
     else if (state.playing === false) this.pause();
   }
 
   dispose(): void {
+    if (this.disposed) return;
     this.pause();
+    this.disposed = true;
     this.removeAllListeners();
   }
 }

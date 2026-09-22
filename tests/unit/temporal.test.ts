@@ -66,12 +66,23 @@ describe('TemporalDataLayer', () => {
     ).toThrow();
   });
 
+  it('throws on non-finite times', () => {
+    expect(() => new TemporalDataLayer('t', frames3, [0, Number.NaN, 1], 'jet', {}))
+      .toThrow(/times\[1\]/);
+  });
+
   it('throws on factor assignment length mismatch', () => {
     expect(() =>
       new TemporalDataLayer('t', frames3, times3, 'jet', {
         factor: { name: 'cond', levels: ['A', 'B'], assignment: [0, 1] } // needs 3
       })
     ).toThrow();
+  });
+
+  it('rejects factor assignments outside the declared levels', () => {
+    expect(() => new TemporalDataLayer('t', frames3, times3, 'jet', {
+      factor: { name: 'cond', levels: ['A', 'B'], assignment: [0, 2, 0] }
+    })).toThrow(/factor\.assignment\[1\]/);
   });
 
   it('initializes data to first frame', () => {
@@ -117,6 +128,22 @@ describe('TemporalDataLayer', () => {
     expect(data[0]).toBeCloseTo(15);
   });
 
+  it('rejects invalid interpolation before changing data or notifications', () => {
+    const layer = new TemporalDataLayer('t1', frames3, times3, 'jet', {});
+    const before = new Float32Array(layer.getData()!);
+    const revision = layer.getDataRevision();
+    const changed = vi.fn();
+    layer._onChangeCallback = changed;
+    layer.needsUpdate = false;
+
+    expect(() => layer.setTime(0, 1, Number.NaN)).toThrow(/alpha/);
+    expect(() => layer.setTime(-1, 1, 0.5)).toThrow(/frameA/);
+    expect(layer.getData()).toEqual(before);
+    expect(layer.getDataRevision()).toBe(revision);
+    expect(layer.needsUpdate).toBe(false);
+    expect(changed).not.toHaveBeenCalled();
+  });
+
   it('getRGBAData returns correct length', () => {
     const layer = new TemporalDataLayer('t1', frames3, times3, 'jet', {
       range: [0, 25]
@@ -144,6 +171,12 @@ describe('TemporalDataLayer', () => {
     expect(series[2]).toBe(24);
   });
 
+  it('rejects fractional and out-of-range time-series vertices', () => {
+    const layer = new TemporalDataLayer('t1', frames3, times3, 'jet', {});
+    expect(() => layer.getTimeSeries(0.5)).toThrow(/integer/);
+    expect(() => layer.getTimeSeries(5)).toThrow(/at most 4/);
+  });
+
   it('getTimes returns a copy', () => {
     const layer = new TemporalDataLayer('t1', frames3, times3, 'jet', {});
     const t = layer.getTimes();
@@ -163,6 +196,9 @@ describe('TemporalDataLayer', () => {
       factor
     });
     expect(layer.getFactorDescriptor()).toEqual(factor);
+    const returned = layer.getFactorDescriptor()!;
+    returned.assignment[0] = 1;
+    expect(layer.getFactorDescriptor()?.assignment[0]).toBe(0);
   });
 
   it('handles single-frame edge case', () => {
@@ -276,10 +312,23 @@ describe('TimelineController', () => {
     expect(changed).toHaveBeenCalledWith({ speed: 2.5 });
   });
 
-  it('setSpeed clamps to minimum', () => {
+  it('setSpeed rejects invalid input without state or events changing', () => {
     const tc = new TimelineController(times);
-    tc.setSpeed(-1);
-    expect(tc.getState().speed).toBe(0.01);
+    const changed = vi.fn();
+    tc.on('speedchange', changed);
+    expect(() => tc.setSpeed(-1)).toThrow(/speed/);
+    expect(() => tc.setSpeed(Number.NaN)).toThrow(/speed/);
+    expect(tc.getState().speed).toBe(1);
+    expect(changed).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid seek input without state or events changing', () => {
+    const tc = new TimelineController(times);
+    const changed = vi.fn();
+    tc.on('timechange', changed);
+    expect(() => tc.seek(Number.NaN)).toThrow(/time/);
+    expect(tc.getState().currentTime).toBe(0);
+    expect(changed).not.toHaveBeenCalled();
   });
 
   it('setLoop changes loop mode', () => {
@@ -335,6 +384,37 @@ describe('TimelineController', () => {
     tc.play();
     tc.dispose();
     expect(tc.getState().playing).toBe(false);
+  });
+
+  it('owns one stable frame at a time and cannot restart after disposal', () => {
+    let nextId = 0;
+    const frames = new Map<number, FrameRequestCallback>();
+    const request = vi.fn((callback: FrameRequestCallback) => {
+      const id = ++nextId;
+      frames.set(id, callback);
+      return id;
+    });
+    const cancel = vi.fn((id: number) => frames.delete(id));
+    vi.stubGlobal('requestAnimationFrame', request);
+    vi.stubGlobal('cancelAnimationFrame', cancel);
+
+    const tc = new TimelineController(times);
+    tc.play();
+    tc.play();
+    expect(frames.size).toBe(1);
+    expect(request).toHaveBeenCalledOnce();
+    const staleCallback = [...frames.values()][0];
+
+    tc.dispose();
+    tc.dispose();
+    tc.play();
+    staleCallback(100);
+
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(frames.size).toBe(0);
+    expect(request).toHaveBeenCalledOnce();
+    expect(tc.getState().playing).toBe(false);
+    vi.unstubAllGlobals();
   });
 
   it('constructor options set speed and loop', () => {
@@ -438,6 +518,26 @@ describe('SparklineOverlay', () => {
     const canvas = container.querySelector('canvas') as HTMLCanvasElement;
     expect(canvas.width).toBe(300);
     expect(canvas.height).toBe(120);
+    overlay.dispose();
+  });
+
+  it('rejects invalid sparkline geometry and time state before showing', () => {
+    expect(() => new SparklineOverlay(container, { width: Number.NaN }))
+      .toThrow(/finite/);
+    expect(() => new SparklineOverlay(container, { width: 10, padding: 5 }))
+      .toThrow(/positive sparkline drawing area/);
+
+    const overlay = new SparklineOverlay(container);
+    const canvas = container.querySelector('canvas') as HTMLCanvasElement;
+    expect(() => overlay.show(
+      new Float32Array([0, 1]),
+      [0, Number.NaN],
+      0,
+      10,
+      10
+    )).toThrow(/finite/);
+    expect(canvas.style.display).toBe('none');
+    expect(() => overlay.updateTimeMarker(Number.NaN)).toThrow(/finite/);
     overlay.dispose();
   });
 });

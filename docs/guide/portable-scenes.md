@@ -8,6 +8,11 @@ The browser embed is `dist/surfview.embed.iife.js`. It includes Three.js r185
 exactly once and exposes the public API as `window.surfview`. It does not load
 scripts, styles, fonts, or assets from a CDN.
 
+The npm archive intentionally omits a source map for this self-contained embed.
+Core ESM and UMD artifacts retain source maps for downstream compatibility; the
+embed remains debuggable from this open repository without adding roughly 5 MiB
+of duplicated source content to every package installation.
+
 ## Mount a scene
 
 ```html

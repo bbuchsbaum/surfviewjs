@@ -2,8 +2,9 @@
  * Events emitted by surfaces
  */
 
-import { NeuroSurface } from '../classes';
-import { Layer } from '../layers';
+import type { NeuroSurface } from '../classes';
+import type { Layer } from '../layers';
+import type { ColorRepresentation } from 'three';
 
 export interface SurfaceLayerReorderedEvent {
   surface: NeuroSurface;
@@ -15,7 +16,7 @@ export interface SurfaceLayerReorderedEvent {
 export interface SurfaceEventMap {
   'visibility:changed': { surface: NeuroSurface; visible: boolean };
   'opacity:changed': { surface: NeuroSurface; opacity: number };
-  'color:changed': { surface: NeuroSurface; color: any };
+  'color:changed': { surface: NeuroSurface; color: ColorRepresentation };
   'layer:added': { surface: NeuroSurface; layer: Layer };
   'layer:removed': { surface: NeuroSurface; layerId: string };
   'layer:updated': { surface: NeuroSurface; layer?: Layer | null; changes?: Record<string, unknown> };

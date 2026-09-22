@@ -812,7 +812,7 @@ describe('ViewerControlTarget frame timing', () => {
         .bind(fixture.viewer);
       (fixture.viewer as any).needsRender = false;
 
-      fixture.viewer.animate();
+      fixture.viewer.requestRender();
       const scheduledViewerFrame = [...frames.entries()][0];
       expect(scheduledViewerFrame).toBeDefined();
       expect(fixture.target.updateScalarMapping(

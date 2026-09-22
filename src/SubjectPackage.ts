@@ -330,8 +330,8 @@ function validateSurfaceSet(
   return {
     manifest: surface,
     vertexCount: baseVertexCount ?? 0,
-    faceCount: baseFaceCount,
-    variants: variantNames
+    variants: variantNames,
+    ...(baseFaceCount === undefined ? {} : { faceCount: baseFaceCount })
   };
 }
 

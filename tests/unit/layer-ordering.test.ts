@@ -4,6 +4,7 @@ import { GPULayerCompositor } from '../../src/GPULayerCompositor';
 import {
   BaseLayer,
   DataLayer,
+  Layer,
   LayerStack
 } from '../../src/layers';
 import { CurvatureLayer } from '../../src/layers/CurvatureLayer';
@@ -192,6 +193,21 @@ describe('canonical layer ordering', () => {
     expect(uniforms.layerOpacity.value[0]).toBeCloseTo(0.2, 6);
     expect(uniforms.layerOpacity.value[1]).toBeCloseTo(0.8, 6);
     expect(uniforms.layerCount.value).toBe(2);
+    compositor.dispose();
+  });
+
+  it('rejects a custom layer that violates the RGBA buffer contract', () => {
+    class MalformedLayer extends Layer {
+      getRGBAData(): Float32Array {
+        return new Float32Array(3);
+      }
+
+      update(): void {}
+    }
+
+    const compositor = new GPULayerCompositor(1, 1);
+    expect(() => compositor.updateLayers([new MalformedLayer('bad')]))
+      .toThrow(/RGBA length must be 4/);
     compositor.dispose();
   });
 });

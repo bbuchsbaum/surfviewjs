@@ -1,77 +1,78 @@
-# NeuroSurface Tests
+# SurfView test suites
 
-This directory contains tests and examples for the NeuroSurface viewer, particularly focusing on GIFTI surface file support.
+SurfView separates fast source tests from public-package, browser, and visual
+evidence. The required CI matrix is documented in
+[the CI policy](../docs/testing/ci-policy.md).
 
-## Test Files
+## Unit and computational tests
 
-### test-gifti.html
-An interactive browser-based test for loading and viewing GIFTI surfaces. It includes:
-- Loading test GIFTI files from the GIFTI-Reader-JS repository
-- Support for ASCII, Base64, and GZip+Base64 encoded GIFTI files
-- Local file loading
-- Adding data layers to surfaces
-- Visual inspection of loaded surfaces
-
-To run: `npm run test:browser` or open `tests/test-gifti.html` in a browser after running `npm run build`.
-
-### test-crosshair-annotations.html
-Minimal demo for the new interaction helpers:
-- Hover crosshair (toggle)
-- Click-to-add annotation
-- Manual crosshair placement and annotation activation
-- Clear annotations / hide crosshair
-
-To run: open `tests/test-crosshair-annotations.html` after `npm run build`.
-
-### test-parser.js
-A Node.js test script that downloads and tests the GIFTI parser with real test files.
-
-To run: `npm test`
-
-### E2E visual QA specs
-
-Playwright specs in `tests/e2e/` exercise browser-rendered demos and regression pages:
-- `publication-presets.spec.ts` verifies the publication preset demo renders and `exportPNG()` returns a figure PNG.
-- `new-feature-visual-qa.spec.ts` verifies linked 3D/flatmap ROI drawing/export and alignment QA slice/overlay panels with shifted-transform metrics.
-- `volume-layer-webgl2.spec.ts` verifies WebGL2 volume projection parity, including fragment and ribbon modes.
-
-To run a focused visual QA slice:
+`tests/unit/` contains Vitest suites for loaders, layers, statistics,
+serialization, React and controls bindings, report scenes, viewer ownership,
+render scheduling, WebGL resource cleanup, and pure GPU-preparation logic.
+Local GIFTI fixtures cover ASCII, Base64, GZip+Base64, and raw zlib/deflate
+payloads marked as `GZipBase64Binary`; tests do not download parser fixtures.
 
 ```bash
-npx start-server-and-test dev:ci http://localhost:4173/demo/index.html "npx playwright test tests/e2e/new-feature-visual-qa.spec.ts"
+npm test
+npm run test:coverage
 ```
 
-## Test Data Sources
+The coverage command enforces global and risk-weighted per-module thresholds.
+Numerical oracle and property coverage is described in
+[computational assurance](../docs/testing/computational-assurance.md).
 
-Test GIFTI files are sourced from the [GIFTI-Reader-JS](https://github.com/rii-mango/GIFTI-Reader-JS) repository:
+## Type and packed-package contracts
 
-- **ascii.surf.gii** - ASCII-encoded surface mesh
-- **base64.surf.gii** - Base64-encoded surface mesh
-- **tetrahedron_gzip.gii** - GZip+Base64 encoded surface mesh
-- **fsaverage5-*-pial.gii** - FreeSurfer-style fixtures marked as GZip+Base64 but stored as raw zlib/deflate payloads
-
-## Adding New Tests
-
-1. For browser tests, create new HTML files in this directory
-2. For Node.js tests, add test cases to test-parser.js or create new test files
-3. Test data can be added to the `tests/data/` directory
-
-## Known Limitations
-
-- Only surface meshes are tested; other GIFTI data types (labels, time series) are not yet implemented
-
-## Running All Tests
+`tests/types/` holds compile-time contracts, including expected type errors.
+`tests/types/package/` verifies declarations generated in `dist/`.
+`npm run test:package-consumers` creates a real npm archive, installs it into
+clean consumers, executes CommonJS and ESM imports, compiles every optional
+entry, and runs the canonical documentation examples.
 
 ```bash
-# Run parser tests
-npm test
+npm run test:types
+npm run build
+npm run test:package-consumers
+```
 
-# Run browser tests
-npm run test:browser
+## Browser and visual tests
 
-# Build and test
-npm run build && npm test
+`tests/e2e/` uses the project-managed Playwright Chromium build. The suite
+covers surface loading and rendering, GZip GIFTI, controls, portable embeds,
+React, volume projection, GPU compositing, picking, viewer lifecycle, visual
+regressions, and synchronized performance budgets. WebGL absence is a failure,
+not a skip.
 
-# Run Playwright browser tests
+```bash
 npm run test:playwright
 ```
+
+For a focused development run, keep server ownership inside
+`start-server-and-test`:
+
+```bash
+npx start-server-and-test dev:ci http://localhost:4173/demo/index.html \
+  "playwright test tests/e2e/new-feature-visual-qa.spec.ts"
+```
+
+The interactive pages `tests/test-gifti.html` and
+`tests/test-crosshair-annotations.html` are browser fixtures used for manual
+inspection and regression scenarios. Serve them through `npm run dev`; do not
+open them as `file://` documents.
+
+## Adding coverage
+
+- Put deterministic source behavior in `tests/unit/`.
+- Add compile-time public contracts to `tests/types/`.
+- Add browser/WebGL behavior to `tests/e2e/` and use stable semantic or explicit
+  test IDs.
+- Keep all test data in `tests/data/` and record its provenance here or beside
+  the fixture.
+- Add or update a demo scenario for user-visible features.
+- Avoid committed `.only`, silent browser skips, wall-clock-only performance
+  assertions, and network-fetched fixtures.
+
+Current surface fixtures originate from
+[GIFTI-Reader-JS](https://github.com/rii-mango/GIFTI-Reader-JS). The full test
+suite additionally covers label, temporal, parcellation, connectivity, volume,
+and statistical-map behavior; it is not limited to mesh parsing.

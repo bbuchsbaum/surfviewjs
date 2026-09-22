@@ -1,5 +1,6 @@
-import { Layer, LayerConfig, LayerUpdateData } from '../layers';
+import { assertLayerUpdateFields, Layer, LayerConfig, LayerUpdateData } from '../layers';
 import { debugLog } from '../debug';
+import { finiteNumber, opacity as validateOpacity } from '../utils/validation';
 
 /**
  * Configuration options for curvature display
@@ -67,11 +68,20 @@ export class CurvatureLayer extends Layer {
       ? curvature
       : new Float32Array(curvature);
 
-    this.brightness = config.brightness ?? 0.5;
-    this.contrast = config.contrast ?? 0.5;
-    this.smoothness = config.smoothness ?? 1;
+    this.brightness = finiteNumber(config.brightness ?? 0.5, 'brightness', {
+      minimum: 0,
+      maximum: 1
+    });
+    this.contrast = finiteNumber(config.contrast ?? 0.5, 'contrast', {
+      minimum: 0,
+      maximum: 1
+    });
+    this.smoothness = finiteNumber(config.smoothness ?? 1, 'smoothness', {
+      minimum: 0,
+      minimumExclusive: true
+    });
 
-    debugLog(`CurvatureLayer ${id}: Created with ${this.curvature.length} vertices`);
+    debugLog('CurvatureLayer', id, ': Created with', this.curvature.length, 'vertices');
   }
 
   /**
@@ -96,7 +106,7 @@ export class CurvatureLayer extends Layer {
    * Set brightness (base gray level)
    */
   setBrightness(brightness: number): void {
-    this.brightness = Math.max(0, Math.min(1, brightness));
+    this.brightness = finiteNumber(brightness, 'brightness', { minimum: 0, maximum: 1 });
     this.rgbaBuffer = null;
     this._notifyChange();
   }
@@ -105,7 +115,7 @@ export class CurvatureLayer extends Layer {
    * Set contrast (curvature influence on brightness)
    */
   setContrast(contrast: number): void {
-    this.contrast = Math.max(0, Math.min(1, contrast));
+    this.contrast = finiteNumber(contrast, 'contrast', { minimum: 0, maximum: 1 });
     this.rgbaBuffer = null;
     this._notifyChange();
   }
@@ -114,7 +124,10 @@ export class CurvatureLayer extends Layer {
    * Set smoothness (curvature scaling factor)
    */
   setSmoothness(smoothness: number): void {
-    this.smoothness = Math.max(0.01, smoothness);
+    this.smoothness = finiteNumber(smoothness, 'smoothness', {
+      minimum: 0,
+      minimumExclusive: true
+    });
     this.rgbaBuffer = null;
     this._notifyChange();
   }
@@ -144,11 +157,10 @@ export class CurvatureLayer extends Layer {
     const brightness = this.brightness;
     const contrast = this.contrast;
     const smoothness = this.smoothness;
-    const opacity = this.opacity;
 
     for (let i = 0; i < vertexCount; i++) {
       // Get curvature value (default to 0 if out of bounds)
-      const curv = i < curvature.length ? curvature[i] : 0;
+      const curv = i < curvature.length ? curvature[i]! : 0;
 
       // Apply pycortex-style mapping:
       // gray = clamp(curvature / smoothness, -0.5, 0.5) * contrast + brightness
@@ -159,7 +171,7 @@ export class CurvatureLayer extends Layer {
       buffer[offset] = gray;     // R
       buffer[offset + 1] = gray; // G
       buffer[offset + 2] = gray; // B
-      buffer[offset + 3] = opacity; // A
+      buffer[offset + 3] = 1;       // Intrinsic alpha; compositor applies opacity
     }
 
     this.needsUpdate = false;
@@ -170,6 +182,19 @@ export class CurvatureLayer extends Layer {
    * Update layer properties
    */
   update(data: CurvatureLayerUpdateData): void {
+    assertLayerUpdateFields(data, 'CurvatureLayer', [
+      'curvature', 'brightness', 'contrast', 'smoothness'
+    ]);
+    if (data.brightness !== undefined) {
+      finiteNumber(data.brightness, 'brightness', { minimum: 0, maximum: 1 });
+    }
+    if (data.contrast !== undefined) {
+      finiteNumber(data.contrast, 'contrast', { minimum: 0, maximum: 1 });
+    }
+    if (data.smoothness !== undefined) {
+      finiteNumber(data.smoothness, 'smoothness', { minimum: 0, minimumExclusive: true });
+    }
+    if (data.opacity !== undefined) validateOpacity(data.opacity);
     if (data.curvature !== undefined) {
       this.setCurvature(data.curvature);
     }
@@ -210,22 +235,3 @@ export class CurvatureLayer extends Layer {
     this.rgbaBuffer = null;
   }
 }
-
-// Register with Layer.fromConfig
-const originalFromConfig = Layer.fromConfig.bind(Layer);
-Layer.fromConfig = function(config: Record<string, any>): Layer {
-  if (config.type === 'curvature') {
-    if (!config.curvature) {
-      throw new Error('CurvatureLayer requires curvature data');
-    }
-    return new CurvatureLayer(config.id, config.curvature, {
-      visible: config.visible,
-      opacity: config.opacity,
-      brightness: config.brightness,
-      contrast: config.contrast,
-      smoothness: config.smoothness,
-      order: config.order
-    });
-  }
-  return originalFromConfig(config);
-};

@@ -107,7 +107,7 @@ import { TemporalDataLayer, TimelineController } from 'surfview';
 // times: sorted number[] of length T
 const layer = new TemporalDataLayer('activation', frames, times, 'hot', {
   range: [0, 1],
-  threshold: [0.15, 0],
+  threshold: [0, 0.15],
   opacity: 0.85
 });
 
@@ -149,6 +149,41 @@ The foundational layer (automatically created).
 const baseLayer = surface.getLayer('base');
 ```
 
+## RGBA compositing contract
+
+SurfView stores and exposes **straight-alpha** RGBA. A layer's RGBA buffer
+contains intrinsic colormap or data coverage; `layer.opacity` scales source
+alpha exactly once in the compositor. CPU and WebGL paths use the same
+bottom-to-top algebra.
+
+For destination color/alpha `Cb, Ab`, source `Cs, As`, and layer opacity `o`,
+first set `as = As * o`. Normal and multiply use W3C separable blending followed
+by Porter-Duff source-over:
+
+```text
+Ao = as + Ab * (1 - as)
+normal premultiplied RGB = Cs * as + Cb * Ab * (1 - as)
+multiply premultiplied RGB =
+  Cb * Ab * (1 - as) + Cs * as * (1 - Ab) + (Cb * Cs) * Ab * as
+straight output RGB = premultiplied RGB / Ao   (or zero when Ao is zero)
+```
+
+Additive mode is Porter-Duff plus-lighter: premultiplied source and destination
+RGB and alpha are added, then clamped to one. This makes partial coverage and
+partial opacity behave correctly instead of adding unweighted straight RGB.
+
+The shader outputs straight alpha. Production materials use Three.js
+`NormalBlending` with `premultipliedAlpha: false`, `depthTest: true`, and
+`depthWrite: false`. Normal canvas blending converts the result to the
+framebuffer's premultiplied representation over a transparent clear, or blends
+it source-over the configured opaque clear color.
+
+The automatic `BaseLayer` is an ordinary bottom layer. Hiding or removing every
+layer produces a transparent surface; a visible opaque base produces alpha one.
+Layer order therefore matters. GPU compositing supports eight visible layers;
+excess layers produce a warning, and a viewer without WebGL2 explicitly keeps
+the CPU compositor.
+
 ### OutlineLayer
 
 For edge highlighting.
@@ -188,6 +223,19 @@ surface.updateLayers([
   { id: 'roi', opacity: 1.0 }
 ]);
 ```
+
+Numeric mutations are validation-first. Opacity is finite and in `[0, 1]`
+(zero remains a valid fully transparent layer). Ranges and thresholds contain
+exactly two finite ascending bounds; equal bounds are valid and disable the
+threshold hide zone. Setters defensively copy pairs. A compound `update()` with
+any invalid numeric field throws `NumericValidationError` before data, buffers,
+revision counters, callbacks, or events change.
+
+`StatisticalMapLayer` additionally requires p-values in `[0, 1]` with exactly
+one value per data item and positive finite degrees of freedom. Updates are
+checked against the candidate data length before any metadata or correction
+mask changes. FDR/Bonferroni levels are in `(0, 1]`; cluster thresholds are
+finite and nonnegative and minimum cluster sizes are positive integers.
 
 ### Removing Layers
 
@@ -290,6 +338,17 @@ arrays or private sparse index mapping:
 const value = layer.sampleValueAtVertex(vertexIndex);
 ```
 
+Connectivity layers apply the same transactional numeric contract. Edge
+indices are nonnegative integers, edge weights are finite, weight ranges are
+finite ascending pairs, thresholds and `topN` are nonnegative (`topN` is an
+integer), and tube/node radii are positive. Parcel-connectivity display and
+alpha ranges are defensively copied; alpha endpoints stay in `[0, 1]`.
+Compound updates validate all supplied numeric controls before replacing
+edges, matrices, filters, buffers, or emitting change notifications.
+Optional update fields follow omission semantics; use documented `null` values
+for resets such as a parcel-connectivity threshold. Do not use explicit
+`undefined` as a reset sentinel.
+
 Dense layers index their value vector directly. Indexed sparse layers resolve
 the surface vertex through a lazy lookup; if duplicate mappings exist, the
 later mapping wins, matching rendering and summary semantics. The method
@@ -310,8 +369,8 @@ disposed layer. It does not throw for these expected missing-data cases.
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `range` | [min, max] | auto | Data range for colormap |
-| `threshold` | [low, high] | [0, 0] | Threshold range (transparent inside) |
+| `range` | [min, max] | [0, 1] | Finite ascending data range for colormap |
+| `threshold` | [low, high] | [0, 0] | Finite ascending threshold range (transparent inside) |
 | `colorMap` | string | 'viridis' | Colormap name |
 
 ## Blend Modes
@@ -319,7 +378,6 @@ disposed layer. It does not throw for these expected missing-data cases.
 - `normal` - Standard alpha blending
 - `additive` - Add colors together
 - `multiply` - Multiply colors
-- `screen` - Screen blend mode
 
 ```javascript
 const layer = new DataLayer('glow', data, null, 'hot', {

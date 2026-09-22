@@ -30,7 +30,8 @@ export class SurfaceSet {
     this.curv = {};
     this.meta = config.meta || {};
 
-    if (!config.variants[config.defaultVariant]) {
+    const defaultPositions = config.variants[config.defaultVariant];
+    if (!defaultPositions) {
       throw new Error(`SurfaceSet: defaultVariant "${config.defaultVariant}" missing in variants map`);
     }
 
@@ -39,7 +40,7 @@ export class SurfaceSet {
       throw new Error(`SurfaceSet: faces length must be multiple of 3 (got ${this.faces.length})`);
     }
 
-    const basePositions = new Float32Array(config.variants[config.defaultVariant]);
+    const basePositions = new Float32Array(defaultPositions);
     if (basePositions.length % 3 !== 0) {
       throw new Error('SurfaceSet: default variant vertex array length must be multiple of 3');
     }
@@ -58,7 +59,7 @@ export class SurfaceSet {
       Object.entries(config.curv).forEach(([name, values]) => {
         const arr = new Float32Array(values);
         if (arr.length !== this.vertexCount) {
-          debugLog(`SurfaceSet: ignoring curv for ${name}; expected ${this.vertexCount} values, got ${arr.length}`);
+          debugLog('SurfaceSet: ignoring curv for', name, '; expected', this.vertexCount, 'values, got', arr.length);
           return;
         }
         this.curv[name] = arr;

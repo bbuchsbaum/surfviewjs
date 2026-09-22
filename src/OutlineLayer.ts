@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { Layer, LayerConfig } from './layers';
+import { assertLayerUpdateFields, Layer, LayerConfig, LayerUpdateData } from './layers';
+import { finiteNumber, opacity as validateOpacity } from './utils/validation';
 
 export interface OutlineLayerOptions extends LayerConfig {
   roiLabels: Uint32Array | Int32Array | number[];
@@ -12,7 +13,18 @@ export interface OutlineLayerOptions extends LayerConfig {
   roiSubset?: number[] | null;
 }
 
-export type OutlineLayerUpdate = Partial<OutlineLayerOptions>;
+export interface OutlineLayerUpdate extends LayerUpdateData {
+  roiLabels?: Uint32Array | Int32Array | number[];
+  color?: THREE.ColorRepresentation;
+  width?: number;
+  halo?: boolean;
+  haloColor?: THREE.ColorRepresentation;
+  haloWidth?: number;
+  offset?: number;
+  roiSubset?: number[] | null;
+  /** @deprecated Use LayerStack ordering commands. */
+  order?: number;
+}
 
 /**
  * Geometry-based layer that draws ROI boundaries as line segments.
@@ -33,10 +45,10 @@ export class OutlineLayer extends Layer {
 
   constructor(id: string, options: OutlineLayerOptions) {
     super(id, {
-      visible: options.visible,
       opacity: options.opacity ?? 1,
-      blendMode: options.blendMode,
-      order: options.order ?? 10
+      order: options.order ?? 10,
+      ...(options.visible === undefined ? {} : { visible: options.visible }),
+      ...(options.blendMode === undefined ? {} : { blendMode: options.blendMode })
     }, {
       role: 'outline',
       pinned: 'top',
@@ -54,11 +66,14 @@ export class OutlineLayer extends Layer {
         : new Uint32Array(options.roiLabels);
 
     this.color = new THREE.Color(options.color ?? 0x000000).getHex();
-    this.width = options.width ?? 1.5;
+    this.width = finiteNumber(options.width ?? 1.5, 'width', {
+      minimum: 0,
+      minimumExclusive: true
+    });
     this.halo = options.halo ?? false;
     this.haloColor = new THREE.Color(options.haloColor ?? 0xffffff).getHex();
-    this.haloWidth = options.haloWidth ?? 1;
-    this.offset = options.offset ?? 0;
+    this.haloWidth = finiteNumber(options.haloWidth ?? 1, 'haloWidth', { minimum: 0 });
+    this.offset = finiteNumber(options.offset ?? 0, 'offset');
     this.roiSubset = options.roiSubset ?? null;
   }
 
@@ -71,6 +86,19 @@ export class OutlineLayer extends Layer {
   }
 
   update(update: OutlineLayerUpdate): void {
+    assertLayerUpdateFields(update, 'OutlineLayer', [
+      'roiLabels', 'color', 'width', 'halo', 'haloColor', 'haloWidth',
+      'offset', 'roiSubset', 'order'
+    ]);
+    if (update.width !== undefined) {
+      finiteNumber(update.width, 'width', { minimum: 0, minimumExclusive: true });
+    }
+    if (update.haloWidth !== undefined) {
+      finiteNumber(update.haloWidth, 'haloWidth', { minimum: 0 });
+    }
+    if (update.offset !== undefined) finiteNumber(update.offset, 'offset');
+    if (update.opacity !== undefined) validateOpacity(update.opacity);
+    if (update.order !== undefined) finiteNumber(update.order, 'order');
     if (update.roiLabels) {
       this.roiLabels = update.roiLabels instanceof Uint32Array
         ? update.roiLabels
@@ -138,6 +166,3 @@ export class OutlineLayer extends Layer {
     }
   }
 }
-
-// Register with factory without creating import cycle
-Layer.registerOutlineLayer(OutlineLayer);

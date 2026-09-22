@@ -74,3 +74,76 @@ export function finiteNumber(
   }
   return value;
 }
+
+/** Validate and defensively copy finite ascending bounds. Equal bounds are valid. */
+export function finitePair(value: unknown, parameter: string): [number, number] {
+  if (!Array.isArray(value) || value.length !== 2) {
+    throw new NumericValidationError(
+      'invalid-length',
+      parameter,
+      'must contain exactly two numeric bounds.',
+      value
+    );
+  }
+  const lower = finiteNumber(value[0], `${parameter}[0]`);
+  const upper = finiteNumber(value[1], `${parameter}[1]`);
+  if (lower > upper) {
+    throw new NumericValidationError(
+      'invalid-pair',
+      parameter,
+      'must contain ascending bounds (minimum <= maximum).',
+      value
+    );
+  }
+  return [lower, upper];
+}
+
+/** Validate an opacity/alpha multiplier. Both transparent zero and opaque one are valid. */
+export function opacity(value: unknown, parameter = 'opacity'): number {
+  return finiteNumber(value, parameter, { minimum: 0, maximum: 1 });
+}
+
+/** Validate an RGB integer stored as 0xRRGGBB. */
+export function rgbInteger(value: unknown, parameter: string): number {
+  return finiteNumber(value, parameter, {
+    minimum: 0,
+    maximum: 0xffffff,
+    integer: true
+  });
+}
+
+/** Maximum renderer pixel ratio used to bound GPU framebuffer allocation. */
+export const MAX_DEVICE_PIXEL_RATIO = 4;
+
+/** Validate a positive DPR and cap it to the documented framebuffer safety limit. */
+export function devicePixelRatio(value: unknown, parameter = 'dpr'): number {
+  return Math.min(
+    MAX_DEVICE_PIXEL_RATIO,
+    finiteNumber(value, parameter, { minimum: 0, minimumExclusive: true })
+  );
+}
+
+/** Recursively reject numbers that JSON would silently coerce to null. */
+export function assertFiniteJSONNumbers(
+  value: unknown,
+  parameter = '$',
+  ancestors: Set<object> = new Set()
+): void {
+  if (typeof value === 'number') {
+    finiteNumber(value, parameter);
+    return;
+  }
+  if (!value || typeof value !== 'object') return;
+  if (ancestors.has(value)) {
+    throw new TypeError(`${parameter} must not contain circular references.`);
+  }
+  ancestors.add(value);
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => assertFiniteJSONNumbers(item, `${parameter}[${index}]`, ancestors));
+  } else {
+    for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+      assertFiniteJSONNumbers(item, `${parameter}.${key}`, ancestors);
+    }
+  }
+  ancestors.delete(value);
+}

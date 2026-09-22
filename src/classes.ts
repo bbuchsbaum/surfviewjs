@@ -2,8 +2,15 @@ import * as THREE from 'three';
 import ColorMap from './ColorMap';
 import { debugLog } from './debug';
 import { EventEmitter, UnsubscribeFn } from './EventEmitter';
+import type { SurfaceEventMap } from './events/SurfaceEvents';
 import { LaplacianSmoothing } from './utils/LaplacianSmoothing';
 import { MeshAdjacency, buildVertexAdjacency } from './utils/meshAdjacency';
+import {
+  finiteNumber,
+  finitePair,
+  opacity as validateOpacity,
+  rgbInteger
+} from './utils/validation';
 
 export type SurfaceGeometryErrorCode =
   | 'empty-vertices'
@@ -188,6 +195,72 @@ export interface SurfaceConfig {
   irange?: [number, number];
 }
 
+/** Fully normalized runtime surface configuration. */
+export interface ResolvedSurfaceConfig {
+  color: THREE.ColorRepresentation;
+  flatShading: boolean;
+  smoothingAngle?: number;
+  materialType: 'phong' | 'standard' | 'physical';
+  shininess: number;
+  specularColor: number;
+  metalness: number;
+  roughness: number;
+  emissive: THREE.ColorRepresentation;
+  emissiveIntensity: number;
+  alpha: number;
+  thresh: [number, number];
+  irange: [number, number];
+}
+
+function normalizeSurfaceConfig(
+  input: SurfaceConfig,
+  inferredRange: [number, number],
+  base?: ResolvedSurfaceConfig
+): ResolvedSurfaceConfig {
+  const merged: ResolvedSurfaceConfig = {
+    color: 0xa9a9a9,
+    flatShading: false,
+    materialType: 'phong',
+    shininess: 30,
+    specularColor: 0x555555,
+    metalness: 0,
+    roughness: 0.5,
+    emissive: 0x0a0a0a,
+    emissiveIntensity: 0.2,
+    alpha: 1,
+    thresh: [0, 0],
+    irange: inferredRange,
+    ...base
+  };
+  for (const [key, value] of Object.entries(input)) {
+    if (value !== undefined) {
+      (merged as unknown as Record<string, unknown>)[key] = value;
+    }
+  }
+  if (typeof merged.color === 'number') rgbInteger(merged.color, 'color');
+  if (typeof merged.emissive === 'number') rgbInteger(merged.emissive, 'emissive');
+  merged.specularColor = rgbInteger(merged.specularColor, 'specularColor');
+  if (merged.smoothingAngle !== undefined) {
+    merged.smoothingAngle = finiteNumber(
+      merged.smoothingAngle,
+      'smoothingAngle',
+      { minimum: 0, maximum: 180 }
+    );
+  }
+  merged.shininess = finiteNumber(merged.shininess, 'shininess', { minimum: 0, maximum: 200 });
+  merged.metalness = finiteNumber(merged.metalness, 'metalness', { minimum: 0, maximum: 1 });
+  merged.roughness = finiteNumber(merged.roughness, 'roughness', { minimum: 0, maximum: 1 });
+  merged.emissiveIntensity = finiteNumber(
+    merged.emissiveIntensity,
+    'emissiveIntensity',
+    { minimum: 0, maximum: 1 }
+  );
+  merged.alpha = validateOpacity(merged.alpha, 'alpha');
+  merged.thresh = finitePair(merged.thresh, 'thresh');
+  merged.irange = finitePair(merged.irange, 'irange');
+  return merged;
+}
+
 export class SurfaceGeometry {
   vertices: Float32Array;
   faces: Uint32Array;
@@ -211,6 +284,7 @@ export class SurfaceGeometry {
     vertexCurv: Float32Array | number[] | null = null,
     createStandaloneMesh = true
   ) {
+    validateSurfaceGeometryData(vertices, faces, vertexCurv);
     this.vertices = new Float32Array(vertices);
     this.faces = new Uint32Array(faces);
     this.hemi = hemi;
@@ -275,9 +349,10 @@ export class SurfaceGeometry {
     let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
 
     for (let i = 0; i < this.vertices.length; i += 3) {
-      const x = this.vertices[i];
-      const y = this.vertices[i + 1];
-      const z = this.vertices[i + 2];
+      // Construction validates a complete xyz layout.
+      const x = this.vertices[i]!;
+      const y = this.vertices[i + 1]!;
+      const z = this.vertices[i + 2]!;
       minX = Math.min(minX, x); maxX = Math.max(maxX, x);
       minY = Math.min(minY, y); maxY = Math.max(maxY, y);
       minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z);
@@ -331,7 +406,7 @@ export class SurfaceGeometry {
   }
 }
 
-export abstract class NeuroSurface extends EventEmitter {
+export abstract class NeuroSurface extends EventEmitter<SurfaceEventMap> {
   /**
    * Calculate min/max range for typed arrays without using spread operator
    */
@@ -342,7 +417,7 @@ export abstract class NeuroSurface extends EventEmitter {
     let max = -Infinity;
     
     for (let i = 0; i < data.length; i++) {
-      const value = data[i];
+      const value = data[i]!;
       if (isFinite(value)) {
         min = Math.min(min, value);
         max = Math.max(max, value);
@@ -370,16 +445,12 @@ export abstract class NeuroSurface extends EventEmitter {
       
       // If smoothing angle is specified and less than 180, apply selective smoothing
       if (this.config.smoothingAngle !== undefined && this.config.smoothingAngle < 180) {
-        // Convert angle to radians and compute cosine threshold
-        const angleThreshold = (this.config.smoothingAngle * Math.PI) / 180;
-        const cosineThreshold = Math.cos(angleThreshold);
-        
         // Note: Full implementation would require creating split vertices for edges
         // that exceed the angle threshold. This is a simplified version.
         // For full control, consider using THREE.BufferGeometryUtils.computeMorphedAttributes
         // or implementing custom normal computation based on face adjacency.
         
-        debugLog(`Smoothing angle set to ${this.config.smoothingAngle} degrees`);
+        debugLog('Smoothing angle set to', this.config.smoothingAngle, 'degrees');
       }
     }
   }
@@ -392,7 +463,7 @@ export abstract class NeuroSurface extends EventEmitter {
   threshold: [number, number];
   irange: [number, number];
   hemisphere: string;
-  config: Required<SurfaceConfig>;
+  config: ResolvedSurfaceConfig;
   viewer?: any; // Will be set by viewer when added
 
   constructor(
@@ -403,39 +474,44 @@ export abstract class NeuroSurface extends EventEmitter {
   ) {
     super(); // Initialize EventEmitter
     this.geometry = geometry;
+    const vertexCount = geometry.vertices.length / 3;
+    const dataArray = new Float32Array(data);
     
     // Default indices: one-to-one mapping with vertices if not provided
     if (!indices || (indices as any).length === 0) {
-      const vertexCount = geometry.vertices.length / 3;
+      if (dataArray.length !== vertexCount) {
+        throw new RangeError(
+          `Data length must equal vertex count ${vertexCount} when indices are omitted ` +
+          `(received ${dataArray.length})`
+        );
+      }
       // Create identity mapping: vertex i gets data[i]
       this.indices = new Uint32Array(Array.from({length: vertexCount}, (_, i) => i));
       debugLog('Using default indices (identity mapping) for', vertexCount, 'vertices');
     } else {
       this.indices = new Uint32Array(indices);
+      if (this.indices.length !== dataArray.length) {
+        throw new RangeError(
+          `indices length ${this.indices.length} must match data length ${dataArray.length}`
+        );
+      }
+      for (let index = 0; index < this.indices.length; index++) {
+        if (this.indices[index]! >= vertexCount) {
+          throw new RangeError(
+            `indices[${index}] references vertex ${this.indices[index]} outside [0, ${vertexCount - 1}]`
+          );
+        }
+      }
     }
     
-    this.data = new Float32Array(data);
+    this.data = dataArray;
     this.vertexCurv = geometry.vertexCurv || null;
     this.mesh = null;
-    // Default threshold shows everything unless explicitly set
-    this.threshold = Array.isArray(config.thresh) ? config.thresh : [0, 0];
-    // Avoid spread operator for typed arrays - can cause stack overflow
-    this.irange = config.irange || this.calculateDataRange(data);
+    this.config = normalizeSurfaceConfig(config, this.calculateDataRange(dataArray));
+    // Default threshold shows everything unless explicitly set.
+    this.threshold = [...this.config.thresh];
+    this.irange = [...this.config.irange];
     this.hemisphere = geometry.hemisphere; // Pass through hemisphere
-
-    this.config = {
-      color: new THREE.Color(0xA9A9A9), // Set default color to dark gray
-      flatShading: false,
-      smoothingAngle: undefined, // No angle-based smoothing by default
-      shininess: 30,
-      specularColor: 0x555555,  // Lighter gray specular for better highlights
-      emissive: new THREE.Color(0x0a0a0a),  // Slight self-illumination
-      emissiveIntensity: 0.2,  // Small amount of emissive for better visibility
-      alpha: 1,
-      thresh: this.threshold,
-      irange: this.irange,
-      ...config
-    } as Required<SurfaceConfig>;
   }
 
   update(property: string, value: any): void {
@@ -465,7 +541,10 @@ export abstract class NeuroSurface extends EventEmitter {
    */
   updateConfig(newConfig: Partial<SurfaceConfig>): void {
     const oldConfig = { ...this.config };
-    this.config = { ...this.config, ...newConfig } as Required<SurfaceConfig>;
+    const nextConfig = normalizeSurfaceConfig(newConfig, this.irange, this.config);
+    this.config = nextConfig;
+    this.threshold = [...nextConfig.thresh];
+    this.irange = [...nextConfig.irange];
     
     if (this.mesh && this.mesh.material) {
       const material = this.mesh.material as any; // Type will vary based on material type
@@ -597,9 +676,9 @@ export abstract class NeuroSurface extends EventEmitter {
    * ```
    */
   setSmoothShading(smooth: boolean, smoothingAngle?: number): void {
-    this.updateConfig({ 
+    this.updateConfig({
       flatShading: !smooth,
-      smoothingAngle: smoothingAngle
+      ...(smoothingAngle === undefined ? {} : { smoothingAngle })
     });
     
     // Recompute normals if mesh exists
@@ -669,7 +748,7 @@ export abstract class NeuroSurface extends EventEmitter {
       this.emit('geometry:updated', { surface: this });
       this.emit('render:needed', { surface: this });
       
-      debugLog(`Applied ${method} smoothing: ${iterations} iterations, lambda=${lambda}`);
+      debugLog('Applied', method, 'smoothing:', iterations, 'iterations, lambda=', lambda);
     } catch (error) {
       console.error('Error applying Laplacian smoothing:', error);
     }
@@ -961,8 +1040,9 @@ export class ColorMappedNeuroSurface extends NeuroSurface {
 
     if (this.data) {
       for (let i = 0; i < this.indices.length; i++) {
-        const index = this.indices[i];
-        const value = this.data[i];
+        // Constructor/setData maintain aligned data and index arrays with valid vertices.
+        const index = this.indices[i]!;
+        const value = this.data[i]!;
         const color = this.colorMap.getColor(value);
         const colorIndex = index * componentsPerColor;
         
@@ -1017,7 +1097,15 @@ export class ColorMappedNeuroSurface extends NeuroSurface {
     // Parent class already handles all material updates properly
     // Just need to handle colormap-specific updates
     if (this.colorMap) {
-      this.colorMap.setAlpha(this.config.alpha);
+      if (newConfig.irange !== undefined) {
+        this.colorMap.setRange(this.irange);
+      }
+      if (newConfig.thresh !== undefined) {
+        this.colorMap.setThreshold(this.threshold);
+      }
+      if (newConfig.alpha !== undefined) {
+        this.colorMap.setAlpha(this.config.alpha);
+      }
     }
     this.updateColors(); // Reapply colors with new config
   }
@@ -1072,16 +1160,22 @@ export class VertexColoredNeuroSurface extends NeuroSurface {
   ) {
     // Pass dummy data array - will be set based on colors  
     const vertexCount = geometry.vertices.length / 3;
-    super(geometry, indices, new Float32Array(vertexCount), config);
+    const mappingCount = indices && indices.length > 0 ? indices.length : vertexCount;
+    super(geometry, indices, new Float32Array(mappingCount), config);
     this.colors = new Float32Array(0);
     this.createMesh();  // Create the mesh first
     this.setColors(colors);
   }
 
   setColors(newColors: number[] | THREE.Color[] | string[]): void {
+    if (newColors.length !== this.indices.length) {
+      throw new RangeError(
+        `colors length ${newColors.length} must match mapped index length ${this.indices.length}`
+      );
+    }
     this.colors = new Float32Array(newColors.length * 3);
     for (let i = 0; i < newColors.length; i++) {
-      const color = new THREE.Color(newColors[i]);
+      const color = new THREE.Color(newColors[i]!);
       this.colors[i * 3] = color.r;
       this.colors[i * 3 + 1] = color.g;
       this.colors[i * 3 + 2] = color.b;
@@ -1112,10 +1206,11 @@ export class VertexColoredNeuroSurface extends NeuroSurface {
     
     // Update colors in place
     for (let i = 0; i < this.indices.length; i++) {
-      const index = this.indices[i];
-      colors[index * 3] = this.colors[i * 3];
-      colors[index * 3 + 1] = this.colors[i * 3 + 1];
-      colors[index * 3 + 2] = this.colors[i * 3 + 2];
+      // Constructor/setColors maintain aligned colors and valid mapped indices.
+      const index = this.indices[i]!;
+      colors[index * 3] = this.colors[i * 3]!;
+      colors[index * 3 + 1] = this.colors[i * 3 + 1]!;
+      colors[index * 3 + 2] = this.colors[i * 3 + 2]!;
     }
 
     // Mark the attribute as needing update

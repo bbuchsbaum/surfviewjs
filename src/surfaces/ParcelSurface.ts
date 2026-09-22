@@ -108,11 +108,11 @@ export class ParcelSurface extends MultiLayerNeuroSurface {
     let cz = 0;
 
     for (let i = 0; i < vertexIndices.length; i++) {
-      const vertexIndex = vertexIndices[i];
+      const vertexIndex = vertexIndices[i]!;
       const offset = vertexIndex * 3;
-      cx += vertices[offset];
-      cy += vertices[offset + 1];
-      cz += vertices[offset + 2];
+      cx += vertices[offset]!;
+      cy += vertices[offset + 1]!;
+      cz += vertices[offset + 2]!;
     }
 
     const invCount = 1 / vertexIndices.length;
@@ -120,15 +120,15 @@ export class ParcelSurface extends MultiLayerNeuroSurface {
     cy *= invCount;
     cz *= invCount;
 
-    let bestVertex = vertexIndices[0];
+    let bestVertex = vertexIndices[0]!;
     let bestDistance = Infinity;
 
     for (let i = 0; i < vertexIndices.length; i++) {
-      const vertexIndex = vertexIndices[i];
+      const vertexIndex = vertexIndices[i]!;
       const offset = vertexIndex * 3;
-      const dx = vertices[offset] - cx;
-      const dy = vertices[offset + 1] - cy;
-      const dz = vertices[offset + 2] - cz;
+      const dx = vertices[offset]! - cx;
+      const dy = vertices[offset + 1]! - cy;
+      const dz = vertices[offset + 2]! - cz;
       const distance = dx * dx + dy * dy + dz * dz;
 
       if (distance < bestDistance) {
@@ -176,11 +176,11 @@ export class ParcelSurface extends MultiLayerNeuroSurface {
     const layer = new LabelLayer(id, {
       labels: this.getVertexLabels(),
       labelDefs: this.buildParcelLabelDefinitions(colorResolver),
-      defaultColor: config.defaultColor,
-      visible: config.visible,
-      opacity: config.opacity,
-      blendMode: config.blendMode,
-      order: config.order
+      ...(config.defaultColor === undefined ? {} : { defaultColor: config.defaultColor }),
+      ...(config.visible === undefined ? {} : { visible: config.visible }),
+      ...(config.opacity === undefined ? {} : { opacity: config.opacity }),
+      ...(config.blendMode === undefined ? {} : { blendMode: config.blendMode }),
+      ...(config.order === undefined ? {} : { order: config.order })
     });
 
     this.parcelColorLayers.set(id, { colorResolver });

@@ -471,7 +471,6 @@ export function resolveFigureExportOptions(
     transparent: options.transparent ?? figure.transparent,
     colorbar: options.colorbar ?? figure.colorbar,
     colorbarLabel: options.colorbarLabel ?? 'Value',
-    colorbarRange: options.colorbarRange,
     colorbarColors: options.colorbarColors ?? defaultColorbarColors(preset),
     roiLabels: options.roiLabels ?? figure.roiLabels,
     scaleBar: options.scaleBar ?? figure.scaleBar,
@@ -479,10 +478,13 @@ export function resolveFigureExportOptions(
     scaleBarLength: finitePositive(options.scaleBarLength, 0.18, 'scaleBarLength'),
     fontScale,
     backgroundColor: options.backgroundColor ?? preset.background.clearColor,
-    title: options.title,
-    subtitle: options.subtitle,
-    downloadFilename: options.downloadFilename,
-    preset
+    preset,
+    ...(options.colorbarRange === undefined ? {} : { colorbarRange: options.colorbarRange }),
+    ...(options.title === undefined ? {} : { title: options.title }),
+    ...(options.subtitle === undefined ? {} : { subtitle: options.subtitle }),
+    ...(options.downloadFilename === undefined
+      ? {}
+      : { downloadFilename: options.downloadFilename })
   };
 }
 

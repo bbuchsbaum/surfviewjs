@@ -212,8 +212,8 @@ export const statisticalMap: Scenario = {
 
     // Vertex hover info
     const infoEl = ctx.panel.querySelector('#vertex-info');
-    viewer.on('vertex:hover', (e: { vertexIndex: number }) => {
-      if (!infoEl) return;
+    viewer.on('vertex:hover', (e) => {
+      if (!infoEl || e.vertexIndex === null) return;
       const info = statLayer.getVertexStatInfo(e.vertexIndex);
       if (info) {
         const z = info.zScore !== null ? info.zScore.toFixed(2) : '—';

@@ -261,8 +261,9 @@ function polygonBounds(polygon: RoiPoint[]): { minX: number; maxX: number; minY:
 function pointInPolygon(point: RoiPoint, polygon: RoiPoint[]): boolean {
   let inside = false;
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const pi = polygon[i];
-    const pj = polygon[j];
+    // Loop bounds guarantee both current and previous polygon vertices exist.
+    const pi = polygon[i]!;
+    const pj = polygon[j]!;
     const intersects = ((pi.y > point.y) !== (pj.y > point.y)) &&
       (point.x < ((pj.x - pi.x) * (point.y - pi.y)) / Math.max(1e-12, pj.y - pi.y) + pi.x);
     if (intersects) inside = !inside;
@@ -272,8 +273,9 @@ function pointInPolygon(point: RoiPoint, polygon: RoiPoint[]): boolean {
 
 function pointOnPolygonBoundary(point: RoiPoint, polygon: RoiPoint[], tolerance = 1e-6): boolean {
   for (let i = 0; i < polygon.length; i++) {
-    const a = polygon[i];
-    const b = polygon[(i + 1) % polygon.length];
+    // Callers require a non-empty polygon before boundary evaluation.
+    const a = polygon[i]!;
+    const b = polygon[(i + 1) % polygon.length]!;
     const dx = b.x - a.x;
     const dy = b.y - a.y;
     const len2 = dx * dx + dy * dy;

@@ -117,7 +117,11 @@ export class VolumeTexture3D {
       : (() => {
         const out = new Float32Array(data.length);
         for (let i = 0; i < data.length; i++) {
-          out[i] = data[i];
+          const value = data[i];
+          if (value === undefined) {
+            throw new RangeError(`VolumeTexture3D: data value ${i} is missing`);
+          }
+          out[i] = value;
         }
         return out;
       })();
@@ -129,7 +133,7 @@ export class VolumeTexture3D {
     // Convert Float32 -> HalfFloat (Uint16 bit pattern)
     const half = new Uint16Array(floatData.length);
     for (let i = 0; i < floatData.length; i++) {
-      half[i] = THREE.DataUtils.toHalfFloat(floatData[i]);
+      half[i] = THREE.DataUtils.toHalfFloat(floatData[i]!);
     }
     return { gpuData: half, gpuType: THREE.HalfFloatType };
   }

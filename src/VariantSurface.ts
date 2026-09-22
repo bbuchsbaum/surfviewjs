@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { SurfaceGeometry } from './classes';
 import { MultiLayerNeuroSurface, MultiLayerSurfaceConfig } from './MultiLayerNeuroSurface';
 import { SurfaceSet } from './SurfaceSet';
+import { finiteNumber } from './utils/validation';
 
 export interface VariantTransitionOptions {
   animate?: boolean;
@@ -38,13 +39,14 @@ export class VariantSurface extends MultiLayerNeuroSurface {
   }
 
   setVariant(name: string, options: VariantTransitionOptions = {}): void {
+    const duration = finiteNumber(options.duration ?? 300, 'duration', { minimum: 0 });
     if (!this.surfaceSet.hasVariant(name)) {
       console.warn(`VariantSurface: variant "${name}" not found`);
       return;
     }
     if (name === this.currentVariantName) return;
 
-    const { animate = true, duration = 300, ease = (t: number) => t } = options;
+    const { animate = true, ease = (t: number) => t } = options;
     const target = this.surfaceSet.getPositions(name);
     const geometry = this.mesh?.geometry as THREE.BufferGeometry;
     if (!geometry) return;
@@ -75,10 +77,11 @@ export class VariantSurface extends MultiLayerNeuroSurface {
     const start = performance.now();
     const animateFrame = (now: number) => {
       const t = Math.min(1, (now - start) / duration);
-      const k = ease ? ease(t) : t;
+      const k = finiteNumber(ease ? ease(t) : t, 'ease result');
       const arr = positionAttr.array as Float32Array;
       for (let i = 0; i < arr.length; i++) {
-        arr[i] = startPositions[i] + (target[i] - startPositions[i]) * k;
+        // SurfaceSet and the position attribute have already established equal shapes.
+        arr[i] = startPositions[i]! + (target[i]! - startPositions[i]!) * k;
       }
       positionAttr.needsUpdate = true;
       this.emit('render:needed', { surface: this });

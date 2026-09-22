@@ -2,6 +2,7 @@ import { normalizeAnatomicalHemisphere } from '../AnatomicalView';
 import type { InspectionSelection } from '../Inspection';
 import {
   CURRENT_VERSION,
+  assertValidViewerStateNumbers,
   migrateViewerState
 } from './ViewerState';
 import type {
@@ -121,6 +122,18 @@ function finish(
 
 function validateRestoration(viewer: any, state: ViewerStateV2): RestorationIssue[] {
   const issues: RestorationIssue[] = [];
+  try {
+    assertValidViewerStateNumbers(state);
+  } catch (error) {
+    addIssue(
+      issues,
+      'invalid-state',
+      error && typeof error === 'object' && 'parameter' in error
+        ? String((error as { parameter: unknown }).parameter)
+        : '$',
+      error instanceof Error ? error.message : 'Serialized numeric state is invalid.'
+    );
+  }
   if (!state.surfaces || typeof state.surfaces !== 'object' || Array.isArray(state.surfaces)) {
     addIssue(issues, 'invalid-state', 'surfaces', 'ViewerState v2 surfaces must be an object.');
     return issues;

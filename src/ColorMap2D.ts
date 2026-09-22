@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { debugLog } from './debug';
+import { finiteNumber, finitePair, opacity } from './utils/validation';
 
 /**
  * 2D Colormap for visualizing relationships between two scalar fields.
@@ -55,13 +56,20 @@ export class ColorMap2D {
     textureSize: number,
     options: ColorMap2DOptions = {}
   ) {
+    finiteNumber(textureSize, 'textureSize', { minimum: 2, maximum: 4096, integer: true });
+    const expectedLength = textureSize * textureSize * 4;
+    if (textureData.length !== expectedLength) {
+      throw new RangeError(
+        `textureData length must be ${expectedLength} for textureSize ${textureSize}.`
+      );
+    }
     this.textureData = textureData;
     this.textureSize = textureSize;
-    this.rangeX = options.rangeX || [0, 1];
-    this.rangeY = options.rangeY || [0, 1];
-    this.thresholdX = options.thresholdX || [0, 0];
-    this.thresholdY = options.thresholdY || [0, 0];
-    this.alpha = options.alpha ?? 1.0;
+    this.rangeX = finitePair(options.rangeX ?? [0, 1], 'rangeX');
+    this.rangeY = finitePair(options.rangeY ?? [0, 1], 'rangeY');
+    this.thresholdX = finitePair(options.thresholdX ?? [0, 0], 'thresholdX');
+    this.thresholdY = finitePair(options.thresholdY ?? [0, 0], 'thresholdY');
+    this.alpha = opacity(options.alpha ?? 1, 'alpha');
   }
 
   /**
@@ -88,11 +96,12 @@ export class ColorMap2D {
     const y = Math.floor(normY * (this.textureSize - 1));
     const idx = (y * this.textureSize + x) * 4;
 
+    // Texture construction allocates exactly four channels for every sampled texel.
     return [
-      this.textureData[idx],
-      this.textureData[idx + 1],
-      this.textureData[idx + 2],
-      this.textureData[idx + 3] * this.alpha
+      this.textureData[idx]!,
+      this.textureData[idx + 1]!,
+      this.textureData[idx + 2]!,
+      this.textureData[idx + 3]! * this.alpha
     ];
   }
 
@@ -139,23 +148,23 @@ export class ColorMap2D {
 
   // Setters for ranges and thresholds
   setRangeX(range: [number, number]): void {
-    this.rangeX = range;
+    this.rangeX = finitePair(range, 'rangeX');
   }
 
   setRangeY(range: [number, number]): void {
-    this.rangeY = range;
+    this.rangeY = finitePair(range, 'rangeY');
   }
 
   setThresholdX(threshold: [number, number]): void {
-    this.thresholdX = threshold;
+    this.thresholdX = finitePair(threshold, 'thresholdX');
   }
 
   setThresholdY(threshold: [number, number]): void {
-    this.thresholdY = threshold;
+    this.thresholdY = finitePair(threshold, 'thresholdY');
   }
 
   setAlpha(alpha: number): void {
-    this.alpha = Math.max(0, Math.min(1, alpha));
+    this.alpha = opacity(alpha, 'alpha');
   }
 
   // Getters
@@ -266,7 +275,7 @@ export class ColorMap2D {
       }
     }
 
-    debugLog(`ColorMap2D: Generated ${preset} texture (${size}x${size})`);
+    debugLog('ColorMap2D: Generated', preset, 'texture', size, 'x', size);
     return data;
   }
 

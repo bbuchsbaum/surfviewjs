@@ -1,4 +1,11 @@
-import { DataLayer, DataLayerConfig, DataLayerUpdateData } from '../layers';
+import {
+  assertLayerUpdateFields,
+  DataLayer,
+  DataLayerConfig,
+  DataLayerUpdateData,
+  LayerUpdateData
+} from '../layers';
+import type ColorMap from '../ColorMap';
 import type { Color } from '../ColorMap';
 import type { ParcelData, ParcelRecord } from '../parcellation';
 import { ParcelIndex } from '../parcellation';
@@ -7,10 +14,13 @@ export interface ParcelValueLayerConfig extends DataLayerConfig {
   valueColumn?: string;
 }
 
-export interface ParcelValueLayerUpdateData extends DataLayerUpdateData {
+export interface ParcelValueLayerUpdateData extends LayerUpdateData {
   parcelData?: ParcelData;
   vertexLabels?: Uint32Array | Int32Array | number[];
   valueColumn?: string;
+  colorMap?: ColorMap | string | Color[];
+  range?: [number, number];
+  threshold?: [number, number];
 }
 
 /**
@@ -80,6 +90,9 @@ export class ParcelValueLayer extends DataLayer {
   }
 
   update(updates: ParcelValueLayerUpdateData): void {
+    assertLayerUpdateFields(updates, 'ParcelValueLayer', [
+      'colorMap', 'range', 'threshold', 'parcelData', 'vertexLabels', 'valueColumn'
+    ]);
     let needsDataRefresh = false;
 
     if (updates.parcelData !== undefined) {
@@ -104,14 +117,13 @@ export class ParcelValueLayer extends DataLayer {
       this.refreshVertexData();
     }
 
-    const dataUpdates: DataLayerUpdateData = {
-      colorMap: updates.colorMap,
-      range: updates.range,
-      threshold: updates.threshold,
-      opacity: updates.opacity,
-      visible: updates.visible,
-      blendMode: updates.blendMode
-    };
+    const dataUpdates: DataLayerUpdateData = {};
+    if (updates.colorMap !== undefined) dataUpdates.colorMap = updates.colorMap;
+    if (updates.range !== undefined) dataUpdates.range = updates.range;
+    if (updates.threshold !== undefined) dataUpdates.threshold = updates.threshold;
+    if (updates.opacity !== undefined) dataUpdates.opacity = updates.opacity;
+    if (updates.visible !== undefined) dataUpdates.visible = updates.visible;
+    if (updates.blendMode !== undefined) dataUpdates.blendMode = updates.blendMode;
 
     super.update(dataUpdates);
   }

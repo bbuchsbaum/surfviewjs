@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { buildVertexAdjacency } from './meshAdjacency';
+import { finiteNumber } from './validation';
 
 /**
  * Laplacian smoothing utility for mesh geometry
@@ -30,31 +32,15 @@ export class LaplacianSmoothing {
   private static buildAdjacencyList(
     vertices: Float32Array,
     faces: Uint32Array
-  ): Map<number, Set<number>> {
-    const adjacency = new Map<number, Set<number>>();
+  ): Set<number>[] {
+    if (vertices.length === 0 || vertices.length % 3 !== 0) {
+      throw new RangeError('vertices length must be a non-zero multiple of 3');
+    }
     const numVertices = vertices.length / 3;
-    
-    // Initialize adjacency list
-    for (let i = 0; i < numVertices; i++) {
-      adjacency.set(i, new Set<number>());
+    for (let index = 0; index < vertices.length; index++) {
+      finiteNumber(vertices[index], `vertices[${index}]`);
     }
-    
-    // Build adjacency from faces
-    for (let i = 0; i < faces.length; i += 3) {
-      const v0 = faces[i];
-      const v1 = faces[i + 1];
-      const v2 = faces[i + 2];
-      
-      // Add bidirectional edges
-      adjacency.get(v0)?.add(v1);
-      adjacency.get(v0)?.add(v2);
-      adjacency.get(v1)?.add(v0);
-      adjacency.get(v1)?.add(v2);
-      adjacency.get(v2)?.add(v0);
-      adjacency.get(v2)?.add(v1);
-    }
-    
-    return adjacency;
+    return buildVertexAdjacency(faces, numVertices).neighbors;
   }
   
   /**
@@ -90,11 +76,8 @@ export class LaplacianSmoothing {
     lambda: number = 0.5,
     boundarySmoothing: boolean = false
   ): Float32Array {
-    if (lambda < -1 || lambda > 1) {
-      throw new Error('Lambda must be between -1 and 1');
-    }
-    
-    console.log(`Laplacian smoothing: ${iterations} iterations, lambda=${lambda}, boundarySmoothing=${boundarySmoothing}`);
+    finiteNumber(iterations, 'iterations', { minimum: 0, integer: true });
+    finiteNumber(lambda, 'lambda', { minimum: -1, maximum: 1 });
     
     const numVertices = vertices.length / 3;
     const adjacency = this.buildAdjacencyList(vertices, faces);
@@ -106,12 +89,13 @@ export class LaplacianSmoothing {
       const edgeCount = new Map<string, number>();
       
       for (let i = 0; i < faces.length; i += 3) {
-        const v0 = faces[i];
-        const v1 = faces[i + 1];
-        const v2 = faces[i + 2];
+        // The adjacency builder above validated the complete triangular layout.
+        const v0 = faces[i]!;
+        const v1 = faces[i + 1]!;
+        const v2 = faces[i + 2]!;
         
         // Count each edge
-        const edges = [
+        const edges: readonly (readonly [number, number])[] = [
           [Math.min(v0, v1), Math.max(v0, v1)],
           [Math.min(v1, v2), Math.max(v1, v2)],
           [Math.min(v2, v0), Math.max(v2, v0)]
@@ -127,8 +111,8 @@ export class LaplacianSmoothing {
       edgeCount.forEach((count, key) => {
         if (count === 1) {
           const [a, b] = key.split('-').map(Number);
-          boundaryVertices.add(a);
-          boundaryVertices.add(b);
+          if (a !== undefined) boundaryVertices.add(a);
+          if (b !== undefined) boundaryVertices.add(b);
         }
       });
     }
@@ -145,17 +129,18 @@ export class LaplacianSmoothing {
           continue;
         }
         
-        const neighbors = adjacency.get(i);
-        if (!neighbors || neighbors.size === 0) {
+        const neighbors = adjacency[i]!;
+        if (neighbors.size === 0) {
           continue;
         }
         
         // Calculate average position of neighbors
         let avgX = 0, avgY = 0, avgZ = 0;
         neighbors.forEach(j => {
-          avgX += vertices[j * 3];
-          avgY += vertices[j * 3 + 1];
-          avgZ += vertices[j * 3 + 2];
+          // Adjacency construction proved every neighbor index is in range.
+          avgX += vertices[j * 3]!;
+          avgY += vertices[j * 3 + 1]!;
+          avgZ += vertices[j * 3 + 2]!;
         });
         
         const count = neighbors.size;
@@ -165,9 +150,12 @@ export class LaplacianSmoothing {
         
         // Apply Laplacian smoothing
         const idx = i * 3;
-        newVertices[idx] = vertices[idx] + lambda * (avgX - vertices[idx]);
-        newVertices[idx + 1] = vertices[idx + 1] + lambda * (avgY - vertices[idx + 1]);
-        newVertices[idx + 2] = vertices[idx + 2] + lambda * (avgZ - vertices[idx + 2]);
+        const x = vertices[idx]!;
+        const y = vertices[idx + 1]!;
+        const z = vertices[idx + 2]!;
+        newVertices[idx] = x + lambda * (avgX - x);
+        newVertices[idx + 1] = y + lambda * (avgY - y);
+        newVertices[idx + 2] = z + lambda * (avgZ - z);
       }
       
       // Copy new positions back
@@ -210,7 +198,9 @@ export class LaplacianSmoothing {
     mu: number = -0.53,
     boundarySmoothing: boolean = false
   ): Float32Array {
-    console.log(`Taubin smoothing: ${iterations} iterations, lambda=${lambda}, mu=${mu}`);
+    finiteNumber(iterations, 'iterations', { minimum: 0, integer: true });
+    finiteNumber(lambda, 'lambda', { minimum: -1, maximum: 1 });
+    finiteNumber(mu, 'mu', { minimum: -1, maximum: 0, maximumExclusive: true });
     
     for (let i = 0; i < iterations; i++) {
       // Apply positive lambda (shrinking)

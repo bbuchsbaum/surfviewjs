@@ -23,6 +23,10 @@ export default defineConfig({
   build: {
     outDir: resolve(__dirname, 'demo-dist'),
     emptyOutDir: true,
+    // The scenario gallery deliberately ships the complete viewer and every
+    // eager demo scenario in one entry. Package entries have independent,
+    // stricter compressed budgets; warn only if this gallery exceeds 1.3 MB.
+    chunkSizeWarningLimit: 1300,
     rollupOptions: {
       input: { gallery: resolve(demoRoot, 'index.html'), puzzle: resolve(demoRoot, 'puzzle.html'), mapLab: resolve(demoRoot, 'map-lab.html') }
     }

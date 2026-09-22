@@ -1,20 +1,23 @@
 import { defineConfig } from 'vite';
-import { resolve } from 'path';
-import { copyFileSync, existsSync, readFileSync } from 'fs';
+import { resolve } from 'node:path';
+import { copyFileSync, existsSync, readFileSync } from 'node:fs';
 
 function legacyBundleAliases() {
   return {
     name: 'legacy-bundle-aliases',
     closeBundle() {
       for (const [source, target] of [
+        // The .cjs copy is the actual Node/CommonJS entry. The .js UMD file
+        // remains available for 2.x browser-script compatibility.
+        ['surfview.umd.js', 'surfview.umd.cjs'],
         ['surfview.es.js', 'neurosurface.es.js'],
         ['surfview.es.js.map', 'neurosurface.es.js.map'],
         ['surfview.umd.js', 'neurosurface.umd.js'],
         ['surfview.umd.js.map', 'neurosurface.umd.js.map']
       ]) {
-        const sourcePath = resolve(__dirname, 'dist', source);
+        const sourcePath = resolve(import.meta.dirname, 'dist', source);
         if (existsSync(sourcePath)) {
-          copyFileSync(sourcePath, resolve(__dirname, 'dist', target));
+          copyFileSync(sourcePath, resolve(import.meta.dirname, 'dist', target));
         }
       }
     }
@@ -26,7 +29,7 @@ function serveBuiltEmbedWithoutTransforms() {
     name: 'serve-built-embed-without-transforms',
     configureServer(server) {
       server.middlewares.use('/dist/surfview.embed.iife.js', (_request, response) => {
-        const embedPath = resolve(__dirname, 'dist', 'surfview.embed.iife.js');
+        const embedPath = resolve(import.meta.dirname, 'dist', 'surfview.embed.iife.js');
         if (!existsSync(embedPath)) {
           response.statusCode = 404;
           response.end('Run npm run build before the embed browser test.');
@@ -42,14 +45,14 @@ function serveBuiltEmbedWithoutTransforms() {
 export default defineConfig({
   resolve: {
     alias: {
-      '@src': resolve(__dirname, 'src')
+      '@src': resolve(import.meta.dirname, 'src')
     },
     extensions: ['.ts', '.tsx', '.js', '.jsx']
   },
   plugins: [serveBuiltEmbedWithoutTransforms(), legacyBundleAliases()],
   build: {
     lib: {
-      entry: resolve(__dirname, 'src/index.ts'),
+      entry: resolve(import.meta.dirname, 'src/index.ts'),
       name: 'surfview',
       fileName: (format) => `surfview.${format}.js`,
       formats: ['es', 'umd']
@@ -80,7 +83,8 @@ export default defineConfig({
       'react',
       'react-dom',
       'react-dom/client',
-      'react/jsx-runtime'
+      'react/jsx-runtime',
+      'react/jsx-dev-runtime'
     ]
   }
 });

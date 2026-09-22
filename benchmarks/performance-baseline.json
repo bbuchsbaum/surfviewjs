@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "description": "Cross-machine CI ceilings for deterministic cortical workloads. Local reports include medians and MAD; ceilings include broad runner variance and should only ratchet downward with hosted evidence.",
+  "noise": {
+    "warmup": 1,
+    "samples": 5,
+    "browserSamples": 3,
+    "statistic": "median",
+    "dispersion": "median absolute deviation"
+  },
+  "budgets": {
+    "cpuCompositeMsPerMillionVertexLayers": 60,
+    "gpuInitialPreparationMsPerMillionVertexLayers": 30,
+    "gpuDirtyLayerMsPerMillionVertices": 20,
+    "cpuRaycastMsPerMillionTriangles": 250,
+    "coreBundleBrotliBytes": 180000,
+    "browserFullUploadAndDrawMs": 150,
+    "browserDirtyLayerAndDrawMs": 50,
+    "browserReorderAndDrawMs": 150,
+    "browserVisibilityAndDrawMs": 50,
+    "browserResizeAndDrawMs": 150,
+    "browserGPUPickMs": 50
+  },
+  "reference": {
+    "capturedAt": "2026-08-28",
+    "node": {
+      "runtime": "Node 26.7.0, darwin arm64",
+      "maxCpuCompositeMsPerMillionVertexLayers": 11.12,
+      "maxGpuInitialPreparationMsPerMillionVertexLayers": 3.67,
+      "maxGpuDirtyLayerMsPerMillionVertices": 0.56,
+      "maxCpuRaycastMsPerMillionTriangles": 43.0,
+      "coreBundleBrotliBytes": 118506
+    },
+    "browser": {
+      "runtime": "Playwright-managed Chromium headless WebGL2, darwin arm64, full 7-worker suite",
+      "maxMedianFullUploadAndDrawMs": 15.6,
+      "maxMedianDirtyLayerAndDrawMs": 0.8,
+      "maxMedianReorderAndDrawMs": 4.6,
+      "maxMedianVisibilityAndDrawMs": 0.7,
+      "maxMedianResizeAndDrawMs": 28.6,
+      "maxMedianGpuPickMs": 6.9
+    }
+  }
+}

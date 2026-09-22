@@ -37,6 +37,36 @@ test('GPU compositing toggle updates mode and layer counts', async ({ page }) =>
   await expect(perf).toContainText(/Layers: 1/);
 });
 
+test('GPU compositing scenario animates typed data layers and stops cleanly', async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
+
+  await page.goto('/demo/index.html?scenario=gpu-compositing');
+  await expect(page.locator('canvas')).toBeVisible({ timeout: 15_000 });
+  const perf = page.locator('#perf-text');
+  await expect(perf).toContainText(/CPU \| 4 layers \| 0 FPS/);
+
+  const animation = page.locator('#toggle-animation');
+  await animation.click();
+  await expect(animation).toHaveText('Stop Animation');
+  await expect(page.locator('#status-text')).toContainText('Animation started');
+  await expect(perf).toContainText(/CPU \| 4 layers \| [1-9]\d* FPS/, { timeout: 5_000 });
+
+  await page.getByRole('button', { name: 'Switch to GPU' }).click();
+  await expect(perf).toContainText(/GPU \| 4 layers \| [1-9]\d* FPS/);
+
+  await animation.click();
+  await expect(animation).toHaveText('Start Animation');
+  await expect(page.locator('#status-text')).toContainText('Animation stopped');
+  const stopped = await perf.textContent();
+  await page.waitForTimeout(250);
+  await expect(perf).toHaveText(stopped ?? '');
+
+  await page.getByRole('button', { name: /Quick start/i }).click();
+  await expect(page.locator('#status-text')).toContainText('Running: Quick start');
+  expect(pageErrors).toEqual([]);
+});
+
 test('layer stack actions remain coherent', async ({ page }) => {
   await page.goto('/demo/index.html');
   await page.getByRole('button', { name: /Multi-layer \+ compositing/i }).click();

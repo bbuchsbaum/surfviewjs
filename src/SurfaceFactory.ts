@@ -74,7 +74,7 @@ export class SurfaceFactory {
           hemi: def.hemisphere || 'unknown',
           defaultVariant: def.defaultVariant,
           variants: def.variants,
-          curv: def.curv
+          ...(def.curv === undefined ? {} : { curv: def.curv })
         });
         return new VariantSurface(set, def.config);
       }

@@ -1,7 +1,17 @@
 import ColorMap, { Color } from '../ColorMap';
-import { Layer, LayerConfig, LayerUpdateData } from '../layers';
+import {
+  assertLayerUpdateFields,
+  Layer,
+  LayerConfig,
+  LayerUpdateData
+} from '../layers';
 import type { ParcelData } from '../parcellation';
 import { ParcelIndex } from '../parcellation';
+import {
+  finiteNumber,
+  finitePair,
+  opacity as validateOpacity
+} from '../utils/validation';
 
 export type ParcelConnectivityAlphaMode = 'constant' | 'magnitude';
 
@@ -35,7 +45,7 @@ export interface ParcelConnectivityLayerUpdate extends LayerUpdateData {
 
 function toFlatMatrix(matrix: Float32Array | number[][] | number[]): Float32Array {
   if (matrix instanceof Float32Array) {
-    return matrix;
+    return matrix.slice();
   }
 
   if (Array.isArray(matrix) && Array.isArray(matrix[0])) {
@@ -55,6 +65,22 @@ function toFlatMatrix(matrix: Float32Array | number[][] | number[]): Float32Arra
   return new Float32Array(matrix as number[]);
 }
 
+function validateAlphaRange(alphaRange: [number, number]): [number, number] {
+  const pair = finitePair(alphaRange, 'alphaRange');
+  validateOpacity(pair[0], 'alphaRange[0]');
+  validateOpacity(pair[1], 'alphaRange[1]');
+  return pair;
+}
+
+function validateAlphaMode(alphaMode: ParcelConnectivityAlphaMode): ParcelConnectivityAlphaMode {
+  if (alphaMode !== 'constant' && alphaMode !== 'magnitude') {
+    throw new TypeError(
+      `alphaMode must be "constant" or "magnitude"; received ${String(alphaMode)}.`
+    );
+  }
+  return alphaMode;
+}
+
 function inferMatrixSize(flatMatrix: Float32Array): number {
   const size = Math.round(Math.sqrt(flatMatrix.length));
   if (size * size !== flatMatrix.length) {
@@ -68,7 +94,7 @@ function inferRange(flatMatrix: Float32Array): [number, number] {
   let max = -Infinity;
 
   for (let i = 0; i < flatMatrix.length; i++) {
-    const value = flatMatrix[i];
+    const value = flatMatrix[i]!;
     if (!Number.isFinite(value)) {
       continue;
     }
@@ -128,11 +154,15 @@ export class ParcelConnectivityLayer extends Layer {
     this.matrixSize = inferMatrixSize(this.matrix);
     this.parcelIds = this.resolveParcelIds(config.parcelIds);
     this.parcelIdToRow = this.buildParcelIdToRow(this.parcelIds);
-    this.seedParcelId = config.seedParcelId ?? null;
-    this.range = config.range ?? inferRange(this.matrix);
-    this.threshold = config.threshold ?? null;
-    this.alphaMode = config.alphaMode ?? 'magnitude';
-    this.alphaRange = config.alphaRange ?? [0, 1];
+    this.seedParcelId = null;
+    this.range = config.range === undefined
+      ? inferRange(this.matrix)
+      : finitePair(config.range, 'range');
+    this.threshold = config.threshold === undefined || config.threshold === null
+      ? null
+      : finiteNumber(config.threshold, 'threshold');
+    this.alphaMode = validateAlphaMode(config.alphaMode ?? 'magnitude');
+    this.alphaRange = validateAlphaRange(config.alphaRange ?? [0, 1]);
     this.useAbsoluteThreshold = config.useAbsoluteThreshold ?? true;
     this.useAbsoluteAlpha = config.useAbsoluteAlpha ?? true;
     this.showSeedParcel = config.showSeedParcel ?? true;
@@ -141,6 +171,9 @@ export class ParcelConnectivityLayer extends Layer {
     this.colorMap = resolved.map;
     this.colorMapName = resolved.name;
     this.colorMap.setRange(this.range);
+    if (config.seedParcelId !== undefined) {
+      this.seedParcelId = this.validatedSeedParcel(config.seedParcelId);
+    }
   }
 
   getParcelData(): ParcelData {
@@ -172,15 +205,17 @@ export class ParcelConnectivityLayer extends Layer {
   }
 
   setSeedParcel(parcelId: number | null): void {
-    if (parcelId !== null && !this.parcelIdToRow.has(parcelId)) {
-      throw new Error(`Unknown parcel id '${parcelId}' for connectivity matrix`);
-    }
-    this.seedParcelId = parcelId;
+    this.seedParcelId = this.validatedSeedParcel(parcelId);
     this._notifyChange();
   }
 
   setSeedFromVertex(vertexIndex: number): void {
-    this.setSeedParcel(this.parcelIndex.getParcelIdForVertex(vertexIndex));
+    const nextIndex = finiteNumber(vertexIndex, 'vertexIndex', {
+      minimum: 0,
+      maximum: this.getVertexLabels().length - 1,
+      integer: true
+    });
+    this.setSeedParcel(this.parcelIndex.getParcelIdForVertex(nextIndex));
   }
 
   getConnectivityValue(parcelId: number, seedParcelId: number | null = this.seedParcelId): number | null {
@@ -194,18 +229,23 @@ export class ParcelConnectivityLayer extends Layer {
       return null;
     }
 
-    const value = this.matrix[row * this.matrixSize + col];
+    const value = this.matrix[row * this.matrixSize + col]!;
     return Number.isFinite(value) ? value : null;
   }
 
   setMatrix(matrix: Float32Array | number[][] | number[], parcelIds?: ArrayLike<number>): void {
-    this.matrix = toFlatMatrix(matrix);
-    this.matrixSize = inferMatrixSize(this.matrix);
-    this.parcelIds = this.resolveParcelIds(parcelIds);
-    this.parcelIdToRow = this.buildParcelIdToRow(this.parcelIds);
-    this.range = inferRange(this.matrix);
-    this.colorMap.setRange(this.range);
-    if (this.seedParcelId !== null && !this.parcelIdToRow.has(this.seedParcelId)) {
+    const nextMatrix = toFlatMatrix(matrix);
+    const nextMatrixSize = inferMatrixSize(nextMatrix);
+    const nextParcelIds = this.resolveParcelIds(parcelIds, nextMatrixSize);
+    const nextParcelIdToRow = this.buildParcelIdToRow(nextParcelIds);
+    const nextRange = inferRange(nextMatrix);
+    this.matrix = nextMatrix;
+    this.matrixSize = nextMatrixSize;
+    this.parcelIds = nextParcelIds;
+    this.parcelIdToRow = nextParcelIdToRow;
+    this.range = nextRange;
+    this.colorMap.setRange(nextRange);
+    if (this.seedParcelId !== null && !nextParcelIdToRow.has(this.seedParcelId)) {
       this.seedParcelId = null;
     }
     this._notifyChange();
@@ -237,23 +277,24 @@ export class ParcelConnectivityLayer extends Layer {
   }
 
   setRange(range: [number, number]): void {
-    this.range = range;
-    this.colorMap.setRange(range);
+    const nextRange = finitePair(range, 'range');
+    this.range = nextRange;
+    this.colorMap.setRange(nextRange);
     this._notifyChange();
   }
 
   setThreshold(threshold: number | null): void {
-    this.threshold = threshold;
+    this.threshold = threshold === null ? null : finiteNumber(threshold, 'threshold');
     this._notifyChange();
   }
 
   setAlphaMode(alphaMode: ParcelConnectivityAlphaMode): void {
-    this.alphaMode = alphaMode;
+    this.alphaMode = validateAlphaMode(alphaMode);
     this._notifyChange();
   }
 
   setAlphaRange(alphaRange: [number, number]): void {
-    this.alphaRange = alphaRange;
+    this.alphaRange = validateAlphaRange(alphaRange);
     this._notifyChange();
   }
 
@@ -306,11 +347,41 @@ export class ParcelConnectivityLayer extends Layer {
   }
 
   update(updates: ParcelConnectivityLayerUpdate): void {
+    assertLayerUpdateFields(updates, 'ParcelConnectivityLayer', [
+      'matrix', 'parcelData', 'vertexLabels', 'parcelIds', 'seedParcelId',
+      'colorMap', 'range', 'threshold', 'alphaMode', 'alphaRange',
+      'useAbsoluteThreshold', 'useAbsoluteAlpha', 'showSeedParcel'
+    ]);
+    if (updates.range !== undefined) finitePair(updates.range, 'range');
+    if (updates.threshold !== undefined && updates.threshold !== null) {
+      finiteNumber(updates.threshold, 'threshold');
+    }
+    if (updates.alphaRange !== undefined) validateAlphaRange(updates.alphaRange);
+    if (updates.alphaMode !== undefined) validateAlphaMode(updates.alphaMode);
+    if (updates.opacity !== undefined) validateOpacity(updates.opacity);
+    if (updates.colorMap !== undefined) this.resolveColorMap(updates.colorMap);
+
+    let candidateParcelIdToRow = this.parcelIdToRow;
+    if (updates.matrix !== undefined) {
+      const candidateMatrix = toFlatMatrix(updates.matrix);
+      const candidateSize = inferMatrixSize(candidateMatrix);
+      const candidateIds = this.resolveParcelIds(updates.parcelIds, candidateSize);
+      candidateParcelIdToRow = this.buildParcelIdToRow(candidateIds);
+    } else if (updates.parcelIds !== undefined) {
+      const candidateIds = this.resolveParcelIds(updates.parcelIds);
+      candidateParcelIdToRow = this.buildParcelIdToRow(candidateIds);
+    }
+    if (updates.seedParcelId !== undefined) {
+      this.validatedSeedParcel(updates.seedParcelId, candidateParcelIdToRow);
+    }
+
     if (updates.matrix !== undefined) {
       this.setMatrix(updates.matrix, updates.parcelIds);
     } else if (updates.parcelIds !== undefined) {
-      this.parcelIds = this.resolveParcelIds(updates.parcelIds);
-      this.parcelIdToRow = this.buildParcelIdToRow(this.parcelIds);
+      const nextParcelIds = this.resolveParcelIds(updates.parcelIds);
+      const nextParcelIdToRow = this.buildParcelIdToRow(nextParcelIds);
+      this.parcelIds = nextParcelIds;
+      this.parcelIdToRow = nextParcelIdToRow;
       this._notifyChange();
     }
     if (updates.parcelData !== undefined) {
@@ -374,24 +445,47 @@ export class ParcelConnectivityLayer extends Layer {
     };
   }
 
-  private resolveParcelIds(parcelIds?: ArrayLike<number>): Uint32Array {
+  private resolveParcelIds(
+    parcelIds?: ArrayLike<number>,
+    matrixSize: number = this.matrixSize
+  ): Uint32Array {
     const ids = parcelIds
       ? Array.from(parcelIds)
       : this.getParcelData().parcels.map(parcel => parcel.id);
 
-    if (ids.length !== this.matrixSize) {
+    if (ids.length !== matrixSize) {
       throw new Error(
-        `Parcel connectivity matrix size ${this.matrixSize} does not match parcelIds length ${ids.length}`
+        `Parcel connectivity matrix size ${matrixSize} does not match parcelIds length ${ids.length}`
       );
     }
 
-    return new Uint32Array(ids);
+    return new Uint32Array(ids.map((id, index) => finiteNumber(id, `parcelIds[${index}]`, {
+      minimum: 0,
+      maximum: 0xffffffff,
+      integer: true
+    })));
+  }
+
+  private validatedSeedParcel(
+    parcelId: number | null,
+    parcelIdToRow: Map<number, number> = this.parcelIdToRow
+  ): number | null {
+    if (parcelId === null) return null;
+    const normalized = finiteNumber(parcelId, 'seedParcelId', {
+      minimum: 0,
+      maximum: 0xffffffff,
+      integer: true
+    });
+    if (!parcelIdToRow.has(normalized)) {
+      throw new Error(`Unknown parcel id '${normalized}' for connectivity matrix`);
+    }
+    return normalized;
   }
 
   private buildParcelIdToRow(parcelIds: Uint32Array): Map<number, number> {
     const lookup = new Map<number, number>();
     for (let i = 0; i < parcelIds.length; i++) {
-      const parcelId = parcelIds[i];
+      const parcelId = parcelIds[i]!;
       if (lookup.has(parcelId)) {
         throw new Error(`Duplicate parcel id '${parcelId}' in connectivity matrix`);
       }

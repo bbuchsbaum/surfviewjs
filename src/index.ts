@@ -31,7 +31,14 @@ export type {
 } from './atlas/types';
 import { NeuroSurfaceViewer } from './NeuroSurfaceViewer';
 import { SurfaceControls } from './SurfaceControls';
-import { SurfaceGeometry, NeuroSurface, ColorMappedNeuroSurface, VertexColoredNeuroSurface } from './classes';
+import {
+  SurfaceGeometry,
+  SurfaceGeometryError,
+  validateSurfaceGeometryData,
+  NeuroSurface,
+  ColorMappedNeuroSurface,
+  VertexColoredNeuroSurface
+} from './classes';
 import { MultiLayerNeuroSurface } from './MultiLayerNeuroSurface';
 import { VariantSurface } from './VariantSurface';
 import { MorphableSurface, Easing } from './MorphableSurface';
@@ -47,7 +54,7 @@ import { computeMeanCurvature, normalizeCurvature, curvatureToGrayscale } from '
 import { ClipPlane, ClipPlaneSet } from './utils/ClipPlane';
 import { debugLog, setDebug } from './debug';
 import ColorMap from './ColorMap';
-import { EventEmitter } from './EventEmitter';
+import { DynamicEventEmitter, EventEmitter } from './EventEmitter';
 import { LaplacianSmoothing } from './utils/LaplacianSmoothing';
 import { BoundingBoxHelper } from './utils/BoundingBox';
 import { AnnotationManager } from './annotations';
@@ -60,6 +67,13 @@ import { StatisticalMapLayer } from './layers/StatisticalMapLayer';
 import { ParcelValueLayer } from './layers/ParcelValueLayer';
 import { ParcelConnectivityLayer } from './layers/ParcelConnectivityLayer';
 import { ConnectivityLayer } from './ConnectivityLayer';
+import {
+  builtInLayerRegistry,
+  createLayerFromConfig,
+  LayerConfigError,
+  LayerRegistry,
+  tryCreateLayerFromConfig
+} from './LayerRegistry';
 import { SubjectPackage, validateSubjectPackageManifest } from './SubjectPackage';
 import { PluginHost } from './PluginHost';
 import { FlatMapView } from './FlatMapView';
@@ -67,9 +81,18 @@ import { LinkedBrainWorkspace } from './LinkedBrainWorkspace';
 import { ROIManager } from './roi';
 import { AlignmentQAWorkspace } from './AlignmentQA';
 import { STYLE_PRESETS, getStylePreset, listStylePresets, resolveFigureExportOptions, resolveStylePreset } from './StylePresets';
-import { buildVertexAdjacency } from './utils/meshAdjacency';
+import { buildVertexAdjacency, MeshAdjacencyError } from './utils/meshAdjacency';
 import { computeFDRThreshold, computeBonferroniThreshold, findClusters, filterClustersBySize, pToZ, tToZ } from './utils/statistics';
 import { detectCapabilities } from './utils/capabilities';
+import {
+  compositeStraightRGBA,
+  compositeStraightRGBABuffer,
+  premultiplyStraightRGBA
+} from './utils/rgbaCompositing';
+import {
+  MAX_DEVICE_PIXEL_RATIO,
+  NumericValidationError
+} from './utils/validation';
 import {
   serialize,
   deserialize,
@@ -86,8 +109,6 @@ import {
   exportStaticHTML
 } from './serialization';
 
-// Register TemporalDataLayer with Layer factory to avoid circular dependency
-Layer.registerTemporalLayer(TemporalDataLayer);
 import { NoopNeuroSurfaceViewer, hasDOM } from './NoopNeuroSurfaceViewer';
 import { VolumeTexture3D } from './textures/VolumeTexture3D';
 import { VolumeProjectionMaterial } from './materials/VolumeProjectionMaterial';
@@ -120,6 +141,8 @@ export {
   NeuroSurfaceViewer,
   SurfaceControls,
   SurfaceGeometry,
+  SurfaceGeometryError,
+  validateSurfaceGeometryData,
   NeuroSurface,
   ColorMappedNeuroSurface,
   VertexColoredNeuroSurface,
@@ -148,6 +171,7 @@ export {
   ClipPlaneSet,
   ColorMap,
   EventEmitter,
+  DynamicEventEmitter,
   LaplacianSmoothing,
   THREE,
   debugLog,
@@ -155,6 +179,11 @@ export {
   BoundingBoxHelper,
   AnnotationManager,
   detectCapabilities,
+  compositeStraightRGBA,
+  compositeStraightRGBABuffer,
+  premultiplyStraightRGBA,
+  MAX_DEVICE_PIXEL_RATIO,
+  NumericValidationError,
   embedStyles,
   applyEmbedStyles,
   computePickInfo,
@@ -182,6 +211,11 @@ export {
   ParcelValueLayer,
   ParcelConnectivityLayer,
   ConnectivityLayer,
+  LayerRegistry,
+  LayerConfigError,
+  builtInLayerRegistry,
+  createLayerFromConfig,
+  tryCreateLayerFromConfig,
   SubjectPackage,
   validateSubjectPackageManifest,
   PluginHost,
@@ -195,6 +229,7 @@ export {
   resolveFigureExportOptions,
   resolveStylePreset,
   buildVertexAdjacency,
+  MeshAdjacencyError,
   computeFDRThreshold,
   computeBonferroniThreshold,
   findClusters,
@@ -224,6 +259,55 @@ export {
   createReportSceneControlTarget
 };
 
+export type {
+  RegisteredLayerConfig,
+  BuiltInLayerConfigBase,
+  BaseLayerFactoryConfig,
+  RGBALayerFactoryConfig,
+  DataLayerFactoryConfig,
+  OutlineLayerFactoryConfig,
+  LabelLayerFactoryConfig,
+  TwoDataLayerFactoryConfig,
+  TemporalLayerFactoryConfig,
+  VolumeLayerFactoryConfig,
+  CurvatureLayerFactoryConfig,
+  StatisticalLayerFactoryConfig,
+  ConnectivityLayerFactoryConfig,
+  BuiltInLayerConfigMap,
+  BuiltInLayerMap,
+  BuiltInLayerType,
+  BuiltInLayerRegistryEntries,
+  BuiltInLayerConfig,
+  BuiltInLayer,
+  BuiltInLayerFor,
+  LayerCreationFailureCode,
+  LayerCreationResult,
+  LayerRegistryEntry,
+  LayerFactory,
+  ReadonlyLayerRegistry,
+  RegistryType,
+  RegistryConfigUnion,
+  RegistryLayer,
+  RegistryLayerUnion,
+  RegistryLayerForConfig
+} from './LayerRegistry';
+
+export type { Color, ColorArray, ColorMapOptions, RGB, RGBA } from './ColorMap';
+export type {
+  ColorMap2DPreset,
+  ColorMap2DOptions,
+  RGBA as ColorMap2DRGBA
+} from './ColorMap2D';
+
+export type {
+  ColorMapEventMap
+} from './ColorMap';
+
+export type {
+  NumericValidationErrorCode,
+  FiniteNumberDomain
+} from './utils/validation';
+
 // Export temporal types for TypeScript consumers
 export type {
   TemporalDataConfig,
@@ -238,10 +322,17 @@ export type {
 // Export statistical map types for TypeScript consumers
 export type {
   StatisticalMapLayerConfig,
+  StatisticalMapLayerUpdateData,
   DualThresholdConfig,
   VertexStatInfo,
-  StatType
+  StatType,
+  CorrectionMethod
 } from './layers/StatisticalMapLayer';
+
+export type {
+  ParcelValueLayerConfig,
+  ParcelValueLayerUpdateData
+} from './layers/ParcelValueLayer';
 
 export type {
   ParcelConnectivityLayerConfig,
@@ -250,6 +341,17 @@ export type {
 } from './layers/ParcelConnectivityLayer';
 
 export type {
+  BlendMode,
+  LayerConfig,
+  DataLayerConfig,
+  TwoDataLayerConfig,
+  LayerUpdateData,
+  RGBALayerUpdateData,
+  DataLayerUpdateData,
+  TwoDataLayerUpdateData,
+  BaseLayerUpdateData,
+  LabelLayerOptions,
+  LabelLayerUpdateData,
   LayerChangeSet,
   LayerRole,
   LayerPinnedPosition,
@@ -270,6 +372,39 @@ export type {
   VolumeProjectionLayerConfig,
   VolumeProjectionLayerUpdateData
 } from './layers';
+
+export type {
+  MultiLayerSurfaceConfig,
+  LayerUpdate,
+  ClearLayersOptions
+} from './MultiLayerNeuroSurface';
+
+export type {
+  EasingFunction,
+  MorphTargetConfig,
+  MorphAnimationOptions,
+  MorphableSurfaceConfig
+} from './MorphableSurface';
+
+export type { LabelDefinition } from './LabeledNeuroSurface';
+export type { SurfaceDefinition, SurfaceType } from './SurfaceFactory';
+export type { SurfaceSetConfig } from './SurfaceSet';
+export type { VariantTransitionOptions } from './VariantSurface';
+export type { SurfaceControlsConfig } from './SurfaceControls';
+export type { OutlineLayerOptions, OutlineLayerUpdate } from './OutlineLayer';
+export type { AnnotationOptions, AnnotationRecord } from './annotations';
+export type { CrosshairMode, CrosshairOptions } from './CrosshairManager';
+export type { PickInfo } from './utils/Picking';
+export type { GPUPickResult } from './utils/GPUPicker';
+export type { ClipAxis, ClipPlaneConfig } from './utils/ClipPlane';
+export type { ViewerCapabilities } from './utils/capabilities';
+export type {
+  VolumeProjectionMaterialConfig,
+  VolumeProjectionMaterialOptions
+} from './materials/VolumeProjectionMaterial';
+export type { VolumeProjectedSurfaceOptions } from './surfaces/VolumeProjectedSurface';
+export type { VolumeTexture3DOptions } from './textures/VolumeTexture3D';
+export type { CurvatureConfig, CurvatureLayerUpdateData } from './layers/CurvatureLayer';
 
 export {
   ANATOMICAL_VIEWS,
@@ -339,6 +474,10 @@ export {
 } from './roi';
 
 export type {
+  PackageAssetRef,
+  SubjectHemisphere,
+  ValidationSeverity,
+  SceneLayerSourceType,
   SubjectPackageManifest,
   SubjectPackageSoftware,
   SubjectPackageProvenance,
@@ -405,9 +544,17 @@ export type {
 
 export type {
   ControlDomain,
+  EventListener,
+  EventPayloadArgs,
+  EventArgsFor,
+  EventType,
+  TypedEventListener,
+  UnsubscribeFn,
   ViewerStateChangedEvent,
   LayerReorderedEvent,
   SurfaceLayerReorderedEvent,
+  SurfaceEventMap,
+  SurfaceEventType,
   ViewerEventMap,
   ViewerEventType,
   ViewerEventListener
@@ -444,6 +591,7 @@ export type {
   ControlCommandFailure,
   ControlCommandSuccess,
   ControlCommandResult,
+  ControlQueryResult,
   SetAnatomicalViewRequest,
   LayerControlAddress,
   ScalarMappingUpdate,
@@ -465,8 +613,12 @@ export type {
 
 export type {
   NeuroSurfaceViewerConfig,
+  ResolvedNeuroSurfaceViewerConfig,
   ParcelFocusOptions,
-  ViewerFigureBackground
+  ViewerFigureBackground,
+  Viewpoint,
+  ViewpointConfig,
+  ViewpointState
 } from './NeuroSurfaceViewer';
 
 export type {
@@ -523,11 +675,21 @@ export type {
   CSRData
 } from './ConnectivityLayer';
 
-// Export mesh adjacency types
-export type { MeshAdjacency } from './utils/meshAdjacency';
+// Export geometry and mesh adjacency types
+export type {
+  SurfaceConfig,
+  ResolvedSurfaceConfig,
+  SurfaceGeometryErrorCode
+} from './classes';
+export type { MeshAdjacency, MeshAdjacencyErrorCode } from './utils/meshAdjacency';
 
 // Export statistics result types
 export type { FDRResult, BonferroniResult, ClusterResult } from './utils/statistics';
+export type { StraightRGBA } from './utils/rgbaCompositing';
+export type {
+  GPUCompositorCapacity,
+  GPUCompositorUpdateStats
+} from './GPULayerCompositor';
 
 // Export serialization types
 export type {
@@ -543,6 +705,7 @@ export type {
   SurfaceState,
   SurfaceGroupState,
   CrosshairState as SerializedCrosshairState,
+  SerializedTimelineState,
   SelectionState,
   RestorationIssueCode,
   RestorationIssue,

@@ -6,39 +6,239 @@ on:
   pull_request:
     branches: ['*']
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build-test:
+  static-analysis:
+    name: Types and lint (Node 24)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Use Node.js 20
+      - name: Use Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Type check
+      - name: Enforce runtime and reviewed development audit policy
+        run: npm run audit:dependencies
+
+      - name: Type check implementation
         run: npm run type-check
+
+      - name: Type check demo scenarios
+        run: npm run type-check:demo
+
+      - name: Type check public contracts
+        run: npm run test:types
 
       - name: Lint
         run: npm run lint
 
+  packed-consumers:
+    name: Packed consumers (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [22, 24]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build publishable artifacts
+        run: npm run build
+
+      - name: Install and execute clean packed consumers
+        run: npm run test:package-consumers
+
+  documentation:
+    name: API reference, guide, and demo (Node 24)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build API reference and guide
+        run: npm run docs:build
+
+      - name: Build demo application
+        run: npm run demo:build
+
+      - name: Build React controls consumer fixture
+        run: npm run test:react-fixture:build
+
+  unit-coverage:
+    name: Unit tests and coverage (Node 24)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run risk-weighted coverage gates
+        run: npm run test:coverage
+
+      - name: Publish coverage evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-node-24
+          path: coverage/
+          if-no-files-found: error
+          retention-days: 14
+
+  build-size-performance:
+    name: Build, size, and deterministic performance (Node 24)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Build library
         run: npm run build
 
-      - name: Bundle size check
+      - name: Enforce bundle budgets
         run: npm run size
 
-      - name: Run tests
-        run: npm test
+      - name: Enforce deterministic performance budgets
+        run: npm run benchmark:check -- --output=benchmark-results.json
 
-      - name: Install Playwright browsers
+      - name: Publish build and benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-performance-node-24
+          path: |
+            dist/
+            benchmark-results.json
+          if-no-files-found: error
+          retention-days: 14
+
+  browser:
+    name: Chromium WebGL (Node 24)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install project-controlled Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Playwright smoke
+      - name: Build browser fixtures and embed runtime
+        run: npm run build
+
+      - name: Run browser and WebGL gates
         run: npm run test:playwright
+        env:
+          SURFVIEW_GOLDEN_SNAPSHOTS: '0'
+
+      - name: Publish browser failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-failure-node-24
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: error
+          retention-days: 14
+
+  visual-regression:
+    name: Controls visual regression (Node 24, macOS)
+    runs-on: macos-14
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install project-controlled Chromium
+        run: npx playwright install chromium
+
+      - name: Compare controls with reviewed macOS baselines
+        run: >-
+          npx start-server-and-test dev:ci
+          http://localhost:4173/tests/test-gifti.html
+          "playwright test tests/e2e/controls-panel.spec.ts"
+        env:
+          SURFVIEW_GOLDEN_SNAPSHOTS: '1'
+
+      - name: Publish visual failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: controls-visual-failure-node-24-macos
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: error
+          retention-days: 14

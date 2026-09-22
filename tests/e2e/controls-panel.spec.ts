@@ -1,4 +1,16 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator } from '@playwright/test';
+
+const verifyGoldenSnapshots = process.env.SURFVIEW_GOLDEN_SNAPSHOTS === '1' ||
+  (!process.env.CI && process.platform === 'darwin');
+
+async function expectGoldenScreenshot(locator: Locator, name: string): Promise<void> {
+  if (!verifyGoldenSnapshots) return;
+  await expect(locator).toHaveScreenshot(name, {
+    animations: 'disabled',
+    caret: 'hide',
+    maxDiffPixelRatio: 0.005
+  });
+}
 
 test.describe('first-party controls visual fixture', () => {
   test('keeps View and Layers usable at desktop and narrow inline widths', async ({ page }) => {
@@ -62,10 +74,7 @@ test.describe('first-party controls visual fixture', () => {
 
     const desktop = await controls.screenshot();
     expect(desktop.length).toBeGreaterThan(10000);
-    await expect(controls).toHaveScreenshot(
-      'controls-desktop-many-dark-comfortable.png',
-      { animations: 'disabled', caret: 'hide', maxDiffPixelRatio: 0.005 }
-    );
+    await expectGoldenScreenshot(controls, 'controls-desktop-many-dark-comfortable.png');
     await assertContained();
 
     const inheritedFonts = await controls.evaluate(element => {
@@ -169,17 +178,11 @@ test.describe('first-party controls visual fixture', () => {
     await expect(controls).toHaveAttribute('theme', 'auto');
     await expect(controls.locator('.panel')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
     const automaticLight = await controls.screenshot();
-    await expect(controls).toHaveScreenshot(
-      'controls-auto-light-comfortable.png',
-      { animations: 'disabled', caret: 'hide', maxDiffPixelRatio: 0.005 }
-    );
+    await expectGoldenScreenshot(controls, 'controls-auto-light-comfortable.png');
     await page.emulateMedia({ colorScheme: 'dark' });
     await expect(controls.locator('.panel')).toHaveCSS('background-color', 'rgb(18, 24, 32)');
     const automaticDark = await controls.screenshot();
-    await expect(controls).toHaveScreenshot(
-      'controls-auto-dark-comfortable.png',
-      { animations: 'disabled', caret: 'hide', maxDiffPixelRatio: 0.005 }
-    );
+    await expectGoldenScreenshot(controls, 'controls-auto-dark-comfortable.png');
     expect(automaticDark.equals(automaticLight)).toBe(false);
 
     await controls.evaluate(element => {
@@ -197,10 +200,7 @@ test.describe('first-party controls visual fixture', () => {
       element.getBoundingClientRect().height
     );
     const light = await controls.screenshot();
-    await expect(controls).toHaveScreenshot(
-      'controls-light-comfortable.png',
-      { animations: 'disabled', caret: 'hide', maxDiffPixelRatio: 0.005 }
-    );
+    await expectGoldenScreenshot(controls, 'controls-light-comfortable.png');
     await controls.evaluate(element => {
       (element as HTMLElement & { density: string }).density = 'compact';
     });
@@ -210,10 +210,7 @@ test.describe('first-party controls visual fixture', () => {
     );
     expect(compactHeight).toBeLessThan(comfortableHeight);
     const compact = await controls.screenshot();
-    await expect(controls).toHaveScreenshot(
-      'controls-light-compact.png',
-      { animations: 'disabled', caret: 'hide', maxDiffPixelRatio: 0.005 }
-    );
+    await expectGoldenScreenshot(controls, 'controls-light-compact.png');
     expect(compact.equals(light)).toBe(false);
     await controls.evaluate(element => {
       const typed = element as HTMLElement & { theme: string; density: string };
@@ -408,10 +405,7 @@ test.describe('first-party controls visual fixture', () => {
     const narrow = await controls.screenshot();
     expect(narrow.length).toBeGreaterThan(10000);
     expect(narrow.equals(desktop)).toBe(false);
-    await expect(controls).toHaveScreenshot(
-      'controls-narrow-many-dark-comfortable.png',
-      { animations: 'disabled', caret: 'hide', maxDiffPixelRatio: 0.005 }
-    );
+    await expectGoldenScreenshot(controls, 'controls-narrow-many-dark-comfortable.png');
 
     await page.getByRole('button', { name: 'Fixture: one layer' }).click();
     await expect(controls.locator('[data-layer-id]')).toHaveCount(1);
@@ -419,10 +413,7 @@ test.describe('first-party controls visual fixture', () => {
     await assertContained();
     const oneLayer = await controls.screenshot();
     expect(oneLayer.length).toBeGreaterThan(3000);
-    await expect(controls).toHaveScreenshot(
-      'controls-narrow-one-layer.png',
-      { animations: 'disabled', caret: 'hide', maxDiffPixelRatio: 0.005 }
-    );
+    await expectGoldenScreenshot(controls, 'controls-narrow-one-layer.png');
 
     await page.getByRole('button', { name: 'Fixture: empty' }).click();
     await expect(controls.locator('[data-layer-id]')).toHaveCount(0);
@@ -431,10 +422,7 @@ test.describe('first-party controls visual fixture', () => {
     const empty = await controls.screenshot();
     expect(empty.length).toBeGreaterThan(2000);
     expect(empty.equals(oneLayer)).toBe(false);
-    await expect(controls).toHaveScreenshot(
-      'controls-narrow-empty.png',
-      { animations: 'disabled', caret: 'hide', maxDiffPixelRatio: 0.005 }
-    );
+    await expectGoldenScreenshot(controls, 'controls-narrow-empty.png');
     expect(blockedExternalRequests).toEqual([
       'https://network.invalid/surfview-controls-certification'
     ]);

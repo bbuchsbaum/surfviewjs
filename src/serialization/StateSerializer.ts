@@ -9,7 +9,7 @@ import type {
   TimelineState
 } from './ViewerState';
 import type { InspectionSelection } from '../Inspection';
-import { CURRENT_VERSION } from './ViewerState';
+import { assertValidViewerStateNumbers, CURRENT_VERSION } from './ViewerState';
 
 // ---------------------------------------------------------------------------
 // StateSerializer — extracts the current ViewerStateV2 from a live viewer
@@ -23,7 +23,7 @@ import { CURRENT_VERSION } from './ViewerState';
  * the serializer reads public fields directly.
  */
 export function serialize(viewer: any): ViewerStateV2 {
-  return {
+  const state: ViewerStateV2 = {
     version: CURRENT_VERSION,
     camera: serializeCamera(viewer),
     config: serializeConfig(viewer),
@@ -33,6 +33,8 @@ export function serialize(viewer: any): ViewerStateV2 {
     timeline: serializeTimeline(viewer),
     inspectionSelection: serializeInspectionSelection(viewer)
   };
+  assertValidViewerStateNumbers(state);
+  return state;
 }
 
 // ---------------------------------------------------------------------------

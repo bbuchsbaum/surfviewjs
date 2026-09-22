@@ -48,7 +48,7 @@ export class CrosshairManager {
       return;
     }
 
-    const crosshair = this.ensureGroup(options?.size, options?.color);
+    this.ensureGroup(options?.size, options?.color);
 
     if (this.parent && this.parent !== mesh && this.group) {
       this.parent.remove(this.group);

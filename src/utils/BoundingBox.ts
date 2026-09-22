@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { finiteNumber } from './validation';
 
 /**
  * Calculate bounding box and optimal camera position for a surface
@@ -14,16 +15,22 @@ export class BoundingBoxHelper {
     size: THREE.Vector3;
     radius: number;
   } {
+    if (vertices.length === 0 || vertices.length % 3 !== 0) {
+      throw new RangeError('vertices must contain one or more complete xyz triples');
+    }
     let minX = Infinity, minY = Infinity, minZ = Infinity;
     let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
     
     for (let i = 0; i < vertices.length; i += 3) {
-      minX = Math.min(minX, vertices[i]);
-      maxX = Math.max(maxX, vertices[i]);
-      minY = Math.min(minY, vertices[i + 1]);
-      maxY = Math.max(maxY, vertices[i + 1]);
-      minZ = Math.min(minZ, vertices[i + 2]);
-      maxZ = Math.max(maxZ, vertices[i + 2]);
+      const x = finiteNumber(vertices[i], `vertices[${i}]`);
+      const y = finiteNumber(vertices[i + 1], `vertices[${i + 1}]`);
+      const z = finiteNumber(vertices[i + 2], `vertices[${i + 2}]`);
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+      minZ = Math.min(minZ, z);
+      maxZ = Math.max(maxZ, z);
     }
     
     const min = new THREE.Vector3(minX, minY, minZ);

@@ -1,5 +1,6 @@
 import { SurfaceGeometry } from '../classes';
 import { buildVertexAdjacency } from './meshAdjacency';
+import { finiteNumber } from './validation';
 import * as THREE from 'three';
 
 /**
@@ -40,13 +41,15 @@ export function computeMeanCurvature(geometry: SurfaceGeometry): Float32Array {
   const normal = new THREE.Vector3();
 
   for (let i = 0; i < vertexCount; i++) {
+    const vertexOffset = i * 3;
     vertexPos.set(
-      vertices[i * 3],
-      vertices[i * 3 + 1],
-      vertices[i * 3 + 2]
+      vertices[vertexOffset]!,
+      vertices[vertexOffset + 1]!,
+      vertices[vertexOffset + 2]!
     );
 
-    const neighborSet = neighbors[i];
+    // Shared adjacency construction initializes one set and face list per vertex.
+    const neighborSet = neighbors[i]!;
     if (neighborSet.size === 0) {
       curvature[i] = 0;
       continue;
@@ -56,9 +59,9 @@ export function computeMeanCurvature(geometry: SurfaceGeometry): Float32Array {
     let sumX = 0, sumY = 0, sumZ = 0;
 
     for (const j of neighborSet) {
-      sumX += vertices[j * 3];
-      sumY += vertices[j * 3 + 1];
-      sumZ += vertices[j * 3 + 2];
+      sumX += vertices[j * 3]!;
+      sumY += vertices[j * 3 + 1]!;
+      sumZ += vertices[j * 3 + 2]!;
     }
 
     const n = neighborSet.size;
@@ -72,10 +75,11 @@ export function computeMeanCurvature(geometry: SurfaceGeometry): Float32Array {
     v0.copy(vertexPos);
     let faceCount = 0;
 
-    for (const fi of vertexFaces[i]) {
-      const a = faces[fi * 3];
-      const b = faces[fi * 3 + 1];
-      const c = faces[fi * 3 + 2];
+    for (const fi of vertexFaces[i]!) {
+      // Face incidence is produced from already validated complete triangles.
+      const a = faces[fi * 3]!;
+      const b = faces[fi * 3 + 1]!;
+      const c = faces[fi * 3 + 2]!;
 
       // Get the other two vertices
       let i1: number, i2: number;
@@ -83,8 +87,8 @@ export function computeMeanCurvature(geometry: SurfaceGeometry): Float32Array {
       else if (b === i) { i1 = c; i2 = a; }
       else { i1 = a; i2 = b; }
 
-      v1.set(vertices[i1 * 3], vertices[i1 * 3 + 1], vertices[i1 * 3 + 2]);
-      v2.set(vertices[i2 * 3], vertices[i2 * 3 + 1], vertices[i2 * 3 + 2]);
+      v1.set(vertices[i1 * 3]!, vertices[i1 * 3 + 1]!, vertices[i1 * 3 + 2]!);
+      v2.set(vertices[i2 * 3]!, vertices[i2 * 3 + 1]!, vertices[i2 * 3 + 2]!);
 
       edge1.subVectors(v1, v0);
       edge2.subVectors(v2, v0);
@@ -124,14 +128,16 @@ export function normalizeCurvature(
   curvature: Float32Array,
   percentile: number = 98
 ): Float32Array {
+  const validPercentile = finiteNumber(percentile, 'percentile', { minimum: 0, maximum: 100 });
+  if (curvature.length === 0) return new Float32Array(0);
   // Sort absolute values to find percentile
   const sorted = Array.from(curvature).map(Math.abs).sort((a, b) => a - b);
-  const idx = Math.floor(sorted.length * percentile / 100);
+  const idx = Math.min(sorted.length - 1, Math.floor(sorted.length * validPercentile / 100));
   const scale = sorted[idx] || 1;
 
   const normalized = new Float32Array(curvature.length);
   for (let i = 0; i < curvature.length; i++) {
-    normalized[i] = Math.max(-1, Math.min(1, curvature[i] / scale));
+    normalized[i] = Math.max(-1, Math.min(1, curvature[i]! / scale));
   }
 
   return normalized;
@@ -159,14 +165,20 @@ export function curvatureToGrayscale(
     contrast = 0.5,
     smoothness = 1
   } = options;
+  const validBrightness = finiteNumber(brightness, 'brightness');
+  const validContrast = finiteNumber(contrast, 'contrast');
+  const validSmoothness = finiteNumber(smoothness, 'smoothness', {
+    minimum: 0,
+    minimumExclusive: true
+  });
 
   const grayscale = new Float32Array(curvature.length);
 
   for (let i = 0; i < curvature.length; i++) {
     // Clamp curvature/smoothness to [-0.5, 0.5]
-    const scaled = Math.max(-0.5, Math.min(0.5, curvature[i] / smoothness));
+    const scaled = Math.max(-0.5, Math.min(0.5, curvature[i]! / validSmoothness));
     // Apply contrast and brightness
-    const gray = scaled * contrast + brightness;
+    const gray = scaled * validContrast + validBrightness;
     // Clamp to valid range
     grayscale[i] = Math.max(0, Math.min(1, gray));
   }

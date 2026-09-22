@@ -2,6 +2,11 @@
 
 The `NeuroSurfaceViewer` is the main class that manages the Three.js scene, camera, lighting, and rendering.
 
+The host application owns the container, layout observers, data sources, and
+application UI. The viewer owns the canvas and every rendered resource
+registered with it. This boundary determines cleanup: remove host observers in
+the host, and call the viewer's idempotent `dispose()` for viewer resources.
+
 ## Creating a Viewer
 
 ```javascript
@@ -27,11 +32,30 @@ const viewer = new NeuroSurfaceViewer(
 | `useControls` | boolean | false | Deprecated warning-only flag; enabled values do not create UI |
 | `allowCDNFallback` | boolean | false | Deprecated warning-only flag; runtime CDN loading remains disabled |
 | `backgroundColor` | number | 0x000000 | Scene background color |
-| `ambientLightColor` | number | 0x404040 | Ambient light color |
-| `directionalLightIntensity` | number | 0.5 | Directional light intensity |
+| `ambientLightColor` | number | 0xb5b5b5 | Integer RGB color (`0x000000`-`0xffffff`) |
+| `directionalLightColor` | number | 0xffffff | Integer RGB color (`0x000000`-`0xffffff`) |
+| `directionalLightIntensity` | number | 1.6 | Finite nonnegative directional-light intensity |
 | `preset` | string | `default` | Style preset: `presentation`, `paper-light`, `talk-dark`, `clinical-qc`, `retinotopy`, or `glass-brain-surface` |
-| `cameraPosition` | [x, y, z] | [0, 0, 200] | Initial camera position |
-| `rotationSpeed` | number | 2.0 | Mouse rotation sensitivity |
+| `initialZoom` | number | 12 | Positive finite initial camera distance |
+| `rotationSpeed` | number | 2.0 | Positive finite mouse rotation sensitivity |
+| `ssaoRadius` | number | 4 | Finite nonnegative SSAO radius |
+| `ssaoKernelSize` | integer | 32 | SSAO kernel size from 1 through 64 |
+| `rimStrength` | number | 0 | Finite nonnegative rim-light strength |
+| `metalness`, `roughness` | number | 0.1, 0.6 | Finite values in `[0, 1]` |
+| `hoverCrosshairSize` | number | 1.2 | Positive finite crosshair size |
+
+The constructor and `updateConfig()` validate the complete normalized
+configuration before changing viewer state. Passing `undefined` cannot erase a
+required runtime default. Invalid numeric values throw
+`NumericValidationError` and do not change the camera, renderer, revision, or
+events.
+
+SurfView's published declarations use TypeScript exact optional-property
+semantics: omit an option to preserve or select its default. Explicit
+`undefined` is not a reset value and is rejected by TypeScript. Where an API
+supports clearing state, its type names the reset value (normally `null`).
+Plain JavaScript objects that contain an explicit `undefined` are normalized as
+if that property had been omitted, including during state restoration.
 
 ## Methods
 
@@ -41,12 +65,17 @@ const viewer = new NeuroSurfaceViewer(
 // Add a surface
 viewer.addSurface(surface, 'brain');
 
-// Remove a surface
-viewer.removeSurface(surface);
+// Remove and dispose a surface by its registered ID
+viewer.removeSurface('brain');
 
 // Get a surface by ID
 const surface = viewer.getSurface('brain');
 ```
+
+After `addSurface(surface, id)`, replacement, `removeSurface(id)`,
+`clearSurfaces()`, and `viewer.dispose()` dispose that registered surface. Do
+not dispose it a second time as part of the normal removal path. If a surface is
+disposed directly, the viewer observes its disposal and unregisters it.
 
 ### Camera Controls
 
@@ -60,6 +89,19 @@ viewer.setViewpoint('lateral');  // lateral, medial, dorsal, ventral, anterior, 
 // Get current camera position
 const pos = viewer.getCameraPosition();
 
+// Positive finite camera distance
+viewer.setZoom(14);
+
+// Legacy camera snapshots are validated atomically before application.
+viewer.setCameraState({
+  position: [0, 0, 14],
+  rotation: [0, 0, 0, 'XYZ'],
+  target: [0, 0, 0]
+});
+
+// A finite nonnegative total separation; negative/NaN values are rejected.
+viewer.separateHemispheres(20);
+
 // Disable and restore camera/surface interaction
 viewer.setInteractionEnabled(false);
 viewer.setInteractionEnabled(true);
@@ -67,6 +109,10 @@ viewer.setInteractionEnabled(true);
 // Access the interaction controller when direct tuning is necessary
 viewer.cameraControls.rotateSpeed = 1.5;
 ```
+
+Camera position, rotation, target, zoom, and hemisphere separation must be
+finite. A camera-state update validates every supplied tuple before changing
+any camera or control object.
 
 For control surfaces and other reusable integrations, use the explicit
 anatomical-view API instead of relying on the first loaded surface:
@@ -137,18 +183,35 @@ participates in the future first-party controls architecture.
 ### Rendering
 
 ```javascript
-// Start automatic render loop
+// Automatic on-demand rendering is enabled at construction. This is also the
+// resume operation after stopRenderLoop(). It requests one coalesced frame.
 viewer.startRenderLoop();
 
-// Stop render loop
+// Pause automatic rendering and cancel a pending frame
 viewer.stopRenderLoop();
 
-// Request a single render
+// Invalidate the view. Repeated calls before the next frame are coalesced.
 viewer.requestRender();
 
-// Force immediate render
+// Paint synchronously (unless disposed or the WebGL context is lost)
 viewer.render();
 ```
+
+The viewer does not keep a permanent `requestAnimationFrame` loop alive. A
+settled viewer has no pending frame. Layer changes, temporal `timechange`
+handlers, resize operations, and camera controls call `requestRender()` as
+needed. Trackball interaction temporarily owns follow-up frames while the
+pointer is active or damping is still moving the camera, then releases them
+when movement settles. `start()` and `stop()` are compatibility aliases for
+`startRenderLoop()` and `stopRenderLoop()`.
+
+WebGL context loss cancels the pending frame and suppresses rendering. A live
+viewer requests one fresh frame after context restoration. `dispose()` is
+idempotent and terminal: it cancels queued work, removes canvas, control, and
+context listeners, releases GPU resources, and prevents `start()`, restoration,
+or later invalidations from restarting the viewer. Applications remain
+responsible for removing listeners they attach themselves, such as the resize
+listener below.
 
 ### Resize
 
@@ -156,6 +219,16 @@ viewer.render();
 window.addEventListener('resize', () => {
   viewer.resize(window.innerWidth, window.innerHeight);
 });
+```
+
+Width and height must be positive finite CSS-pixel values. `dpr` must be
+positive and finite; SurfView caps it at the exported
+`MAX_DEVICE_PIXEL_RATIO` value (`4`) to bound framebuffer allocation. Validation
+happens before any renderer, camera, surface, event, or revision mutation:
+
+```javascript
+const actual = viewer.resize(1200, 800, { dpr: window.devicePixelRatio });
+console.log(actual.dpr); // <= 4
 ```
 
 ### State Serialization
@@ -184,8 +257,10 @@ were pane focus and are ignored. The only v1 crosshair promoted to scientific
 selection is one that is visible, has `mode: 'selection'`, names a non-empty
 surface ID, and has a non-negative integer vertex index.
 
-Restoration validates every surface, layer-order, group, and selection reference
-before changing canonical viewer state. Invalid references are returned in
+Restoration validates every numeric domain, surface, layer-order, group, and
+selection reference before changing canonical viewer state. Encoding and
+serialization reject non-finite values instead of allowing `JSON.stringify()`
+to turn them into `null`. Invalid references are returned in
 `report.errors` with a stable `code`, `path`, and `message`; validation failure
 does not partially restore the camera or any other section.
 
@@ -267,10 +342,22 @@ console.log(qa.getReport().metrics.surfaceVoxelDistance);
 
 ### Cleanup
 
-```javascript
-// Dispose of all resources
-viewer.dispose();
+```ts
+const observer = new ResizeObserver(() => {
+  // host-owned layout work
+});
+observer.observe(container);
+
+// During application teardown:
+observer.disconnect(); // host-owned
+viewer.dispose();      // viewer-owned; safe to call more than once
 ```
+
+`viewer.dispose()` cancels scheduled frames, removes viewer and WebGL-context
+listeners, disposes registered plugins and surfaces, releases camera controls,
+post-processing, picking, annotations, renderer resources, and the WebGL
+context, and removes the canvas from its host. It is terminal: later
+invalidations and context restoration cannot restart rendering.
 
 ## Picking and Interaction
 

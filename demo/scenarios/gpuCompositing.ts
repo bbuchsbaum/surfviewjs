@@ -92,18 +92,17 @@ export const gpuCompositing: Scenario = {
     function animateLayers() {
       if (!isAnimating) return;
 
-      const layers = surface.layerStack.getLayers();
+      const layers = surface.layerStack.getAllLayers();
       const time = performance.now() * 0.001;
 
       layers.forEach((layer, index) => {
-        if (layer.type === 'data') {
-          const dataLayer = layer as DataLayer;
+        if (layer instanceof DataLayer) {
           const data = new Float32Array(surface.vertexCount);
           for (let i = 0; i < data.length; i++) {
             data[i] = Math.sin(i * 0.05 + time * (index + 1)) * 5 +
                      Math.cos(i * 0.03 - time * 0.5) * 3;
           }
-          dataLayer.setData(data);
+          layer.setData(data);
         }
       });
 

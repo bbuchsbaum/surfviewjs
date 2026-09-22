@@ -3,6 +3,7 @@ import { SurfaceGeometry } from './classes';
 import { MultiLayerNeuroSurface, MultiLayerSurfaceConfig } from './MultiLayerNeuroSurface';
 import { SurfaceSet } from './SurfaceSet';
 import { debugLog } from './debug';
+import { finiteNumber } from './utils/validation';
 
 /**
  * Easing functions for morph animations
@@ -165,7 +166,7 @@ export class MorphableSurface extends MultiLayerNeuroSurface {
       }
     }
 
-    debugLog(`MorphableSurface created from SurfaceSet with ${surface.morphTargetNames.length} morph targets`);
+    debugLog('MorphableSurface created from SurfaceSet with', surface.morphTargetNames.length, 'morph targets');
     return surface;
   }
 
@@ -177,12 +178,7 @@ export class MorphableSurface extends MultiLayerNeuroSurface {
    * @param curvature - Optional curvature data for this morph target
    */
   addMorphTarget(name: string, positions: Float32Array | number[], curvature?: Float32Array | number[]): void {
-    if (this.morphTargetDictionary[name] !== undefined) {
-      console.warn(`MorphableSurface: morph target "${name}" already exists, replacing`);
-      this.removeMorphTarget(name);
-    }
-
-    const posArray = positions instanceof Float32Array ? positions : new Float32Array(positions);
+    const posArray = new Float32Array(positions);
 
     if (posArray.length !== this.basePositions.length) {
       throw new Error(
@@ -194,6 +190,26 @@ export class MorphableSurface extends MultiLayerNeuroSurface {
     if (!this.mesh || !this.mesh.geometry) {
       throw new Error('MorphableSurface: mesh not initialized');
     }
+    for (let index = 0; index < posArray.length; index += 1) {
+      finiteNumber(posArray[index], `positions[${index}]`);
+    }
+    const curvatureArray = curvature === undefined ? undefined : new Float32Array(curvature);
+    if (curvatureArray && curvatureArray.length !== this.basePositions.length / 3) {
+      throw new Error(
+        `MorphableSurface: curvature for "${name}" has ${curvatureArray.length} values, ` +
+        `expected ${this.basePositions.length / 3}`
+      );
+    }
+    if (curvatureArray) {
+      for (let index = 0; index < curvatureArray.length; index += 1) {
+        finiteNumber(curvatureArray[index], `curvature[${index}]`);
+      }
+    }
+
+    if (this.morphTargetDictionary[name] !== undefined) {
+      console.warn(`MorphableSurface: morph target "${name}" already exists, replacing`);
+      this.removeMorphTarget(name);
+    }
 
     const bufferGeometry = this.mesh.geometry as THREE.BufferGeometry;
 
@@ -201,7 +217,7 @@ export class MorphableSurface extends MultiLayerNeuroSurface {
     // Note: morphTargets need the DELTA from base position, not absolute positions
     const morphPositions = new Float32Array(posArray.length);
     for (let i = 0; i < posArray.length; i++) {
-      morphPositions[i] = posArray[i] - this.basePositions[i];
+      morphPositions[i] = posArray[i]! - this.basePositions[i]!;
     }
 
     const attribute = new THREE.Float32BufferAttribute(morphPositions, 3);
@@ -217,10 +233,8 @@ export class MorphableSurface extends MultiLayerNeuroSurface {
     this.morphTargetNames.push(name);
 
     // Store curvature if provided
-    if (curvature) {
-      this.morphTargetCurvatures[name] = curvature instanceof Float32Array
-        ? curvature
-        : new Float32Array(curvature);
+    if (curvatureArray) {
+      this.morphTargetCurvatures[name] = curvatureArray;
     }
 
     // Initialize influence to 0
@@ -237,7 +251,7 @@ export class MorphableSurface extends MultiLayerNeuroSurface {
 
     this.emit('geometry:updated', { surface: this });
     this.emit('render:needed', { surface: this });
-    debugLog(`Added morph target "${name}" at index ${index}`);
+    debugLog('Added morph target', name, 'at index', index);
   }
 
   /**
@@ -277,7 +291,7 @@ export class MorphableSurface extends MultiLayerNeuroSurface {
 
     this.emit('geometry:updated', { surface: this });
     this.emit('render:needed', { surface: this });
-    debugLog(`Removed morph target "${name}"`);
+    debugLog('Removed morph target', name);
     return true;
   }
 
@@ -325,6 +339,7 @@ export class MorphableSurface extends MultiLayerNeuroSurface {
    * @param weight - Weight value (typically 0-1, but can exceed for exaggeration)
    */
   setMorphWeight(name: string, weight: number): void {
+    const nextWeight = finiteNumber(weight, `weights.${name}`);
     const index = this.morphTargetDictionary[name];
     if (index === undefined) {
       console.warn(`MorphableSurface: morph target "${name}" not found`);
@@ -332,8 +347,8 @@ export class MorphableSurface extends MultiLayerNeuroSurface {
     }
 
     if (this.mesh?.morphTargetInfluences) {
-      this.mesh.morphTargetInfluences[index] = weight;
-      this.emit('morph:changed', { surface: this, target: name, weight });
+      this.mesh.morphTargetInfluences[index] = nextWeight;
+      this.emit('morph:changed', { surface: this, target: name, weight: nextWeight });
       this.emit('render:needed', { surface: this });
     }
   }
@@ -344,7 +359,11 @@ export class MorphableSurface extends MultiLayerNeuroSurface {
    * @param weights - Dictionary of target name to weight
    */
   setMorphWeights(weights: Record<string, number>): void {
-    for (const [name, weight] of Object.entries(weights)) {
+    const normalized = Object.entries(weights).map(([name, weight]) => [
+      name,
+      finiteNumber(weight, `weights.${name}`)
+    ] as const);
+    for (const [name, weight] of normalized) {
       const index = this.morphTargetDictionary[name];
       if (index !== undefined && this.mesh?.morphTargetInfluences) {
         this.mesh.morphTargetInfluences[index] = weight;
@@ -375,6 +394,7 @@ export class MorphableSurface extends MultiLayerNeuroSurface {
    * @returns Promise that resolves when animation completes
    */
   morphTo(targetName: string, options: MorphAnimationOptions = {}): Promise<void> {
+    const duration = finiteNumber(options.duration ?? 500, 'duration', { minimum: 0 });
     return new Promise((resolve) => {
       const index = this.morphTargetDictionary[targetName];
       if (index === undefined) {
@@ -387,7 +407,6 @@ export class MorphableSurface extends MultiLayerNeuroSurface {
       this.cancelAnimation();
 
       const {
-        duration = 500,
         easing = Easing.easeInOut,
         onComplete,
         onProgress
@@ -407,7 +426,7 @@ export class MorphableSurface extends MultiLayerNeuroSurface {
       const animate = (currentTime: number) => {
         const elapsed = currentTime - startTime;
         const rawProgress = Math.min(1, elapsed / duration);
-        const progress = easing(rawProgress);
+        const progress = finiteNumber(easing(rawProgress), 'easing result');
 
         // Interpolate all weights
         if (this.mesh?.morphTargetInfluences) {
@@ -529,7 +548,8 @@ export class MorphableSurface extends MultiLayerNeuroSurface {
         if (this.mesh?.morphTargetInfluences) {
           for (let i = 0; i < this.morphTargetNames.length; i++) {
             const start = startWeights[i] ?? 0;
-            const target = targetArray[i];
+            // Target weights are mapped from the same morph-target name array.
+            const target = targetArray[i]!;
             this.mesh.morphTargetInfluences[i] = start + (target - start) * progress;
           }
         }
@@ -598,7 +618,10 @@ export class MorphableSurface extends MultiLayerNeuroSurface {
       return;
     }
 
-    value = Math.max(0, Math.min(this.morphTargetNames.length, value));
+    value = Math.max(
+      0,
+      Math.min(this.morphTargetNames.length, finiteNumber(value, 'value'))
+    );
 
     // Reset all influences
     for (let i = 0; i < this.mesh.morphTargetInfluences.length; i++) {
@@ -657,19 +680,18 @@ export class MorphableSurface extends MultiLayerNeuroSurface {
 
     if (baseCurv && baseWeight > 0) {
       for (let i = 0; i < vertexCount; i++) {
-        result[i] = baseCurv[i] * baseWeight;
+        result[i] = baseCurv[i]! * baseWeight;
       }
     }
 
     // Add weighted morph target curvatures
-    for (let i = 0; i < this.morphTargetNames.length; i++) {
-      const name = this.morphTargetNames[i];
+    for (const [i, name] of this.morphTargetNames.entries()) {
       const influence = this.mesh.morphTargetInfluences[i] ?? 0;
       const curv = this.morphTargetCurvatures[name];
 
       if (curv && influence > 0) {
         for (let j = 0; j < vertexCount; j++) {
-          result[j] += curv[j] * influence;
+          result[j] = result[j]! + curv[j]! * influence;
         }
       }
     }

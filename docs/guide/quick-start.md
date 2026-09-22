@@ -1,141 +1,102 @@
-# Quick Start
+# Quick start
 
-Get a brain surface rendering in under 5 minutes.
+This page shows how to adapt the verified first example without changing its
+ownership model.
 
-## Minimal Example
+## Canonical example
 
-```html
-<!DOCTYPE html>
-<html>
-<head>
-  <title>SurfView.js Quick Start</title>
-  <style>
-    body { margin: 0; }
-    #viewer { width: 100vw; height: 100vh; }
-  </style>
-</head>
-<body>
-  <div id="viewer"></div>
+Create an application-owned `<div id="viewer"></div>`, then use:
 
-  <script type="module">
-    import {
-      NeuroSurfaceViewer,
-      MultiLayerNeuroSurface,
-      SurfaceGeometry,
-      THREE
-    } from 'surfview';
+<<< ../../examples/quickstart.ts
 
-    // Create viewer
-    const container = document.getElementById('viewer');
-    const viewer = new NeuroSurfaceViewer(container,
-      window.innerWidth,
-      window.innerHeight
-    );
+This exact file is compiled in strict mode against a clean `npm pack` archive.
+It deliberately uses tiny in-memory arrays; the viewer and layer APIs are the
+same for a cortical mesh.
 
-    // Create a simple sphere as demo geometry
-    const sphere = new THREE.SphereGeometry(50, 64, 64);
-    const geometry = new SurfaceGeometry(
-      new Float32Array(sphere.attributes.position.array),
-      new Uint32Array(sphere.index.array),
-      'demo'
-    );
+## Size and resize
 
-    // Create and add surface
-    const surface = new MultiLayerNeuroSurface(geometry, {
-      baseColor: 0x6699cc
-    });
+Pass positive CSS-pixel dimensions to the constructor. If the host changes
+size, resize the viewer from the application's layout observer:
 
-    viewer.addSurface(surface, 'demo');
-    viewer.centerCamera();
-    viewer.startRenderLoop();
-
-    // Handle resize
-    window.addEventListener('resize', () => {
-      viewer.resize(window.innerWidth, window.innerHeight);
-    });
-  </script>
-</body>
-</html>
+```ts
+const observer = new ResizeObserver(([entry]) => {
+  if (!entry) return;
+  const { width, height } = entry.contentRect;
+  if (width > 0 && height > 0) viewer.resize(width, height);
+});
+observer.observe(container);
 ```
 
-## With Data Overlay
+Disconnect host-owned observers during application teardown. `viewer.dispose()`
+cleans up viewer-owned resources, but it cannot remove an observer the host
+created.
 
-Add activation data to your surface:
+## Replace the sample geometry
 
-```javascript
-import { DataLayer } from 'surfview';
+`SurfaceGeometry` accepts finite XYZ triples and integer triangle indices. For
+network data, prefer the validated loader:
 
-// Generate sample data (one value per vertex)
-const vertexCount = geometry.vertices.length / 3;
-const data = new Float32Array(vertexCount);
-for (let i = 0; i < vertexCount; i++) {
-  data[i] = Math.sin(i * 0.1) * 5;
-}
+```ts
+const geometry = await loadSurface(
+  '/subjects/S01/lh.pial.gii',
+  'auto',
+  'unknown',
+  30_000,
+  false,
+  100,
+  { signal: abortController.signal, maxBytes: 100 * 1024 * 1024 }
+);
+```
 
-// Create a data layer with hot colormap
-const layer = new DataLayer('activation', data, null, 'hot', {
-  range: [-5, 5],
-  opacity: 0.8
+Explicit laterality wins, followed by valid file metadata and then an
+unambiguous filename token. If none is available, laterality remains `unknown`.
+A failed or aborted load returns no geometry and does not mutate a viewer.
+
+## Add an overlay
+
+`DataLayer` accepts dense values when `indices` is `null`, or sparse values with
+an explicit vertex-index array. A dense layer must provide one value per
+surface vertex before compositing:
+
+```ts
+const activation = new DataLayer(
+  'activation',
+  vertexValues,
+  null,
+  'coolwarm',
+  { range: [-5, 5], threshold: [-1.96, 1.96], opacity: 0.85 }
+);
+surface.addLayer(activation);
+```
+
+Layer mutations request a coalesced render. Call `viewer.render()` only when an
+immediate synchronous paint is specifically required.
+
+## Optional controls
+
+The first-party panel is a separate ESM entry and an ordinary DOM sibling of
+the canvas:
+
+```ts
+import { mountSurfViewControls } from 'surfview/controls';
+
+const controls = mountSurfViewControls(viewer, controlsContainer, {
+  theme: 'auto',
+  density: 'compact'
 });
 
-// Add layer to surface
-surface.addLayer(layer);
+// During host teardown:
+controls.dispose();
+viewer.dispose();
 ```
 
-## Loading Real Brain Data
+Mounting does not add scene objects, move the camera, or rearrange the host
+page. See [First-party controls](./controls.md) for React, report targets, and
+feature selection.
 
-```javascript
-import { loadSurface } from 'surfview';
+## Continue
 
-// Load GIFTI format surface
-const geometry = await loadSurface('lh.pial.gii', 'gifti');
-// Node/SSR: install jsdom or pass a DOMParser to parseGIfTISurface if no DOM is available.
-
-const surface = new MultiLayerNeuroSurface(geometry, {
-  baseColor: 0xdddddd,
-  metalness: 0.2,
-  roughness: 0.8
-});
-
-viewer.addSurface(surface, 'brain');
-viewer.centerCamera();
-```
-
-## Optional First-Party Controls
-
-Mount the tailored SurfView control panel into an application-owned sidebar.
-The optional `surfview/controls` entry is separate from the core renderer, and
-mounting it does not rearrange the page or add anything to the Three.js scene.
-
-```html
-<div class="workspace">
-  <div id="viewer"></div>
-  <aside id="controls"></aside>
-</div>
-
-<script type="module">
-  import { mountSurfViewControls } from 'surfview/controls';
-
-  const controls = mountSurfViewControls(
-    viewer,
-    document.getElementById('controls'),
-    {
-      theme: 'auto',       // 'auto', 'light', or 'dark'
-      density: 'compact'   // 'compact' or 'comfortable'
-    }
-  );
-
-  // Later: idempotently removes the panel and all of its subscriptions.
-  controls.dispose();
-</script>
-```
-
-The permanent Figure section selects a style preset and viewer background.
-Export dimensions, DPI, title, transparency, colorbar, and filename stay in
-the keyboard-accessible **Export PNG** dialog so they do not consume sidebar
-space. The panel inherits the host application's font. CSS custom properties
-such as `--surfview-controls-focus` can override individual visual tokens.
-
-See [First-party controls](./controls.md) for feature selection, direct
-custom-element integration, React, report-target differences, lifecycle, and
-the v0.1 certification contract.
+- [Surfaces](./surfaces.md) for formats and geometry invariants
+- [Layers](./layers.md) for ordering, updates, and compositing
+- [Viewer](./viewer.md) for lifecycle and interaction
+- [Reliability and contracts](./reliability.md) for the enforced boundaries

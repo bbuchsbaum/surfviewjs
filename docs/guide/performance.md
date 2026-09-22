@@ -1,197 +1,136 @@
 # Performance
 
-Tips for optimizing SurfView.js performance with large meshes and multiple layers.
+SurfView performance depends on the mesh, layer count, update pattern, canvas,
+device pixel ratio, browser, driver, and GPU. This guide explains the levers;
+the [benchmark report](../performance/benchmark-report.md) records the exact
+workloads, runner, repetitions, dispersion, memory, and checked ceilings.
 
-## General Guidelines
+## Read the evidence first
 
-### Mesh Complexity
+The repository benchmarks 32,492, 163,842, and 324,002 vertices with 1, 4, and
+8 layers. Node measurements cover CPU compositing and texture preparation.
+Browser measurements call `gl.finish()` after each measured draw, so they
+include submitted WebGL work rather than JavaScript dispatch alone. Picking,
+dirty updates, reorder, visibility, resize, memory, and bundle size have
+separate results.
 
-| Vertex Count | Performance | Use Case |
-|--------------|-------------|----------|
-| < 50,000 | Excellent | Interactive exploration |
-| 50,000 - 150,000 | Good | Standard brain surfaces |
-| 150,000 - 500,000 | Moderate | High-resolution surfaces |
-| > 500,000 | Consider optimization | Very detailed meshes |
+Those values are regression evidence for named synthetic workloads. They are
+not a guaranteed frame rate for a user's anatomy or hardware. Profile the
+application's actual mesh and interaction path before choosing a compositor or
+render size.
 
-### Quick Wins
+## On-demand rendering
 
-```javascript
-// 1. Keep expensive effects disabled unless needed
-const viewer = new NeuroSurfaceViewer(container, width, height, {
-  useShaders: false
-});
+Ordinary viewers do not keep a permanent animation frame alive. Mutations call
+`requestRender()`, and repeated invalidations before the next frame are
+coalesced:
 
-// 2. Use basic materials for large meshes
-const surface = new MultiLayerNeuroSurface(geometry, {
-  materialType: 'basic',  // Instead of 'phong' or 'physical'
-  flatShading: true       // Reduces vertex calculations
-});
-
-// 3. Reduce pixel ratio on high-DPI displays
-viewer.renderer.setPixelRatio(1);  // Instead of devicePixelRatio
-```
-
-## Layer Performance
-
-### CPU vs GPU Compositing
-
-```javascript
-// GPU compositing is faster with many layers
-const surface = new MultiLayerNeuroSurface(geometry, {
-  useGPUCompositing: true  // Enable for 3+ layers
-});
-```
-
-**When to use GPU compositing:**
-- 3 or more data layers
-- Frequent layer updates
-- Real-time animations
-
-**When to use CPU compositing:**
-- 1-2 layers
-- Infrequent updates
-- Maximum compatibility
-
-### GPU Volume Projection
-
-`VolumeProjectionLayer` can sample a 3D volume texture at each vertex position during GPU compositing (WebGL2). This keeps volume-to-surface projection off the CPU.
-
-**What’s fast**
-- Range/threshold/colormap/opacity changes are uniform/texture updates in the compositor (no CPU reprojection).
-- Per-frame cost is typically dominated by the draw call (sampling happens in the vertex shader).
-
-**What’s expensive**
-- Updating `volumeData` uploads a full 3D texture to the GPU; large volumes can take tens of milliseconds per update.
-- CPU compositing uses nearest-neighbor sampling (no trilinear interpolation).
-
-**Memory**
-- Float32 volume texture ≈ `nx * ny * nz * 4` bytes.
-- Half-float (`useHalfFloat: true`) halves that, but requires CPU conversion and may need `OES_texture_half_float_linear` for smooth filtering.
-
-### Batch Layer Updates
-
-```javascript
-// Bad: Multiple individual updates
-surface.updateLayer('layer1', { opacity: 0.5 });
-surface.updateLayer('layer2', { opacity: 0.8 });
-surface.updateLayer('layer3', { range: [-5, 5] });
-
-// Good: Batch update
+```ts
 surface.updateLayers([
-  { id: 'layer1', opacity: 0.5 },
-  { id: 'layer2', opacity: 0.8 },
-  { id: 'layer3', range: [-5, 5] }
+  { id: 'activation', opacity: 0.7 },
+  { id: 'uncertainty', visible: false }
 ]);
-```
-
-### Throttle Data Updates
-
-```javascript
-// For real-time data, throttle updates
-import { throttle } from 'lodash';
-
-const updateData = throttle((newData) => {
-  layer.setData(newData);
-  surface.updateColors();
-}, 50);  // Max 20 updates per second
-```
-
-## Rendering Optimization
-
-### Request Renders Instead of Force
-
-```javascript
-// Bad: Force immediate render
-viewer.render();
-
-// Good: Request render (batches multiple requests)
 viewer.requestRender();
 ```
 
-### Stop Render Loop When Hidden
+Use `viewer.render()` only when a synchronous paint is required. Trackball
+interaction temporarily schedules follow-up frames while the pointer or damping
+is active, then settles to zero. `stopRenderLoop()` explicitly pauses automatic
+rendering; `startRenderLoop()` resumes it and requests one frame.
 
-```javascript
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) {
-    viewer.stopRenderLoop();
-  } else {
-    viewer.startRenderLoop();
-  }
+## CPU and GPU compositing
+
+Request GPU compositing when constructing a multi-layer surface:
+
+```ts
+const surface = new MultiLayerNeuroSurface(geometry, {
+  useGPUCompositing: true
 });
+
+viewer.addSurface(surface, 'brain');
+console.log(surface.getCompositingMode()); // 'GPU' or 'CPU'
 ```
 
-### Resize Handling
+The request is not a promise that the GPU path will activate. SurfView checks
+the attached renderer's WebGL2, texture-unit, texture-size, and filtering
+capabilities. Unsupported configurations remain on, or return to, CPU
+compositing.
 
-```javascript
-// Throttle resize handling
-const handleResize = throttle(() => {
-  viewer.resize(window.innerWidth, window.innerHeight);
-}, 100);
+On the GPU path, changing data in one layer can regenerate and upload only that
+layer's array-texture slice. Hiding, showing, or reordering a layer can move
+later visible layers between shader slots, so those relocated slices are also
+regenerated. Measure the operation your application actually performs; a dirty
+data update and a full reorder are different workloads.
 
-window.addEventListener('resize', handleResize);
+CPU compositing remains the compatibility path. It writes the final per-vertex
+RGBA buffer and uploads that color attribute. It can be the simpler and faster
+choice for a small number of infrequently changing layers.
+
+## Volume projection
+
+`VolumeProjectionLayer` samples a 3D volume texture on the GPU when WebGL2 and
+the required texture capabilities are present. Range, threshold, colormap, and
+opacity changes update uniforms or small lookup textures. Replacing
+`volumeData` uploads the complete 3D texture.
+
+Float32 texture storage is approximately `nx * ny * nz * 4` bytes before driver
+overhead. Half-float data halves the texture payload but requires conversion and
+the corresponding filtering support. Keep high-frequency volume replacement
+out of an interaction loop unless measurements on the target hardware support
+it.
+
+## Canvas and framebuffer cost
+
+Framebuffer work grows with rendered pixels, not surface vertices. Pass CSS
+pixel dimensions to the viewer and resize only when layout changes:
+
+```ts
+const actual = viewer.resize(width, height, {
+  dpr: window.devicePixelRatio
+});
+console.log(actual.dpr); // positive and capped at 4
 ```
 
-## Memory Management
+SurfView caps device pixel ratio at `MAX_DEVICE_PIXEL_RATIO` (`4`) to bound
+framebuffer allocation. Applications can choose a lower DPR for large canvases
+or constrained devices. Effects and physically based materials should be
+evaluated visually and measured on the intended renderer; do not select them
+from generic speed labels.
 
-### Dispose Unused Resources
+## Memory and cleanup
 
-```javascript
-// When removing surfaces
-viewer.removeSurface(surface);
-surface.dispose();  // Free GPU memory
+Layer arrays, composite buffers, geometry attributes, GPU array textures, and
+volume textures are distinct allocations. The benchmark report accounts for
+the arrays it owns and reports texture backing separately; browser and driver
+overhead is outside that accounting.
 
-// When done with viewer
+Removing a registered surface by ID disposes it. Disposing the viewer clears all
+registered surfaces and viewer-owned GPU resources:
+
+```ts
+viewer.removeSurface('temporary');
+
+// Final application teardown:
 viewer.dispose();
 ```
 
-### Reuse Geometry
+Do not call `surface.dispose()` again after `removeSurface(id)`. Clean up
+host-owned observers, timers, and controls handles separately.
 
-```javascript
-// Share geometry between surfaces with same mesh
-const geometry = new SurfaceGeometry(vertices, faces, 'brain');
+## Reproduce and diagnose a regression
 
-const surface1 = new MultiLayerNeuroSurface(geometry, { baseColor: 0xff0000 });
-const surface2 = new MultiLayerNeuroSurface(geometry, { baseColor: 0x0000ff });
+```bash
+# Deterministic Node matrix and emitted provenance
+npm run benchmark:performance
+
+# Checked Node ceilings against an existing build
+npm run benchmark:check
+
+# Synchronized Chromium WebGL matrix
+npm run benchmark:browser
 ```
 
-## Profiling
-
-### Monitor FPS
-
-```javascript
-let frameCount = 0;
-let lastTime = performance.now();
-
-viewer.on('render:after', () => {
-  frameCount++;
-  const now = performance.now();
-  if (now - lastTime >= 1000) {
-    console.log(`FPS: ${frameCount}`);
-    frameCount = 0;
-    lastTime = now;
-  }
-});
-```
-
-### Three.js Stats
-
-```javascript
-import Stats from 'three/examples/jsm/libs/stats.module';
-
-const stats = new Stats();
-document.body.appendChild(stats.dom);
-
-viewer.on('render:after', () => stats.update());
-```
-
-## Checklist
-
-- [ ] Use `materialType: 'basic'` for large meshes
-- [ ] Enable `flatShading` when normals aren't critical
-- [ ] Set `pixelRatio` to 1 on high-DPI displays
-- [ ] Use GPU compositing with 3+ layers
-- [ ] Batch layer updates
-- [ ] Throttle real-time data updates
-- [ ] Stop render loop when tab is hidden
-- [ ] Dispose surfaces when removing
-- [ ] Reuse geometry when possible
+Compare medians, median absolute deviation, minima, and maxima. Reproduce a
+failure on the same runtime, identify whether it is CPU work, texture bytes,
+shader execution, picking, resize, or runner noise, and collect repeated hosted
+runs before changing a ceiling. A local pass is not hosted or release proof.

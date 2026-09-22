@@ -34,7 +34,7 @@ export class SurfaceDebugger {
       // Check if colors are all black/zero
       let allZero = true;
       for (let i = 0; i < Math.min(colors.length, 100); i++) {
-        if (colors[i] > 0.01) {
+        if (colors[i]! > 0.01) {
           allZero = false;
           break;
         }

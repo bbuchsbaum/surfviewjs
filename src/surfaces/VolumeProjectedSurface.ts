@@ -4,6 +4,7 @@ import { VolumeProjectionMaterial } from '../materials/VolumeProjectionMaterial'
 import { VolumeTexture3D } from '../textures/VolumeTexture3D';
 import { createColormapTexture } from '../textures/createColormapTexture';
 import type { RibbonReducer, VolumeProjectionMode } from '../layers';
+import { finiteNumber, finitePair, opacity as validateOpacity } from '../utils/validation';
 
 export interface VolumeProjectedSurfaceOptions {
   volumeData: Float32Array | ArrayLike<number>;
@@ -67,8 +68,16 @@ export class VolumeProjectedSurface extends NeuroSurface {
       ribbonSamples = 7,
       ribbonReducer = 'mean'
     } = options;
+    const normalizedIntensityRange = finitePair(intensityRange, 'intensityRange');
+    const normalizedThreshold = finitePair(threshold, 'threshold');
+    const normalizedOverlayOpacity = validateOpacity(overlayOpacity, 'overlayOpacity');
+    const normalizedFillValue = finiteNumber(fillValue, 'fillValue');
     this.projectionMode = projectionMode;
-    this.ribbonSamples = Math.max(1, Math.min(16, Math.round(ribbonSamples)));
+    this.ribbonSamples = finiteNumber(ribbonSamples, 'ribbonSamples', {
+      minimum: 1,
+      maximum: 16,
+      integer: true
+    });
     this.ribbonReducer = ribbonReducer;
     this.pialPositions = options.pialPositions ? new Float32Array(options.pialPositions) : null;
     this.whitePositions = options.whitePositions ? new Float32Array(options.whitePositions) : null;
@@ -90,11 +99,11 @@ export class VolumeProjectedSurface extends NeuroSurface {
       worldToIJK: this.worldToIJKMatrix,
       colormapTexture: this.colormapTexture,
       config: {
-        intensityRange,
-        threshold,
-        overlayOpacity,
+        intensityRange: normalizedIntensityRange,
+        threshold: normalizedThreshold,
+        overlayOpacity: normalizedOverlayOpacity,
         baseColor,
-        fillValue,
+        fillValue: normalizedFillValue,
         projectionMode,
         ribbonSamples: this.ribbonSamples,
         ribbonReducer: this.ribbonReducer
@@ -130,19 +139,21 @@ export class VolumeProjectedSurface extends NeuroSurface {
   }
 
   setIntensityRange(min: number, max: number): void {
-    this.projectionMaterial.intensityRange = [min, max];
+    const range = finitePair([min, max], 'intensityRange');
+    this.projectionMaterial.intensityRange = range;
     this.emit('material:updated', { surface: this });
     this.emit('render:needed', { surface: this });
   }
 
   setThreshold(min: number, max: number): void {
-    this.projectionMaterial.threshold = [min, max];
+    const threshold = finitePair([min, max], 'threshold');
+    this.projectionMaterial.threshold = threshold;
     this.emit('material:updated', { surface: this });
     this.emit('render:needed', { surface: this });
   }
 
   setOverlayOpacity(opacity: number): void {
-    this.projectionMaterial.overlayOpacity = opacity;
+    this.projectionMaterial.overlayOpacity = validateOpacity(opacity, 'overlayOpacity');
     this.emit('material:updated', { surface: this });
     this.emit('render:needed', { surface: this });
   }
@@ -164,10 +175,9 @@ export class VolumeProjectedSurface extends NeuroSurface {
   }
 
   setWorldToIJK(matrix: THREE.Matrix4 | ArrayLike<number>): void {
-    this.worldToIJKMatrix = matrix instanceof THREE.Matrix4
-      ? matrix.clone()
-      : new THREE.Matrix4().fromArray(Array.from(matrix));
-    this.projectionMaterial.setWorldToIJK(this.worldToIJKMatrix);
+    const nextMatrix = this.validatedMatrix(matrix, 'worldToIJK');
+    this.worldToIJKMatrix = nextMatrix;
+    this.projectionMaterial.setWorldToIJK(nextMatrix);
     this.emit('material:updated', { surface: this });
     this.emit('render:needed', { surface: this });
   }
@@ -180,7 +190,11 @@ export class VolumeProjectedSurface extends NeuroSurface {
   }
 
   setRibbonSampling(samples: number, reducer: RibbonReducer = this.ribbonReducer): void {
-    this.ribbonSamples = Math.max(1, Math.min(16, Math.round(samples)));
+    this.ribbonSamples = finiteNumber(samples, 'ribbonSamples', {
+      minimum: 1,
+      maximum: 16,
+      integer: true
+    });
     this.ribbonReducer = reducer;
     this.projectionMaterial.setRibbonSampling(this.ribbonSamples, this.ribbonReducer);
     this.emit('material:updated', { surface: this });
@@ -188,9 +202,11 @@ export class VolumeProjectedSurface extends NeuroSurface {
   }
 
   setRibbonSurfaces(pial: Float32Array | ArrayLike<number>, white: Float32Array | ArrayLike<number>): void {
-    this.pialPositions = new Float32Array(pial);
-    this.whitePositions = new Float32Array(white);
-    this.validateRibbonAttributes();
+    const nextPial = new Float32Array(pial);
+    const nextWhite = new Float32Array(white);
+    this.validateRibbonPositions(nextPial, nextWhite);
+    this.pialPositions = nextPial;
+    this.whitePositions = nextWhite;
     if (this.mesh) {
       const geometry = this.mesh.geometry as THREE.BufferGeometry;
       geometry.setAttribute('pialPosition', new THREE.Float32BufferAttribute(this.pialPositions, 3));
@@ -219,19 +235,19 @@ export class VolumeProjectedSurface extends NeuroSurface {
 
   private computeWorldToIJK(options: VolumeProjectedSurfaceOptions): THREE.Matrix4 {
     if (options.worldToIJK) {
-      return options.worldToIJK instanceof THREE.Matrix4
-        ? options.worldToIJK.clone()
-        : new THREE.Matrix4().fromArray(Array.from(options.worldToIJK));
+      return this.validatedMatrix(options.worldToIJK, 'worldToIJK');
     }
 
     let voxelToWorld: THREE.Matrix4;
     if (options.affineMatrix) {
-      voxelToWorld = options.affineMatrix instanceof THREE.Matrix4
-        ? options.affineMatrix.clone()
-        : new THREE.Matrix4().fromArray(Array.from(options.affineMatrix));
+      voxelToWorld = this.validatedMatrix(options.affineMatrix, 'affineMatrix');
     } else {
-      const voxelSize = options.voxelSize ?? [1, 1, 1];
-      const origin = options.volumeOrigin ?? [0, 0, 0];
+      const voxelSize = (options.voxelSize ?? [1, 1, 1]).map((value, index) =>
+        finiteNumber(value, `voxelSize[${index}]`, { minimum: 0, minimumExclusive: true })
+      ) as [number, number, number];
+      const origin = (options.volumeOrigin ?? [0, 0, 0]).map((value, index) =>
+        finiteNumber(value, `volumeOrigin[${index}]`)
+      ) as [number, number, number];
       voxelToWorld = new THREE.Matrix4().set(
         voxelSize[0], 0, 0, origin[0],
         0, voxelSize[1], 0, origin[1],
@@ -244,15 +260,40 @@ export class VolumeProjectedSurface extends NeuroSurface {
   }
 
   private validateRibbonAttributes(): void {
+    this.validateRibbonPositions(this.pialPositions, this.whitePositions);
+  }
+
+  private validateRibbonPositions(
+    pial: Float32Array | null,
+    white: Float32Array | null
+  ): void {
     const expected = this.geometry.vertices.length;
-    if ((this.pialPositions && !this.whitePositions) || (!this.pialPositions && this.whitePositions)) {
+    if ((pial && !white) || (!pial && white)) {
       throw new Error('VolumeProjectedSurface: ribbon projection requires both pialPositions and whitePositions');
     }
-    if (this.pialPositions && this.pialPositions.length !== expected) {
+    if (pial && pial.length !== expected) {
       throw new Error('VolumeProjectedSurface: pialPositions length must match geometry vertices');
     }
-    if (this.whitePositions && this.whitePositions.length !== expected) {
+    if (white && white.length !== expected) {
       throw new Error('VolumeProjectedSurface: whitePositions length must match geometry vertices');
     }
+    for (const [name, positions] of [['pialPositions', pial], ['whitePositions', white]] as const) {
+      if (!positions) continue;
+      for (let index = 0; index < positions.length; index += 1) {
+        finiteNumber(positions[index], `${name}[${index}]`);
+      }
+    }
+  }
+
+  private validatedMatrix(
+    matrix: THREE.Matrix4 | ArrayLike<number>,
+    parameter: string
+  ): THREE.Matrix4 {
+    const elements = matrix instanceof THREE.Matrix4 ? matrix.elements : Array.from(matrix);
+    if (elements.length !== 16) {
+      throw new RangeError(`${parameter} must contain exactly 16 elements.`);
+    }
+    const normalized = elements.map((value, index) => finiteNumber(value, `${parameter}[${index}]`));
+    return new THREE.Matrix4().fromArray(normalized);
   }
 }

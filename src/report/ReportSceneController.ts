@@ -211,8 +211,9 @@ export class ReportSceneController {
         : null;
     }
     const surfaceIds = Object.keys(this.manifest.geometries);
-    return surfaceIds.length === 1 && this.viewer.getSurface(surfaceIds[0])
-      ? Object.freeze({ kind: 'surface', surfaceId: surfaceIds[0] })
+    const onlySurfaceId = surfaceIds.length === 1 ? surfaceIds[0] : undefined;
+    return onlySurfaceId !== undefined && this.viewer.getSurface(onlySurfaceId)
+      ? Object.freeze({ kind: 'surface', surfaceId: onlySurfaceId })
       : null;
   }
 
@@ -448,7 +449,8 @@ export class ReportSceneController {
       }
     }
     if (visible.size !== 1) return null;
-    const candidate = [...visible][0];
+    const candidate = visible.values().next().value as string | undefined;
+    if (candidate === undefined) return null;
     return surfaceLayers.every(layers => {
       const candidateLayer = layers.find(layer => layer.id === candidate);
       return (!candidateLayer || candidateLayer.visible) &&

@@ -18,16 +18,21 @@ import {
   LayerOrderResult
 } from './layers';
 import ColorMap2D, { ColorMap2DPreset } from './ColorMap2D';
-import { CurvatureLayer, CurvatureConfig } from './layers/CurvatureLayer';
+import { CurvatureLayer } from './layers/CurvatureLayer';
 import { ClipPlaneSet, ClipPlane, ClipAxis } from './utils/ClipPlane';
-import { debugLog } from './debug';
+import { debugLog, isDebugEnabled } from './debug';
 import ColorMap from './ColorMap';
 import { GPULayerCompositor } from './GPULayerCompositor';
+import { compositeStraightRGBABuffer } from './utils/rgbaCompositing';
+import { SurfaceColorUpdateScheduler } from './surface/SurfaceColorUpdateScheduler';
+import {
+  devicePixelRatio as normalizeDevicePixelRatio,
+  finiteNumber
+} from './utils/validation';
 import { OutlineLayer } from './OutlineLayer';
 import { ConnectivityLayer } from './ConnectivityLayer';
 import { ParcelValueLayer, ParcelValueLayerConfig } from './layers/ParcelValueLayer';
 import { TemporalDataLayer } from './temporal/TemporalDataLayer';
-import type { TemporalDataConfig } from './temporal/types';
 import type { ParcelData } from './parcellation';
 import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
@@ -65,8 +70,9 @@ function computeBoundaryEdges(
 
   const addEdge = (a: number, b: number) => {
     if (a === b) return;
-    const roiA = roiLabels[a];
-    const roiB = roiLabels[b];
+    // Face indices and label length are validated against the same surface domain.
+    const roiA = roiLabels[a]!;
+    const roiB = roiLabels[b]!;
     if (roiA === roiB) return;
     if (subset && !subset.has(roiA) && !subset.has(roiB)) return;
 
@@ -77,9 +83,10 @@ function computeBoundaryEdges(
   };
 
   for (let i = 0; i < faces.length; i += 3) {
-    const a = faces[i];
-    const b = faces[i + 1];
-    const c = faces[i + 2];
+    // SurfaceGeometry guarantees complete, in-range triangles.
+    const a = faces[i]!;
+    const b = faces[i + 1]!;
+    const c = faces[i + 2]!;
     addEdge(a, b);
     addEdge(b, c);
     addEdge(c, a);
@@ -157,9 +164,9 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
   layerStack: LayerStack;
   compositeBuffer: Float32Array;
   vertexCount: number;
-  private _updatePending: boolean;
-  private _updateFrameId: number | null;
+  private colorUpdates?: SurfaceColorUpdateScheduler;
   private useGPUCompositing: boolean;
+  private gpuCompositingRequested: boolean;
   private gpuCompositor: GPULayerCompositor | null = null;
   private outlineResolution: THREE.Vector2 | null = null;
   private useWideLines: boolean;
@@ -182,43 +189,30 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     this.layerStack = new LayerStack();
     this.compositeBuffer = new Float32Array(vertexCount * 4);
     this.vertexCount = vertexCount;
-    this._updatePending = false; // For throttling updates
-    this._updateFrameId = null;
-    this.useGPUCompositing = config.useGPUCompositing ?? false; // Default to CPU for compatibility
+    this.colorUpdates = this.createColorUpdateScheduler();
+    this.gpuCompositingRequested = config.useGPUCompositing ?? false;
+    // Hardware capability belongs to the viewer renderer, which is attached later.
+    this.useGPUCompositing = false;
     this.useWideLines = config.useWideLines ?? true;
     this.clipPlanes = new ClipPlaneSet();
-    
-    // Initialize GPU compositor if requested
-    if (this.useGPUCompositing && this.supportsWebGL2()) {
-      try {
-        this.gpuCompositor = new GPULayerCompositor(vertexCount);
-        debugLog('GPU compositing enabled for surface');
-      } catch (error) {
-        console.warn('Failed to initialize GPU compositor, falling back to CPU:', error);
-        this.useGPUCompositing = false;
-      }
-    } else if (this.useGPUCompositing) {
-      console.warn('GPU compositing requested but WebGL2 not available; falling back to CPU');
-      this.useGPUCompositing = false;
-    }
     
     // Add curvature layer if provided (renders below base layer)
     if (config.curvature && config.showCurvature !== false) {
       const curvOpts = config.curvatureOptions || {};
       const curvLayer = new CurvatureLayer('curvature', config.curvature, {
-        brightness: curvOpts.brightness,
-        contrast: curvOpts.contrast,
-        smoothness: curvOpts.smoothness,
-        order: -2 // Below base layer
+        order: -2, // Below base layer
+        ...(curvOpts.brightness === undefined ? {} : { brightness: curvOpts.brightness }),
+        ...(curvOpts.contrast === undefined ? {} : { contrast: curvOpts.contrast }),
+        ...(curvOpts.smoothness === undefined ? {} : { smoothness: curvOpts.smoothness })
       });
       this.layerStack.addLayer(curvLayer);
-      debugLog(`CurvatureLayer added with ${(config.curvature as any).length} vertices`);
+      debugLog('CurvatureLayer added with', (config.curvature as any).length, 'vertices');
     }
 
     // Add base layer
     // If curvature is shown, the base layer should be hidden (curvature acts as underlay)
     const hasCurvature = config.curvature && config.showCurvature !== false;
-    const baseColor = config.baseColor || 0xcccccc;
+    const baseColor = config.baseColor ?? 0xcccccc;
     const baseLayer = new BaseLayer(typeof baseColor === 'number' ? baseColor : new THREE.Color(baseColor).getHex(), {
       opacity: 1,
       visible: !hasCurvature  // Hide base layer when curvature is visible
@@ -267,7 +261,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
 
     const outlineObjects = this.buildOutlineObjects(layer);
     if (!outlineObjects) {
-      debugLog(`OutlineLayer ${layer.id}: no boundary edges found`);
+      debugLog('OutlineLayer', layer.id, ': no boundary edges found');
       return;
     }
 
@@ -345,8 +339,9 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     if (!this.mesh) return null;
 
     if (layer.roiLabels.length !== this.vertexCount) {
-      console.warn(
-        `OutlineLayer ${layer.id}: roiLabels length ${layer.roiLabels.length} does not match vertex count ${this.vertexCount}`
+      throw new RangeError(
+        `OutlineLayer ${layer.id}: roiLabels length ${layer.roiLabels.length} ` +
+        `does not match vertex count ${this.vertexCount}`
       );
     }
 
@@ -360,6 +355,12 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     }
 
     if (!positionAttr || !normalAttr) return null;
+    if (positionAttr.count !== this.vertexCount || normalAttr.count !== this.vertexCount) {
+      throw new RangeError(
+        `OutlineLayer ${layer.id}: position and normal attributes must contain ` +
+        `${this.vertexCount} vertices`
+      );
+    }
 
     const edges = computeBoundaryEdges(this.geometry.faces, layer.roiLabels, layer.roiSubset);
     if (!edges.length) {
@@ -372,19 +373,19 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     const offset = layer.offset || 0;
 
     for (const [a, b] of edges) {
-      const ax = pos[a * 3];
-      const ay = pos[a * 3 + 1];
-      const az = pos[a * 3 + 2];
-      const bx = pos[b * 3];
-      const by = pos[b * 3 + 1];
-      const bz = pos[b * 3 + 2];
+      const ax = pos[a * 3]!;
+      const ay = pos[a * 3 + 1]!;
+      const az = pos[a * 3 + 2]!;
+      const bx = pos[b * 3]!;
+      const by = pos[b * 3 + 1]!;
+      const bz = pos[b * 3 + 2]!;
 
-      const anx = normals[a * 3];
-      const any = normals[a * 3 + 1];
-      const anz = normals[a * 3 + 2];
-      const bnx = normals[b * 3];
-      const bny = normals[b * 3 + 1];
-      const bnz = normals[b * 3 + 2];
+      const anx = normals[a * 3]!;
+      const any = normals[a * 3 + 1]!;
+      const anz = normals[a * 3 + 2]!;
+      const bnx = normals[b * 3]!;
+      const bny = normals[b * 3 + 1]!;
+      const bnz = normals[b * 3 + 2]!;
 
       positions.push(
         ax + anx * offset,
@@ -447,19 +448,22 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
       halo.visible = layer.visible;
     }
 
-    return { line, halo };
+    return halo === undefined ? { line } : { line, halo };
   }
 
   updateOutlineResolution(width: number, height: number, dpr: number = 1): void {
+    const nextWidth = finiteNumber(width, 'width', { minimum: 0, minimumExclusive: true });
+    const nextHeight = finiteNumber(height, 'height', { minimum: 0, minimumExclusive: true });
+    const nextDpr = normalizeDevicePixelRatio(dpr);
     if (!this.outlineResolution) {
       this.outlineResolution = new THREE.Vector2();
     }
-    this.outlineResolution.set(width * dpr, height * dpr);
+    this.outlineResolution.set(nextWidth * nextDpr, nextHeight * nextDpr);
 
     this.layerStack.getAllLayers().forEach(layer => {
       if (layer instanceof OutlineLayer) {
-        this.setMaterialResolution(layer.lineObject, width * dpr, height * dpr);
-        this.setMaterialResolution(layer.haloObject, width * dpr, height * dpr);
+        this.setMaterialResolution(layer.lineObject, nextWidth * nextDpr, nextHeight * nextDpr);
+        this.setMaterialResolution(layer.haloObject, nextWidth * nextDpr, nextHeight * nextDpr);
       }
     });
   }
@@ -468,14 +472,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
    * Request a color update (throttled)
    */
   requestColorUpdate(): void {
-    if (!this._updatePending) {
-      this._updatePending = true;
-      // Use requestAnimationFrame for smooth updates
-      this._updateFrameId = requestAnimationFrame(() => {
-        this._updateFrameId = null;
-        this.flushPendingColorUpdate();
-      });
-    }
+    this.ensureColorUpdates().request();
   }
 
   /**
@@ -486,15 +483,20 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
    * independently queued compositing callback.
    */
   flushPendingColorUpdate(): boolean {
-    if (!this._updatePending && !this.layerStack.needsComposite) return false;
-    if (this._updateFrameId !== null) {
-      cancelAnimationFrame(this._updateFrameId);
-      this._updateFrameId = null;
-    }
-    this._updatePending = false;
-    this.updateColors();
-    this.emit('render:needed', { surface: this });
-    return true;
+    return this.ensureColorUpdates().flush();
+  }
+
+  private createColorUpdateScheduler(): SurfaceColorUpdateScheduler {
+    return new SurfaceColorUpdateScheduler({
+      needsComposite: () => this.layerStack?.needsComposite ?? false,
+      updateColors: () => this.updateColors(),
+      onRenderNeeded: () => this.emit('render:needed', { surface: this })
+    });
+  }
+
+  private ensureColorUpdates(): SurfaceColorUpdateScheduler {
+    this.colorUpdates ??= this.createColorUpdateScheduler();
+    return this.colorUpdates;
   }
 
   /**
@@ -691,10 +693,10 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
       if (options?.smoothness !== undefined) existing.setSmoothness(options.smoothness);
     } else {
       const layer = new CurvatureLayer('curvature', curvature, {
-        brightness: options?.brightness,
-        contrast: options?.contrast,
-        smoothness: options?.smoothness,
-        order: -2
+        order: -2,
+        ...(options?.brightness === undefined ? {} : { brightness: options.brightness }),
+        ...(options?.contrast === undefined ? {} : { contrast: options.contrast }),
+        ...(options?.smoothness === undefined ? {} : { smoothness: options.smoothness })
       });
       this.layerStack.addLayer(layer);
     }
@@ -920,22 +922,24 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
                 props.dims,
                 {
                   colormap: colormapName,
-                  range: props.range,
-                  threshold: props.threshold,
-                  worldToIJK: props.worldToIJK,
-                  affineMatrix: props.affineMatrix ?? props.affine,
-                  voxelSize: props.voxelSize,
-                  volumeOrigin: props.volumeOrigin,
-                  useHalfFloat: props.useHalfFloat,
-                  fillValue: props.fillValue,
-                  projectionMode: props.projectionMode,
-                  sampling: props.sampling,
-                  quality: props.quality,
-                  ribbon: props.ribbon,
-                  visible: props.visible,
-                  opacity: props.opacity,
-                  blendMode: props.blendMode,
-                  order: props.order
+                  ...(props.range === undefined ? {} : { range: props.range }),
+                  ...(props.threshold === undefined ? {} : { threshold: props.threshold }),
+                  ...(props.worldToIJK === undefined ? {} : { worldToIJK: props.worldToIJK }),
+                  ...((props.affineMatrix ?? props.affine) === undefined
+                    ? {}
+                    : { affineMatrix: props.affineMatrix ?? props.affine }),
+                  ...(props.voxelSize === undefined ? {} : { voxelSize: props.voxelSize }),
+                  ...(props.volumeOrigin === undefined ? {} : { volumeOrigin: props.volumeOrigin }),
+                  ...(props.useHalfFloat === undefined ? {} : { useHalfFloat: props.useHalfFloat }),
+                  ...(props.fillValue === undefined ? {} : { fillValue: props.fillValue }),
+                  ...(props.projectionMode === undefined ? {} : { projectionMode: props.projectionMode }),
+                  ...(props.sampling === undefined ? {} : { sampling: props.sampling }),
+                  ...(props.quality === undefined ? {} : { quality: props.quality }),
+                  ...(props.ribbon === undefined ? {} : { ribbon: props.ribbon }),
+                  ...(props.visible === undefined ? {} : { visible: props.visible }),
+                  ...(props.opacity === undefined ? {} : { opacity: props.opacity }),
+                  ...(props.blendMode === undefined ? {} : { blendMode: props.blendMode }),
+                  ...(props.order === undefined ? {} : { order: props.order })
                 }
               );
             }
@@ -945,11 +949,11 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
               layer = new LabelLayer(id, {
                 labels: props.labels,
                 labelDefs: props.labelDefs,
-                defaultColor: props.defaultColor,
-                visible: props.visible,
-                opacity: props.opacity,
-                blendMode: props.blendMode,
-                order: props.order
+                ...(props.defaultColor === undefined ? {} : { defaultColor: props.defaultColor }),
+                ...(props.visible === undefined ? {} : { visible: props.visible }),
+                ...(props.opacity === undefined ? {} : { opacity: props.opacity }),
+                ...(props.blendMode === undefined ? {} : { blendMode: props.blendMode }),
+                ...(props.order === undefined ? {} : { order: props.order })
               });
             }
             break;
@@ -960,13 +964,13 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
                   ? props.colormap
                   : (props.cmap ?? 'viridis');
               layer = new ParcelValueLayer(id, props.parcelData, props.vertexLabels, colormapParcel, {
-                valueColumn: props.valueColumn,
-                range: props.range,
-                threshold: props.threshold,
-                visible: props.visible,
-                opacity: props.opacity,
-                blendMode: props.blendMode,
-                order: props.order
+                ...(props.valueColumn === undefined ? {} : { valueColumn: props.valueColumn }),
+                ...(props.range === undefined ? {} : { range: props.range }),
+                ...(props.threshold === undefined ? {} : { threshold: props.threshold }),
+                ...(props.visible === undefined ? {} : { visible: props.visible }),
+                ...(props.opacity === undefined ? {} : { opacity: props.opacity }),
+                ...(props.blendMode === undefined ? {} : { blendMode: props.blendMode }),
+                ...(props.order === undefined ? {} : { order: props.order })
               });
             }
             break;
@@ -974,17 +978,17 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
             if (props.roiLabels) {
               layer = new OutlineLayer(id, {
                 roiLabels: props.roiLabels,
-                color: props.color,
-                width: props.width,
-                opacity: props.opacity,
-                halo: props.halo,
-                haloColor: props.haloColor,
-                haloWidth: props.haloWidth,
-                offset: props.offset,
-                roiSubset: props.roiSubset,
-                visible: props.visible,
-                blendMode: props.blendMode,
-                order: props.order
+                ...(props.color === undefined ? {} : { color: props.color }),
+                ...(props.width === undefined ? {} : { width: props.width }),
+                ...(props.opacity === undefined ? {} : { opacity: props.opacity }),
+                ...(props.halo === undefined ? {} : { halo: props.halo }),
+                ...(props.haloColor === undefined ? {} : { haloColor: props.haloColor }),
+                ...(props.haloWidth === undefined ? {} : { haloWidth: props.haloWidth }),
+                ...(props.offset === undefined ? {} : { offset: props.offset }),
+                ...(props.roiSubset === undefined ? {} : { roiSubset: props.roiSubset }),
+                ...(props.visible === undefined ? {} : { visible: props.visible }),
+                ...(props.blendMode === undefined ? {} : { blendMode: props.blendMode }),
+                ...(props.order === undefined ? {} : { order: props.order })
               });
             }
             break;
@@ -997,13 +1001,13 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
                 props.times,
                 colormapTemporal,
                 {
-                  range: props.range,
-                  threshold: props.threshold,
-                  factor: props.factor,
-                  visible: props.visible,
-                  opacity: props.opacity,
-                  blendMode: props.blendMode,
-                  order: props.order
+                  ...(props.range === undefined ? {} : { range: props.range }),
+                  ...(props.threshold === undefined ? {} : { threshold: props.threshold }),
+                  ...(props.factor === undefined ? {} : { factor: props.factor }),
+                  ...(props.visible === undefined ? {} : { visible: props.visible }),
+                  ...(props.opacity === undefined ? {} : { opacity: props.opacity }),
+                  ...(props.blendMode === undefined ? {} : { blendMode: props.blendMode }),
+                  ...(props.order === undefined ? {} : { order: props.order })
                 }
               );
             }
@@ -1011,13 +1015,13 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
           case 'curvature':
             if (props.curvature) {
               layer = new CurvatureLayer(id, props.curvature, {
-                brightness: props.brightness,
-                contrast: props.contrast,
-                smoothness: props.smoothness,
-                visible: props.visible,
-                opacity: props.opacity,
-                blendMode: props.blendMode,
-                order: props.order ?? -2
+                order: props.order ?? -2,
+                ...(props.brightness === undefined ? {} : { brightness: props.brightness }),
+                ...(props.contrast === undefined ? {} : { contrast: props.contrast }),
+                ...(props.smoothness === undefined ? {} : { smoothness: props.smoothness }),
+                ...(props.visible === undefined ? {} : { visible: props.visible }),
+                ...(props.opacity === undefined ? {} : { opacity: props.opacity }),
+                ...(props.blendMode === undefined ? {} : { blendMode: props.blendMode })
               });
             }
             break;
@@ -1057,7 +1061,9 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     });
     
     if (needsUpdate) {
-      this.emit('layer:updated', { surface: this, layer: this.layerStack.getLayer(updates[0].id) });
+      const firstUpdate = updates[0];
+      const updatedLayer = firstUpdate ? this.layerStack.getLayer(firstUpdate.id) : undefined;
+      if (updatedLayer) this.emit('layer:updated', { surface: this, layer: updatedLayer });
       this.requestColorUpdate();
     }
   }
@@ -1108,30 +1114,16 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
    * Update colors using CPU compositing (original method)
    */
   private updateColorsCPU(): void {
-    // Initialize composite buffer with base color (not zeros/transparent black)
-    // This provides a fallback if overlay data is invalid/transparent
-    const baseColor = (this.config as MultiLayerSurfaceConfig).baseColor || 0xcccccc;
-    const baseColorNum = typeof baseColor === 'number' ? baseColor : new THREE.Color(baseColor).getHex();
-    const r = ((baseColorNum >> 16) & 255) / 255;
-    const g = ((baseColorNum >> 8) & 255) / 255;
-    const b = (baseColorNum & 255) / 255;
-
-    // Initialize all vertices with base color (full alpha)
-    for (let i = 0; i < this.compositeBuffer.length; i += 4) {
-      this.compositeBuffer[i] = r;
-      this.compositeBuffer[i + 1] = g;
-      this.compositeBuffer[i + 2] = b;
-      this.compositeBuffer[i + 3] = 1.0;
-    }
-
-    debugLog(`MultiLayerNeuroSurface: updateColorsCPU initialized with base color rgb(${r.toFixed(2)}, ${g.toFixed(2)}, ${b.toFixed(2)})`);
+    // Every visible color, including the anatomical base, is an ordered layer.
+    // A genuinely empty/hidden stack therefore remains transparent.
+    this.compositeBuffer.fill(0);
 
     // Get visible layers in order
     const visibleLayers = this.layerStack
       .getVisibleLayers()
       .filter(layer => !(layer instanceof OutlineLayer) && !(layer instanceof ConnectivityLayer));
 
-    debugLog(`MultiLayerNeuroSurface: updateColorsCPU found ${visibleLayers.length} visible layers`);
+    debugLog('MultiLayerNeuroSurface: updateColorsCPU found', visibleLayers.length, 'visible layers');
 
     if (visibleLayers.length === 0) {
       debugLog('No visible layers');
@@ -1139,24 +1131,33 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
       return;
     }
 
+    const collectDebugStats = isDebugEnabled();
+
     // Composite each layer
     for (const layer of visibleLayers) {
       try {
-        debugLog(`MultiLayerNeuroSurface: Processing layer ${layer.id} (type: ${layer.constructor.name})`);
+        debugLog('MultiLayerNeuroSurface: Processing layer', layer.id, '(type:', layer.constructor.name, ')');
         const layerRGBA = layer.getRGBAData(this.vertexCount);
+        const expectedLength = this.vertexCount * 4;
+        if (layerRGBA.length !== expectedLength) {
+          throw new RangeError(
+            `Layer ${layer.id} returned ${layerRGBA.length} RGBA values; expected ${expectedLength}`
+          );
+        }
 
         // Debug: sample first few values
-        if (layerRGBA.length >= 8) {
+        if (collectDebugStats && layerRGBA.length >= 8) {
           const sample = Array.from(layerRGBA.slice(0, 8)).map(v => v.toFixed(3));
           debugLog(`MultiLayerNeuroSurface: Layer ${layer.id} RGBA sample [0..7]: ${sample.join(', ')}`);
         }
 
-        // Count non-transparent pixels
-        let nonTransparentCount = 0;
-        for (let i = 3; i < layerRGBA.length; i += 4) {
-          if (layerRGBA[i] > 0) nonTransparentCount++;
+        if (collectDebugStats) {
+          let nonTransparentCount = 0;
+          for (let i = 3; i < layerRGBA.length; i += 4) {
+            if (layerRGBA[i]! > 0) nonTransparentCount++;
+          }
+          debugLog(`MultiLayerNeuroSurface: Layer ${layer.id} has ${nonTransparentCount}/${this.vertexCount} non-transparent vertices`);
         }
-        debugLog(`MultiLayerNeuroSurface: Layer ${layer.id} has ${nonTransparentCount}/${this.vertexCount} non-transparent vertices`);
 
         this.compositeLayer(layerRGBA, layer);
         layer.needsUpdate = false;
@@ -1181,65 +1182,12 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
    * Composite a single layer into the buffer
    */
   private compositeLayer(layerRGBA: Float32Array, layer: Layer): void {
-    const blendMode = layer.blendMode;
-    const opacity = layer.opacity;
-    
-    for (let i = 0; i < this.vertexCount; i++) {
-      const offset = i * 4;
-      const srcR = layerRGBA[offset];
-      const srcG = layerRGBA[offset + 1];
-      const srcB = layerRGBA[offset + 2];
-      const srcA = layerRGBA[offset + 3] * opacity;
-      
-      if (srcA === 0) continue; // Skip transparent pixels
-      
-      const dstR = this.compositeBuffer[offset];
-      const dstG = this.compositeBuffer[offset + 1];
-      const dstB = this.compositeBuffer[offset + 2];
-      const dstA = this.compositeBuffer[offset + 3];
-      
-      switch (blendMode) {
-        case 'normal': {
-          // Standard alpha blending
-          const alpha = srcA + dstA * (1 - srcA);
-          if (alpha > 0) {
-            this.compositeBuffer[offset] = (srcR * srcA + dstR * dstA * (1 - srcA)) / alpha;
-            this.compositeBuffer[offset + 1] = (srcG * srcA + dstG * dstA * (1 - srcA)) / alpha;
-            this.compositeBuffer[offset + 2] = (srcB * srcA + dstB * dstA * (1 - srcA)) / alpha;
-            this.compositeBuffer[offset + 3] = alpha;
-          }
-          break;
-        }
-          
-        case 'additive':
-          // Additive blending (good for activations)
-          this.compositeBuffer[offset] = Math.min(1, dstR + srcR * srcA);
-          this.compositeBuffer[offset + 1] = Math.min(1, dstG + srcG * srcA);
-          this.compositeBuffer[offset + 2] = Math.min(1, dstB + srcB * srcA);
-          this.compositeBuffer[offset + 3] = Math.min(1, dstA + srcA);
-          break;
-          
-        case 'multiply': {
-          // Multiply blending
-          const invSrcA = 1 - srcA;
-          this.compositeBuffer[offset] = dstR * (invSrcA + srcR * srcA);
-          this.compositeBuffer[offset + 1] = dstG * (invSrcA + srcG * srcA);
-          this.compositeBuffer[offset + 2] = dstB * (invSrcA + srcB * srcA);
-          this.compositeBuffer[offset + 3] = dstA + srcA * (1 - dstA);
-          break;
-        }
-      }
-    }
-  }
-
-  /**
-   * Check if composite buffer has any non-zero alpha values (valid color data)
-   */
-  private hasValidColorData(): boolean {
-    for (let i = 3; i < this.compositeBuffer.length; i += 4) {
-      if (this.compositeBuffer[i] > 0) return true;
-    }
-    return false;
+    compositeStraightRGBABuffer(
+      this.compositeBuffer,
+      layerRGBA,
+      layer.blendMode,
+      layer.opacity
+    );
   }
 
   /**
@@ -1250,19 +1198,6 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
 
     const geometry = this.mesh.geometry as THREE.BufferGeometry;
     const material = this.mesh.material as THREE.MeshPhongMaterial;
-
-    // Check if we have valid color data before enabling vertex colors
-    const hasValidColors = this.hasValidColorData();
-
-    debugLog(`MultiLayerNeuroSurface: applyCompositeToMesh hasValidColors=${hasValidColors}`);
-
-    if (!hasValidColors) {
-      // No valid overlay colors - use material base color instead
-      material.vertexColors = false;
-      material.needsUpdate = true;
-      debugLog('MultiLayerNeuroSurface: No valid colors, using material base color');
-      return;
-    }
 
     // Get or create color attribute
     let colorAttribute = geometry.getAttribute('color') as THREE.BufferAttribute | undefined;
@@ -1287,21 +1222,26 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     // Only enable vertex colors AFTER valid data exists
     material.vertexColors = true;
     material.transparent = true;
+    material.depthTest = true;
+    material.depthWrite = false;
+    material.blending = THREE.NormalBlending;
+    material.premultipliedAlpha = false;
     material.needsUpdate = true;
 
     debugLog('MultiLayerNeuroSurface: Applied vertex colors to mesh');
 
-    // Debug: Log mesh and geometry state
-    debugLog('MultiLayerNeuroSurface: Mesh state:', {
-      meshExists: !!this.mesh,
-      geometryExists: !!geometry,
-      positionCount: geometry.getAttribute('position')?.count,
-      colorCount: colorAttribute.count,
-      indexCount: geometry.getIndex()?.count,
-      materialVertexColors: material.vertexColors,
-      materialVisible: material.visible,
-      meshVisible: this.mesh?.visible,
-    });
+    if (isDebugEnabled()) {
+      debugLog('MultiLayerNeuroSurface: Mesh state:', {
+        meshExists: !!this.mesh,
+        geometryExists: !!geometry,
+        positionCount: geometry.getAttribute('position')?.count,
+        colorCount: colorAttribute.count,
+        indexCount: geometry.getIndex()?.count,
+        materialVertexColors: material.vertexColors,
+        materialVisible: material.visible,
+        meshVisible: this.mesh?.visible,
+      });
+    }
 
     // Only compute bounding box/sphere if not already computed
     // (positions don't change during color updates)
@@ -1321,12 +1261,16 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     return new THREE.MeshPhongMaterial({
       vertexColors: false, // Start false until color attribute has valid data
       transparent: true,
+      depthTest: true,
+      depthWrite: false,
+      blending: THREE.NormalBlending,
+      premultipliedAlpha: false,
       opacity: 1, // We handle opacity per-vertex
-      shininess: this.config.shininess || 30,
-      specular: new THREE.Color(this.config.specularColor || 0x111111),
-      flatShading: this.config.flatShading || false,
+      shininess: this.config.shininess ?? 30,
+      specular: new THREE.Color(this.config.specularColor ?? 0x111111),
+      flatShading: this.config.flatShading ?? false,
       side: THREE.DoubleSide, // Ensure both sides are visible
-      color: new THREE.Color((this.config as MultiLayerSurfaceConfig).baseColor || 0xcccccc) // Fallback base color
+      color: new THREE.Color((this.config as MultiLayerSurfaceConfig).baseColor ?? 0xcccccc)
     });
   }
 
@@ -1364,12 +1308,14 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     geometry.computeBoundingBox();
     geometry.computeBoundingSphere();
 
-    debugLog('MultiLayerNeuroSurface: createMesh complete', {
-      vertexCount: this.geometry.vertices.length / 3,
-      faceCount: this.geometry.faces.length / 3,
-      boundingSphereRadius: geometry.boundingSphere?.radius,
-      boundingSphereCenter: geometry.boundingSphere?.center.toArray(),
-    });
+    if (isDebugEnabled()) {
+      debugLog('MultiLayerNeuroSurface: createMesh complete', {
+        vertexCount: this.geometry.vertices.length / 3,
+        faceCount: this.geometry.faces.length / 3,
+        boundingSphereRadius: geometry.boundingSphere?.radius,
+        boundingSphereCenter: geometry.boundingSphere?.center.toArray(),
+      });
+    }
 
     // Initial color update
     this.updateColors();
@@ -1381,13 +1327,15 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
    * Switch compositing mode between CPU and GPU
    */
   setCompositingMode(useGPU: boolean): void {
+    this.gpuCompositingRequested = useGPU;
     if (useGPU === this.useGPUCompositing) return; // No change needed
     
     this.useGPUCompositing = useGPU;
     
     if (useGPU) {
-      if (!this.supportsWebGL2()) {
-        console.warn('GPU compositing requires WebGL2; keeping CPU mode');
+      const capacity = this.assessGPUCompositingCapacity();
+      if (!capacity.supported) {
+        console.warn(`GPU compositing unavailable: ${capacity.reason}; keeping CPU mode`);
         this.useGPUCompositing = false;
         return;
       }
@@ -1439,6 +1387,13 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     this.emit('material:updated', { surface: this });
   }
 
+  /** Activate the constructor-requested GPU path once a viewer renderer exists. */
+  activateConfiguredCompositor(): void {
+    if (this.gpuCompositingRequested) {
+      this.setCompositingMode(true);
+    }
+  }
+
   setWideLines(useWide: boolean): void {
     if (useWide === this.useWideLines) return;
     this.useWideLines = useWide;
@@ -1461,20 +1416,26 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     return this.useGPUCompositing ? 'GPU' : 'CPU';
   }
 
-  private supportsWebGL2(): boolean {
+  private assessGPUCompositingCapacity(): ReturnType<typeof GPULayerCompositor.assessCapacity> {
     const renderer = (this.viewer as any)?.renderer;
-    return !!(renderer && renderer.capabilities && renderer.capabilities.isWebGL2);
+    if (!renderer?.capabilities) {
+      return Object.freeze({
+        supported: false,
+        reason: 'a viewer WebGL renderer is required',
+        requiredVertexTextureUnits: 10,
+        availableVertexTextureUnits: 0,
+        requiredTextureSize: Math.ceil(Math.sqrt(this.vertexCount)),
+        availableTextureSize: 0
+      });
+    }
+    return GPULayerCompositor.assessCapacity(renderer, this.vertexCount);
   }
 
   /**
    * Dispose of all resources
    */
   dispose(): void {
-    if (this._updateFrameId !== null) {
-      cancelAnimationFrame(this._updateFrameId);
-      this._updateFrameId = null;
-      this._updatePending = false;
-    }
+    this.colorUpdates?.dispose();
     // Remove outline and connectivity objects to avoid orphaned materials
     this.layerStack.getAllLayers().forEach(layer => {
       if (layer instanceof OutlineLayer) {

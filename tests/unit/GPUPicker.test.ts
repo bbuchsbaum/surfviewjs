@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import {
+  GPUPicker,
   buildFacePickGeometry,
   getFaceVertexIndices,
   pickNearestVertexOnFace
@@ -44,6 +45,8 @@ describe('GPUPicker helpers', () => {
     expect(getFaceVertexIndices(geometry, 0)).toEqual([0, 1, 2]);
     expect(getFaceVertexIndices(geometry, 1)).toEqual([2, 1, 3]);
     expect(getFaceVertexIndices(geometry, 2)).toBeNull();
+    expect(getFaceVertexIndices(geometry, 0.5)).toBeNull();
+    expect(getFaceVertexIndices(geometry, Number.NaN)).toBeNull();
   });
 
   it('chooses the nearest original vertex on the picked face', () => {
@@ -70,5 +73,13 @@ describe('GPUPicker helpers', () => {
     expect(hit.point?.x).toBeCloseTo(10.9, 5);
     expect(hit.point?.y).toBeCloseTo(0.05, 5);
     expect(hit.point?.z).toBeCloseTo(0, 5);
+  });
+
+  it('rejects an invalid throttle before changing picker state', () => {
+    const picker = new GPUPicker({} as THREE.WebGLRenderer);
+    picker.setThrottleMs(8);
+    expect(() => picker.setThrottleMs(Number.NaN)).toThrow(/finite/);
+    expect((picker as unknown as { pickThrottleMs: number }).pickThrottleMs).toBe(8);
+    picker.dispose();
   });
 });

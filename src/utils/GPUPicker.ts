@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { debugLog } from '../debug';
+import { finiteNumber } from './validation';
 
 /**
  * Result of a GPU pick operation
@@ -111,17 +112,18 @@ export function getFaceVertexIndices(
   faceIndex: number
 ): [number, number, number] | null {
   const position = geometry.getAttribute('position') as THREE.BufferAttribute | undefined;
-  if (!position || faceIndex < 0) {
+  if (!position || !Number.isSafeInteger(faceIndex) || faceIndex < 0) {
     return null;
   }
 
   if (geometry.index) {
     const index = geometry.index.array as ArrayLike<number>;
     const offset = faceIndex * 3;
-    if (offset + 2 >= geometry.index.count) {
+    if (offset + 2 >= geometry.index.count || offset + 2 >= index.length) {
       return null;
     }
-    return [index[offset], index[offset + 1], index[offset + 2]];
+    // The count and backing-array checks above prove this full face is present.
+    return [index[offset]!, index[offset + 1]!, index[offset + 2]!];
   }
 
   const offset = faceIndex * 3;
@@ -293,7 +295,7 @@ export class GPUPicker {
     });
     this.nextFaceBaseId += faceCount;
 
-    debugLog(`GPUPicker: Added surface "${id}" with ${faceCount} faces`);
+    debugLog('GPUPicker: Added surface', id, 'with', faceCount, 'faces');
   }
 
   /**
@@ -307,7 +309,7 @@ export class GPUPicker {
     surface.pickMesh.geometry.dispose();
     this.surfaces.delete(id);
 
-    debugLog(`GPUPicker: Removed surface "${id}"`);
+    debugLog('GPUPicker: Removed surface', id);
     return true;
   }
 
@@ -342,7 +344,7 @@ export class GPUPicker {
    * Set the minimum time between pick operations (for throttling).
    */
   setThrottleMs(ms: number): void {
-    this.pickThrottleMs = Math.max(0, ms);
+    this.pickThrottleMs = finiteNumber(ms, 'throttleMs', { minimum: 0 });
   }
 
   /**
@@ -435,9 +437,10 @@ export class GPUPicker {
     this.renderer.setClearColor(this.savedClearColor, currentClearAlpha);
 
     // Decode face index from RGB
-    const r = this.pixelBuffer[0];
-    const g = this.pixelBuffer[1];
-    const b = this.pixelBuffer[2];
+    // `pixelBuffer` is a private, fixed four-byte render-target buffer.
+    const r = this.pixelBuffer[0]!;
+    const g = this.pixelBuffer[1]!;
+    const b = this.pixelBuffer[2]!;
     const encodedFaceId = r | (g << 8) | (b << 16);
 
     // Check for no-hit

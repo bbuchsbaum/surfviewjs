@@ -84,6 +84,13 @@ layer.getFactorDescriptor(); // FactorDescriptor | null
 
 ## TimelineController
 
+Timeline times must be finite and ascending. Playback speed is a positive finite
+multiplier; seek targets must be finite (finite out-of-range targets are
+clamped). `TemporalDataLayer.setTime()` requires in-range integer frame indices
+and an interpolation alpha in `[0, 1]`. Invalid values throw
+`NumericValidationError` before playback state, frame buffers, revisions, or
+events change.
+
 A pure playback state machine that knows nothing about layers or rendering. It uses `requestAnimationFrame` internally and emits events with frame interpolation data.
 
 ### Constructor
@@ -159,6 +166,12 @@ new SparklineOverlay(container: HTMLElement, options?: SparklineOptions)
 | `bgColor` | `string` | `'rgba(0,0,0,0.85)'` | Background color |
 | `timeMarkerColor` | `string` | `'#ff4444'` | Vertical playhead marker color |
 | `padding` | `number` | 8 | Internal padding |
+
+Canvas dimensions are positive integers. Padding is finite and nonnegative and
+must leave a positive drawing area. `show()` requires one finite, strictly
+increasing time per series value, finite current/screen coordinates, and a
+matching factor assignment length. `updateTimeMarker()` accepts only finite
+times; rejection leaves the cached marker and canvas visibility unchanged.
 
 ### Methods
 
@@ -240,7 +253,7 @@ import {
 // Setup
 const container = document.getElementById('viewer');
 const viewer = new NeuroSurfaceViewer(container, 800, 600, {
-  enableHoverCrosshair: true
+  hoverCrosshair: true
 });
 
 const geometry = await loadSurface('brain.surf.gii', 'gifti', 'left');
@@ -281,8 +294,10 @@ timeline.on('timechange', (e) => sparkline.updateTimeMarker(e.time));
 
 // Start
 timeline.play();
-viewer.startRenderLoop();
 ```
+
+Timeline changes invalidate the layer and schedule on-demand viewer renders; a
+permanent viewer render loop is not required.
 
 ## Cleanup
 
@@ -291,5 +306,5 @@ Always dispose temporal resources when done:
 ```javascript
 timeline.dispose();   // stops rAF, removes listeners
 sparkline.dispose();  // removes canvas from DOM
-surface.dispose();    // disposes layers + geometry
+viewer.dispose();     // disposes the registered surface and viewer resources
 ```

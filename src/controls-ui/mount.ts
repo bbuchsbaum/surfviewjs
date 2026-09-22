@@ -124,8 +124,8 @@ export function mountSurfViewControls(
     id: pluginId,
     mount(host) {
       session = createManagedViewerControlSession(viewer, {
-        target: options.target,
-        session: options.session
+        ...(options.target === undefined ? {} : { target: options.target }),
+        ...(options.session === undefined ? {} : { session: options.session })
       });
       try {
         element = host.ownerDocument.createElement(

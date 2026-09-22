@@ -1,456 +1,157 @@
 # SurfView.js
 
-A modular Three.js-based brain surface visualization library for neuroimaging applications.
+[Guide](https://bbuchsbaum.github.io/surfviewjs/) ·
+[API reference](https://bbuchsbaum.github.io/surfviewjs/api/) ·
+[Demo](https://bbuchsbaum.github.io/surfviewjs/demo/) ·
+[npm](https://www.npmjs.com/package/surfview)
 
-**[Live Demo](https://bbuchsbaum.github.io/surfviewjs/demo/)** | **[Documentation](https://bbuchsbaum.github.io/surfviewjs/)**
+SurfView.js is a TypeScript library for rendering interactive cortical surfaces
+in the browser. It keeps mesh geometry, ordered data overlays, scientific color
+mappings, picking, and temporal playback in one typed viewer model built on
+Three.js.
 
-## Features
+Use it when a neuroimaging application needs to own its page and data flow while
+SurfView owns the canvas, scene, and GPU resources. Rendering is on demand by
+default, and optional controls mount into a container supplied by the host
+application.
 
-- High-performance 3D brain surface rendering
-- Multiple layer support with blending modes
-- GPU volume-to-surface projection (WebGL2) via `VolumeProjectionLayer`
-- Customizable colormaps for data visualization
-- React component support
-- Temporal playback with frame interpolation and sparkline tooltips
-- Optional first-party scientific controls, compact report controls, and a plugin API
-- Support for GIFTI format
-- TypeScript support
+> **Runtime boundary:** construct a viewer only in a browser with WebGL. The
+> package declares Node.js 22 or newer for build tooling and server-side imports;
+> GPU rendering remains a browser responsibility.
 
-## Installation
-
-Install the library with its Three.js peer dependency. React bindings need React 18+.
+## Install
 
 ```bash
 npm install surfview three
-# React apps
-npm install react react-dom
 ```
 
-The first-party panel lives at `surfview/controls`, its React adapter at
-`surfview/controls/react`, and portable report mounting at `surfview/report`.
-See the [controls guide](docs/guide/controls.md) for package boundaries and
-integration contracts.
+`three` is a required peer dependency. React is optional and is needed only for
+the `surfview/react` or `surfview/controls/react` entry points.
 
-## Quick Start
+## Quick start
 
-### Basic Usage (Vanilla JS)
-```javascript
-import { NeuroSurfaceViewer, SurfaceGeometry, ColorMappedNeuroSurface } from 'surfview';
+Add `<div id="viewer"></div>` to the page, then run the following as a browser
+module. The small triangle makes the example self-contained; replace its typed
+arrays with a loaded cortical mesh for real data.
 
-const container = document.getElementById('viewer-container');
-const viewer = new NeuroSurfaceViewer(container, 800, 600, { preset: 'paper-light' });
-
-// Typed arrays for vertices (xyz) and faces (triangle indices)
-const geometry = new SurfaceGeometry(
-  myVerticesFloat32Array,
-  myFacesUint32Array,
-  'left' // hemisphere tag
-);
-
-const surface = new ColorMappedNeuroSurface(
-  geometry,
-  null,
-  myActivationDataFloat32Array,
-  'viridis'
-);
-
-viewer.addSurface(surface, 'brain');
-viewer.startRenderLoop();
-```
-
-### Optional Scientific Controls
-
-Mount the first-party panel into a container owned by your application. It is
-an ordinary DOM sibling of the canvas: mounting it does not add scene objects,
-move the camera, or rearrange the host page.
-
-```javascript
-import { mountSurfViewControls } from 'surfview/controls';
-
-const controls = mountSurfViewControls(
-  viewer,
-  document.getElementById('controls'),
-  { theme: 'auto', density: 'compact' }
-);
-
-// Removes the panel and its subscriptions; safe to call more than once.
-controls.dispose();
-```
-
-Try the [full configuration gallery](https://bbuchsbaum.github.io/surfviewjs/demo/?scenario=controls-gallery)
-or read the [controls guide](docs/guide/controls.md) for feature subsets, React,
-report scenes, lifecycle, and migration from the former pane API.
-
-## Demo Hub
-
-Run a unified, menu-driven set of visual checks:
-
-```bash
-npm run demo
-```
-
-This starts a Vite-powered demo app under `demo/` with scenarios for quick-start rendering, multi-layer compositing, lighting/material tuning, hemisphere layouts, and file loading (using fixtures in `tests/data`). Use it for quick sanity passes before releases.
-
-### React Usage
-
-```jsx
-import React, { useRef } from 'react';
-import { NeuroSurfaceViewerReact, useNeuroSurface } from 'surfview/react';
-
-function BrainViewer() {
-  const viewerRef = useRef();
-  const { addSurface } = useNeuroSurface(viewerRef);
-
-  const handleReady = () => {
-    addSurface({
-      type: 'multi-layer',
-      vertices: vertexData,
-      faces: faceData,
-      hemisphere: 'left',
-      config: { baseColor: 0xdddddd }
-    });
-  };
-
-  return (
-    <NeuroSurfaceViewerReact
-      ref={viewerRef}
-      width={window.innerWidth}
-      height={window.innerHeight}
-      config={{
-        ambientLightColor: 0x404040
-      }}
-      viewpoint="lateral"
-      onReady={handleReady}
-    />
-  );
-}
-```
-
-## Core Components
-
-### NeuroSurfaceViewer
-The main viewer class that manages the Three.js scene, camera, and rendering.
-
-### Surface Types
-
-- **NeuroSurface**: Basic surface with solid color
-- **ColorMappedNeuroSurface**: Surface with data-driven colormapping
-- **VertexColoredNeuroSurface**: Surface with per-vertex colors
-- **MultiLayerNeuroSurface**: Surface supporting multiple data layers
-
-### Layer System
-
-Layers allow you to overlay multiple data visualizations on the same surface:
-
-- **BaseLayer**: The foundational surface layer
-- **DataLayer**: Scalar data with colormap
-- **RGBALayer**: Pre-computed RGBA colors per vertex
-- **VolumeProjectionLayer**: Sample a 3D volume texture at each vertex (GPU compositing)
-- **TemporalDataLayer**: Time-varying scalar data with frame interpolation
-- **OutlineLayer**: ROI boundary outlines
-- **LabelLayer**: Discrete region labels
-
-```javascript
-// Add a data layer to existing surface
-surface.addLayer(new DataLayer(
-  'activation',
-  activationData,
-  {
-    colorMap: 'hot',
-    range: [-5, 5],
-    opacity: 0.7,
-    blendMode: 'additive'
-  }
-));
-```
-
-```javascript
-// GPU volume-to-surface overlay (WebGL2 + GPU compositing)
-import { VolumeProjectionLayer } from 'surfview';
-
-surface.setCompositingMode(true);
-surface.addLayer(new VolumeProjectionLayer('volume', volumeData, [nx, ny, nz], {
-  affineMatrix,           // voxel->world (column-major)
-  colormap: 'hot',
-  range: [-3, 3],
-  threshold: [-1.96, 1.96],
-  opacity: 0.85
-}));
-surface.updateColors();
-```
-
-#### Layer management quick hits
-- Add: `surface.addLayer(layer)` where `layer` is `BaseLayer`, `DataLayer`, `RGBALayer`, `VolumeProjectionLayer`, `OutlineLayer`, or `LabelLayer`.
-- Update: `surface.updateLayer(id, updates)` for single-layer tweaks or `surface.updateLayers([{ id, ...updates }])` for batches (no `type` required when updating).
-- Order: read `surface.getOrderedLayers()`, then use the typed, atomic
-  `surface.setLayerOrder([...])` or `surface.moveLayer(id, index)` commands.
-  Anatomy underlays and outline/connectivity overlays remain pinned.
-- Clear: `surface.clearLayers()` removes all non-base layers; pass `{ includeBase: true }` to drop the base too.
-- CPU vs GPU compositing: pass `useGPUCompositing: true` in `MultiLayerNeuroSurface` config to enable WebGL2-based blending; call `surface.setWideLines(false)` if your platform dislikes wide-line outlines.
-
-## Temporal Playback
-
-Animate time-series data on a brain surface with smooth frame interpolation, playback controls, and hover sparkline tooltips.
-
-```javascript
+<!-- example:quickstart:start -->
+```ts
 import {
-  MultiLayerNeuroSurface, TemporalDataLayer,
-  TimelineController, SparklineOverlay
+  DataLayer,
+  MultiLayerNeuroSurface,
+  NeuroSurfaceViewer,
+  SurfaceGeometry
 } from 'surfview';
 
-// frames: array of Float32Arrays (one per timepoint, each of length vertexCount)
-// times: sorted array of time values (same length as frames)
-const temporalLayer = new TemporalDataLayer('activation', frames, times, 'hot', {
-  range: [0, 1],
-  threshold: [0.15, 0],
-  opacity: 0.85
-});
+const container = document.querySelector<HTMLElement>('#viewer');
+if (!container) throw new Error('Expected a #viewer element.');
 
-surface.addLayer(temporalLayer);
+const geometry = new SurfaceGeometry(
+  new Float32Array([-1, -1, 0, 1, -1, 0, 0, 1, 0]),
+  new Uint32Array([0, 1, 2]),
+  'left'
+);
+const surface = new MultiLayerNeuroSurface(geometry, { baseColor: 0xb8bec8 });
+surface.addLayer(new DataLayer(
+  'activation',
+  new Float32Array([-2, 0, 2]),
+  null,
+  'coolwarm',
+  { range: [-2, 2] }
+));
 
-// Timeline controller drives playback (decoupled from rendering)
-const timeline = new TimelineController(times, { speed: 0.5, loop: 'loop' });
+const viewer = new NeuroSurfaceViewer(container, 800, 600, { preset: 'paper-light' });
+viewer.addSurface(surface, 'left-cortex');
 
-timeline.on('timechange', (e) => {
-  temporalLayer.setTime(e.frameA, e.frameB, e.alpha);
-  surface.requestColorUpdate();
-});
-
-timeline.play();
+window.addEventListener('pagehide', () => viewer.dispose(), { once: true });
 ```
+<!-- example:quickstart:end -->
 
-### Sparkline Tooltips
+Adding the surface schedules one coalesced frame; a permanent animation loop is
+not required. `viewer.dispose()` releases listeners, surfaces, controls,
+post-processing objects, renderer resources, and the WebGL context.
 
-Show a per-vertex time-series sparkline on hover with a playback position marker:
+This exact example is compiled in strict mode from a clean packed-package
+consumer. Continue with [loading a real surface](docs/guide/surfaces.md#loading-surfaces)
+or the [guided first workflow](docs/guide/getting-started.md).
 
-```javascript
-const sparkline = new SparklineOverlay(container, {
-  width: 220, height: 90,
-  lineColor: '#ff8800', timeMarkerColor: '#ff2222'
-});
+## What it covers
 
-viewer.on('vertex:hover', (e) => {
-  if (e.vertexIndex !== null) {
-    const series = temporalLayer.getTimeSeries(e.vertexIndex);
-    sparkline.show(series, times, timeline.getState().currentTime, e.screenX, e.screenY);
-  } else {
-    sparkline.hide();
-  }
-});
+- Load validated GIFTI, FreeSurfer triangle, and supported PLY surface files.
+- Compose scalar, RGBA, label, outline, connectivity, volume-projection, and
+  temporal layers in an explicit order.
+- Pick vertices, synchronize 2D flatmaps, annotate surfaces, and coordinate
+  bilateral anatomical views.
+- Mount opt-in DOM or React controls without putting UI state in the Three.js
+  scene graph.
+- Export portable report scenes with manifest-backed labels, units, legends,
+  provenance, and displayed-map policy.
 
-timeline.on('timechange', (e) => sparkline.updateTimeMarker(e.time));
-```
+## Package entry points
 
-### TimelineController API
+| Import | Use | Published format |
+| --- | --- | --- |
+| `surfview` | Core viewer, surfaces, layers, loaders, and utilities | ESM plus the 2.x CommonJS/UMD compatibility build |
+| `surfview/react` | React viewer and hook | ESM |
+| `surfview/controls` | Host-mounted scientific controls | ESM |
+| `surfview/controls/react` | React controls adapter | ESM |
+| `surfview/report` | Portable report-scene mounting | ESM |
 
-- `play()`, `pause()`, `stop()`, `toggle()` -- playback control
-- `seek(time)` -- jump to a specific time
-- `setSpeed(multiplier)` -- e.g. `0.5` for half speed, `2` for double
-- `setLoop('none' | 'loop' | 'bounce')` -- loop mode
-- `getState()` -- returns `{ currentTime, playing, speed, loopMode, frameA, frameB, alpha }`
-- Events: `'timechange'`, `'play'`, `'pause'`, `'stop'`
+The package exports declarations for every entry point. Optional React and
+controls code is kept out of the core entry and has independent bundle budgets.
+See [Reliability and contracts](docs/guide/reliability.md) for exact runtime,
+loader, numerical, lifecycle, and performance boundaries.
 
-## Available Colormaps
+## Fit and boundaries
 
-The library includes many standard scientific colormaps:
-- Sequential: `viridis`, `plasma`, `inferno`, `magma`, `hot`, `cool`
-- Diverging: `RdBu`, `bwr`, `coolwarm`, `seismic`, `Spectral`
-- Qualitative: `jet`, `hsv`, `rainbow`
-- Monochrome: `greys`, `blues`, `reds`, `greens`
+SurfView is a good fit for browser applications that already have cortical
+geometry and vertex-aligned data. It does not perform registration, statistical
+model fitting, or scientific calibration. Its statistical helpers have narrow,
+documented estimands; for example, `tToZ(t, df)` preserves the signed Student-t
+cumulative probability and is not a large-sample substitution of `z = t`.
 
-## Loading Data
+WebGL is required. Features that need WebGL2 or particular texture capabilities
+report unsupported hardware or use a documented CPU path. Loader limits and
+validation protect the application boundary, but applications still decide
+which URLs and data are trusted.
 
-### GIFTI Format
+Performance numbers are workload- and runner-specific. The repository publishes
+the exact meshes, layer counts, synchronization method, memory accounting, and
+checked ceilings in its [benchmark report](docs/performance/benchmark-report.md)
+instead of claiming a universal frame rate.
 
-```javascript
-import { loadSurface, ColorMappedNeuroSurface } from 'surfview';
+## Documentation
 
-const geometry = await loadSurface('path/to/surface.gii', 'gifti', 'left');
-const surface = new ColorMappedNeuroSurface(geometry, null, dataArray, 'coolwarm');
-viewer.addSurface(surface, 'lh-brain');
-
-// Node/SSR: loadSurface will auto-use jsdom if present; otherwise supply a DOMParser:
-// const domParser = new (await import('jsdom')).JSDOM().window.DOMParser;
-// const geometry = parseGIfTISurface(giftiXml, domParser);
-```
-
-### Custom Data Format
-
-```javascript
-const surfaceData = {
-  vertices: Float32Array, // x,y,z coordinates
-  faces: Uint32Array,     // triangle indices
-  data: Float32Array      // optional per-vertex data
-};
-```
-
-## API Reference
-
-### NeuroSurfaceViewer
-
-#### Constructor
-`new NeuroSurfaceViewer(container: HTMLElement, width: number, height: number, config?: ViewerConfig, viewpoint?: Viewpoint)`
-
-#### Config Options
-```typescript
-interface ViewerConfig {
-  showControls?: boolean;      // deprecated warning-only compatibility flag
-  useControls?: boolean;       // deprecated warning-only compatibility flag
-  allowCDNFallback?: boolean;  // deprecated warning-only compatibility flag
-  backgroundColor?: number;
-  ambientLightColor?: number;
-  directionalLightColor?: number;
-  directionalLightIntensity?: number;
-  rotationSpeed?: number;
-  initialZoom?: number;
-  ssaoRadius?: number;
-  ssaoKernelSize?: number;
-  rimStrength?: number;
-  metalness?: number;
-  roughness?: number;
-  useShaders?: boolean;
-  controlType?: 'trackball' | 'surface';
-  preset?: 'default' | 'presentation';
-  linkHemispheres?: boolean;
-  hoverCrosshair?: boolean;
-  hoverCrosshairColor?: number;
-  hoverCrosshairSize?: number;
-  clickToAddAnnotation?: boolean;
-}
-
-type Viewpoint = 'lateral' | 'medial' | 'ventral' | 'posterior' | 'anterior' | 'unknown_lateral';
-```
-
-#### Methods
-- `addSurface(surface, id?)`: Add a surface to the scene
-- `removeSurface(id)`: Remove a surface
-- `clearSurfaces()`: Remove all surfaces
-- `centerCamera()`: Center camera on all surfaces
-- `resetCamera()`: Reset camera distance/up
-- `setViewpoint(viewpoint)`: Set camera viewpoint
-- `startRenderLoop()`: Begin the animation/render loop
-- `cameraControls`: Camera/surface interaction controller; preferred over the deprecated `controls` alias
-- `setInteractionEnabled(enabled)`, `isInteractionEnabled()`: Control camera and surface interaction
-- `resize(width, height)`: Resize renderer + camera interaction controls
-- `toggleControls(show?)`: Deprecated warning no-op, scheduled for removal in v3
-- `addLayer(surfaceId, layer)`, `updateLayer(surfaceId, layerId, updates)`, `removeLayer(surfaceId, layerId)`, `clearLayers(surfaceId, { includeBase? })`
-- `pick({ x, y })`: Ray-pick a surface/vertex under screen coordinates
-- `dispose()`: Clean up resources
-- `showCrosshair(surfaceId, vertexIndex, { size?, color? })`: Draw a 3-axis crosshair on a vertex
-- `hideCrosshair()`: Remove the crosshair
-- `toggleCrosshair(surfaceId?, vertexIndex?, { size?, color? })`: Toggle the crosshair (reuses last target if omitted)
-- `addAnnotation(surfaceId, vertexIndex, data?, options?)`: Add a small marker sphere
-- `listAnnotations(surfaceId?)`, `moveAnnotation(id, vertexIndex)`, `removeAnnotations(surfaceId)`: Manage markers in bulk
-
-Minimal pick-to-crosshair example:
-```ts
-const hit = viewer.pick({ x: event.clientX, y: event.clientY });
-if (hit.surfaceId && hit.vertexIndex !== null) {
-  viewer.showCrosshair(hit.surfaceId, hit.vertexIndex, { size: 2, color: 0xffcc00 });
-}
-```
-
-### Interaction helpers
-- Set `config.hoverCrosshair = true` to show a lightweight hover crosshair (throttled).
-- Set `config.clickToAddAnnotation = true` to drop an annotation + activate it on click.
-- `onSurfaceClick` is now fired from the core viewer after a successful pick.
-- For generated reports, import `mountSurfView` from `surfview/report` and use `{ controls: true }`. Applications can mount the scientific panel from `surfview/controls` or package specialized behavior as a `ViewerPlugin`.
-- The former Tweakpane implementation has been deleted. See the [viewer migration table](docs/guide/viewer.md#pane-era-api-migration) for the 2.x compatibility shims and v3 removals.
-
-### ColorMap
-
-#### Creating Custom Colormaps
-```javascript
-import { ColorMap } from 'surfview';
-
-const customColormap = new ColorMap([
-  [0, 0, 1],    // blue
-  [0, 1, 0],    // green  
-  [1, 1, 0],    // yellow
-  [1, 0, 0]     // red
-], {
-  range: [0, 100],
-  threshold: [10, 90]
-});
-```
-
-## Browser Support
-
-- Chrome 90+
-- Firefox 88+
-- Safari 14+
-- Edge 90+
-
-Requires WebGL 2.0 support.
-
-### Performance Cheatsheet
-
-- Disable SSAO/shadows and tonemapping for maximum FPS (`useShaders=false`, shadows off by default in current build).
-- Reduce render size on high-DPI displays (`renderer.setPixelRatio(1)` or pass a smaller width/height to `resize`).
-- Prefer flat colors over PBR materials for large meshes.
-- Keep GPU compositing off unless you really need multi-layer blending.
-
-### Troubleshooting
-
-- If you see “WebGL is not available”, confirm hardware acceleration is enabled and the browser supports WebGL 2.
-- For SSR/Node environments, only construct `NeuroSurfaceViewer` in the browser (e.g., inside a `useEffect` in React).
-- If you must import on the server, use the provided `NoopNeuroSurfaceViewer` and `hasDOM` helpers to avoid touching the DOM/GL.
-  ```ts
-  import { hasDOM, NoopNeuroSurfaceViewer, NeuroSurfaceViewer } from 'surfview';
-  const Viewer = hasDOM() ? NeuroSurfaceViewer : NoopNeuroSurfaceViewer;
-  const viewer = new Viewer(container, 800, 600);
-  ```
-- Next.js/Remix SSR guard for React:
-  ```jsx
-  import dynamic from 'next/dynamic';
-  const SSRSafeViewer = dynamic(() => import('surfview/react').then(m => m.NeuroSurfaceViewerReact), { ssr: false });
-  ```
-
-### Events you can listen for
-- `surface:added|surface:removed|surface:variant`
-- `layer:added|layer:removed|layer:updated|layer:colormap|layer:intensity|layer:threshold|layer:opacity`
-- `surface:click` (pick result), `vertex:hover` (hover with surfaceId, vertexIndex, screenX, screenY)
-- `render:before|render:after`, `render:needed`
-- `annotation:added|annotation:moved|annotation:removed|annotation:reset|annotation:activated`
-- `viewpoint:changed`, `controls:changed|controls:error`
-
-Example:
-```js
-viewer.on('layer:intensity', ({ layerId, range }) => {
-  console.log('Layer', layerId, 'intensity changed to', range);
-});
-```
+- [Getting started](docs/guide/getting-started.md) — install, render, load, and
+  clean up a first viewer.
+- [Surfaces](docs/guide/surfaces.md) and [layers](docs/guide/layers.md) — data
+  contracts and compositing workflows.
+- [Viewer lifecycle](docs/guide/viewer.md) — ownership, scheduling, interaction,
+  and disposal.
+- [First-party controls](docs/guide/controls.md) — DOM, React, and report-control
+  boundaries.
+- [Reliability and contracts](docs/guide/reliability.md) — package formats,
+  scientific semantics, failure behavior, and evidence limits.
+- [Generated API reference](https://bbuchsbaum.github.io/surfviewjs/api/) — public
+  symbols and declarations from the current source.
+- [CI policy](docs/testing/ci-policy.md) — required local and hosted gates.
 
 ## Development
 
 ```bash
-# Install dependencies
-npm install
-
-# Development server
-npm run dev
-
-# Build library
-npm run build
-
-# Type checking
+npm ci
 npm run type-check
-
-# Playwright smoke (run after installing browsers with `npx playwright install chromium`)
-npm run test:playwright
+npm run type-check:demo
+npm test
+npm run docs:build
 ```
+
+The full release candidate also runs strict public type contracts, clean
+packed-package consumers on Node 22 and 24, coverage thresholds, bundle and
+performance budgets, Chromium WebGL tests, and macOS visual regression. See the
+[CI policy](docs/testing/ci-policy.md) for the distinction between local evidence
+and hosted release proof.
 
 ## License
 
-MIT
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## Acknowledgments
-
-Built with:
-- [Three.js](https://threejs.org/) - 3D graphics library
-- [Three.js](https://threejs.org/) - WebGL rendering
-- [colormap](https://github.com/bpostlethwaite/colormap) - Colormap generation
+[MIT](LICENSE)

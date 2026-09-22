@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Removed unused Gulp, Webpack CLI, `node-fetch`, direct Rollup 2 plugins, and
+  their stale package scripts; application and package builds now use Vite 8
+  with Rolldown, while VitePress retains its isolated Vite 5/Rollup 4 stack.
+- Publish source maps only for the core ESM/UMD bundles and their required
+  `neurosurface.*` compatibility aliases. Optional entries and the self-contained
+  embed no longer duplicate source content in the archive.
+
+### Security
+- Added an exact dependency-audit gate: the published runtime must remain free
+  of advisories, critical development findings are rejected, and the remaining
+  VitePress-nested Vite advisory is narrowly allowlisted with a dated review.
+
 ### Fixed
 - Restored legacy `dist/neurosurface.*` bundle aliases and UMD source maps for
   downstream `neurosurf` htmlwidget/pkgdown sync targets that still consume the

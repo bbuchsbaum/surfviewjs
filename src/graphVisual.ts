@@ -25,7 +25,7 @@ export interface GraphBoundaryLayerConfig {
   widthMap?: (normalizedMetric: number) => number;
   opacityMap?: (normalizedMetric: number) => number;
   colorMap?: (normalizedMetric: number) => string;
-  patternMap?: (normalizedMetric: number) => GraphStyle['pattern'];
+  patternMap?: (normalizedMetric: number) => NonNullable<GraphStyle['pattern']>;
   glowMap?: (normalizedMetric: number) => number;
 }
 
@@ -104,6 +104,7 @@ export function computeNeighborhoodShells(
   let q = 0;
   while (q < queue.length) {
     const current = queue[q++];
+    if (!current) continue;
     if (current.hop >= maxHops) {
       continue;
     }
@@ -111,6 +112,7 @@ export function computeNeighborhoodShells(
     const neighbors = adjacency.get(current.node) || [];
     for (let i = 0; i < neighbors.length; i++) {
       const neighbor = neighbors[i];
+      if (neighbor === undefined) continue;
       if (shells.has(neighbor)) {
         continue;
       }
@@ -176,7 +178,7 @@ function inferMetricRange(values: number[]): [number, number] {
   let min = Infinity;
   let max = -Infinity;
   for (let i = 0; i < values.length; i++) {
-    const value = values[i];
+    const value = values[i]!;
     if (!Number.isFinite(value)) continue;
     min = Math.min(min, value);
     max = Math.max(max, value);
@@ -197,7 +199,8 @@ export function resolveBoundaryStyles(
   const colorMap = config.colorMap || ((n: number) => (n > 0.5 ? '#f59e0b' : '#9ca3af'));
 
   return edges.map((edge, idx) => {
-    const metric = metrics[idx];
+    // `metrics` is produced by mapping the same `edges` array.
+    const metric = metrics[idx]!;
     const normalized = normalizeLinear(metric, metricRange);
     return {
       metric,
@@ -221,7 +224,7 @@ export function createDifferenceEdgeMetric(
     if (nodeValues instanceof Map) {
       return nodeValues.get(node) ?? Number.NaN;
     }
-    return nodeValues[String(node)];
+    return nodeValues[String(node)] ?? Number.NaN;
   };
 
   return (source: NodeId, target: NodeId): number => {

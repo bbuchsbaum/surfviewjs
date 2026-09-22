@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { finiteNumber, rgbInteger } from './utils/validation';
 import type { NeuroSurfaceViewer } from './NeuroSurfaceViewer';
 import type { NeuroSurface } from './classes';
 
@@ -253,16 +254,26 @@ export class AnnotationManager {
   }
 
   setDefaults(defaults: { radius?: number; colorOn?: number; colorOff?: number }): void {
-    if (defaults.radius !== undefined) {
-      this.defaultRadius = defaults.radius;
+    const radius = defaults.radius === undefined
+      ? undefined
+      : finiteNumber(defaults.radius, 'radius', { minimum: 0, minimumExclusive: true });
+    const colorOn = defaults.colorOn === undefined
+      ? undefined
+      : rgbInteger(defaults.colorOn, 'colorOn');
+    const colorOff = defaults.colorOff === undefined
+      ? undefined
+      : rgbInteger(defaults.colorOff, 'colorOff');
+    if (radius !== undefined) {
+      const nextGeometry = new THREE.SphereGeometry(radius, 12, 12);
+      this.defaultRadius = radius;
       this.markerGeometry.dispose();
-      this.markerGeometry = new THREE.SphereGeometry(this.defaultRadius, 12, 12);
+      this.markerGeometry = nextGeometry;
     }
-    if (defaults.colorOn !== undefined) {
-      this.defaultOnMaterial.color.setHex(defaults.colorOn);
+    if (colorOn !== undefined) {
+      this.defaultOnMaterial.color.setHex(colorOn);
     }
-    if (defaults.colorOff !== undefined) {
-      this.defaultOffMaterial.color.setHex(defaults.colorOff);
+    if (colorOff !== undefined) {
+      this.defaultOffMaterial.color.setHex(colorOff);
     }
   }
 

@@ -86,6 +86,17 @@ describe('statistics', () => {
 
       expect(result.clusterCount).toBe(0);
     });
+
+    it('rejects missing adjacency rows and out-of-range neighbors', () => {
+      expect(() => findClusters(
+        new Uint8Array([1, 1]),
+        [new Set([1])]
+      )).toThrow(/neighbors length/);
+      expect(() => findClusters(
+        new Uint8Array([1, 1]),
+        [new Set([2]), new Set([0])]
+      )).toThrow(/out-of-range vertex 2/);
+    });
   });
 
   describe('filterClustersBySize', () => {
@@ -115,28 +126,101 @@ describe('statistics', () => {
       expect(pToZ(0)).toBe(38.0);
       expect(() => pToZ(-0.1)).toThrow();
       expect(() => pToZ(1.1)).toThrow();
+      expect(() => pToZ(Number.NaN)).toThrow();
+      expect(() => pToZ(Number.POSITIVE_INFINITY)).toThrow();
     });
   });
 
   describe('tToZ', () => {
-    it('should convert t-statistics to z-scores for large df', () => {
-      const z = tToZ(2.0, 100);
-      expect(z).toBeCloseTo(2.0, 1); // For large df, t ≈ z
+    // Generated independently with R 4.x using the numerically stable upper
+    // tail: qnorm(pt(t, df, lower.tail=FALSE), lower.tail=FALSE).
+    const rOracle = [
+      { t: 0.1, df: 1, z: 0.0796080844835949 },
+      { t: 0.5, df: 1, z: 0.378804878070813 },
+      { t: 2, df: 1, z: 1.04685331733493 },
+      { t: 5, df: 1, z: 1.53141881730814 },
+      { t: 8, df: 1, z: 1.75554079941594 },
+      { t: 0.1, df: 2, z: 0.0885174213992957 },
+      { t: 0.5, df: 2, z: 0.430727299295457 },
+      { t: 2, df: 2, z: 1.33004507921329 },
+      { t: 5, df: 2, z: 2.07756382077749 },
+      { t: 8, df: 2, z: 2.42595716689398 },
+      { t: 0.1, df: 5, z: 0.0951066184385608 },
+      { t: 0.5, df: 5, z: 0.470078587598904 },
+      { t: 2, df: 5, z: 1.63552289670035 },
+      { t: 5, df: 5, z: 2.87000015482413 },
+      { t: 8, df: 5, z: 3.48458186030585 },
+      { t: 0.1, df: 10, z: 0.0975108495901718 },
+      { t: 0.5, df: 10, z: 0.484693742746123 },
+      { t: 2, df: 10, z: 1.79040993226883 },
+      { t: 5, df: 10, z: 3.46142009618562 },
+      { t: 8, df: 10, z: 4.38171378378715 },
+      { t: 0.1, df: 30, z: 0.0991620427268623 },
+      { t: 0.5, df: 30, z: 0.494825921794522 },
+      { t: 2, df: 30, z: 1.92184674115272 },
+      { t: 5, df: 30, z: 4.23069840596461 },
+      { t: 8, df: 30, z: 5.80950392636888 },
+      { t: 0.1, df: 31, z: 0.0991889535353704 },
+      { t: 0.5, df: 31, z: 0.494991739827139 },
+      { t: 2, df: 31, z: 1.92421838675025 },
+      { t: 5, df: 31, z: 4.24894634821719 },
+      { t: 8, df: 31, z: 5.84917188633599 },
+      { t: 0.1, df: 100, z: 0.099747824860969 },
+      { t: 0.5, df: 100, z: 0.49844054421832 },
+      { t: 2, df: 100, z: 1.97549343644226 },
+      { t: 5, df: 100, z: 4.71223271480169 },
+      { t: 8, df: 100, z: 7.0166281257255 },
+      { t: 0.1, df: 1000, z: 0.0999747532135894 },
+      { t: 0.5, df: 1000, z: 0.499843780290377 },
+      { t: 2, df: 1000, z: 1.99750504934628 },
+      { t: 5, df: 1000, z: 4.96792660747233 },
+      { t: 8, df: 1000, z: 7.87429624322521 }
+    ];
+
+    it.each(rOracle)('matches the independent R oracle at t=$t, df=$df', ({ t, df, z }) => {
+      expect(tToZ(t, df)).toBeCloseTo(z, 7);
     });
 
-    it('should handle small df', () => {
-      const z = tToZ(2.0, 10);
-      expect(z).toBeGreaterThan(0);
+    it('satisfies zero identity and odd symmetry', () => {
+      for (const df of [0.5, 1, 5, 30, 31, 100, 1000]) {
+        expect(tToZ(0, df)).toBe(0);
+        for (const t of [0.1, 0.5, 2, 5]) {
+          expect(tToZ(-t, df)).toBeCloseTo(-tToZ(t, df), 12);
+        }
+      }
     });
 
-    it('should preserve sign', () => {
-      expect(tToZ(-2.0, 20)).toBeLessThan(0);
-      expect(tToZ(2.0, 20)).toBeGreaterThan(0);
+    it('is monotone in absolute t for every tested df', () => {
+      for (const df of [0.5, 1, 2, 10, 30, 31, 100, 1000]) {
+        const values = [0, 0.1, 0.5, 1, 2, 5, 8].map(t => tToZ(t, df));
+        for (let i = 1; i < values.length; i++) {
+          expect(values[i]).toBeGreaterThan(values[i - 1]);
+        }
+      }
     });
 
-    it('should throw on invalid df', () => {
-      expect(() => tToZ(2.0, 0)).toThrow();
-      expect(() => tToZ(2.0, -1)).toThrow();
+    it('is continuous across the former df=30 branch boundary', () => {
+      for (const t of [0.1, 0.5, 2, 5, 8]) {
+        const below = tToZ(t, 30 - 1e-6);
+        const above = tToZ(t, 30 + 1e-6);
+        expect(Math.abs(above - below)).toBeLessThan(1e-6);
+      }
+    });
+
+    it('supports positive non-integer degrees of freedom', () => {
+      expect(tToZ(2, 0.5)).toBeCloseTo(0.762913657396488, 7);
+      expect(tToZ(2, 12.5)).toBeGreaterThan(0);
+    });
+
+    it('defines invalid and extreme input behavior', () => {
+      expect(() => tToZ(Number.NaN, 10)).toThrow(/t-statistic must be finite/);
+      expect(() => tToZ(Number.POSITIVE_INFINITY, 10)).toThrow(/t-statistic must be finite/);
+      expect(() => tToZ(2, Number.NaN)).toThrow(/Degrees of freedom/);
+      expect(() => tToZ(2, Number.POSITIVE_INFINITY)).toThrow(/Degrees of freedom/);
+      expect(() => tToZ(2, 0)).toThrow(/Degrees of freedom/);
+      expect(() => tToZ(2, -1)).toThrow(/Degrees of freedom/);
+      expect(tToZ(Number.MAX_VALUE, 1)).toBe(38);
+      expect(tToZ(-Number.MAX_VALUE, 1)).toBe(-38);
     });
   });
 });

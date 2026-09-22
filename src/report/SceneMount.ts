@@ -142,17 +142,18 @@ class SceneMount implements SurfViewMountHandle {
   ) {
     this.container = container;
     this.manifest = manifest;
+    const { bilateralGroup, ...optionValues } = options;
     this.options = {
-      ...options,
+      ...optionValues,
       lazy: options.lazy ?? true,
       rootMargin: options.rootMargin ?? '128px',
       preset: options.preset ?? 'paper-light',
       controls: options.controls ?? true,
       initialView: options.initialView ?? 'lateral',
       hemisphereGap: options.hemisphereGap ?? 8,
-      bilateralGroup: options.bilateralGroup
-        ? freezeBilateralSurfaceGroup(options.bilateralGroup)
-        : undefined
+      ...(bilateralGroup === undefined
+        ? {}
+        : { bilateralGroup: freezeBilateralSurfaceGroup(bilateralGroup) })
     };
     this.selectedLayer = manifest.selectedLayer ??
       Object.values(manifest.layers).find(layer => layer.visible)?.id ??
@@ -382,8 +383,8 @@ class SceneMount implements SurfViewMountHandle {
     await Promise.all(Object.values(this.manifest.assets).map(async descriptor => {
       const values = await loadSceneAsset(descriptor, {
         signal: this.abortController.signal,
-        fetcher: this.options.fetcher,
-        baseUrl: this.options.baseUrl
+        ...(this.options.fetcher === undefined ? {} : { fetcher: this.options.fetcher }),
+        ...(this.options.baseUrl === undefined ? {} : { baseUrl: this.options.baseUrl })
       });
       loaded.set(descriptor.id, values);
     }));
@@ -399,7 +400,7 @@ class SceneMount implements SurfViewMountHandle {
         ? this.requireFloat32(assets, geometryManifest.curvature)
         : null;
       for (let index = 0; index < faces.length; index += 1) {
-        if (faces[index] >= geometryManifest.vertexCount) {
+        if (faces[index]! >= geometryManifest.vertexCount) {
           throw new Error(
             `Geometry ${geometryManifest.id} face index ${faces[index]} exceeds vertex count`
           );
@@ -419,9 +420,9 @@ class SceneMount implements SurfViewMountHandle {
         metalness: style.material.metalness,
         roughness: style.material.roughness,
         curvatureOptions: style.curvature,
-        curvature: curvature ?? undefined,
         showCurvature: Boolean(curvature),
-        useGPUCompositing: false
+        useGPUCompositing: false,
+        ...(curvature === null ? {} : { curvature })
       });
 
       for (const layerManifest of Object.values(this.manifest.layers)) {
@@ -433,7 +434,7 @@ class SceneMount implements SurfViewMountHandle {
           : null;
         if (indices) {
           for (let index = 0; index < indices.length; index += 1) {
-            if (indices[index] >= geometryManifest.vertexCount) {
+            if (indices[index]! >= geometryManifest.vertexCount) {
               throw new Error(
                 `Layer ${layerManifest.id} index ${indices[index]} exceeds vertex count`
               );
@@ -447,9 +448,11 @@ class SceneMount implements SurfViewMountHandle {
           layerManifest.colorMap,
           {
             range: layerManifest.limits,
-            threshold: layerManifest.threshold,
             opacity: layerManifest.opacity ?? 1,
-            visible: layerManifest.id === this.selectedLayer
+            visible: layerManifest.id === this.selectedLayer,
+            ...(layerManifest.threshold === undefined
+              ? {}
+              : { threshold: layerManifest.threshold })
           }
         ));
       }

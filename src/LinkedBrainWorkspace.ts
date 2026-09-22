@@ -1,4 +1,4 @@
-import type { UnsubscribeFn } from './EventEmitter';
+import type { TypedEventListener, UnsubscribeFn } from './EventEmitter';
 import type { ViewerEventMap, ViewerEventType } from './events/ViewerEvents';
 import type { FlatMapView } from './FlatMapView';
 
@@ -10,7 +10,7 @@ export interface LinkOptions {
 }
 
 export interface LinkedViewerLike {
-  on<K extends ViewerEventType>(event: K, listener: ViewerEventMap[K] extends void ? () => void : (event: ViewerEventMap[K]) => void): UnsubscribeFn;
+  on<K extends ViewerEventType>(event: K, listener: TypedEventListener<ViewerEventMap[K]>): UnsubscribeFn;
   showCrosshair?(surfaceId: string, vertexIndex: number, options?: Record<string, unknown>): void;
   hideCrosshair?(): void;
 }

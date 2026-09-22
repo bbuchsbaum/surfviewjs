@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite';
-import { resolve } from 'path';
+import { resolve } from 'node:path';
 
 export default defineConfig({
   resolve: {
@@ -9,17 +9,14 @@ export default defineConfig({
     // Preserve the peer-dependency ESM/UMD build created by the first step.
     emptyOutDir: false,
     lib: {
-      entry: resolve(__dirname, 'src/embed.ts'),
+      entry: resolve(import.meta.dirname, 'src/embed.ts'),
       name: 'surfview',
       fileName: () => 'surfview.embed.iife.js',
       formats: ['iife']
     },
-    rollupOptions: {
-      output: {
-        inlineDynamicImports: true
-      }
-    },
-    sourcemap: true,
+    // The self-contained embed is large and has no downstream source-map
+    // compatibility contract. Core maps remain published by vite.config.js.
+    sourcemap: false,
     minify: 'terser',
     terserOptions: {
       compress: {

@@ -2,11 +2,13 @@
  * Export all event-related modules
  */
 
-export { EventEmitter } from '../EventEmitter';
+export { DynamicEventEmitter, EventEmitter } from '../EventEmitter';
 export type {
   EventListener,
+  EventType,
   UnsubscribeFn,
   EventPayloadArgs,
+  EventArgsFor,
   TypedEventListener
 } from '../EventEmitter';
 export type {

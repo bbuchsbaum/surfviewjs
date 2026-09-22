@@ -8,6 +8,7 @@ import {
   VertexROI,
   selectVerticesInPolygon
 } from './roi';
+import { finiteNumber } from './utils/validation';
 
 export interface FlatMapGeometryInput {
   vertices: Float32Array | number[];
@@ -77,6 +78,43 @@ interface FlatMapBounds {
   maxY: number;
 }
 
+function normalizedGeometry(geometry: FlatMapGeometryInput): {
+  vertices: Float32Array;
+  faces: Uint32Array;
+} {
+  const vertices = new Float32Array(geometry.vertices);
+  if (vertices.length === 0 || vertices.length % 3 !== 0) {
+    throw new RangeError('vertices must contain one or more complete x/y/z triples.');
+  }
+  for (let index = 0; index < vertices.length; index += 1) {
+    finiteNumber(vertices[index], `vertices[${index}]`);
+  }
+  const rawFaces = geometry.faces ?? [];
+  if (rawFaces.length % 3 !== 0) {
+    throw new RangeError('faces must contain complete triangle index triples.');
+  }
+  const vertexCount = vertices.length / 3;
+  const faces = new Uint32Array(rawFaces.length);
+  for (let index = 0; index < rawFaces.length; index += 1) {
+    faces[index] = finiteNumber(rawFaces[index], `faces[${index}]`, {
+      minimum: 0,
+      maximum: vertexCount - 1,
+      integer: true
+    });
+  }
+  return { vertices, faces };
+}
+
+function validatedPolygon(polygon: RoiPoint[]): RoiPoint[] {
+  if (!Array.isArray(polygon) || polygon.length < 3) {
+    throw new RangeError('polygon must contain at least three points.');
+  }
+  return polygon.map((point, index) => ({
+    x: finiteNumber(point.x, `polygon[${index}].x`),
+    y: finiteNumber(point.y, `polygon[${index}].y`)
+  }));
+}
+
 export class FlatMapView extends EventEmitter<FlatMapEventMap> {
   readonly canvas: HTMLCanvasElement;
   readonly surfaceId: string | null;
@@ -103,20 +141,36 @@ export class FlatMapView extends EventEmitter<FlatMapEventMap> {
 
   constructor(container: HTMLElement, geometry: FlatMapGeometryInput, options: FlatMapViewOptions = {}) {
     super();
+    const normalized = normalizedGeometry(geometry);
     this.canvas = options.canvas ?? document.createElement('canvas');
     this.surfaceId = geometry.surfaceId ?? null;
-    this.vertices = new Float32Array(geometry.vertices);
-    this.faces = new Uint32Array(geometry.faces ?? []);
+    this.vertices = normalized.vertices;
+    this.faces = normalized.faces;
+    const width = finiteNumber(options.width ?? (container.clientWidth || 320), 'width', {
+      minimum: 1,
+      integer: true
+    });
+    const height = finiteNumber(options.height ?? (container.clientHeight || 240), 'height', {
+      minimum: 1,
+      integer: true
+    });
+    const padding = finiteNumber(options.padding ?? 12, 'padding', { minimum: 0 });
+    if (padding * 2 >= Math.min(width, height)) {
+      throw new RangeError('padding must leave a positive drawable width and height.');
+    }
     this.options = {
-      width: options.width ?? (container.clientWidth || 320),
-      height: options.height ?? (container.clientHeight || 240),
-      padding: options.padding ?? 12,
+      width,
+      height,
+      padding,
       background: options.background ?? '#050505',
       fillStyle: options.fillStyle ?? 'rgba(160, 164, 170, 0.35)',
       strokeStyle: options.strokeStyle ?? 'rgba(255, 255, 255, 0.22)',
       hoverStyle: options.hoverStyle ?? '#58c4ff',
       selectionStyle: options.selectionStyle ?? '#ffd166',
-      pointRadius: options.pointRadius ?? 4,
+      pointRadius: finiteNumber(options.pointRadius ?? 4, 'pointRadius', {
+        minimum: 0,
+        minimumExclusive: true
+      }),
       autoRender: options.autoRender ?? true
     };
     this.canvas.width = this.options.width;
@@ -196,29 +250,42 @@ export class FlatMapView extends EventEmitter<FlatMapEventMap> {
   }
 
   resize(width: number, height: number): void {
-    this.options.width = width;
-    this.options.height = height;
-    this.canvas.width = width;
-    this.canvas.height = height;
+    const nextWidth = finiteNumber(width, 'width', { minimum: 1, integer: true });
+    const nextHeight = finiteNumber(height, 'height', { minimum: 1, integer: true });
+    if (this.options.padding * 2 >= Math.min(nextWidth, nextHeight)) {
+      throw new RangeError('width and height must leave positive drawable space after padding.');
+    }
+    this.options.width = nextWidth;
+    this.options.height = nextHeight;
+    this.canvas.width = nextWidth;
+    this.canvas.height = nextHeight;
     this.requestRender();
   }
 
   setGeometry(geometry: FlatMapGeometryInput): void {
-    this.vertices = new Float32Array(geometry.vertices);
-    this.faces = new Uint32Array(geometry.faces ?? []);
+    const normalized = normalizedGeometry(geometry);
+    this.vertices = normalized.vertices;
+    this.faces = normalized.faces;
     this.bounds = this.computeBounds();
     this.requestRender();
   }
 
   setHover(vertexIndex: number | null, options: { emit?: boolean; screenX?: number; screenY?: number } = {}): void {
-    this.hoverVertexIndex = vertexIndex;
+    const nextVertexIndex = this.validateVertexIndex(vertexIndex, 'vertexIndex');
+    const screenX = options.screenX === undefined
+      ? undefined
+      : finiteNumber(options.screenX, 'screenX');
+    const screenY = options.screenY === undefined
+      ? undefined
+      : finiteNumber(options.screenY, 'screenY');
+    this.hoverVertexIndex = nextVertexIndex;
     if (options.emit ?? true) {
-      const point = vertexIndex === null ? null : this.projectVertex(vertexIndex);
+      const point = nextVertexIndex === null ? null : this.projectVertex(nextVertexIndex);
       this.emit('vertex:hover', {
         surfaceId: this.surfaceId,
-        vertexIndex,
-        screenX: options.screenX ?? point?.x ?? 0,
-        screenY: options.screenY ?? point?.y ?? 0,
+        vertexIndex: nextVertexIndex,
+        screenX: screenX ?? point?.x ?? 0,
+        screenY: screenY ?? point?.y ?? 0,
         mapX: point?.x ?? null,
         mapY: point?.y ?? null
       });
@@ -227,11 +294,12 @@ export class FlatMapView extends EventEmitter<FlatMapEventMap> {
   }
 
   setSelection(vertexIndex: number | null, options: { emit?: boolean } = {}): void {
-    this.selectedVertexIndex = vertexIndex;
+    const nextVertexIndex = this.validateVertexIndex(vertexIndex, 'vertexIndex');
+    this.selectedVertexIndex = nextVertexIndex;
     if (options.emit ?? true) {
       this.emit('selection:changed', {
         surfaceId: this.surfaceId,
-        vertexIndex
+        vertexIndex: nextVertexIndex
       });
     }
     this.requestRender();
@@ -244,12 +312,16 @@ export class FlatMapView extends EventEmitter<FlatMapEventMap> {
   }
 
   setTime(time: number): void {
-    this.currentTime = time;
-    this.emit('time:changed', { time });
+    const nextTime = finiteNumber(time, 'time');
+    this.currentTime = nextTime;
+    this.emit('time:changed', { time: nextTime });
     this.requestRender();
   }
 
   startROIDrawing(options: FlatMapROIDrawingOptions): void {
+    if (options.minVertices !== undefined) {
+      finiteNumber(options.minVertices, 'minVertices', { minimum: 1, integer: true });
+    }
     this.drawingOptions = { ...options };
     this.drawingPoints = [];
     this.isDrawingLasso = false;
@@ -273,12 +345,12 @@ export class FlatMapView extends EventEmitter<FlatMapEventMap> {
     }
     const roi = this.createROIFromPolygon(this.drawingPoints, {
       name: options.name,
-      color: options.color,
       provenance: {
         ...options.provenance,
         tool: options.mode
       },
-      minVertices: options.minVertices
+      ...(options.color === undefined ? {} : { color: options.color }),
+      ...(options.minVertices === undefined ? {} : { minVertices: options.minVertices })
     });
     this.drawingOptions = null;
     this.drawingPoints = [];
@@ -289,10 +361,11 @@ export class FlatMapView extends EventEmitter<FlatMapEventMap> {
   }
 
   selectVerticesInPolygon(polygon: RoiPoint[]): number[] {
+    const nextPolygon = validatedPolygon(polygon);
     return selectVerticesInPolygon({
       vertexCount: this.vertices.length / 3,
       projectVertex: vertexIndex => this.projectVertex(vertexIndex)
-    }, polygon);
+    }, nextPolygon);
   }
 
   createROIFromPolygon(
@@ -304,15 +377,20 @@ export class FlatMapView extends EventEmitter<FlatMapEventMap> {
       minVertices?: number;
     }
   ): VertexROI | null {
-    const vertexIndices = this.selectVerticesInPolygon(polygon);
-    if (vertexIndices.length < (options.minVertices ?? 1)) return null;
+    const nextPolygon = validatedPolygon(polygon);
+    const minVertices = finiteNumber(options.minVertices ?? 1, 'minVertices', {
+      minimum: 1,
+      integer: true
+    });
+    const vertexIndices = this.selectVerticesInPolygon(nextPolygon);
+    if (vertexIndices.length < minVertices) return null;
     const roi = this.rois.create({
       name: options.name,
       surfaceId: this.surfaceId,
       vertexIndices,
-      color: options.color,
-      outline: polygon,
-      provenance: options.provenance
+      outline: nextPolygon,
+      ...(options.color === undefined ? {} : { color: options.color }),
+      ...(options.provenance === undefined ? {} : { provenance: options.provenance })
     });
     this.emit('roi:created', { surfaceId: this.surfaceId, roi });
     this.requestRender();
@@ -328,13 +406,14 @@ export class FlatMapView extends EventEmitter<FlatMapEventMap> {
       provenance?: RoiProvenance;
     }
   ): VertexROI | null {
-    const vertexIndices = updates.polygon ? this.selectVerticesInPolygon(updates.polygon) : undefined;
+    const polygon = updates.polygon ? validatedPolygon(updates.polygon) : undefined;
+    const vertexIndices = polygon ? this.selectVerticesInPolygon(polygon) : undefined;
     const roi = this.rois.update(roiId, {
-      name: updates.name,
-      vertexIndices,
-      color: updates.color,
-      outline: updates.polygon,
-      provenance: updates.provenance
+      ...(updates.name === undefined ? {} : { name: updates.name }),
+      ...(vertexIndices === undefined ? {} : { vertexIndices }),
+      ...(updates.color === undefined ? {} : { color: updates.color }),
+      ...(polygon === undefined ? {} : { outline: polygon }),
+      ...(updates.provenance === undefined ? {} : { provenance: updates.provenance })
     });
     if (roi) {
       this.emit('roi:updated', { surfaceId: this.surfaceId, roi });
@@ -362,17 +441,23 @@ export class FlatMapView extends EventEmitter<FlatMapEventMap> {
   }
 
   pickVertex(clientX: number, clientY: number): number | null {
-    const point = this.clientToCanvas(clientX, clientY);
+    const point = this.clientToCanvas(
+      finiteNumber(clientX, 'clientX'),
+      finiteNumber(clientY, 'clientY')
+    );
     return this.pickVertexAt(point.x, point.y);
   }
 
   pickVertexAt(x: number, y: number, maxDistance = 10): number | null {
+    const nextX = finiteNumber(x, 'x');
+    const nextY = finiteNumber(y, 'y');
+    const nextMaxDistance = finiteNumber(maxDistance, 'maxDistance', { minimum: 0 });
     let bestIndex: number | null = null;
-    let bestDistance = maxDistance * maxDistance;
+    let bestDistance = nextMaxDistance * nextMaxDistance;
     for (let i = 0; i < this.vertices.length / 3; i++) {
       const point = this.projectVertex(i);
-      const dx = point.x - x;
-      const dy = point.y - y;
+      const dx = point.x - nextX;
+      const dy = point.y - nextY;
       const d2 = dx * dx + dy * dy;
       if (d2 <= bestDistance) {
         bestDistance = d2;
@@ -383,8 +468,9 @@ export class FlatMapView extends EventEmitter<FlatMapEventMap> {
   }
 
   projectVertex(vertexIndex: number): { x: number; y: number } {
-    const x = this.vertices[vertexIndex * 3];
-    const y = this.vertices[vertexIndex * 3 + 1];
+    const nextVertexIndex = this.validateVertexIndex(vertexIndex, 'vertexIndex')!;
+    const x = this.vertices[nextVertexIndex * 3]!;
+    const y = this.vertices[nextVertexIndex * 3 + 1]!;
     const width = this.canvas.width;
     const height = this.canvas.height;
     const padding = this.options.padding;
@@ -408,9 +494,10 @@ export class FlatMapView extends EventEmitter<FlatMapEventMap> {
     ctx.lineWidth = 1;
 
     for (let i = 0; i < this.faces.length; i += 3) {
-      const a = this.projectVertex(this.faces[i]);
-      const b = this.projectVertex(this.faces[i + 1]);
-      const c = this.projectVertex(this.faces[i + 2]);
+      // Geometry normalization validates complete in-range triangles.
+      const a = this.projectVertex(this.faces[i]!);
+      const b = this.projectVertex(this.faces[i + 1]!);
+      const c = this.projectVertex(this.faces[i + 2]!);
       ctx.beginPath();
       ctx.moveTo(a.x, a.y);
       ctx.lineTo(b.x, b.y);
@@ -445,6 +532,15 @@ export class FlatMapView extends EventEmitter<FlatMapEventMap> {
     }
   }
 
+  private validateVertexIndex(vertexIndex: number | null, parameter: string): number | null {
+    if (vertexIndex === null) return null;
+    return finiteNumber(vertexIndex, parameter, {
+      minimum: 0,
+      maximum: this.vertices.length / 3 - 1,
+      integer: true
+    });
+  }
+
   private drawVertex(vertexIndex: number | null, style: string, radius: number): void {
     if (vertexIndex === null || !this.ctx) return;
     const point = this.projectVertex(vertexIndex);
@@ -476,11 +572,13 @@ export class FlatMapView extends EventEmitter<FlatMapEventMap> {
 
   private drawPath(points: RoiPoint[], color: string, closed: boolean): void {
     const ctx = this.ctx;
-    if (!ctx) return;
+    const firstPoint = points[0];
+    if (!ctx || !firstPoint) return;
     ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
+    ctx.moveTo(firstPoint.x, firstPoint.y);
     for (let i = 1; i < points.length; i++) {
-      ctx.lineTo(points[i].x, points[i].y);
+      const point = points[i];
+      if (point) ctx.lineTo(point.x, point.y);
     }
     if (closed) ctx.closePath();
     ctx.fillStyle = closed ? transparentColor(color, 0.18) : 'transparent';
@@ -506,10 +604,10 @@ export class FlatMapView extends EventEmitter<FlatMapEventMap> {
     let minY = Infinity;
     let maxY = -Infinity;
     for (let i = 0; i < this.vertices.length; i += 3) {
-      minX = Math.min(minX, this.vertices[i]);
-      maxX = Math.max(maxX, this.vertices[i]);
-      minY = Math.min(minY, this.vertices[i + 1]);
-      maxY = Math.max(maxY, this.vertices[i + 1]);
+      minX = Math.min(minX, this.vertices[i]!);
+      maxX = Math.max(maxX, this.vertices[i]!);
+      minY = Math.min(minY, this.vertices[i + 1]!);
+      maxY = Math.max(maxY, this.vertices[i + 1]!);
     }
     if (!Number.isFinite(minX)) {
       return { minX: 0, maxX: 1, minY: 0, maxY: 1 };

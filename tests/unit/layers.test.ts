@@ -46,10 +46,10 @@ describe('DataLayer', () => {
 
   it('keeps intrinsic alpha independent from compositor opacity', () => {
     const layer = makeDataLayer();
+    const before = layer.getRGBAData(5)[3];
     layer.setOpacity(0.5);
     const rgba = layer.getRGBAData(5);
-    // The compositor, not this intrinsic buffer, applies layer opacity.
-    expect(rgba[0 * 4 + 3]).toBe(1);
+    expect(rgba[3]).toBeCloseTo(before);
     expect(layer.opacity).toBe(0.5);
   });
 
@@ -106,7 +106,7 @@ describe('RGBALayer', () => {
 
 describe('BaseLayer', () => {
   it('returns constant color for all vertices', () => {
-    const layer = new BaseLayer('base', { color: 0xff0000 });
+    const layer = new BaseLayer(0xff0000);
     const rgba = layer.getRGBAData(3);
     expect(rgba.length).toBe(12);
     // All vertices should have the same color

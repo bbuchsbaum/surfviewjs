@@ -316,6 +316,12 @@ describe('viewer state serialization', () => {
       expect(state.camera).toMatchObject({ position: [0, 0, 200], fov: 45 });
     });
 
+    it('refuses to emit non-finite live numeric state', () => {
+      const viewer = makeMockViewer();
+      viewer.camera.position.x = Number.NaN;
+      expect(() => serialize(viewer as any)).toThrow(/camera\.position/);
+    });
+
     it('captures viewer configuration state', () => {
       const viewer = makeMockViewer();
       const state = serialize(viewer as any);
@@ -409,6 +415,52 @@ describe('viewer state serialization', () => {
   });
 
   describe('validation-first restoration', () => {
+    it('treats JavaScript explicit undefined serialized options as omitted', () => {
+      const viewer = makeMockViewer();
+      const sentinelBackground = { sentinel: true };
+      viewer.scene.background = sentinelBackground;
+      const state = makeMinimalState();
+      Reflect.set(state.config, 'background', undefined);
+
+      const report = deserialize(viewer as any, state);
+
+      expect(report.success).toBe(true);
+      expect(viewer.scene.background).toBe(sentinelBackground);
+    });
+
+    it('rejects invalid numeric state before any camera, layer, or eventful mutation', () => {
+      const viewer = makeMockViewer();
+      const surface = makeSurface(['data']);
+      viewer.surfaces.set('lh', surface);
+      const state = makeMinimalState();
+      state.camera.position[0] = Number.NaN;
+      state.surfaces.lh = {
+        id: 'lh',
+        type: 'surface',
+        visible: false,
+        layers: [{
+          id: 'data',
+          type: 'data',
+          visible: false,
+          opacity: 0.5,
+          blendMode: 'normal'
+        }],
+        layerOrder: ['data'],
+        clipPlanes: []
+      };
+
+      const report = deserialize(viewer as any, state);
+
+      expect(report.success).toBe(false);
+      expect(report.errors).toContainEqual(expect.objectContaining({
+        code: 'invalid-state',
+        path: '$.camera.position[0]'
+      }));
+      expect(viewer.camera.position).toMatchObject({ x: 0, y: 0, z: 200 });
+      expect(surface.mesh.visible).toBe(true);
+      expect(surface.layerStack.getLayer('data')!.opacity).toBe(1);
+    });
+
     it('restores a supported v1 fixture but leaves pane focus untouched', () => {
       const viewer = makeMockViewer();
       viewer.surfaces.set(

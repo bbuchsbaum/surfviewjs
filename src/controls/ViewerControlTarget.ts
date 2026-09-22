@@ -277,7 +277,8 @@ function colorMapPreview(colorMapName: string): LayerColorPreviewDescriptor {
   }
   const indexes = [0, Math.floor((colors.length - 1) / 2), colors.length - 1];
   const stops = indexes.map(index => {
-    const color = colors[index];
+    // Indices are derived from this known non-empty palette.
+    const color = colors[index]!;
     const channels = color.slice(0, 3).map(channel =>
       Math.round(Math.max(0, Math.min(1, channel)) * 255)
     );
@@ -995,10 +996,13 @@ export class ViewerControlTarget implements SurfViewControlTarget {
       return disabled('This surface does not support canonical layer reordering.');
     }
     const candidate = [...layerIds];
-    [candidate[index], candidate[destination]] = [
-      candidate[destination],
-      candidate[index]
-    ];
+    const sourceId = candidate[index];
+    const destinationId = candidate[destination];
+    if (sourceId === undefined || destinationId === undefined) {
+      return disabled('The requested layer positions are unavailable.');
+    }
+    candidate[index] = destinationId;
+    candidate[destination] = sourceId;
     const validation = validator.validateLayerOrder(candidate);
     return validation.ok && validation.changed
       ? ENABLED
@@ -1077,8 +1081,8 @@ export class ViewerControlTarget implements SurfViewControlTarget {
     if (typeof candidate.getTimes !== 'function') return undefined;
     const times = candidate.getTimes().filter(Number.isFinite);
     if (times.length === 0) return undefined;
-    const first = times[0];
-    const last = times[times.length - 1];
+    const first = times[0]!;
+    const last = times[times.length - 1]!;
     return deepFreeze({
       availability: disabled('Timeline ownership is not attached to the viewer target.'),
       currentTime: first,

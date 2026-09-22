@@ -1,4 +1,21 @@
 import * as THREE from 'three';
+import { finiteNumber } from './validation';
+
+function finiteVector(vector: THREE.Vector3, parameter: string): THREE.Vector3 {
+  return new THREE.Vector3(
+    finiteNumber(vector.x, `${parameter}.x`),
+    finiteNumber(vector.y, `${parameter}.y`),
+    finiteNumber(vector.z, `${parameter}.z`)
+  );
+}
+
+function unitNormal(vector: THREE.Vector3, parameter: string): THREE.Vector3 {
+  const normalized = finiteVector(vector, parameter);
+  if (normalized.lengthSq() === 0) {
+    throw new RangeError(`${parameter} must be non-zero.`);
+  }
+  return normalized.normalize();
+}
 
 /**
  * Axis type for clip plane orientation
@@ -54,8 +71,8 @@ export class ClipPlane {
   private _flip: boolean;
 
   constructor(config: ClipPlaneConfig = {}) {
-    this.normal = config.normal?.clone() ?? new THREE.Vector3(1, 0, 0);
-    this.point = config.point?.clone() ?? new THREE.Vector3(0, 0, 0);
+    this.normal = unitNormal(config.normal ?? new THREE.Vector3(1, 0, 0), 'normal');
+    this.point = finiteVector(config.point ?? new THREE.Vector3(0, 0, 0), 'point');
     this.enabled = config.enabled ?? false;
     this._flip = config.flip ?? false;
     this._plane = new THREE.Plane();
@@ -70,20 +87,24 @@ export class ClipPlane {
    * @param flip - If true, flip which side is clipped (default: false)
    */
   setFromAxisDistance(axis: ClipAxis, distance: number, flip = false): this {
+    const nextDistance = finiteNumber(distance, 'distance');
+    if (axis !== 'x' && axis !== 'y' && axis !== 'z') {
+      throw new TypeError(`axis must be "x", "y", or "z"; received ${String(axis)}.`);
+    }
     this._flip = flip;
 
     switch (axis) {
       case 'x':
         this.normal.set(1, 0, 0);
-        this.point.set(distance, 0, 0);
+        this.point.set(nextDistance, 0, 0);
         break;
       case 'y':
         this.normal.set(0, 1, 0);
-        this.point.set(0, distance, 0);
+        this.point.set(0, nextDistance, 0);
         break;
       case 'z':
         this.normal.set(0, 0, 1);
-        this.point.set(0, 0, distance);
+        this.point.set(0, 0, nextDistance);
         break;
     }
 
@@ -108,11 +129,13 @@ export class ClipPlane {
     b: THREE.Vector3,
     c: THREE.Vector3
   ): this {
-    const edge1 = new THREE.Vector3().subVectors(b, a);
-    const edge2 = new THREE.Vector3().subVectors(c, a);
+    const nextPoint = finiteVector(a, 'a');
+    const edge1 = finiteVector(b, 'b').sub(nextPoint);
+    const edge2 = finiteVector(c, 'c').sub(nextPoint);
+    const nextNormal = unitNormal(new THREE.Vector3().crossVectors(edge1, edge2), 'points');
 
-    this.normal.crossVectors(edge1, edge2).normalize();
-    this.point.copy(a);
+    this.normal.copy(nextNormal);
+    this.point.copy(nextPoint);
 
     if (this._flip) {
       this.normal.negate();
@@ -129,8 +152,10 @@ export class ClipPlane {
    * @param point - Point on the plane
    */
   setFromNormalAndPoint(normal: THREE.Vector3, point: THREE.Vector3): this {
-    this.normal.copy(normal).normalize();
-    this.point.copy(point);
+    const nextNormal = unitNormal(normal, 'normal');
+    const nextPoint = finiteVector(point, 'point');
+    this.normal.copy(nextNormal);
+    this.point.copy(nextPoint);
 
     if (this._flip) {
       this.normal.negate();
@@ -147,8 +172,9 @@ export class ClipPlane {
    * @param distance - Distance from origin along normal
    */
   setDistance(distance: number): this {
+    const nextDistance = finiteNumber(distance, 'distance');
     // Move point along the normal direction
-    this.point.copy(this.normal).multiplyScalar(distance);
+    this.point.copy(this.normal).multiplyScalar(nextDistance);
     this._updatePlane();
     return this;
   }

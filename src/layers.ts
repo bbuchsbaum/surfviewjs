@@ -1,9 +1,15 @@
 import * as THREE from 'three';
-import ColorMap, { ColorMapOptions, Color, ColorArray } from './ColorMap';
-import ColorMap2D, { ColorMap2DPreset, ColorMap2DOptions } from './ColorMap2D';
-import { debugLog } from './debug';
+import ColorMap, { Color } from './ColorMap';
+import ColorMap2D, { ColorMap2DPreset } from './ColorMap2D';
+import { debugLog, isDebugEnabled } from './debug';
 import { VolumeTexture3D } from './textures/VolumeTexture3D';
 import { createColormapTexture } from './textures/createColormapTexture';
+import {
+  finiteNumber,
+  finitePair,
+  opacity as validateOpacity,
+  rgbInteger
+} from './utils/validation';
 
 export type BlendMode = 'normal' | 'additive' | 'multiply';
 export type LayerRole = 'anatomy' | 'data' | 'outline' | 'connectivity';
@@ -137,7 +143,26 @@ export interface LayerUpdateData {
   opacity?: number;
   visible?: boolean;
   blendMode?: BlendMode;
-  [key: string]: any;
+}
+
+const COMMON_LAYER_UPDATE_FIELDS = ['opacity', 'visible', 'blendMode'] as const;
+
+/** @internal Reject silent no-op fields passed from JavaScript or deserialized input. */
+export function assertLayerUpdateFields(
+  updates: object,
+  layerType: string,
+  fields: readonly string[]
+): void {
+  if (!updates || typeof updates !== 'object' || Array.isArray(updates)) {
+    throw new TypeError(`${layerType}.update requires an object.`);
+  }
+  const allowed = new Set<string>([...COMMON_LAYER_UPDATE_FIELDS, ...fields]);
+  const unsupported = Object.keys(updates).filter(field => !allowed.has(field));
+  if (unsupported.length > 0) {
+    throw new TypeError(
+      `${layerType}.update does not support field${unsupported.length === 1 ? '' : 's'}: ${unsupported.join(', ')}`
+    );
+  }
 }
 
 /** Property/value summary delivered when a public layer mutation succeeds. */
@@ -205,7 +230,6 @@ export interface VolumeProjectionLayerUpdateData extends LayerUpdateData {
   affineMatrix?: THREE.Matrix4 | ArrayLike<number>;
   voxelSize?: [number, number, number];
   volumeOrigin?: [number, number, number];
-  useHalfFloat?: boolean;
   fillValue?: number;
   projectionMode?: VolumeProjectionMode;
   sampling?: VolumeSamplingMode;
@@ -226,6 +250,12 @@ export interface TwoDataLayerUpdateData extends LayerUpdateData {
 
 export interface BaseLayerUpdateData extends LayerUpdateData {
   color?: number;
+}
+
+export interface LabelLayerUpdateData extends LayerUpdateData {
+  labels?: Uint32Array | Int32Array | number[];
+  labelDefs?: Array<{ id: number; color: THREE.ColorRepresentation; name?: string }>;
+  defaultColor?: THREE.ColorRepresentation;
 }
 
 export interface LabelLayerOptions extends LayerConfig {
@@ -253,8 +283,7 @@ export abstract class Layer {
   private _attachedToLayerStack: boolean;
   private _orderMutationWarned: boolean;
   private _presentation: LayerPresentation;
-  private static _outlineCtor: any;
-  private static _temporalCtor: any;
+  private static _configFactory: ((config: unknown) => Layer) | null = null;
 
   constructor(
     id: string,
@@ -263,9 +292,9 @@ export abstract class Layer {
   ) {
     this.id = id;
     this.visible = config.visible !== undefined ? config.visible : true;
-    this.opacity = config.opacity !== undefined ? config.opacity : 1.0;
+    this.opacity = validateOpacity(config.opacity ?? 1, 'opacity');
     this.blendMode = config.blendMode || 'normal';
-    this._orderHint = config.order ?? 0;
+    this._orderHint = finiteNumber(config.order ?? 0, 'order');
     this._orderConstraints = Object.freeze({
       reorderable: orderConstraints.reorderable ?? true,
       pinned: orderConstraints.pinned ?? null,
@@ -293,9 +322,9 @@ export abstract class Layer {
   }
 
   set order(order: number) {
-    if (!Number.isFinite(order)) return;
+    const nextOrder = finiteNumber(order, 'order');
     if (this._attachedToLayerStack) {
-      if (!this._orderMutationWarned && order !== this._orderHint) {
+      if (!this._orderMutationWarned && nextOrder !== this._orderHint) {
         console.warn(
           `Layer.order is an initialization hint; use setLayerOrder() or moveLayer() to reorder attached layer "${this.id}".`
         );
@@ -303,7 +332,7 @@ export abstract class Layer {
       }
       return;
     }
-    this._orderHint = order;
+    this._orderHint = nextOrder;
   }
 
   getOrderConstraints(): LayerOrderConstraints {
@@ -385,10 +414,10 @@ export abstract class Layer {
   }
 
   setOpacity(opacity: number): void {
-    opacity = Math.max(0, Math.min(1, opacity));
-    if (this.opacity !== opacity) {
-      this.opacity = opacity;
-      this._notifyChange({ opacity });
+    const nextOpacity = validateOpacity(opacity);
+    if (this.opacity !== nextOpacity) {
+      this.opacity = nextOpacity;
+      this._notifyChange({ opacity: nextOpacity });
     }
   }
 
@@ -401,8 +430,10 @@ export abstract class Layer {
   }
 
   /**
-   * Get RGBA values for this layer
-   * Must be implemented by subclasses
+   * Get straight RGBA values for this layer.
+   *
+   * Alpha here is intrinsic data/colormap coverage only. `Layer.opacity` is
+   * applied exactly once by the CPU or GPU compositor.
    */
   abstract getRGBAData(vertexCount: number): Float32Array;
 
@@ -428,152 +459,29 @@ export abstract class Layer {
     };
   }
 
-  static registerOutlineLayer(ctor: any): void {
-    Layer._outlineCtor = ctor;
-  }
-
-  static registerTemporalLayer(ctor: any): void {
-    Layer._temporalCtor = ctor;
-  }
-
-  private static get outlineCtor(): any {
-    return Layer._outlineCtor;
+  /**
+   * Install the package's explicit layer registry for the legacy static API.
+   * @internal Applications should use `createLayerFromConfig` or a
+   * `LayerRegistry` directly.
+   */
+  static _installConfigFactory(factory: (config: unknown) => Layer): void {
+    if (Layer._configFactory && Layer._configFactory !== factory) {
+      throw new Error('Layer.fromConfig factory is already installed.');
+    }
+    Layer._configFactory = factory;
   }
 
   /**
-   * Create a concrete Layer instance from a plain object configuration.
-   * Supports: base, rgba, data, outline.
+   * Backward-compatible throwing factory. The package entry point installs the
+   * same explicit registry exposed by `createLayerFromConfig`.
    */
-  static fromConfig(config: Record<string, any>): Layer {
-    const { type, id } = config;
-    if (!type || !id) {
-      throw new Error('Layer.fromConfig requires type and id');
+  static fromConfig(config: unknown): Layer {
+    if (!Layer._configFactory) {
+      throw new Error(
+        'Layer.fromConfig registry is unavailable; import createLayerFromConfig from the package entry point.'
+      );
     }
-
-    const commonConfig: LayerConfig = {
-      visible: config.visible,
-      opacity: config.opacity ?? (config.alpha !== undefined ? config.alpha : undefined),
-      blendMode: config.blendMode,
-      order: config.order,
-      presentation: config.presentation
-    };
-
-    switch (type) {
-      case 'base':
-        return new BaseLayer(config.color ?? 0xcccccc, commonConfig);
-      case 'rgba':
-        if (!config.data) throw new Error('RGBALayer requires data');
-        return new RGBALayer(id, config.data, commonConfig);
-      case 'data':
-        if (!config.data) throw new Error('DataLayer requires data');
-        return new DataLayer(
-          id,
-          config.data,
-          config.indices ?? null,
-          config.cmap ?? config.colorMap ?? 'jet',
-          {
-            ...commonConfig,
-            range: config.range,
-            threshold: config.threshold
-          }
-        );
-      case 'outline':
-        if (!config.roiLabels) throw new Error('OutlineLayer requires roiLabels');
-        if (!Layer.outlineCtor) throw new Error('OutlineLayer constructor not registered');
-        return new Layer.outlineCtor(id, {
-          roiLabels: config.roiLabels,
-          color: config.color,
-          opacity: commonConfig.opacity,
-          width: config.width,
-          halo: config.halo,
-          haloColor: config.haloColor,
-          haloWidth: config.haloWidth,
-          offset: config.offset,
-          roiSubset: config.roiSubset,
-          visible: commonConfig.visible,
-          blendMode: commonConfig.blendMode,
-          order: commonConfig.order,
-          presentation: commonConfig.presentation
-        });
-      case 'label':
-        if (!config.labels || !config.labelDefs) {
-          throw new Error('LabelLayer requires labels and labelDefs');
-        }
-        return new LabelLayer(id, {
-          labels: config.labels,
-          labelDefs: config.labelDefs,
-          defaultColor: config.defaultColor,
-          visible: commonConfig.visible,
-          opacity: commonConfig.opacity,
-          blendMode: commonConfig.blendMode,
-          order: commonConfig.order,
-          presentation: commonConfig.presentation
-        });
-      case 'twodata':
-        if (!config.dataX || !config.dataY) {
-          throw new Error('TwoDataLayer requires dataX and dataY');
-        }
-        return new TwoDataLayer(
-          id,
-          config.dataX,
-          config.dataY,
-          config.indices ?? null,
-          config.cmap ?? config.colorMap ?? 'confidence',
-          {
-            ...commonConfig,
-            rangeX: config.rangeX,
-            rangeY: config.rangeY,
-            thresholdX: config.thresholdX,
-            thresholdY: config.thresholdY
-          }
-        );
-      case 'temporal':
-        if (!config.frames || !config.times) {
-          throw new Error('TemporalDataLayer requires frames and times');
-        }
-        if (!Layer._temporalCtor) {
-          throw new Error('TemporalDataLayer constructor not registered');
-        }
-        return new Layer._temporalCtor(
-          id,
-          config.frames,
-          config.times,
-          config.cmap ?? config.colorMap ?? 'jet',
-          {
-            ...commonConfig,
-            range: config.range,
-            threshold: config.threshold,
-            factor: config.factor
-          }
-        );
-      case 'volume':
-        if (!config.volumeData || !config.dims) {
-          throw new Error('VolumeProjectionLayer requires volumeData and dims');
-        }
-        return new VolumeProjectionLayer(
-          id,
-          config.volumeData,
-          config.dims,
-          {
-            ...commonConfig,
-            colormap: config.colormap ?? config.cmap ?? 'viridis',
-            range: config.range,
-            threshold: config.threshold,
-            worldToIJK: config.worldToIJK,
-            affineMatrix: config.affineMatrix ?? config.affine,
-            voxelSize: config.voxelSize,
-            volumeOrigin: config.volumeOrigin,
-            useHalfFloat: config.useHalfFloat,
-            fillValue: config.fillValue,
-            projectionMode: config.projectionMode,
-            sampling: config.sampling,
-            quality: config.quality,
-            ribbon: config.ribbon
-          }
-        );
-      default:
-        throw new Error(`Unsupported layer type: ${type}`);
-    }
+    return Layer._configFactory(config);
   }
 }
 
@@ -594,17 +502,18 @@ export class RGBALayer extends Layer {
     }
     
     // Ensure it's a Float32Array
-    this.rgbaData = rgbaData instanceof Float32Array 
+    const nextRGBAData = rgbaData instanceof Float32Array
       ? rgbaData 
       : new Float32Array(rgbaData);
     
     // Validate data length (should be divisible by 4)
-    if (this.rgbaData.length % 4 !== 0) {
+    if (nextRGBAData.length % 4 !== 0) {
       throw new Error('RGBA data length must be divisible by 4');
     }
+    this.rgbaData = nextRGBAData;
     
     this._notifyChange({ rgbaData: true });
-    debugLog(`RGBALayer ${this.id}: Set RGBA data with ${this.rgbaData.length / 4} vertices`);
+    debugLog('RGBALayer', this.id, ': Set RGBA data with', this.rgbaData.length / 4, 'vertices');
   }
 
   getRGBAData(vertexCount: number): Float32Array {
@@ -621,6 +530,8 @@ export class RGBALayer extends Layer {
   }
 
   update(data: RGBALayerUpdateData): void {
+    assertLayerUpdateFields(data, 'RGBALayer', ['rgbaData']);
+    if (data.opacity !== undefined) validateOpacity(data.opacity);
     if (data.rgbaData) {
       this.setRGBAData(data.rgbaData);
     }
@@ -666,8 +577,8 @@ export class DataLayer extends Layer {
     config: DataLayerConfig = {}
   ) {
     super(id, config);
-    this.range = config.range || [0, 1];
-    this.threshold = config.threshold || [0, 0];
+    this.range = finitePair(config.range ?? [0, 1], 'range');
+    this.threshold = finitePair(config.threshold ?? [0, 0], 'threshold');
     
     // Initialize data
     this.setData(data, indices);
@@ -705,7 +616,7 @@ export class DataLayer extends Layer {
     this.sparseDataIndex = null;
     this._markDataChanged();
     this._notifyChange({ data: true, indices: true });
-    debugLog(`DataLayer ${this.id}: Set data with ${this.data.length} values`);
+    debugLog('DataLayer', this.id, ': Set data with', this.data.length, 'values');
   }
 
   getData(): Float32Array | null {
@@ -735,14 +646,15 @@ export class DataLayer extends Layer {
         const count = Math.min(this.indices.length, this.data.length);
         for (let index = 0; index < count; index++) {
           // Match rendering and summary semantics: a later duplicate mapping wins.
-          this.sparseDataIndex.set(this.indices[index], index);
+          this.sparseDataIndex.set(this.indices[index]!, index);
         }
       }
       dataIndex = this.sparseDataIndex.get(vertexIndex);
     }
 
     if (dataIndex === undefined) return null;
-    const value = this.data[dataIndex];
+    // Dense and sparse branches above prove `dataIndex` lies within `data`.
+    const value = this.data[dataIndex]!;
     return Number.isFinite(value) ? value : null;
   }
 
@@ -796,7 +708,8 @@ export class DataLayer extends Layer {
       const bin = value === upper
         ? bins - 1
         : Math.min(bins - 1, Math.floor(((value - lower) / width) * bins));
-      counts[bin] += 1;
+      // The bin calculation is clamped to the allocated [0, bins) range.
+      counts[bin] = counts[bin]! + 1;
     }
 
     const summary = Object.freeze({
@@ -828,17 +741,17 @@ export class DataLayer extends Layer {
       throw new Error('ColorMap is required');
     }
     
-    debugLog(`DataLayer ${this.id}: setColorMap called with`, colorMap);
+    debugLog('DataLayer', this.id, ': setColorMap called with', colorMap);
     
     if (colorMap instanceof ColorMap) {
       this.colorMap = colorMap;
       this.colorMapName = 'custom';
-      debugLog(`DataLayer ${this.id}: Set ColorMap instance directly`);
+      debugLog('DataLayer', this.id, ': Set ColorMap instance directly');
     } else if (typeof colorMap === 'string') {
       try {
         this.colorMap = ColorMap.fromPreset(colorMap);
         this.colorMapName = colorMap;
-        debugLog(`DataLayer ${this.id}: Created ColorMap from preset: ${colorMap}`);
+        debugLog('DataLayer', this.id, ': Created ColorMap from preset:', colorMap);
       } catch (err) {
         const presets = ColorMap.getAvailableMaps();
         const fallback = presets.includes('jet') ? 'jet' : (presets[0] || 'jet');
@@ -849,7 +762,7 @@ export class DataLayer extends Layer {
     } else if (Array.isArray(colorMap)) {
       this.colorMap = new ColorMap(colorMap);
       this.colorMapName = 'custom';
-      debugLog(`DataLayer ${this.id}: Created ColorMap from color array`);
+      debugLog('DataLayer', this.id, ': Created ColorMap from color array');
     } else {
       throw new Error('Invalid colorMap type');
     }
@@ -861,22 +774,24 @@ export class DataLayer extends Layer {
     // Invalidate cached RGBA buffer to force regeneration
     this._cachedRGBABuffer = null;
     this._notifyChange({ colorMap: this.getColorMapName() });
-    debugLog(`DataLayer ${this.id}: ColorMap updated, needsUpdate = true`);
+    debugLog('DataLayer', this.id, ': ColorMap updated, needsUpdate = true');
   }
 
   setRange(range: [number, number]): void {
-    this.range = range;
+    const nextRange = finitePair(range, 'range');
+    this.range = nextRange;
     if (this.colorMap) {
-      this.colorMap.setRange(range);
-      this._notifyChange({ range: [...range] });
+      this.colorMap.setRange(nextRange);
+      this._notifyChange({ range: [...nextRange] });
     }
   }
 
   setThreshold(threshold: [number, number]): void {
-    this.threshold = threshold;
+    const nextThreshold = finitePair(threshold, 'threshold');
+    this.threshold = nextThreshold;
     if (this.colorMap) {
-      this.colorMap.setThreshold(threshold);
-      this._notifyChange({ threshold: [...threshold] });
+      this.colorMap.setThreshold(nextThreshold);
+      this._notifyChange({ threshold: [...nextThreshold] });
     }
   }
 
@@ -907,11 +822,14 @@ export class DataLayer extends Layer {
       throw new Error('Data, indices and colorMap must be set');
     }
 
-    debugLog(`DataLayer ${this.id}: getRGBAData called for ${vertexCount} vertices`);
-    debugLog(`DataLayer ${this.id}: data.length=${this.data.length}, indices.length=${this.indices.length}`);
-    debugLog(`DataLayer ${this.id}: range=[${this.range[0].toFixed(4)}, ${this.range[1].toFixed(4)}]`);
-    debugLog(`DataLayer ${this.id}: threshold=[${this.threshold[0].toFixed(4)}, ${this.threshold[1].toFixed(4)}]`);
-    debugLog(`DataLayer ${this.id}: colormap=${this.colorMapName}, opacity=${this.opacity}`);
+    const collectDebugStats = isDebugEnabled();
+    if (collectDebugStats) {
+      debugLog(`DataLayer ${this.id}: getRGBAData called for ${vertexCount} vertices`);
+      debugLog(`DataLayer ${this.id}: data.length=${this.data.length}, indices.length=${this.indices.length}`);
+      debugLog(`DataLayer ${this.id}: range=[${this.range[0].toFixed(4)}, ${this.range[1].toFixed(4)}]`);
+      debugLog(`DataLayer ${this.id}: threshold=[${this.threshold[0].toFixed(4)}, ${this.threshold[1].toFixed(4)}]`);
+      debugLog(`DataLayer ${this.id}: colormap=${this.colorMapName}, opacity=${this.opacity}`);
+    }
 
     // Reuse cached buffer if size matches to avoid GC pressure
     if (!this._cachedRGBABuffer || this._cachedRGBABuffer.length !== vertexCount * 4) {
@@ -928,8 +846,9 @@ export class DataLayer extends Layer {
 
     // Fill in colors for vertices with data
     for (let i = 0; i < this.indices.length && i < this.data.length; i++) {
-      const vertexIndex: number = this.indices[i];
-      const value = this.data[i];
+      // The loop condition proves both aligned mapping entries are present.
+      const vertexIndex: number = this.indices[i]!;
+      const value = this.data[i]!;
 
       // Add bounds and NaN check for safety
       if (vertexIndex >= 0 && vertexIndex < vertexCount && isFinite(value)) {
@@ -939,31 +858,44 @@ export class DataLayer extends Layer {
         rgbaData[offset] = color[0];     // R
         rgbaData[offset + 1] = color[1]; // G
         rgbaData[offset + 2] = color[2]; // B
-        rgbaData[offset + 3] = color[3] ?? 1; // Compositor applies layer opacity once
+        rgbaData[offset + 3] = color[3] ?? 1;
 
         // Track transparency for debugging
-        if (rgbaData[offset + 3] > 0) {
-          nonTransparentCount++;
-        } else {
-          transparentCount++;
+        if (collectDebugStats) {
+          if (rgbaData[offset + 3]! > 0) {
+            nonTransparentCount++;
+          } else {
+            transparentCount++;
+          }
         }
       }
     }
 
-    debugLog(`DataLayer ${this.id}: Generated colors - ${nonTransparentCount} visible, ${transparentCount} transparent`);
+    if (collectDebugStats) {
+      debugLog(`DataLayer ${this.id}: Generated colors - ${nonTransparentCount} visible, ${transparentCount} transparent`);
 
-    // Sample a few values for debugging
-    if (this.data.length > 0) {
       const sampleIdx = Math.floor(this.data.length / 2);
       const sampleValue = this.data[sampleIdx];
-      const sampleColor = this.colorMap.getColor(sampleValue);
-      debugLog(`DataLayer ${this.id}: Sample value[${sampleIdx}]=${sampleValue.toFixed(4)} -> RGBA=[${sampleColor.map(v => v.toFixed(3)).join(', ')}]`);
+      if (sampleValue !== undefined) {
+        const sampleColor = this.colorMap.getColor(sampleValue);
+        debugLog(`DataLayer ${this.id}: Sample value[${sampleIdx}]=${sampleValue.toFixed(4)} -> RGBA=[${sampleColor.map(v => v.toFixed(3)).join(', ')}]`);
+      }
     }
 
     return rgbaData;
   }
 
   update(updates: DataLayerUpdateData): void {
+    assertLayerUpdateFields(updates, 'DataLayer', [
+      'data', 'indices', 'colorMap', 'range', 'threshold'
+    ]);
+    // Validate every numeric field before any requested mutation is applied.
+    if (updates.range !== undefined) finitePair(updates.range, 'range');
+    if (updates.threshold !== undefined) finitePair(updates.threshold, 'threshold');
+    if (updates.opacity !== undefined) validateOpacity(updates.opacity);
+    if (updates.indices !== undefined && updates.data === undefined) {
+      throw new TypeError('DataLayer.update requires data when indices is provided.');
+    }
     if (updates.data !== undefined) {
       this.setData(updates.data, updates.indices);
     }
@@ -1034,7 +966,8 @@ export class DataLayer extends Layer {
     for (let index = 0; index < this.data.length; index++) {
       const vertexIndex = this.denseMapping ? index : this.indices?.[index];
       if (vertexIndex === undefined || vertexIndex < 0 || vertexIndex >= domainSize) continue;
-      valuesByVertex.set(vertexIndex, this.data[index]);
+      // `index` is bounded by `this.data.length` in this loop.
+      valuesByVertex.set(vertexIndex, this.data[index]!);
     }
     return {
       values: valuesByVertex.values(),
@@ -1085,9 +1018,9 @@ export class VolumeProjectionLayer extends Layer {
     super(id, config);
 
     this.dims = dims;
-    this.range = config.range || [0, 1];
-    this.threshold = config.threshold || [0, 0];
-    this.fillValue = config.fillValue ?? 0.0;
+    this.range = finitePair(config.range ?? [0, 1], 'range');
+    this.threshold = finitePair(config.threshold ?? [0, 0], 'threshold');
+    this.fillValue = finiteNumber(config.fillValue ?? 0, 'fillValue');
     this.projectionMode = config.projectionMode ?? 'vertex';
     this.sampling = config.sampling ?? 'nearest';
     this.quality = config.quality ?? 'interactive';
@@ -1101,9 +1034,13 @@ export class VolumeProjectionLayer extends Layer {
     }
 
     this.volumeData = volumeData instanceof Float32Array ? volumeData : new Float32Array(volumeData);
-    this.volumeTexture = new VolumeTexture3D(this.volumeData, dims[0], dims[1], dims[2], {
-      useHalfFloat: config.useHalfFloat
-    });
+    this.volumeTexture = new VolumeTexture3D(
+      this.volumeData,
+      dims[0],
+      dims[1],
+      dims[2],
+      config.useHalfFloat === undefined ? {} : { useHalfFloat: config.useHalfFloat }
+    );
 
     this.worldToIJK = this.computeWorldToIJK(config);
 
@@ -1190,20 +1127,23 @@ export class VolumeProjectionLayer extends Layer {
   }
 
   setRange(range: [number, number]): void {
-    this.range = range;
-    this.colorMap.setRange(range);
-    this._notifyChange({ range: [...range] });
+    const nextRange = finitePair(range, 'range');
+    this.range = nextRange;
+    this.colorMap.setRange(nextRange);
+    this._notifyChange({ range: [...nextRange] });
   }
 
   setThreshold(threshold: [number, number]): void {
-    this.threshold = threshold;
-    this.colorMap.setThreshold(threshold);
-    this._notifyChange({ threshold: [...threshold] });
+    const nextThreshold = finitePair(threshold, 'threshold');
+    this.threshold = nextThreshold;
+    this.colorMap.setThreshold(nextThreshold);
+    this._notifyChange({ threshold: [...nextThreshold] });
   }
 
   setFillValue(fillValue: number): void {
-    this.fillValue = fillValue;
-    this._notifyChange({ fillValue });
+    const nextFillValue = finiteNumber(fillValue, 'fillValue');
+    this.fillValue = nextFillValue;
+    this._notifyChange({ fillValue: nextFillValue });
   }
 
   setProjectionMode(mode: VolumeProjectionMode): void {
@@ -1285,7 +1225,10 @@ export class VolumeProjectionLayer extends Layer {
 
     const vertices = this.attachedSurface.geometry.vertices;
     if (vertices.length / 3 !== vertexCount) {
-      console.warn(`VolumeProjectionLayer ${this.id}: vertexCount mismatch; expected ${vertices.length / 3}, got ${vertexCount}`);
+      throw new RangeError(
+        `VolumeProjectionLayer ${this.id}: vertexCount mismatch; ` +
+        `expected ${vertices.length / 3}, got ${vertexCount}`
+      );
     }
 
     if (!this.rgbaBuffer || this.rgbaBuffer.length !== vertexCount * 4) {
@@ -1309,9 +1252,10 @@ export class VolumeProjectionLayer extends Layer {
 
     for (let vi = 0; vi < vertexCount; vi++) {
       const base = vi * 3;
-      const x = vertices[base];
-      const y = vertices[base + 1];
-      const z = vertices[base + 2];
+      // Exact vertex-count validation above proves every xyz triplet is present.
+      const x = vertices[base]!;
+      const y = vertices[base + 1]!;
+      const z = vertices[base + 2]!;
 
       const value = mode === 'ribbon'
         ? this.sampleRibbonValue(vi, we)
@@ -1345,7 +1289,11 @@ export class VolumeProjectionLayer extends Layer {
       throw new Error('VolumeProjectionLayer.sampleValueAtVertex requires attachment to a surface');
     }
     const vertices = this.attachedSurface.geometry.vertices;
-    if (vertexIndex < 0 || vertexIndex >= vertices.length / 3) {
+    if (
+      !Number.isSafeInteger(vertexIndex) ||
+      vertexIndex < 0 ||
+      vertexIndex >= vertices.length / 3
+    ) {
       throw new Error(`VolumeProjectionLayer.sampleValueAtVertex vertex ${vertexIndex} out of range`);
     }
     const mesh = this.attachedSurface.mesh;
@@ -1359,9 +1307,10 @@ export class VolumeProjectionLayer extends Layer {
       return this.sampleRibbonValue(vertexIndex, we);
     }
     const base = vertexIndex * 3;
-    const x = vertices[base];
-    const y = vertices[base + 1];
-    const z = vertices[base + 2];
+    // The safe-integer range check above proves this xyz triplet is present.
+    const x = vertices[base]!;
+    const y = vertices[base + 1]!;
+    const z = vertices[base + 2]!;
     return this.sampleValueAtWorldCoordinates(
       we[0] * x + we[4] * y + we[8] * z + we[12],
       we[1] * x + we[5] * y + we[9] * z + we[13],
@@ -1370,6 +1319,15 @@ export class VolumeProjectionLayer extends Layer {
   }
 
   update(updates: VolumeProjectionLayerUpdateData): void {
+    assertLayerUpdateFields(updates, 'VolumeProjectionLayer', [
+      'volumeData', 'colormap', 'range', 'threshold', 'worldToIJK',
+      'affineMatrix', 'voxelSize', 'volumeOrigin', 'fillValue',
+      'projectionMode', 'sampling', 'quality', 'ribbon'
+    ]);
+    if (updates.range !== undefined) finitePair(updates.range, 'range');
+    if (updates.threshold !== undefined) finitePair(updates.threshold, 'threshold');
+    if (updates.fillValue !== undefined) finiteNumber(updates.fillValue, 'fillValue');
+    if (updates.opacity !== undefined) validateOpacity(updates.opacity);
     if (updates.volumeData !== undefined) {
       this.updateVolumeData(updates.volumeData);
     }
@@ -1503,7 +1461,8 @@ export class VolumeProjectionLayer extends Layer {
     const i = Math.min(nx - 1, Math.max(0, Math.floor(ijkX + 0.5)));
     const j = Math.min(ny - 1, Math.max(0, Math.floor(ijkY + 0.5)));
     const k = Math.min(nz - 1, Math.max(0, Math.floor(ijkZ + 0.5)));
-    return this.volumeData[i + nx * j + nx * ny * k];
+    // Dimensions and volume length are validated by VolumeTexture3D at construction/update.
+    return this.volumeData[i + nx * j + nx * ny * k]!;
   }
 
   private sampleLinear(ijkX: number, ijkY: number, ijkZ: number): number {
@@ -1520,7 +1479,9 @@ export class VolumeProjectionLayer extends Layer {
     const ty = Math.min(1, Math.max(0, ijkY - y0));
     const tz = Math.min(1, Math.max(0, ijkZ - z0));
 
-    const at = (i: number, j: number, k: number) => this.volumeData[i + nx * j + nx * ny * k];
+    // All coordinates are clamped to validated volume dimensions before lookup.
+    const at = (i: number, j: number, k: number) =>
+      this.volumeData[i + nx * j + nx * ny * k]!;
     const c00 = at(x0, y0, z0) * (1 - tx) + at(x1, y0, z0) * tx;
     const c10 = at(x0, y1, z0) * (1 - tx) + at(x1, y1, z0) * tx;
     const c01 = at(x0, y0, z1) * (1 - tx) + at(x1, y0, z1) * tx;
@@ -1537,12 +1498,20 @@ export class VolumeProjectionLayer extends Layer {
     const denom = Math.max(1, this.ribbonSamples - 1);
     for (let s = 0; s < this.ribbonSamples; s++) {
       const t = denom === 0 ? 0 : s / denom;
-      const x = this.ribbonWhite[base] + (this.ribbonPial[base] - this.ribbonWhite[base]) * t;
-      const y = this.ribbonWhite[base + 1] + (this.ribbonPial[base + 1] - this.ribbonWhite[base + 1]) * t;
-      const z = this.ribbonWhite[base + 2] + (this.ribbonPial[base + 2] - this.ribbonWhite[base + 2]) * t;
-      const wx = worldMatrixElements[0] * x + worldMatrixElements[4] * y + worldMatrixElements[8] * z + worldMatrixElements[12];
-      const wy = worldMatrixElements[1] * x + worldMatrixElements[5] * y + worldMatrixElements[9] * z + worldMatrixElements[13];
-      const wz = worldMatrixElements[2] * x + worldMatrixElements[6] * y + worldMatrixElements[10] * z + worldMatrixElements[14];
+      // `validateRibbonForVertexCount` proves both aligned xyz triplets are present.
+      const whiteX = this.ribbonWhite[base]!;
+      const whiteY = this.ribbonWhite[base + 1]!;
+      const whiteZ = this.ribbonWhite[base + 2]!;
+      const x = whiteX + (this.ribbonPial[base]! - whiteX) * t;
+      const y = whiteY + (this.ribbonPial[base + 1]! - whiteY) * t;
+      const z = whiteZ + (this.ribbonPial[base + 2]! - whiteZ) * t;
+      // The only caller passes Three.js Matrix4.elements, whose length is always 16.
+      const wx = worldMatrixElements[0]! * x + worldMatrixElements[4]! * y +
+        worldMatrixElements[8]! * z + worldMatrixElements[12]!;
+      const wy = worldMatrixElements[1]! * x + worldMatrixElements[5]! * y +
+        worldMatrixElements[9]! * z + worldMatrixElements[13]!;
+      const wz = worldMatrixElements[2]! * x + worldMatrixElements[6]! * y +
+        worldMatrixElements[10]! * z + worldMatrixElements[14]!;
       const value = this.sampleValueAtWorldCoordinates(wx, wy, wz);
       if (value !== null && isFinite(value) && Math.abs(value - this.fillValue) >= 1e-6) {
         values.push(value);
@@ -1557,7 +1526,10 @@ export class VolumeProjectionLayer extends Layer {
       case 'median': {
         const sorted = [...values].sort((a, b) => a - b);
         const mid = Math.floor(sorted.length / 2);
-        return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+        // `values.length > 0`; both median positions are therefore present.
+        return sorted.length % 2 === 0
+          ? (sorted[mid - 1]! + sorted[mid]!) / 2
+          : sorted[mid]!;
       }
       case 'mean':
       default:
@@ -1659,10 +1631,10 @@ export class TwoDataLayer extends Layer {
     config: TwoDataLayerConfig = {}
   ) {
     super(id, config);
-    this.rangeX = config.rangeX || [0, 1];
-    this.rangeY = config.rangeY || [0, 1];
-    this.thresholdX = config.thresholdX || [0, 0];
-    this.thresholdY = config.thresholdY || [0, 0];
+    this.rangeX = finitePair(config.rangeX ?? [0, 1], 'rangeX');
+    this.rangeY = finitePair(config.rangeY ?? [0, 1], 'rangeY');
+    this.thresholdX = finitePair(config.thresholdX ?? [0, 0], 'thresholdX');
+    this.thresholdY = finitePair(config.thresholdY ?? [0, 0], 'thresholdY');
 
     // Initialize data
     this.setData(dataX, dataY, indices);
@@ -1678,12 +1650,14 @@ export class TwoDataLayer extends Layer {
       throw new Error('Both dataX and dataY are required');
     }
 
-    this.dataX = dataX instanceof Float32Array ? dataX : new Float32Array(dataX);
-    this.dataY = dataY instanceof Float32Array ? dataY : new Float32Array(dataY);
+    const nextDataX = dataX instanceof Float32Array ? dataX : new Float32Array(dataX);
+    const nextDataY = dataY instanceof Float32Array ? dataY : new Float32Array(dataY);
 
-    if (this.dataX.length !== this.dataY.length) {
+    if (nextDataX.length !== nextDataY.length) {
       throw new Error('dataX and dataY must have the same length');
     }
+    this.dataX = nextDataX;
+    this.dataY = nextDataY;
 
     if (indices) {
       this.indices = indices instanceof Uint32Array
@@ -1698,7 +1672,7 @@ export class TwoDataLayer extends Layer {
     }
 
     this._notifyChange({ dataX: true, dataY: true, indices: true });
-    debugLog(`TwoDataLayer ${this.id}: Set data with ${this.dataX.length} values`);
+    debugLog('TwoDataLayer', this.id, ': Set data with', this.dataX.length, 'values');
   }
 
   getDataX(): Float32Array | null {
@@ -1735,7 +1709,7 @@ export class TwoDataLayer extends Layer {
     this.colorMap.setThresholdY(this.thresholdY);
 
     this._notifyChange({ colorMap: this.colorMapName });
-    debugLog(`TwoDataLayer ${this.id}: ColorMap set to ${this.colorMapName}`);
+    debugLog('TwoDataLayer', this.id, ': ColorMap set to', this.colorMapName);
   }
 
   getColorMap(): ColorMap2D | null {
@@ -1743,34 +1717,38 @@ export class TwoDataLayer extends Layer {
   }
 
   setRangeX(range: [number, number]): void {
-    this.rangeX = range;
+    const nextRange = finitePair(range, 'rangeX');
+    this.rangeX = nextRange;
     if (this.colorMap) {
-      this.colorMap.setRangeX(range);
-      this._notifyChange({ rangeX: [...range] });
+      this.colorMap.setRangeX(nextRange);
+      this._notifyChange({ rangeX: [...nextRange] });
     }
   }
 
   setRangeY(range: [number, number]): void {
-    this.rangeY = range;
+    const nextRange = finitePair(range, 'rangeY');
+    this.rangeY = nextRange;
     if (this.colorMap) {
-      this.colorMap.setRangeY(range);
-      this._notifyChange({ rangeY: [...range] });
+      this.colorMap.setRangeY(nextRange);
+      this._notifyChange({ rangeY: [...nextRange] });
     }
   }
 
   setThresholdX(threshold: [number, number]): void {
-    this.thresholdX = threshold;
+    const nextThreshold = finitePair(threshold, 'thresholdX');
+    this.thresholdX = nextThreshold;
     if (this.colorMap) {
-      this.colorMap.setThresholdX(threshold);
-      this._notifyChange({ thresholdX: [...threshold] });
+      this.colorMap.setThresholdX(nextThreshold);
+      this._notifyChange({ thresholdX: [...nextThreshold] });
     }
   }
 
   setThresholdY(threshold: [number, number]): void {
-    this.thresholdY = threshold;
+    const nextThreshold = finitePair(threshold, 'thresholdY');
+    this.thresholdY = nextThreshold;
     if (this.colorMap) {
-      this.colorMap.setThresholdY(threshold);
-      this._notifyChange({ thresholdY: [...threshold] });
+      this.colorMap.setThresholdY(nextThreshold);
+      this._notifyChange({ thresholdY: [...nextThreshold] });
     }
   }
 
@@ -1785,7 +1763,10 @@ export class TwoDataLayer extends Layer {
       throw new Error('Data, indices and colorMap must be set');
     }
 
-    debugLog(`TwoDataLayer ${this.id}: getRGBAData called for ${vertexCount} vertices`);
+    const collectDebugStats = isDebugEnabled();
+    if (collectDebugStats) {
+      debugLog(`TwoDataLayer ${this.id}: getRGBAData called for ${vertexCount} vertices`);
+    }
 
     const rgbaData = new Float32Array(vertexCount * 4);
     rgbaData.fill(0); // Initialize with transparent black
@@ -1799,10 +1780,12 @@ export class TwoDataLayer extends Layer {
     const dataY = this.dataY;
     const colorMap = this.colorMap;
 
-    for (let i = 0; i < indices.length && i < dataX.length; i++) {
-      const vertexIndex = indices[i];
-      const valueX = dataX[i];
-      const valueY = dataY[i];
+    const mappedCount = Math.min(indices.length, dataX.length, dataY.length);
+    for (let i = 0; i < mappedCount; i++) {
+      // `mappedCount` establishes aligned bounds once before the hot loop.
+      const vertexIndex = indices[i]!;
+      const valueX = dataX[i]!;
+      const valueY = dataY[i]!;
 
       if (vertexIndex >= 0 && vertexIndex < vertexCount) {
         const color = colorMap.getColor(valueX, valueY);
@@ -1811,19 +1794,37 @@ export class TwoDataLayer extends Layer {
         rgbaData[offset] = color[0];
         rgbaData[offset + 1] = color[1];
         rgbaData[offset + 2] = color[2];
-        rgbaData[offset + 3] = color[3] * this.opacity;
+        rgbaData[offset + 3] = color[3];
 
-        if (rgbaData[offset + 3] > 0) {
+        if (collectDebugStats && rgbaData[offset + 3]! > 0) {
           nonTransparentCount++;
         }
       }
     }
 
-    debugLog(`TwoDataLayer ${this.id}: Generated colors - ${nonTransparentCount} visible`);
+    if (collectDebugStats) {
+      debugLog(`TwoDataLayer ${this.id}: Generated colors - ${nonTransparentCount} visible`);
+    }
     return rgbaData;
   }
 
   update(updates: TwoDataLayerUpdateData): void {
+    assertLayerUpdateFields(updates, 'TwoDataLayer', [
+      'dataX', 'dataY', 'indices', 'colorMap', 'rangeX', 'rangeY',
+      'thresholdX', 'thresholdY'
+    ]);
+    if (updates.rangeX !== undefined) finitePair(updates.rangeX, 'rangeX');
+    if (updates.rangeY !== undefined) finitePair(updates.rangeY, 'rangeY');
+    if (updates.thresholdX !== undefined) finitePair(updates.thresholdX, 'thresholdX');
+    if (updates.thresholdY !== undefined) finitePair(updates.thresholdY, 'thresholdY');
+    if (updates.opacity !== undefined) validateOpacity(updates.opacity);
+    if (
+      updates.indices !== undefined &&
+      updates.dataX === undefined &&
+      updates.dataY === undefined
+    ) {
+      throw new TypeError('TwoDataLayer.update requires dataX or dataY when indices is provided.');
+    }
     if (updates.dataX !== undefined || updates.dataY !== undefined) {
       const newDataX = updates.dataX !== undefined
         ? (updates.dataX instanceof Float32Array ? updates.dataX : new Float32Array(updates.dataX))
@@ -1897,12 +1898,13 @@ export class BaseLayer extends Layer {
       { ...config, order: -1 },
       { role: 'anatomy', pinned: 'bottom', reorderable: false, priority: 1 }
     );
-    this.color = color;
+    this.color = rgbInteger(color, 'color');
   }
 
   setColor(color: number): void {
-    this.color = color;
-    this._notifyChange({ color });
+    const nextColor = rgbInteger(color, 'color');
+    this.color = nextColor;
+    this._notifyChange({ color: nextColor });
   }
 
   getRGBAData(vertexCount: number): Float32Array {
@@ -1918,13 +1920,16 @@ export class BaseLayer extends Layer {
       rgbaData[i] = r;
       rgbaData[i + 1] = g;
       rgbaData[i + 2] = b;
-      rgbaData[i + 3] = this.opacity;
+      rgbaData[i + 3] = 1;
     }
     
     return rgbaData;
   }
 
   update(updates: BaseLayerUpdateData): void {
+    assertLayerUpdateFields(updates, 'BaseLayer', ['color']);
+    if (updates.color !== undefined) rgbInteger(updates.color, 'color');
+    if (updates.opacity !== undefined) validateOpacity(updates.opacity);
     if (updates.color !== undefined) {
       this.setColor(updates.color);
     }
@@ -1933,6 +1938,9 @@ export class BaseLayer extends Layer {
     }
     if (updates.visible !== undefined) {
       this.setVisible(updates.visible);
+    }
+    if (updates.blendMode !== undefined) {
+      this.setBlendMode(updates.blendMode);
     }
   }
 
@@ -1990,7 +1998,9 @@ export class LabelLayer extends Layer {
     this._notifyChange({ labelDefs: true });
   }
 
-  update(data: LabelLayerOptions & LayerUpdateData): void {
+  update(data: LabelLayerUpdateData): void {
+    assertLayerUpdateFields(data, 'LabelLayer', ['labels', 'labelDefs', 'defaultColor']);
+    if (data.opacity !== undefined) validateOpacity(data.opacity);
     if (data.labels !== undefined) {
       this.setLabels(data.labels);
     }
@@ -2065,7 +2075,7 @@ export class LayerStack {
     this.insertLayerByInitializationHint(layer);
     layer._attachToLayerStack();
     this.needsComposite = true;
-    debugLog(`Added layer ${layer.id} to stack`);
+    debugLog('Added layer', layer.id, 'to stack');
   }
 
   removeLayer(id: string): boolean {
@@ -2078,7 +2088,7 @@ export class LayerStack {
       this.layers.delete(id);
       this.layerOrder = this.layerOrder.filter(layerId => layerId !== id);
       this.needsComposite = true;
-      debugLog(`Removed layer ${id} from stack`);
+      debugLog('Removed layer', id, 'from stack');
       return true;
     }
     return false;
@@ -2209,8 +2219,8 @@ export class LayerStack {
 
   getVisibleLayers(): Layer[] {
     return this.layerOrder
-      .map(id => this.layers.get(id)!)
-      .filter(layer => layer && layer.visible);
+      .map(id => this.layers.get(id))
+      .filter((layer): layer is Layer => layer?.visible === true);
   }
 
   clear(): void {
@@ -2232,7 +2242,8 @@ export class LayerStack {
   private insertLayerByInitializationHint(layer: Layer): void {
     const candidateRank = this.constraintRank(layer);
     const insertionIndex = this.layerOrder.findIndex(id => {
-      const existing = this.layers.get(id)!;
+      const existing = this.layers.get(id);
+      if (!existing) return false;
       const existingRank = this.constraintRank(existing);
       if (existingRank.pin !== candidateRank.pin) return existingRank.pin > candidateRank.pin;
       if (existingRank.role !== candidateRank.role) return existingRank.role > candidateRank.role;
@@ -2253,9 +2264,11 @@ export class LayerStack {
     let previousRoleRank = -1;
     let previousPriorityRank = -Infinity;
 
-    for (let index = 0; index < candidate.length; index++) {
-      const id = candidate[index];
-      const layer = this.layers.get(id)!;
+    for (const [index, id] of candidate.entries()) {
+      const layer = this.layers.get(id);
+      if (!layer) {
+        return this.failure('layer-not-found', `Layer "${id}" does not exist.`);
+      }
       const rank = this.constraintRank(layer);
       if (
         rank.pin < previousPinRank ||

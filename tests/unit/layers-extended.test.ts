@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import * as THREE from 'three';
+import '../../src/LayerRegistry';
 import {
   Layer,
   DataLayer,
@@ -69,13 +70,15 @@ describe('TwoDataLayer', () => {
     )).toThrow();
   });
 
-  it('respects opacity', () => {
+  it('leaves opacity for the compositor to apply exactly once', () => {
     const layer = makeTwoDataLayer();
+    const before = layer.getRGBAData(3);
     layer.setOpacity(0.5);
     const rgba = layer.getRGBAData(3);
     for (let i = 0; i < 3; i++) {
-      expect(rgba[i * 4 + 3]).toBeLessThanOrEqual(0.5);
+      expect(rgba[i * 4 + 3]).toBeCloseTo(before[i * 4 + 3]);
     }
+    expect(layer.opacity).toBe(0.5);
   });
 
   it('range getters return copies', () => {
@@ -196,6 +199,20 @@ describe('VolumeProjectionLayer', () => {
     );
     expect(layer.getWorldToIJK()).toBeInstanceOf(THREE.Matrix4);
   });
+
+  it('rejects fractional vertex sampling before reading an xyz triplet', () => {
+    const layer = new VolumeProjectionLayer(
+      'vol',
+      new Float32Array(8),
+      [2, 2, 2]
+    );
+    layer.attach({
+      geometry: {
+        vertices: new Float32Array([0, 0, 0, 1, 0, 0])
+      }
+    });
+    expect(() => layer.sampleValueAtVertex(0.5)).toThrow(/out of range/);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -203,11 +220,11 @@ describe('VolumeProjectionLayer', () => {
 // ---------------------------------------------------------------------------
 describe('Layer.fromConfig', () => {
   it('throws without type', () => {
-    expect(() => Layer.fromConfig({ id: 'x' })).toThrow('type and id');
+    expect(() => Layer.fromConfig({ id: 'x' })).toThrow('non-empty string type');
   });
 
   it('throws without id', () => {
-    expect(() => Layer.fromConfig({ type: 'base' })).toThrow('type and id');
+    expect(() => Layer.fromConfig({ type: 'base' })).toThrow('non-empty string id');
   });
 
   it('creates base layer', () => {

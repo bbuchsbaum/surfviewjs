@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite';
-import { resolve } from 'path';
+import { resolve } from 'node:path';
 
 // Thin ESM entry for `surfview/report`. Report symbols remain compatibility
 // re-exports of the already-built core during 2.x, so this entry must never
@@ -23,11 +23,11 @@ export default defineConfig({
   build: {
     emptyOutDir: false,
     lib: {
-      entry: resolve(__dirname, 'src/index.report.ts'),
+      entry: resolve(import.meta.dirname, 'src/index.report.ts'),
       fileName: () => 'surfview.report.es.js',
       formats: ['es']
     },
-    sourcemap: true,
+    sourcemap: false,
     minify: 'terser',
     terserOptions: {
       compress: {

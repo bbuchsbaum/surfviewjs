@@ -201,7 +201,7 @@ export function mapParcelValuesToVertices(
   const out = new Float32Array(labels.length);
 
   for (let i = 0; i < labels.length; i++) {
-    const row = lookup.get(labels[i]);
+    const row = lookup.get(labels[i]!);
     if (!row) {
       out[i] = Number.NaN;
       continue;
@@ -230,7 +230,7 @@ export function parcelValuesInOrder(
   const out = new Float32Array(orderedParcelIds.length);
 
   for (let i = 0; i < orderedParcelIds.length; i++) {
-    const row = lookup.get(orderedParcelIds[i]);
+    const row = lookup.get(orderedParcelIds[i]!);
     if (!row) {
       out[i] = Number.NaN;
       continue;
@@ -277,7 +277,7 @@ export class ParcelIndex {
       return null;
     }
 
-    const parcelId = this.vertexLabels[vertexIndex];
+    const parcelId = this.vertexLabels[vertexIndex]!;
     return Number.isFinite(parcelId) && parcelId > 0 ? parcelId : null;
   }
 
