@@ -299,6 +299,8 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   private pickingController?: ViewerPickingController;
   ambientLight!: THREE.AmbientLight;
   directionalLight!: THREE.DirectionalLight;
+  /** Secondary light; presets may set its intensity, report scenes keep it camera-relative. */
+  fillLight!: THREE.DirectionalLight;
   viewpoints!: Record<string, ViewpointConfig>;
   viewpointState!: ViewpointState | null;
   currentViewpointKey!: string;
@@ -650,6 +652,8 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     const fillLight = new THREE.DirectionalLight(0xffffff, 0.8);
     fillLight.position.set(-1, -0.5, -1);
     this.scene.add(fillLight);
+    this.scene.add(fillLight.target);
+    this.fillLight = fillLight;
     this.invalidateState(['appearance']);
   }
 
@@ -3161,6 +3165,9 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
         this.ambientLight.color.setHex(style.lighting.ambientColor);
         this.ambientLight.intensity = style.lighting.ambientIntensity;
       }
+      if (this.fillLight) {
+        this.fillLight.intensity = style.lighting.fillIntensity ?? 0.8;
+      }
       if (this.directionalLight) {
         this.directionalLight.color.setHex(style.lighting.directionalColor);
         this.directionalLight.intensity = style.lighting.directionalIntensity;
@@ -3199,6 +3206,12 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
             curvature.setContrast(style.curvature.contrast);
             curvature.setSmoothness(style.curvature.smoothness);
           }
+          surface.setShading({
+            silhouetteDarkening: style.lighting.silhouetteDarkening ?? 0,
+            thresholdOutline: style.lighting.thresholdOutline ?? 0,
+            thresholdOutlineShade: style.lighting.thresholdOutlineShade ?? 0.55,
+            overlayEmission: style.lighting.overlayEmission ?? 0
+          });
         }
       });
 

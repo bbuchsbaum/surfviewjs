@@ -5,6 +5,7 @@ export type SurfViewStylePresetName =
   | 'default'
   | 'presentation'
   | 'paper-light'
+  | 'report'
   | 'talk-dark'
   | 'clinical-qc'
   | 'retinotopy'
@@ -27,6 +28,13 @@ export interface StylePresetLighting {
   rimStrength: number;
   ssaoRadius: number;
   ssaoKernelSize: number;
+  /** Fill light intensity (default 0.8). */
+  fillIntensity?: number;
+  /** Fragment shading of CPU-composited surfaces. */
+  silhouetteDarkening?: number;
+  thresholdOutline?: number;
+  thresholdOutlineShade?: number;
+  overlayEmission?: number;
 }
 
 export interface StylePresetMaterial {
@@ -286,6 +294,54 @@ export const STYLE_PRESETS: Record<SurfViewStylePresetName, SurfViewStylePreset>
     },
     annotation: { radius: 0.72, colorOn: 0x0f766e, colorOff: 0xb91c1c, style: 'minimal' },
     colormaps: { sequential: 'viridis', diverging: 'RdBu', label: 'glasbey', curvature: 'gray' },
+    figure: { width: 2400, height: 1800, dpi: 300, transparent: true, colorbar: true, roiLabels: true, scaleBar: true, fontScale: 1 },
+    labelDensity: 'sparse',
+    fontScale: 1
+  },
+  report: {
+    name: 'report',
+    label: 'Report',
+    // Interactive report widgets: a quiet two-tone sulcal underlay under a
+    // camera-attached key light, on a neutral panel grey that separates the
+    // cortex from white report pages.
+    background: { css: '#f3f5f5', clearColor: 0xf3f5f5, clearAlpha: 1 },
+    lighting: {
+      ambientColor: 0xffffff,
+      ambientIntensity: 0.45,
+      directionalColor: 0xffffff,
+      directionalIntensity: 0.85,
+      directionalPosition: [1, 1.25, 1.4],
+      rimStrength: 0,
+      ssaoRadius: 4,
+      ssaoKernelSize: 32,
+      fillIntensity: 0.3,
+      silhouetteDarkening: 0.2,
+      thresholdOutline: 1,
+      thresholdOutlineShade: 0.55,
+      overlayEmission: 0.4
+    },
+    material: {
+      baseColor: 0xffffff,
+      materialType: 'phong',
+      metalness: 0,
+      roughness: 0.85,
+      alpha: 1
+    },
+    curvature: { brightness: 0.73, contrast: 0.32, smoothness: 0.2 },
+    roi: {
+      strokeColor: '#1b2427',
+      strokeWidth: 1.8,
+      labelDensity: 'sparse',
+      labelColor: '#1b2427',
+      labelFont: '11px sans-serif'
+    },
+    annotation: { radius: 0.72, colorOn: 0x2f6f73, colorOff: 0xb91c1c, style: 'minimal' },
+    colormaps: {
+      sequential: 'surface-heat-positive',
+      diverging: 'surface-heat',
+      label: 'glasbey',
+      curvature: 'gray'
+    },
     figure: { width: 2400, height: 1800, dpi: 300, transparent: true, colorbar: true, roiLabels: true, scaleBar: true, fontScale: 1 },
     labelDensity: 'sparse',
     fontScale: 1

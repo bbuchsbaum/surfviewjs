@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Report scenes gain an `anatomical` layout (`mountSurfView(..., { layout:
+  'anatomical' })`): both hemispheres keep their RAS placement, separated only
+  by `hemisphereGap` at the midline, and whole-brain presets (`left`, `right`,
+  `left-medial`, `right-medial`, `dorsal`, `ventral`, `anterior`, `posterior`,
+  `oblique`) rotate the brain rigidly. Medial presets hide the other
+  hemisphere. The default `split` layout is unchanged.
+- `oblique: 'auto'` picks, per displayed map, the oblique angle that faces the
+  most suprathreshold cortex (`chooseInformativeOblique`); explicit
+  `{ azimuth, elevation }` angles are also accepted.
+- `fitInsets` / `setFitInsets` frame the brain inside the part of the canvas
+  left free by overlaid controls (principal-point shift, orbit target
+  unchanged); camera fitting now uses exact per-vertex perspective bounds.
+- Thresholded data layers draw their threshold as an anti-aliased per-fragment
+  isoline with an optional outline band (`DataLayer.writeThresholdEdgeAttributes`,
+  `MultiLayerNeuroSurface.setShading`), plus optional silhouette darkening and
+  partial overlay emission.
+- `report` style preset: sulcal two-tone underlay, camera-attached key and fill
+  lights, silhouette darkening, heat colormaps for thresholded statistics.
+
+### Fixed
+- Opaque surfaces rendered with `depthWrite: false`, so wherever a closed
+  inflated surface overlapped itself on screen (the insula seen from above, a
+  frontal fold seen head-on) far-side triangles painted over near-side ones as
+  cracks and hatching. Fully opaque composites now render opaque with depth
+  writes.
+- The curvature and base layers created by the `MultiLayerNeuroSurface`
+  constructor were never wired to change events, so runtime curvature
+  brightness/contrast/smoothness changes (including style presets) were
+  silently ignored.
+- Report mounts resized to the container's own height instead of the stage's
+  stale `min-height`, which cropped the brain when a CSS-sized frame narrowed.
+
 ### Changed
 - Removed unused Gulp, Webpack CLI, `node-fetch`, direct Rollup 2 plugins, and
   their stale package scripts; application and package builds now use Vite 8

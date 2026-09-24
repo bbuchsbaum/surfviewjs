@@ -11,6 +11,7 @@ describe('style presets', () => {
   it('exposes publication and talk presets with scientific display controls', () => {
     expect(listStylePresets()).toEqual(expect.arrayContaining([
       'paper-light',
+      'report',
       'talk-dark',
       'clinical-qc',
       'retinotopy',

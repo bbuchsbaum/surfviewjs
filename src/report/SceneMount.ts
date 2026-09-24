@@ -26,14 +26,31 @@ import type {
 import {
   ReportSceneController
 } from './ReportSceneController';
+import type {
+  ReportBrainView,
+  ReportFitInsets,
+  ReportLayout,
+  ReportObliqueAngle
+} from './ReportSceneController';
 import {
   createReportSceneControlTarget,
   ReportSceneControlTarget
 } from './ReportSceneControlTarget';
 import { ReportControls } from './ReportControls';
 
-export { layoutReportAnatomicalMeshes } from './ReportSceneController';
-export type { ReportAnatomicalMesh } from './ReportSceneController';
+export {
+  layoutReportAnatomicalBrain,
+  layoutReportAnatomicalMeshes,
+  REPORT_BRAIN_VIEWS,
+  reportBrainViewAxes
+} from './ReportSceneController';
+export type {
+  ReportAnatomicalMesh,
+  ReportBrainView,
+  ReportFitInsets,
+  ReportLayout,
+  ReportObliqueAngle
+} from './ReportSceneController';
 
 export type SurfViewSceneView = AnatomicalView | 'reset';
 
@@ -63,6 +80,23 @@ export interface MountSurfViewOptions {
   bilateralGroup?: BilateralSurfaceGroup;
   /** Gap between recentered hemispheres in scene units. */
   hemisphereGap?: number;
+  /**
+   * Pair pose: `split` (default) rotates each hemisphere into the view side by
+   * side; `anatomical` keeps one coherent brain and rotates it as a whole.
+   */
+  layout?: ReportLayout;
+  /** Initial whole-brain view for the anatomical layout. Defaults to `oblique`. */
+  initialBrainView?: ReportBrainView;
+  /** Attach the key light to the camera. Defaults to true for the anatomical layout. */
+  headlight?: boolean;
+  /** Vertical camera field of view in degrees. */
+  fov?: number;
+  /** Camera fit margin as a fraction of the framed distance. */
+  fitMargin?: number;
+  /** Camera angle of the `oblique` whole-brain view in degrees, or `auto` (data-driven). */
+  oblique?: ReportObliqueAngle | 'auto';
+  /** Canvas insets (CSS px) kept clear of the fitted brain for overlaid controls. */
+  fitInsets?: ReportFitInsets;
   /** Called after a load or WebGL initialization failure is rendered inline. */
   onError?: (error: Error) => void;
 }
@@ -81,6 +115,12 @@ export interface SurfViewMountHandle {
   setView(view: SurfViewSceneView): void;
   /** Restore the configured initial anatomical view. */
   resetView(): void;
+  /** Pose the pair as one brain (anatomical layout only). */
+  setBrainView(view: ReportBrainView): void;
+  /** Current whole-brain view, or null after free rotation. */
+  getBrainView(): ReportBrainView | null;
+  /** Update the canvas insets kept clear of the fitted brain, and refit. */
+  setFitInsets(insets: ReportFitInsets): void;
   getAnatomicalViewCapabilities(): AnatomicalViewCapabilities;
   resize(width?: number, height?: number): void;
   exportPNG(options?: FigureExportOptions): string;
@@ -131,6 +171,7 @@ class SceneMount implements SurfViewMountHandle {
   private disposed = false;
   private selectedLayer: string;
   private selectedView: AnatomicalView;
+  private selectedBrainView: ReportBrainView | null = null;
   private viewGroup: BilateralSurfaceGroup | null = null;
   private resolveReady!: () => void;
   private rejectReady!: (error: Error) => void;
@@ -201,11 +242,16 @@ class SceneMount implements SurfViewMountHandle {
 
     if (typeof ResizeObserver !== 'undefined') {
       this.resizeObserver = new ResizeObserver(entries => {
-        const width = entries[0]?.contentRect.width;
-        if (width && this.currentViewer) {
+        const rect = entries[0]?.contentRect;
+        if (rect?.width && this.currentViewer) {
+          // Follow the container's own height when it has one (a CSS-sized
+          // frame); the stage's min-height only remembers the previous size.
           this.resize(
-            width,
-            this.options.height ?? finiteSize(this.stage.getBoundingClientRect().height, 480)
+            rect.width,
+            this.options.height ?? finiteSize(
+              rect.height,
+              finiteSize(this.stage.getBoundingClientRect().height, 480)
+            )
           );
         }
       });
@@ -265,7 +311,31 @@ class SceneMount implements SurfViewMountHandle {
   }
 
   resetView(): void {
+    if (this.options.layout === 'anatomical') {
+      this.selectedBrainView = this.options.initialBrainView ?? 'oblique';
+      if (!this.mounted || !this.reportController) return;
+      const result = this.reportController.resetView();
+      if (!result.ok) throw new Error(result.message);
+      return;
+    }
     this.setView(this.options.initialView);
+  }
+
+  setBrainView(view: ReportBrainView): void {
+    this.selectedBrainView = view;
+    if (!this.mounted || !this.reportController) return;
+    const result = this.reportController.setBrainView(view, { fit: true });
+    if (!result.ok) throw new Error(result.message);
+  }
+
+  getBrainView(): ReportBrainView | null {
+    return this.reportController?.getBrainView() ?? null;
+  }
+
+  setFitInsets(insets: ReportFitInsets): void {
+    this.options.fitInsets = insets;
+    this.reportController?.setFitInsets(insets);
+    this.currentViewer?.requestRender();
   }
 
   getAnatomicalViewCapabilities(): AnatomicalViewCapabilities {
@@ -351,14 +421,29 @@ class SceneMount implements SurfViewMountHandle {
       this.reportController = new ReportSceneController(viewer, this.manifest, {
         ...(this.viewGroup ? { bilateralGroup: this.viewGroup } : {}),
         initialView: this.options.initialView,
-        hemisphereGap: this.options.hemisphereGap
+        hemisphereGap: this.options.hemisphereGap,
+        ...(this.options.layout === undefined ? {} : { layout: this.options.layout }),
+        ...(this.options.initialBrainView === undefined
+          ? {}
+          : { initialBrainView: this.options.initialBrainView }),
+        ...(this.options.headlight === undefined ? {} : { headlight: this.options.headlight }),
+        ...(this.options.fov === undefined ? {} : { fov: this.options.fov }),
+        ...(this.options.fitMargin === undefined ? {} : { fitMargin: this.options.fitMargin }),
+        ...(this.options.oblique === undefined ? {} : { oblique: this.options.oblique }),
+        ...(this.options.fitInsets === undefined ? {} : { fitInsets: this.options.fitInsets })
       });
       this.reportTarget = createReportSceneControlTarget(this.reportController);
       this.mounted = true;
       this.status.remove();
 
       this.selectLayer(this.selectedLayer);
-      this.setView(this.selectedView);
+      if (this.options.layout === 'anatomical') {
+        this.setBrainView(
+          this.selectedBrainView ?? this.options.initialBrainView ?? 'oblique'
+        );
+      } else {
+        this.setView(this.selectedView);
+      }
 
       if (this.options.controls) {
         this.reportControls = new ReportControls(
@@ -420,6 +505,16 @@ class SceneMount implements SurfViewMountHandle {
         metalness: style.material.metalness,
         roughness: style.material.roughness,
         curvatureOptions: style.curvature,
+        shading: {
+          ...(style.lighting.silhouetteDarkening === undefined
+            ? {} : { silhouetteDarkening: style.lighting.silhouetteDarkening }),
+          ...(style.lighting.thresholdOutline === undefined
+            ? {} : { thresholdOutline: style.lighting.thresholdOutline }),
+          ...(style.lighting.thresholdOutlineShade === undefined
+            ? {} : { thresholdOutlineShade: style.lighting.thresholdOutlineShade }),
+          ...(style.lighting.overlayEmission === undefined
+            ? {} : { overlayEmission: style.lighting.overlayEmission })
+        },
         showCurvature: Boolean(curvature),
         useGPUCompositing: false,
         ...(curvature === null ? {} : { curvature })
