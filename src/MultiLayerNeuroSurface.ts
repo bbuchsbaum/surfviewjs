@@ -24,6 +24,14 @@ import { debugLog, isDebugEnabled } from './debug';
 import ColorMap from './ColorMap';
 import { GPULayerCompositor } from './GPULayerCompositor';
 import { compositeStraightRGBABuffer } from './utils/rgbaCompositing';
+import {
+  createSurfaceShadingUniforms,
+  installSurfaceShading,
+  SURFACE_EDGE_ATTRIBUTE,
+  SURFACE_OVERLAY_ATTRIBUTE,
+  updateSurfaceShadingUniforms
+} from './surface/SurfaceShading';
+import type { SurfaceShadingOptions, SurfaceShadingUniforms } from './surface/SurfaceShading';
 import { SurfaceColorUpdateScheduler } from './surface/SurfaceColorUpdateScheduler';
 import {
   devicePixelRatio as normalizeDevicePixelRatio,
@@ -55,6 +63,8 @@ export interface MultiLayerSurfaceConfig extends SurfaceConfig {
     contrast?: number;    // Curvature influence (0-1), default 0.5
     smoothness?: number;  // Curvature scaling factor, default 1
   };
+  /** Fragment-level threshold edges, outline, and silhouette shading. */
+  shading?: SurfaceShadingOptions;
 }
 
 type EdgeList = Array<[number, number]>;
@@ -170,6 +180,10 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
   private gpuCompositor: GPULayerCompositor | null = null;
   private outlineResolution: THREE.Vector2 | null = null;
   private useWideLines: boolean;
+  private shadingUniforms!: SurfaceShadingUniforms;
+  private thresholdEdges = true;
+  private overlayBuffer: Float32Array | null = null;
+  private edgeBuffer: Float32Array | null = null;
 
   /** Clip plane set for surface clipping */
   readonly clipPlanes: ClipPlaneSet;
@@ -195,6 +209,8 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     this.useGPUCompositing = false;
     this.useWideLines = config.useWideLines ?? true;
     this.clipPlanes = new ClipPlaneSet();
+    this.shadingUniforms = createSurfaceShadingUniforms(config.shading);
+    this.thresholdEdges = config.shading?.thresholdEdges ?? true;
     
     // Add curvature layer if provided (renders below base layer)
     if (config.curvature && config.showCurvature !== false) {
@@ -206,6 +222,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
         ...(curvOpts.smoothness === undefined ? {} : { smoothness: curvOpts.smoothness })
       });
       this.layerStack.addLayer(curvLayer);
+      this.wireLayerChange(curvLayer);
       debugLog('CurvatureLayer added with', (config.curvature as any).length, 'vertices');
     }
 
@@ -218,6 +235,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
       visible: !hasCurvature  // Hide base layer when curvature is visible
     });
     this.layerStack.addLayer(baseLayer);
+    this.wireLayerChange(baseLayer);
 
     // Create the mesh
     this.createMesh();
@@ -699,6 +717,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
         ...(options?.smoothness === undefined ? {} : { smoothness: options.smoothness })
       });
       this.layerStack.addLayer(layer);
+      this.wireLayerChange(layer);
     }
     this.requestColorUpdate();
   }
@@ -1132,9 +1151,11 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     }
 
     const collectDebugStats = isDebugEnabled();
+    const edgeLayer = this.thresholdEdgeLayer(visibleLayers);
 
     // Composite each layer
     for (const layer of visibleLayers) {
+      if (layer === edgeLayer) continue;
       try {
         debugLog('MultiLayerNeuroSurface: Processing layer', layer.id, '(type:', layer.constructor.name, ')');
         const layerRGBA = layer.getRGBAData(this.vertexCount);
@@ -1166,6 +1187,8 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
       }
     }
 
+    this.applyThresholdEdges(edgeLayer);
+
     // Apply composite to mesh
     this.applyCompositeToMesh();
 
@@ -1176,6 +1199,71 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     if (this.viewer && this.viewer.requestRender) {
       this.viewer.requestRender();
     }
+  }
+
+  /**
+   * The layer drawn with fragment-level threshold edges: the top-most visible
+   * colour layer when it is a plain DataLayer with an active mask and normal
+   * blending. Parcel, temporal and statistical subclasses keep per-vertex
+   * edges, since their values are not meant to be interpolated.
+   */
+  private thresholdEdgeLayer(visibleLayers: Layer[]): DataLayer | null {
+    if (!this.thresholdEdges || !this.mesh) return null;
+    const top = visibleLayers[visibleLayers.length - 1];
+    if (!(top instanceof DataLayer) || Object.getPrototypeOf(top) !== DataLayer.prototype ||
+        top.blendMode !== 'normal') {
+      return null;
+    }
+    const [low, high] = top.getThreshold();
+    return high > low ? top : null;
+  }
+
+  private applyThresholdEdges(layer: DataLayer | null): void {
+    if (!this.mesh) return;
+    const geometry = this.mesh.geometry as THREE.BufferGeometry;
+    const overlay = geometry.getAttribute(SURFACE_OVERLAY_ATTRIBUTE) as THREE.BufferAttribute | undefined;
+    const edge = geometry.getAttribute(SURFACE_EDGE_ATTRIBUTE) as THREE.BufferAttribute | undefined;
+    if (!overlay || !edge) {
+      this.shadingUniforms.surfviewEdgeEnabled.value = 0;
+      return;
+    }
+    let enabled = false;
+    if (layer) {
+      try {
+        enabled = layer.writeThresholdEdgeAttributes(
+          this.vertexCount,
+          overlay.array as Float32Array,
+          edge.array as Float32Array
+        );
+        if (enabled) {
+          const colors = overlay.array as Float32Array;
+          const opacity = layer.opacity;
+          for (let offset = 3; offset < colors.length; offset += 4) colors[offset]! *= opacity;
+        }
+        layer.needsUpdate = false;
+      } catch (error) {
+        console.error(`Error preparing threshold edges for layer ${layer.id}:`, error);
+        enabled = false;
+      }
+      if (!enabled) {
+        // Fall back to the per-vertex path for this layer.
+        this.compositeLayer(layer.getRGBAData(this.vertexCount), layer);
+      }
+    }
+    overlay.needsUpdate = true;
+    edge.needsUpdate = true;
+    this.shadingUniforms.surfviewEdgeEnabled.value = enabled ? 1 : 0;
+  }
+
+  /** Update fragment-level shading (threshold edges, outline, silhouette). */
+  setShading(options: SurfaceShadingOptions): void {
+    updateSurfaceShadingUniforms(this.shadingUniforms, options);
+    if (options.thresholdEdges !== undefined && options.thresholdEdges !== this.thresholdEdges) {
+      this.thresholdEdges = options.thresholdEdges;
+      this.layerStack.needsComposite = true;
+      this.requestColorUpdate();
+    }
+    if (this.viewer && this.viewer.requestRender) this.viewer.requestRender();
   }
 
   /**
@@ -1219,14 +1307,25 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     }
 
     colorAttribute.needsUpdate = true;
-    // Only enable vertex colors AFTER valid data exists
+    // Only enable vertex colors AFTER valid data exists. A fully opaque
+    // composite must render opaque with depth writes: with depthWrite off,
+    // triangles draw in index order, so wherever the closed surface overlaps
+    // itself on screen (an inflated insula seen from above, a frontal fold
+    // seen head-on) far-side triangles paint over near-side ones and show as
+    // cracks and hatching. Only a genuinely translucent composite keeps the
+    // sorted-transparency path.
+    const opaque = this.compositeIsOpaque();
+    const wasTransparent = material.transparent;
     material.vertexColors = true;
-    material.transparent = true;
+    material.transparent = !opaque;
     material.depthTest = true;
-    material.depthWrite = false;
+    material.depthWrite = opaque;
     material.blending = THREE.NormalBlending;
     material.premultipliedAlpha = false;
-    material.needsUpdate = true;
+    if (wasTransparent !== material.transparent || !material.userData.surfviewColorsApplied) {
+      material.userData.surfviewColorsApplied = true;
+      material.needsUpdate = true;
+    }
 
     debugLog('MultiLayerNeuroSurface: Applied vertex colors to mesh');
 
@@ -1253,12 +1352,21 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     }
   }
 
+  private compositeIsOpaque(): boolean {
+    if ((this.config.alpha ?? 1) < 1) return false;
+    const buffer = this.compositeBuffer;
+    for (let offset = 3; offset < buffer.length; offset += 4) {
+      if (buffer[offset]! < 0.999) return false;
+    }
+    return true;
+  }
+
   /**
    * Create fallback material for CPU compositing
    * NOTE: Start with vertexColors: false until color attribute is populated with valid data
    */
   private createFallbackMaterial(): THREE.MeshPhongMaterial {
-    return new THREE.MeshPhongMaterial({
+    const material = new THREE.MeshPhongMaterial({
       vertexColors: false, // Start false until color attribute has valid data
       transparent: true,
       depthTest: true,
@@ -1272,6 +1380,8 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
       side: THREE.DoubleSide, // Ensure both sides are visible
       color: new THREE.Color((this.config as MultiLayerSurfaceConfig).baseColor ?? 0xcccccc)
     });
+    installSurfaceShading(material, this.shadingUniforms);
+    return material;
   }
 
   /**
@@ -1288,6 +1398,10 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
       vertexIndices[i] = i;
     }
     geometry.setAttribute('vertexIndex', new THREE.Float32BufferAttribute(vertexIndices, 1));
+    this.overlayBuffer = new Float32Array(this.vertexCount * 4);
+    this.edgeBuffer = new Float32Array(this.vertexCount).fill(-1);
+    geometry.setAttribute(SURFACE_OVERLAY_ATTRIBUTE, new THREE.BufferAttribute(this.overlayBuffer, 4));
+    geometry.setAttribute(SURFACE_EDGE_ATTRIBUTE, new THREE.BufferAttribute(this.edgeBuffer, 1));
 
     let material: THREE.Material;
 

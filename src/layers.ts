@@ -803,6 +803,50 @@ export class DataLayer extends Layer {
     return [...this.threshold] as [number, number];
   }
 
+  /**
+   * Per-vertex inputs for fragment-level threshold edges.
+   *
+   * Writes, for every vertex, the layer colour it would take just outside the
+   * masked interval (`colors`, straight RGBA, alpha = 1 where data exist) and a
+   * signed distance to the mask in data units (`edges`: > 0 outside the mask,
+   * shown; < 0 inside or without data, hidden). Interpolating the distance
+   * across triangles lets a shader draw the threshold as a smooth isoline
+   * instead of a per-vertex staircase. Returns false when no mask is active.
+   */
+  writeThresholdEdgeAttributes(
+    vertexCount: number,
+    colors: Float32Array,
+    edges: Float32Array
+  ): boolean {
+    if (!this.data || !this.colorMap || !this.indices) return false;
+    const [low, high] = this.threshold;
+    if (!(high > low)) return false;
+    if (colors.length !== vertexCount * 4 || edges.length !== vertexCount) {
+      throw new RangeError('Threshold edge buffers do not match the vertex count');
+    }
+    colors.fill(0);
+    const span = Math.max(Math.abs(this.range[1] - this.range[0]), Math.abs(high - low), 1e-12);
+    const hidden = -span;
+    edges.fill(hidden);
+    const middle = (low + high) / 2;
+    const nudge = span * 1e-6;
+    for (let i = 0; i < this.indices.length && i < this.data.length; i++) {
+      const vertex: number = this.indices[i]!;
+      const value: number = this.data[i]!;
+      if (vertex >= vertexCount || !Number.isFinite(value)) continue;
+      const above = value >= middle;
+      edges[vertex] = above ? value - high : low - value;
+      const shown = above ? Math.max(value, high + nudge) : Math.min(value, low - nudge);
+      const color = this.colorMap.getColor(shown);
+      const offset = vertex * 4;
+      colors[offset] = color[0];
+      colors[offset + 1] = color[1];
+      colors[offset + 2] = color[2];
+      colors[offset + 3] = color[3] ?? 1;
+    }
+    return true;
+  }
+
   getColorMapName(): string {
     return this.colorMapName || 'custom';
   }
