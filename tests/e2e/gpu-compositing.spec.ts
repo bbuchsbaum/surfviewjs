@@ -229,7 +229,9 @@ test('GPU compositor matches the straight-RGBA oracle through production blendin
     expect(testCase.material).toMatchObject({
       transparent: true,
       depthTest: true,
-      depthWrite: false,
+      // Closed meshes must occlude themselves; alpha-0 fragments are discarded
+      // in the shader so an empty stack still writes no depth.
+      depthWrite: true,
       premultipliedAlpha: false
     });
   }

@@ -386,6 +386,8 @@ export type {
   MorphableSurfaceConfig
 } from './MorphableSurface';
 
+export type { SurfaceShadingOptions } from './surface/SurfaceShading';
+
 export type { LabelDefinition } from './LabeledNeuroSurface';
 export type { SurfaceDefinition, SurfaceType } from './SurfaceFactory';
 export type { SurfaceSetConfig } from './SurfaceSet';
@@ -539,7 +541,11 @@ export type {
   ReportSceneControllerState,
   ReportSceneMutationListener,
   ReportSceneMutationPhase,
-  ReportSceneControlTargetOptions
+  ReportSceneControlTargetOptions,
+  ReportLayout,
+  ReportBrainView,
+  ReportObliqueAngle,
+  ReportFitInsets
 } from './report';
 
 export type {
