@@ -109,7 +109,9 @@ test('real Schaefer and Glasser maps retain positive areas through a parameter c
   await expect(root).toHaveAttribute('data-ready', 'true');
   await expect(page.getByLabel('Inspect map parcel', { exact: true }).locator('option')).toHaveCount(181);
   await page.getByLabel('Map outline', { exact: true }).selectOption('6');
-  await expect(root).toHaveAttribute('data-ready', 'true');
+  // A new outline re-solves the harmonic flattening of the full Glasser sheet,
+  // which can exceed the 5 s default on a shared CI runner; wait like other loads.
+  await expect(root).toHaveAttribute('data-ready', 'true', { timeout: 30000 });
   await page.getByRole('button', { name: 'Optimize 80 steps', exact: true }).click();
   await expect(root).toHaveAttribute('data-running', 'false', { timeout: 30000 });
   await expect(root).toHaveAttribute('data-flips', '0');
