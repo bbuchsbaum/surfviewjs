@@ -40,6 +40,22 @@ describe('ViewerPickingController', () => {
     expect(hit.point?.toArray()).toEqual([0, 0, 0]);
   });
 
+  it('reports the nearest surface when an earlier surface lies behind it', () => {
+    const { controller, mesh } = fixture();
+    // "left" is registered first but sits behind "right" along the ray.
+    mesh.position.set(0, 0, -2);
+    mesh.updateMatrixWorld(true);
+    const near = new THREE.Mesh(mesh.geometry.clone(), new THREE.MeshBasicMaterial());
+    near.updateMatrixWorld(true);
+    const surfaces = (controller as unknown as {
+      host: { getSurfaces(): Map<string, { mesh: THREE.Mesh }> };
+    }).host.getSurfaces();
+    surfaces.set('right', { mesh: near });
+    const hit = controller.pick({ x: 50, y: 50, useGPU: false });
+    expect(hit.surfaceId).toBe('right');
+    expect(hit.point?.z).toBeCloseTo(0, 10);
+  });
+
   it('honors the opacity threshold and exposes stable ray helpers', () => {
     const { controller } = fixture(0.05);
     controller.updateScreenPosition(50, 50);

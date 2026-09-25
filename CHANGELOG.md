@@ -28,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lights, silhouette darkening, heat colormaps for thresholded statistics.
 
 ### Fixed
+- CPU picking returned the first registered surface hit along the ray rather
+  than the nearest, so hovering a front hemisphere could report the hidden one
+  behind it.
 - Opaque surfaces rendered with `depthWrite: false`, so wherever a closed
   inflated surface overlapped itself on screen (the insula seen from above, a
   frontal fold seen head-on) far-side triangles painted over near-side ones as

@@ -73,6 +73,9 @@ export class ViewerPickingController {
       }
     });
 
+    // Hits are gathered surface by surface; the visible hit is the nearest one
+    // across all surfaces, not the first surface's (which may lie behind).
+    intersections.sort((left, right) => left.distance - right.distance);
     const hit = intersections[0];
     if (!hit) return { surfaceId: null, vertexIndex: null, point: null };
 
