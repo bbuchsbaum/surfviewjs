@@ -3,7 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   compositeStraightRGBA,
   compositeStraightRGBABuffer,
-  premultiplyStraightRGBA
+  premultiplyStraightRGBA,
+  SURFACE_ALPHA_DISCARD_THRESHOLD
 } from '../../src/utils/rgbaCompositing';
 import { MultiLayerNeuroSurface } from '../../src/MultiLayerNeuroSurface';
 import { SurfaceGeometry } from '../../src/classes';
@@ -146,6 +147,9 @@ describe('CPU production compositing', () => {
       expect(material.transparent).toBe(true);
       expect(material.depthTest).toBe(true);
       expect(material.depthWrite).toBe(false);
+      // Alpha-0 fragments are discarded so they never draw or write depth.
+      expect(material.alphaTest).toBe(SURFACE_ALPHA_DISCARD_THRESHOLD);
+      expect(material.alphaTest).toBeGreaterThan(0);
       expect(material.blending).toBe(THREE.NormalBlending);
       expect(material.premultipliedAlpha).toBe(false);
       expect(surface.mesh!.geometry.getAttribute('color').itemSize).toBe(4);

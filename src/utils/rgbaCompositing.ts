@@ -3,6 +3,15 @@ import type { BlendMode } from '../layers';
 /** A straight-alpha red, green, blue, alpha tuple with channels in [0, 1]. */
 export type StraightRGBA = readonly [number, number, number, number];
 
+/**
+ * Composite alpha below which a surface fragment is discarded instead of drawn.
+ *
+ * Surface materials keep depth writes enabled so a closed mesh occludes itself;
+ * discarding (effectively) fully transparent fragments is what lets an empty
+ * layer stack stay see-through without writing depth. Half of one 8-bit step.
+ */
+export const SURFACE_ALPHA_DISCARD_THRESHOLD = 0.5 / 255;
+
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
 }

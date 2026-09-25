@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Layer, VolumeProjectionLayer } from './layers';
 import { ClipPlaneSet, ClipPlane } from './utils/ClipPlane';
 import { debugLog } from './debug';
+import { SURFACE_ALPHA_DISCARD_THRESHOLD } from './utils/rgbaCompositing';
 
 type ShaderUniforms = THREE.ShaderMaterial['uniforms'];
 
@@ -347,6 +348,10 @@ export class GPULayerCompositor {
 
         // Use pre-computed color from vertex shader (avoids interpolation issues)
         vec4 finalColor = vLayerColor;
+        // Fully transparent fragments must not write depth (see material setup).
+        if (finalColor.a < ${SURFACE_ALPHA_DISCARD_THRESHOLD.toFixed(8)}) {
+          discard;
+        }
 
         // Apply lighting
         vec3 normal = normalize(vNormal);
@@ -415,7 +420,10 @@ export class GPULayerCompositor {
       vertexColors: true,
       transparent: true,
       depthTest: true,
-      depthWrite: false,
+      // A closed cortical mesh must occlude itself; without depth writes its
+      // triangles draw in index order and far-side faces paint over near ones.
+      // Empty-stack transparency comes from the alpha discard in the shader.
+      depthWrite: true,
       blending: THREE.NormalBlending,
       premultipliedAlpha: false,
       side: THREE.DoubleSide

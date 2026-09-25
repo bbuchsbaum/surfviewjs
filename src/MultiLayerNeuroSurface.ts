@@ -23,7 +23,7 @@ import { ClipPlaneSet, ClipPlane, ClipAxis } from './utils/ClipPlane';
 import { debugLog, isDebugEnabled } from './debug';
 import ColorMap from './ColorMap';
 import { GPULayerCompositor } from './GPULayerCompositor';
-import { compositeStraightRGBABuffer } from './utils/rgbaCompositing';
+import { compositeStraightRGBABuffer, SURFACE_ALPHA_DISCARD_THRESHOLD } from './utils/rgbaCompositing';
 import {
   createSurfaceShadingUniforms,
   installSurfaceShading,
@@ -1320,6 +1320,8 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     material.transparent = !opaque;
     material.depthTest = true;
     material.depthWrite = opaque;
+    // Fully transparent fragments are discarded so they never draw or write depth.
+    material.alphaTest = SURFACE_ALPHA_DISCARD_THRESHOLD;
     material.blending = THREE.NormalBlending;
     material.premultipliedAlpha = false;
     if (wasTransparent !== material.transparent || !material.userData.surfviewColorsApplied) {
@@ -1370,7 +1372,8 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
       vertexColors: false, // Start false until color attribute has valid data
       transparent: true,
       depthTest: true,
-      depthWrite: false,
+      depthWrite: true,
+      alphaTest: SURFACE_ALPHA_DISCARD_THRESHOLD,
       blending: THREE.NormalBlending,
       premultipliedAlpha: false,
       opacity: 1, // We handle opacity per-vertex

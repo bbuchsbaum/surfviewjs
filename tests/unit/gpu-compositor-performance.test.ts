@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GPULayerCompositor } from '../../src/GPULayerCompositor';
 import { RGBALayer } from '../../src/layers';
+import { SURFACE_ALPHA_DISCARD_THRESHOLD } from '../../src/utils/rgbaCompositing';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -106,5 +107,18 @@ describe('GPULayerCompositor performance contracts', () => {
       supported: false,
       reason: 'requires 10 vertex texture units, found 8'
     });
+  });
+});
+
+describe('GPULayerCompositor surface material', () => {
+  it('writes depth so a closed mesh occludes itself, discarding empty fragments', () => {
+    const compositor = new GPULayerCompositor(10, 3);
+    const material = compositor.getMaterial()!;
+    expect(material.depthTest).toBe(true);
+    expect(material.depthWrite).toBe(true);
+    expect(material.fragmentShader).toContain(
+      `if (finalColor.a < ${SURFACE_ALPHA_DISCARD_THRESHOLD.toFixed(8)})`
+    );
+    compositor.dispose();
   });
 });

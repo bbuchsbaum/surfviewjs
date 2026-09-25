@@ -161,13 +161,16 @@ export async function mountSurfaceViewer(
     baseColor: 0xd9d9e3,
     useGPUCompositing: true,
   })
+  // addSurface() already fits the camera and applies the requested viewpoint;
+  // calling centerCamera() again would reset it to a +Z (dorsal) view.
   viewer.addSurface(surface, 'cortex')
-  viewer.centerCamera()
 
+  const range = computeRange(metric)
   const layer = new DataLayer('overlay', metric, null, colormap, {
-    range: computeRange(metric),
+    range,
     opacity: 0.92,
-    threshold: [0, 0],
+    // Hide the near-zero background so the anatomy shows through around the blob.
+    threshold: [range[0], range[0] + 0.05 * (range[1] - range[0])],
     blendMode: 'normal',
   })
   viewer.addLayer('cortex', layer)
