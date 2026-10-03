@@ -5,7 +5,8 @@ import {
   installSurfaceShading,
   SURFACE_EDGE_ATTRIBUTE,
   SURFACE_OVERLAY_ATTRIBUTE,
-  updateSurfaceShadingUniforms
+  updateSurfaceShadingUniforms,
+  writeThresholdEdgeSigns
 } from '../../src/surface/SurfaceShading';
 import type { SurfaceShadingUniforms } from '../../src/surface/SurfaceShading';
 import { MultiLayerNeuroSurface } from '../../src/MultiLayerNeuroSurface';
@@ -130,6 +131,19 @@ describe('installSurfaceShading', () => {
     expect(material.customProgramCacheKey()).toContain('surfview-shading');
   });
 
+  it('anti-aliases the threshold contour on the shown side only', () => {
+    const material = new THREE.MeshPhongMaterial();
+    installSurfaceShading(material, createSurfaceShadingUniforms());
+    const fragment = compile(material).fragmentShader.replace(/\s+/g, ' ');
+    // No symmetric ramp: it gave sub-threshold fragments partial colour.
+    expect(fragment).not.toContain('smoothstep( -0.5 * surfviewWidth');
+    expect(fragment).toContain(
+      'float surfviewInside = vSurfviewEdge >= 0.0 ? max( 0.5, smoothstep( 0.0, surfviewWidth, vSurfviewEdge ) ) : 0.0;'
+    );
+    // A new cache key forces programs compiled with the old ramp to rebuild.
+    expect(material.customProgramCacheKey()).toContain('surfview-shading-v3');
+  });
+
   it('is idempotent', () => {
     const material = new THREE.MeshPhongMaterial();
     installSurfaceShading(material, createSurfaceShadingUniforms());
@@ -156,7 +170,7 @@ describe('installSurfaceShading', () => {
     expect(calls).toEqual(['previous']);
     expect(shader.fragmentShader).toContain('// previous-patch');
     expect(shader.fragmentShader).toContain('uniform float surfviewEdgeEnabled;');
-    expect(material.customProgramCacheKey()).toBe('previous-key|surfview-shading-v2');
+    expect(material.customProgramCacheKey()).toBe('previous-key|surfview-shading-v3');
   });
 });
 
@@ -199,6 +213,14 @@ function thresholded(id = 'map', config: Record<string, unknown> = {}): DataLaye
     ...config
   });
 }
+
+describe('writeThresholdEdgeSigns', () => {
+  it('maps signed distances to +1 shown and -1 hidden in place', () => {
+    const edges = new Float32Array([2, 1e-7, 0, -0.5, -10, -0]);
+    expect(writeThresholdEdgeSigns(edges)).toBe(edges);
+    expect(Array.from(edges)).toEqual([1, 1, -1, -1, -1, -1]);
+  });
+});
 
 describe('MultiLayerNeuroSurface constructor-created layers', () => {
   it('recomposites the scheduled update after curvature brightness changes', () => {
@@ -305,13 +327,53 @@ describe('MultiLayerNeuroSurface fragment threshold edges', () => {
       const expectedColors = new Float32Array(16);
       const expectedEdges = new Float32Array(4);
       layer.writeThresholdEdgeAttributes(4, expectedColors, expectedEdges);
-      expect(Array.from(attribute(surface, SURFACE_EDGE_ATTRIBUTE))).toEqual(Array.from(expectedEdges));
+      // The edge attribute carries each vertex's visibility sign.
+      expect(Array.from(attribute(surface, SURFACE_EDGE_ATTRIBUTE)))
+        .toEqual(Array.from(expectedEdges, edge => (edge > 0 ? 1 : -1)));
+      expect(Array.from(attribute(surface, SURFACE_EDGE_ATTRIBUTE))).toEqual([1, -1, 1, -1]);
       const overlay = attribute(surface, SURFACE_OVERLAY_ATTRIBUTE);
       for (let offset = 0; offset < 16; offset++) {
         const expected = offset % 4 === 3 ? expectedColors[offset]! * 0.5 : expectedColors[offset]!;
         expect(overlay[offset]).toBeCloseTo(expected, 6);
       }
       expect(layer.needsUpdate).toBe(false);
+    } finally {
+      surface.dispose();
+    }
+  });
+
+  it('signs agree with the per-vertex colormap mask, including values on the threshold', () => {
+    const surface = makeSurface();
+    try {
+      // 1 and -1 sit exactly on the mask bounds, which the colormap hides.
+      const values = [1, 1.0001, -1, -1.0001];
+      const layer = new DataLayer('map', values, null, 'viridis', { range: [-5, 5], threshold: [-1, 1] });
+      surface.addLayer(layer);
+      surface.updateColors();
+      const shownByColormap = Array.from({ length: 4 }, (_, vertex) =>
+        layer.getRGBAData(4)[vertex * 4 + 3]! > 0 ? 1 : -1);
+      expect(shownByColormap).toEqual([-1, 1, -1, 1]);
+      expect(Array.from(attribute(surface, SURFACE_EDGE_ATTRIBUTE))).toEqual(shownByColormap);
+    } finally {
+      surface.dispose();
+    }
+  });
+
+  it('re-applies the signs on every threshold change', () => {
+    const surface = makeSurface();
+    try {
+      const layer = thresholded('map');
+      surface.addLayer(layer);
+      surface.updateColors();
+      expect(Array.from(attribute(surface, SURFACE_EDGE_ATTRIBUTE))).toEqual([1, -1, 1, -1]);
+
+      layer.setThreshold([-0.25, 0.25]);
+      surface.updateColors();
+      expect(Array.from(attribute(surface, SURFACE_EDGE_ATTRIBUTE))).toEqual([1, 1, 1, -1]);
+
+      layer.setThreshold([-3.5, 4.5]);
+      surface.updateColors();
+      expect(Array.from(attribute(surface, SURFACE_EDGE_ATTRIBUTE))).toEqual([-1, -1, -1, -1]);
     } finally {
       surface.dispose();
     }

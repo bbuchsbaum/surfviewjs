@@ -4,9 +4,14 @@ import type * as THREE from 'three';
  * Fragment-level surface shading shared by CPU-composited surfaces.
  *
  * - Threshold edges: the top thresholded data layer is not baked into vertex
- *   colours. Its colour and a signed distance to the mask travel as vertex
- *   attributes, so the shader draws the threshold as an anti-aliased isoline
- *   (width from screen-space derivatives) rather than a per-vertex staircase.
+ *   colours. Its colour and a per-vertex visibility sign (+1 shown, -1
+ *   hidden; see `writeThresholdEdgeSigns`) travel as vertex attributes.
+ *   Interpolated across triangles, the sign crosses zero midway between a
+ *   shown and a hidden vertex, so the shader draws the threshold as a smooth
+ *   contour there rather than a per-vertex staircase. The anti-aliasing ramp
+ *   is one-sided: fragments on the hidden side get no colour (no faint
+ *   "ghost rings" around sub-threshold patches), fragments on the shown side
+ *   get at least half colour and full colour within one pixel of the contour.
  * - Threshold outline: an optional darker band just inside that isoline.
  * - Silhouette darkening: grazing-angle darkening that separates overlapping
  *   hemispheres and gives the cortex a solid, drawn edge.
@@ -38,6 +43,27 @@ export interface SurfaceShadingUniforms {
 
 export const SURFACE_OVERLAY_ATTRIBUTE = 'surfviewOverlay';
 export const SURFACE_EDGE_ATTRIBUTE = 'surfviewEdge';
+
+/**
+ * Replace signed threshold distances (as written by
+ * `DataLayer.writeThresholdEdgeAttributes`) with per-vertex visibility signs
+ * in place: +1 where the vertex is shown (distance > 0), -1 where it is
+ * masked, on the threshold itself, or without data.
+ *
+ * Interpolating raw distances puts the zero crossing wherever the data
+ * happen to cross the threshold along a triangle edge, which can sit right
+ * next to a vertex; whether a vertex just above (or below) threshold is
+ * coloured at its own pixel then depends on its neighbours. With signs the
+ * contour runs midway between a shown and a hidden vertex, so every shown
+ * vertex is coloured around its own position and no hidden vertex is,
+ * matching the per-vertex colormap mask exactly at the vertices.
+ */
+export function writeThresholdEdgeSigns(edges: Float32Array): Float32Array {
+  for (let i = 0; i < edges.length; i++) {
+    edges[i] = edges[i]! > 0 ? 1 : -1;
+  }
+  return edges;
+}
 
 function finiteIn(value: number | undefined, fallback: number, name: string, max = Infinity): number {
   if (value === undefined) return fallback;
@@ -105,7 +131,11 @@ vec3 surfviewGlow = vec3( 0.0 );
 #endif
 if ( surfviewEdgeEnabled > 0.5 ) {
   float surfviewWidth = max( fwidth( vSurfviewEdge ), 1e-6 );
-  float surfviewInside = smoothstep( -0.5 * surfviewWidth, 0.5 * surfviewWidth, vSurfviewEdge );
+  // One-sided coverage: nothing on the hidden side of the contour, at least
+  // half colour on the shown side, full colour one pixel inside.
+  float surfviewInside = vSurfviewEdge >= 0.0
+    ? max( 0.5, smoothstep( 0.0, surfviewWidth, vSurfviewEdge ) )
+    : 0.0;
   vec3 surfviewFill = vSurfviewOverlay.rgb;
   if ( surfviewOutlineWidth > 0.0 ) {
     float surfviewBand = 1.0 - smoothstep(
@@ -168,6 +198,6 @@ export function installSurfaceShading(
   };
   const previousKey = material.customProgramCacheKey;
   material.customProgramCacheKey = () =>
-    `${previousKey ? previousKey.call(material) : ''}|surfview-shading-v2`;
+    `${previousKey ? previousKey.call(material) : ''}|surfview-shading-v3`;
   material.needsUpdate = true;
 }

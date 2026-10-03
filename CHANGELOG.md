@@ -28,6 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lights, silhouette darkening, heat colormaps for thresholded statistics.
 
 ### Fixed
+- Threshold edges were anti-aliased symmetrically about an interpolated
+  distance to the threshold, so vertices just below threshold took a faint
+  partial colour (dotted "ghost rings" around sub-threshold patches) while
+  whether a vertex just above it was coloured depended on its neighbours.
+  The edge attribute now carries each vertex's visibility sign, placing the
+  contour midway between a shown and a hidden vertex, and the shader's ramp is
+  one-sided: no colour on the hidden side, at least half colour on the shown
+  side. Every vertex is now drawn exactly as the per-vertex colormap mask says.
 - CPU picking returned the first registered surface hit along the ray rather
   than the nearest, so hovering a front hemisphere could report the hidden one
   behind it.

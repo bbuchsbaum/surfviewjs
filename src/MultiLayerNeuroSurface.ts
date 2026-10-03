@@ -29,7 +29,8 @@ import {
   installSurfaceShading,
   SURFACE_EDGE_ATTRIBUTE,
   SURFACE_OVERLAY_ATTRIBUTE,
-  updateSurfaceShadingUniforms
+  updateSurfaceShadingUniforms,
+  writeThresholdEdgeSigns
 } from './surface/SurfaceShading';
 import type { SurfaceShadingOptions, SurfaceShadingUniforms } from './surface/SurfaceShading';
 import { SurfaceColorUpdateScheduler } from './surface/SurfaceColorUpdateScheduler';
@@ -1236,6 +1237,9 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
           edge.array as Float32Array
         );
         if (enabled) {
+          // The shader draws the contour between shown and hidden vertices,
+          // so it needs each vertex's visibility, not its distance.
+          writeThresholdEdgeSigns(edge.array as Float32Array);
           const colors = overlay.array as Float32Array;
           const opacity = layer.opacity;
           for (let offset = 3; offset < colors.length; offset += 4) colors[offset]! *= opacity;
