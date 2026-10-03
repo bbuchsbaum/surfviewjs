@@ -513,6 +513,10 @@ export type {
   SurfViewStylePreset,
   FigureExportLabel,
   FigureExportOptions,
+  FigureBackground,
+  FigureColorbarCaps,
+  FigureColorbarSource,
+  FigureExportContext,
   ResolvedFigureExportOptions
 } from './StylePresets';
 

@@ -113,7 +113,6 @@ export class ColorMap extends EventEmitter<ColorMapEventMap> {
   }
 
   getColor(value: number): ColorArray {
-    const [min, max] = this.range;
     const [threshMin, threshMax] = this.threshold;
 
     // Neuroimaging threshold semantics:
@@ -129,6 +128,16 @@ export class ColorMap extends EventEmitter<ColorMapEventMap> {
         return [0, 0, 0, 0];
       }
     }
+
+    return this.getUnmaskedColor(value);
+  }
+
+  /**
+   * The colour `value` maps to, ignoring the threshold mask: what a colour key
+   * shows for the value, whether or not the surface draws it.
+   */
+  getUnmaskedColor(value: number): ColorArray {
+    const [min, max] = this.range;
 
     // Normalize value to [0, 1] guarding against degenerate ranges
     const denominator = max - min;

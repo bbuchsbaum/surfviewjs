@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import ColorMap, { Color } from './ColorMap';
+import ColorMap, { Color, ColorArray } from './ColorMap';
 import ColorMap2D, { ColorMap2DPreset } from './ColorMap2D';
 import { debugLog, isDebugEnabled } from './debug';
 import { VolumeTexture3D } from './textures/VolumeTexture3D';
@@ -851,6 +851,38 @@ export class DataLayer extends Layer {
     return this.colorMapName || 'custom';
   }
 
+  /**
+   * The value interval a colour key for this layer spans: the display range
+   * by default. Layers that map values through more than one scale (e.g. a
+   * dual-threshold statistical map) widen it to cover every drawn value.
+   */
+  getColorKeyRange(): [number, number] {
+    return this.getRange();
+  }
+
+  /**
+   * Colour-key stops: `count` colours sampled evenly from the low to the high
+   * end of `getColorKeyRange()` with the layer's own colour lookup, ignoring
+   * the threshold mask. Returns null without a colormap.
+   */
+  sampleColorMap(count = 256): ColorArray[] | null {
+    if (!Number.isInteger(count) || count < 2) {
+      throw new RangeError('sampleColorMap count must be an integer of at least 2');
+    }
+    if (!this.colorMap) return null;
+    const [low, high] = this.getColorKeyRange();
+    const samples: ColorArray[] = [];
+    for (let i = 0; i < count; i++) {
+      samples.push([...this.colorKeyColor(low + ((high - low) * i) / (count - 1))] as ColorArray);
+    }
+    return samples;
+  }
+
+  /** The unmasked colour `value` is drawn with; subclasses with their own lookup override it. */
+  protected colorKeyColor(value: number): ColorArray {
+    return this.colorMap!.getUnmaskedColor(value);
+  }
+
   toStateJSON(): Record<string, unknown> {
     return {
       ...super.toStateJSON(),
@@ -1140,6 +1172,27 @@ export class VolumeProjectionLayer extends Layer {
 
   getThreshold(): [number, number] {
     return [...this.threshold] as [number, number];
+  }
+
+  /** Colour-key interval: the display range. */
+  getColorKeyRange(): [number, number] {
+    return this.getRange();
+  }
+
+  /**
+   * Colour-key stops sampled evenly across the display range with this
+   * layer's colormap, ignoring the threshold mask.
+   */
+  sampleColorMap(count = 256): ColorArray[] {
+    if (!Number.isInteger(count) || count < 2) {
+      throw new RangeError('sampleColorMap count must be an integer of at least 2');
+    }
+    const [low, high] = this.range;
+    const samples: ColorArray[] = [];
+    for (let i = 0; i < count; i++) {
+      samples.push([...this.colorMap.getUnmaskedColor(low + ((high - low) * i) / (count - 1))] as ColorArray);
+    }
+    return samples;
   }
 
   getFillValue(): number {

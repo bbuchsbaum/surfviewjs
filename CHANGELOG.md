@@ -56,6 +56,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   silently ignored.
 - Report mounts resized to the container's own height instead of the stage's
   stale `min-height`, which cropped the brain when a CSS-sized frame narrowed.
+- PNG figure export defaulted to a transparent background for the `report`
+  preset (whose viewer is opaque) and keyed every figure with a generic
+  viridis "Value" colour bar whatever the layer's colormap. Report figures are
+  now opaque, and without an explicit choice export uses the live viewer
+  background colour (as set by `setFigureBackground`) rather than the preset's.
+  The new `background` option (`'viewer'`, `'transparent'` or `0xRRGGBB`)
+  overrides `transparent`/`backgroundColor`. The colour key now describes the
+  active layer (or `colorbarLayer`): its colormap, display range, label and
+  units, the masked threshold interval as a striped band with its bounds, and
+  cap triangles where its data extend beyond the colour scale; see
+  `NeuroSurfaceViewer.getFigureColorbarSource`, `DataLayer.sampleColorMap` /
+  `getColorKeyRange` (dual-threshold statistical maps key both scales; volume
+  projection layers are keyed too) and `ColorMap.getUnmaskedColor`.
 
 ### Changed
 - Removed unused Gulp, Webpack CLI, `node-fetch`, direct Rollup 2 plugins, and

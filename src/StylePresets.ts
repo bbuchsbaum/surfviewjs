@@ -109,16 +109,57 @@ export interface FigureExportLabel {
   normalized?: boolean;
 }
 
+/**
+ * Figure background: `'viewer'` reproduces the live viewer background (opaque
+ * unless the viewer canvas itself is transparent), `'transparent'` exports
+ * with alpha, and a number is an opaque 0xRRGGBB colour.
+ */
+export type FigureBackground = 'viewer' | 'transparent' | number;
+
+/** Upper/lower cap markers: drawn values extend beyond the colour scale. */
+export interface FigureColorbarCaps {
+  low: boolean;
+  high: boolean;
+}
+
+/** What a figure's colour key describes, typically taken from a data layer. */
+export interface FigureColorbarSource {
+  readonly label: string;
+  /** CSS colours from the low to the high end of `range`. */
+  readonly colors: readonly string[];
+  readonly range: readonly [number, number];
+  /** Masked interval: values inside it are not drawn. */
+  readonly threshold?: readonly [number, number];
+  readonly caps?: Readonly<FigureColorbarCaps>;
+}
+
+/** Live state the exporting viewer supplies to option resolution. */
+export interface FigureExportContext {
+  readonly background?: { readonly color: number; readonly transparent: boolean };
+  readonly colorbar?: FigureColorbarSource | null;
+}
+
 export interface FigureExportOptions {
   preset?: SurfViewStylePresetName | SurfViewStylePreset;
   width?: number;
   height?: number;
   dpi?: number;
+  /**
+   * Explicit background; overrides `transparent` and `backgroundColor`. When
+   * omitted, `transparent` falls back to the preset's figure default and the
+   * colour to the live viewer background.
+   */
+  background?: FigureBackground;
   transparent?: boolean;
   colorbar?: boolean;
+  /** Layer whose colormap, range, threshold and caps the colour key shows (default: the active layer). */
+  colorbarLayer?: string;
   colorbarLabel?: string;
   colorbarRange?: [number, number];
   colorbarColors?: string[];
+  /** Masked interval drawn as a hatched band on the key; null hides the band. */
+  colorbarThreshold?: [number, number] | null;
+  colorbarCaps?: Partial<FigureColorbarCaps>;
   roiLabels?: boolean | FigureExportLabel[];
   scaleBar?: boolean;
   scaleBarLabel?: string;
@@ -139,6 +180,8 @@ export interface ResolvedFigureExportOptions {
   colorbarLabel: string;
   colorbarRange?: [number, number];
   colorbarColors: string[];
+  colorbarThreshold?: [number, number];
+  colorbarCaps: FigureColorbarCaps;
   roiLabels: boolean | FigureExportLabel[];
   scaleBar: boolean;
   scaleBarLabel: string;
@@ -342,7 +385,9 @@ export const STYLE_PRESETS: Record<SurfViewStylePresetName, SurfViewStylePreset>
       label: 'glasbey',
       curvature: 'gray'
     },
-    figure: { width: 2400, height: 1800, dpi: 300, transparent: true, colorbar: true, roiLabels: true, scaleBar: true, fontScale: 1 },
+    // Opaque on the viewer's own panel grey: report figures sit on slides and
+    // pages next to the static figures, not over arbitrary backgrounds.
+    figure: { width: 2400, height: 1800, dpi: 300, transparent: false, colorbar: true, roiLabels: true, scaleBar: true, fontScale: 1 },
     labelDensity: 'sparse',
     fontScale: 1
   },
@@ -508,10 +553,15 @@ export function resolveStylePreset(preset: SurfViewStylePresetName | SurfViewSty
   return cloneStylePreset(preset);
 }
 
+/**
+ * Merge explicit export options, the exporting viewer's live state
+ * (`context`) and the preset's figure defaults, in that order of precedence.
+ */
 export function resolveFigureExportOptions(
   presetOrName: SurfViewStylePresetName | SurfViewStylePreset | undefined,
   options: FigureExportOptions = {},
-  fallbackSize: { width: number; height: number } = { width: defaultFigure.width, height: defaultFigure.height }
+  fallbackSize: { width: number; height: number } = { width: defaultFigure.width, height: defaultFigure.height },
+  context: FigureExportContext = {}
 ): ResolvedFigureExportOptions {
   const preset = resolveStylePreset(options.preset ?? presetOrName);
   const figure = preset.figure;
@@ -519,28 +569,67 @@ export function resolveFigureExportOptions(
   const height = positiveInteger(options.height, figure.height || fallbackSize.height, 'height');
   const dpi = positiveInteger(options.dpi, figure.dpi, 'dpi');
   const fontScale = finitePositive(options.fontScale, figure.fontScale, 'fontScale');
+  const { transparent, backgroundColor } = resolveFigureBackground(preset, options, context);
+  const source = context.colorbar ?? null;
+  const colorbarRange = options.colorbarRange ??
+    (source ? [source.range[0], source.range[1]] as [number, number] : undefined);
+  const colorbarThreshold = options.colorbarThreshold === null
+    ? undefined
+    : options.colorbarThreshold ??
+      (source?.threshold ? [source.threshold[0], source.threshold[1]] as [number, number] : undefined);
 
   return {
     width,
     height,
     dpi,
-    transparent: options.transparent ?? figure.transparent,
+    transparent,
     colorbar: options.colorbar ?? figure.colorbar,
-    colorbarLabel: options.colorbarLabel ?? 'Value',
-    colorbarColors: options.colorbarColors ?? defaultColorbarColors(preset),
+    colorbarLabel: options.colorbarLabel ?? source?.label ?? 'Value',
+    colorbarColors: options.colorbarColors ?? (source ? [...source.colors] : defaultColorbarColors(preset)),
+    colorbarCaps: {
+      low: options.colorbarCaps?.low ?? source?.caps?.low ?? false,
+      high: options.colorbarCaps?.high ?? source?.caps?.high ?? false
+    },
     roiLabels: options.roiLabels ?? figure.roiLabels,
     scaleBar: options.scaleBar ?? figure.scaleBar,
     scaleBarLabel: options.scaleBarLabel ?? '',
     scaleBarLength: finitePositive(options.scaleBarLength, 0.18, 'scaleBarLength'),
     fontScale,
-    backgroundColor: options.backgroundColor ?? preset.background.clearColor,
+    backgroundColor,
     preset,
-    ...(options.colorbarRange === undefined ? {} : { colorbarRange: options.colorbarRange }),
+    ...(colorbarRange === undefined ? {} : { colorbarRange }),
+    ...(colorbarThreshold === undefined ? {} : { colorbarThreshold }),
     ...(options.title === undefined ? {} : { title: options.title }),
     ...(options.subtitle === undefined ? {} : { subtitle: options.subtitle }),
     ...(options.downloadFilename === undefined
       ? {}
       : { downloadFilename: options.downloadFilename })
+  };
+}
+
+function resolveFigureBackground(
+  preset: SurfViewStylePreset,
+  options: FigureExportOptions,
+  context: FigureExportContext
+): { transparent: boolean; backgroundColor: number } {
+  const viewerColor = context.background?.color ?? preset.background.clearColor;
+  const background = options.background;
+  if (background === 'transparent') return { transparent: true, backgroundColor: viewerColor };
+  if (background === 'viewer') {
+    return { transparent: context.background?.transparent ?? false, backgroundColor: viewerColor };
+  }
+  if (typeof background === 'number') {
+    if (!Number.isInteger(background) || background < 0 || background > 0xffffff) {
+      throw new RangeError('Figure export background must be an integer RGB value between 0x000000 and 0xffffff');
+    }
+    return { transparent: false, backgroundColor: background };
+  }
+  if (background !== undefined) {
+    throw new TypeError("Figure export background must be 'viewer', 'transparent' or an RGB number");
+  }
+  return {
+    transparent: options.transparent ?? preset.figure.transparent,
+    backgroundColor: options.backgroundColor ?? viewerColor
   };
 }
 
