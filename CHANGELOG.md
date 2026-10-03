@@ -35,7 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the other hemisphere between the camera and the one on screen) hovers and
   clicks reported the hidden hemisphere. CPU and GPU picking now consider only
   surfaces that are drawn: visible themselves and through every ancestor, on a
-  camera layer (CPU), and with at least one visible material
+  camera layer, and with at least one visible material
   (`isObjectDrawn` in `utils/Picking`).
 - Opaque surfaces rendered with `depthWrite: false`, so wherever a closed
   inflated surface overlapped itself on screen (the insula seen from above, a

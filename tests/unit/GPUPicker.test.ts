@@ -97,6 +97,14 @@ describe('GPUPicker helpers', () => {
     (mesh.material as THREE.Material).visible = false;
     picker.syncTransforms();
     expect(pickMesh().visible).toBe(false);
+
+    // Layers follow the source mesh, so the cloned pick camera filters alike.
+    (mesh.material as THREE.Material).visible = true;
+    mesh.layers.set(4);
+    picker.syncTransforms();
+    expect(pickMesh().visible).toBe(true);
+    expect(pickMesh().layers.mask).toBe(mesh.layers.mask);
+    expect(pickMesh().layers.test(new THREE.PerspectiveCamera().layers)).toBe(false);
     picker.dispose();
   });
 
