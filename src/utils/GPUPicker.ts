@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { debugLog } from '../debug';
 import { finiteNumber } from './validation';
+import { isObjectDrawn } from './Picking';
 
 /**
  * Result of a GPU pick operation
@@ -322,7 +323,8 @@ export class GPUPicker {
       surface.mesh.updateMatrixWorld(true);
       surface.pickMesh.matrix.copy(surface.mesh.matrixWorld);
       surface.pickMesh.matrixWorld.copy(surface.mesh.matrixWorld);
-      surface.pickMesh.visible = surface.mesh.visible;
+      // Hidden by itself, an ancestor or its material: not pickable.
+      surface.pickMesh.visible = isObjectDrawn(surface.mesh);
     }
   }
 
