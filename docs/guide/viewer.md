@@ -295,10 +295,8 @@ const png = viewer.exportPNG({
   preset: 'paper-light',
   width: 2400,
   height: 1800,
-  transparent: true,
+  background: 'transparent',
   colorbar: true,
-  colorbarLabel: 'z',
-  colorbarRange: [-3, 3],
   roiLabels: [{ text: 'V1', x: 0.62, y: 0.36, normalized: true }],
   scaleBar: true,
   scaleBarLabel: '20 mm',
@@ -309,6 +307,8 @@ console.log(listStylePresets(), getStylePreset('paper-light').figure.dpi);
 ```
 
 Style presets control the viewer background, lighting, material defaults, curvature display parameters, annotation defaults, ROI/export label styling, colormap defaults, export dimensions, and font scale. `paper-light` is an appearance preset, not a report behavior mode. `exportPNG()` renders at the requested pixel size and returns a PNG data URL; `dpi` is retained as figure intent because browser PNG encoders do not reliably write DPI metadata.
+
+`background` takes `'viewer'` (the live viewer background, opaque unless the viewer canvas itself is transparent), `'transparent'`, or an opaque `0xRRGGBB` colour. Without it, figures are opaque on the live viewer background unless the preset declares transparent publication figures (`paper-light`, `glass-brain-surface`) or you pass `transparent`. The colour key describes the active layer — the selected layer if it is a visible scalar layer, otherwise the top-most visible one, or `colorbarLayer` — with its colormap, display range, label and units, the masked threshold interval as a striped band, and cap triangles where its data extend beyond the colour scale. `colorbarLabel`, `colorbarRange`, `colorbarColors`, `colorbarThreshold` (`null` hides the band) and `colorbarCaps` override any of these; `viewer.getFigureColorbarSource()` returns the same description for applications that draw their own key.
 
 ### Alignment QA
 

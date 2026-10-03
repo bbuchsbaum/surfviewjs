@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import ColorMap, { Color } from './ColorMap';
+import ColorMap, { Color, ColorArray } from './ColorMap';
 import ColorMap2D, { ColorMap2DPreset } from './ColorMap2D';
 import { debugLog, isDebugEnabled } from './debug';
 import { VolumeTexture3D } from './textures/VolumeTexture3D';
@@ -849,6 +849,25 @@ export class DataLayer extends Layer {
 
   getColorMapName(): string {
     return this.colorMapName || 'custom';
+  }
+
+  /**
+   * Colour-key stops: `count` colours sampled evenly from the low to the high
+   * end of the display range with the layer's own colormap lookup, ignoring
+   * the threshold mask. Returns null without a colormap.
+   */
+  sampleColorMap(count = 256): ColorArray[] | null {
+    if (!this.colorMap) return null;
+    if (!Number.isInteger(count) || count < 2) {
+      throw new RangeError('sampleColorMap count must be an integer of at least 2');
+    }
+    const [low, high] = this.range;
+    const samples: ColorArray[] = [];
+    for (let i = 0; i < count; i++) {
+      const color = this.colorMap.getUnmaskedColor(low + ((high - low) * i) / (count - 1));
+      samples.push([...color] as ColorArray);
+    }
+    return samples;
   }
 
   toStateJSON(): Record<string, unknown> {

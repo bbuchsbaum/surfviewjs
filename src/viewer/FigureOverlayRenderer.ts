@@ -55,6 +55,18 @@ export function drawFigureOverlays(
   }
 }
 
+/** Compact tick text: integers as-is, otherwise three significant digits. */
+export function formatColorbarTick(value: number): string {
+  if (Number.isInteger(value)) return String(value);
+  return String(Number(value.toPrecision(3)));
+}
+
+/**
+ * Vertical colour key, bottom = low end of the range. Shows the layer's own
+ * colormap, the masked (not drawn) threshold interval as a striped neutral
+ * band with its bounds labelled, and cap triangles where drawn values extend
+ * beyond the colour scale and take its end colours.
+ */
 function drawColorbar(
   ctx: CanvasRenderingContext2D,
   options: ResolvedFigureExportOptions
@@ -64,36 +76,115 @@ function drawColorbar(
   const fontScale = options.fontScale;
   const barWidth = Math.max(16, Math.round(width * 0.018));
   const barHeight = Math.max(140, Math.round(height * 0.28));
-  const x = width - barWidth - Math.round(40 * fontScale);
-  const y = height - barHeight - Math.round(44 * fontScale);
-  const gradient = ctx.createLinearGradient(0, y + barHeight, 0, y);
   const colors = options.colorbarColors.length > 0
     ? options.colorbarColors
     : ['#000000', '#ffffff'];
+  const range = options.colorbarRange;
+  const caps = options.colorbarCaps ?? { low: false, high: false };
+  const cap = Math.round(barWidth * 0.9);
+  const pad = 8 * fontScale;
+  const tickGap = 6 * fontScale;
+  const tickFont = `${Math.round(10 * fontScale)}px sans-serif`;
+  const titleFont = `${Math.round(12 * fontScale)}px sans-serif`;
+
+  const ticks: Array<{ value: number; text: string }> = [];
+  let band: [number, number] | null = null;
+  if (range && range[1] !== range[0]) {
+    ticks.push(
+      { value: range[1], text: formatColorbarTick(range[1]) },
+      { value: range[0], text: formatColorbarTick(range[0]) }
+    );
+    const threshold = options.colorbarThreshold;
+    if (threshold && threshold[1] > threshold[0]) {
+      const lo = Math.min(range[0], range[1]);
+      const hi = Math.max(range[0], range[1]);
+      const from = Math.max(lo, threshold[0]);
+      const to = Math.min(hi, threshold[1]);
+      if (to > from) {
+        band = [from, to];
+        for (const bound of threshold) {
+          if (bound > lo && bound < hi) ticks.push({ value: bound, text: formatColorbarTick(bound) });
+        }
+      }
+    }
+  }
+
+  ctx.save();
+  ctx.font = tickFont;
+  const tickWidth = ticks.reduce((widest, tick) => Math.max(widest, ctx.measureText(tick.text).width), 0);
+  ctx.font = titleFont;
+  const titleWidth = ctx.measureText(options.colorbarLabel).width;
+  const right = width - Math.round(24 * fontScale);
+  const x = right - pad - (ticks.length > 0 ? tickWidth + tickGap : 0) - barWidth;
+  const bottom = height - Math.round(44 * fontScale);
+  const y = bottom - barHeight;
+  const titleY = y - (caps.high ? cap : 0) - 4 * fontScale;
+  const boxLeft = Math.min(x, right - pad - titleWidth) - pad;
+  const boxTop = titleY - 14 * fontScale - pad;
+  const boxBottom = bottom + (caps.low ? cap : 0) + pad;
+  const yOf = (value: number): number => range
+    ? bottom - ((value - range[0]) / (range[1] - range[0])) * barHeight
+    : bottom;
+
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.78)';
+  ctx.fillRect(boxLeft, boxTop, right - boxLeft, boxBottom - boxTop);
+
+  const gradient = ctx.createLinearGradient(0, bottom, 0, y);
   colors.forEach((color, index) => {
     gradient.addColorStop(colors.length === 1 ? 0 : index / (colors.length - 1), color);
   });
-
-  ctx.save();
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.78)';
-  ctx.fillRect(x - 8, y - 8, barWidth + 58 * fontScale, barHeight + 36 * fontScale);
   ctx.fillStyle = gradient;
   ctx.fillRect(x, y, barWidth, barHeight);
+
+  if (band) {
+    const top = Math.max(y, Math.min(yOf(band[0]), yOf(band[1])));
+    const end = Math.min(bottom, Math.max(yOf(band[0]), yOf(band[1])));
+    ctx.fillStyle = '#eef0f2';
+    ctx.fillRect(x, top, barWidth, end - top);
+    ctx.fillStyle = '#c4c8cc';
+    const stripe = Math.max(1, 2 * fontScale);
+    for (let row = top; row < end; row += 2 * stripe) {
+      ctx.fillRect(x, row, barWidth, Math.min(stripe, end - row));
+    }
+  }
+
   ctx.strokeStyle = 'rgba(15, 23, 42, 0.55)';
   ctx.lineWidth = Math.max(1, fontScale);
   ctx.strokeRect(x, y, barWidth, barHeight);
 
+  const drawCap = (tipY: number, baseY: number, color: string): void => {
+    ctx.beginPath();
+    ctx.moveTo(x, baseY);
+    ctx.lineTo(x + barWidth, baseY);
+    ctx.lineTo(x + barWidth / 2, tipY);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.stroke();
+  };
+  if (caps.high) drawCap(y - cap, y, colors[colors.length - 1]!);
+  if (caps.low) drawCap(bottom + cap, bottom, colors[0]!);
+
   ctx.fillStyle = '#111827';
-  ctx.font = `${Math.round(12 * fontScale)}px sans-serif`;
+  ctx.font = titleFont;
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText(options.colorbarLabel, right - pad, titleY);
+
+  ctx.font = tickFont;
+  ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
-  ctx.fillText(options.colorbarLabel, x + barWidth + 10 * fontScale, y + barHeight / 2);
-  if (options.colorbarRange) {
-    const [min, max] = options.colorbarRange;
-    ctx.font = `${Math.round(10 * fontScale)}px sans-serif`;
-    ctx.textBaseline = 'top';
-    ctx.fillText(String(max), x + barWidth + 10 * fontScale, y - 1);
-    ctx.textBaseline = 'bottom';
-    ctx.fillText(String(min), x + barWidth + 10 * fontScale, y + barHeight + 1);
+  const placed: number[] = [];
+  const minSpacing = 11 * fontScale;
+  for (const tick of ticks) {
+    const tickY = yOf(tick.value);
+    if (placed.some(other => Math.abs(other - tickY) < minSpacing)) continue;
+    placed.push(tickY);
+    ctx.beginPath();
+    ctx.moveTo(x + barWidth, tickY);
+    ctx.lineTo(x + barWidth + 3 * fontScale, tickY);
+    ctx.stroke();
+    ctx.fillText(tick.text, x + barWidth + tickGap, tickY);
   }
   ctx.restore();
 }
