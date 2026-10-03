@@ -39,6 +39,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CPU picking returned the first registered surface hit along the ray rather
   than the nearest, so hovering a front hemisphere could report the hidden one
   behind it.
+- CPU picking ray-cast hidden surfaces too, so in a medial view (which hides
+  the other hemisphere between the camera and the one on screen) hovers and
+  clicks reported the hidden hemisphere. CPU and GPU picking now consider only
+  surfaces that are drawn: visible themselves and through every ancestor, on a
+  camera layer, and with at least one visible material
+  (`isObjectDrawn` in `utils/Picking`).
 - Opaque surfaces rendered with `depthWrite: false`, so wherever a closed
   inflated surface overlapped itself on screen (the insula seen from above, a
   frontal fold seen head-on) far-side triangles painted over near-side ones as

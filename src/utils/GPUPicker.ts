@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { debugLog } from '../debug';
 import { finiteNumber } from './validation';
+import { isObjectDrawn } from './Picking';
 
 /**
  * Result of a GPU pick operation
@@ -322,7 +323,11 @@ export class GPUPicker {
       surface.mesh.updateMatrixWorld(true);
       surface.pickMesh.matrix.copy(surface.mesh.matrixWorld);
       surface.pickMesh.matrixWorld.copy(surface.mesh.matrixWorld);
-      surface.pickMesh.visible = surface.mesh.visible;
+      // Hidden by itself, an ancestor or its material: not pickable. The pick
+      // camera is cloned from the view camera, so sharing the source layers
+      // keeps surfaces outside the camera's layers unpickable too.
+      surface.pickMesh.visible = isObjectDrawn(surface.mesh);
+      surface.pickMesh.layers.mask = surface.mesh.layers.mask;
     }
   }
 

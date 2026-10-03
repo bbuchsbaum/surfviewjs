@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GPUPicker } from '../utils/GPUPicker';
+import { isObjectDrawn } from '../utils/Picking';
 
 export interface ViewerPickResult {
   surfaceId: string | null;
@@ -57,11 +58,15 @@ export class ViewerPickingController {
     }
 
     const opacityThreshold = options.opacityThreshold ?? 0.1;
-    this.raycaster.setFromCamera(this.mouse, this.host.getCamera());
+    const camera = this.host.getCamera();
+    this.raycaster.setFromCamera(this.mouse, camera);
     const intersections: Array<THREE.Intersection & { surfaceId?: string }> = [];
 
     this.host.getSurfaces().forEach((surface, id) => {
       if (!surface.mesh) return;
+      // Raycasting ignores visibility: skip surfaces that are not drawn (a
+      // hemisphere hidden by a medial view would otherwise win the pick).
+      if (!isObjectDrawn(surface.mesh, camera)) return;
       const material = surface.mesh.material as THREE.Material | THREE.Material[];
       const isTransparent = Array.isArray(material)
         ? material.every(item => item.opacity < opacityThreshold)

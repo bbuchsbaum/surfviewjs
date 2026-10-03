@@ -75,6 +75,39 @@ describe('GPUPicker helpers', () => {
     expect(hit.point?.z).toBeCloseTo(0, 5);
   });
 
+  it('hides pick meshes of surfaces that are not drawn', () => {
+    const picker = new GPUPicker({} as THREE.WebGLRenderer);
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 1, 0, 0, 0, 1, 0], 3));
+    geometry.setIndex([0, 1, 2]);
+    const group = new THREE.Group();
+    const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial());
+    group.add(mesh);
+    picker.addSurface('left', mesh);
+    const pickMesh = () => (picker as unknown as {
+      surfaces: Map<string, { pickMesh: THREE.Mesh }>;
+    }).surfaces.get('left')!.pickMesh;
+
+    picker.syncTransforms();
+    expect(pickMesh().visible).toBe(true);
+    group.visible = false;
+    picker.syncTransforms();
+    expect(pickMesh().visible).toBe(false);
+    group.visible = true;
+    (mesh.material as THREE.Material).visible = false;
+    picker.syncTransforms();
+    expect(pickMesh().visible).toBe(false);
+
+    // Layers follow the source mesh, so the cloned pick camera filters alike.
+    (mesh.material as THREE.Material).visible = true;
+    mesh.layers.set(4);
+    picker.syncTransforms();
+    expect(pickMesh().visible).toBe(true);
+    expect(pickMesh().layers.mask).toBe(mesh.layers.mask);
+    expect(pickMesh().layers.test(new THREE.PerspectiveCamera().layers)).toBe(false);
+    picker.dispose();
+  });
+
   it('rejects an invalid throttle before changing picker state', () => {
     const picker = new GPUPicker({} as THREE.WebGLRenderer);
     picker.setThrottleMs(8);
