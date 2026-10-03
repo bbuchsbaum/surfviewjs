@@ -10,7 +10,9 @@ import {
   MultiLayerNeuroSurface,
   NeuroSurfaceViewer,
   RGBALayer,
+  StatisticalMapLayer,
   SurfaceGeometry,
+  VolumeProjectionLayer,
   resolveFigureExportOptions
 } from '../../src';
 import type { FigureColorbarSource } from '../../src';
@@ -160,6 +162,55 @@ describe('colormap sampling for keys', () => {
   });
 });
 
+describe('colour keys for other scalar layers', () => {
+  it('spans both scales of a dual-threshold statistical map', () => {
+    const layer = new StatisticalMapLayer('stat', [3, -4, 0.5], null, 'viridis', {
+      range: [-1, 1],
+      threshold: [0, 0]
+    });
+    expect(layer.getColorKeyRange()).toEqual([-1, 1]);
+    layer.setDualThreshold({
+      positiveColorMap: 'hot',
+      negativeColorMap: 'cool',
+      positiveRange: [2, 6],
+      negativeRange: [-6, -2]
+    });
+    expect(layer.getColorKeyRange()).toEqual([-6, 6]);
+    const samples = layer.sampleColorMap(9)!;
+    // Ends take the colours getRGBAData draws -6 and 6 with.
+    const drawn = new StatisticalMapLayer('ref', [-6, 6], null, 'viridis', { threshold: [0, 0] });
+    drawn.setDualThreshold({
+      positiveColorMap: 'hot',
+      negativeColorMap: 'cool',
+      positiveRange: [2, 6],
+      negativeRange: [-6, -2]
+    });
+    const rgba = drawn.getRGBAData(2);
+    for (let channel = 0; channel < 3; channel++) {
+      expect(samples[0]![channel]).toBeCloseTo(rgba[channel]!, 6);
+      expect(samples[8]![channel]).toBeCloseTo(rgba[4 + channel]!, 6);
+    }
+    // Negative and positive ends use different colormaps.
+    expect(samples[0]!.slice(0, 3)).not.toEqual(samples[8]!.slice(0, 3));
+    layer.clearDualThreshold();
+    expect(layer.getColorKeyRange()).toEqual([-1, 1]);
+  });
+
+  it('samples a volume projection layer colormap', () => {
+    const layer = new VolumeProjectionLayer('vol', new Float32Array(8), [2, 2, 2], {
+      worldToIJK: new THREE.Matrix4(),
+      colormap: 'viridis',
+      range: [0, 10],
+      threshold: [2, 8]
+    });
+    const samples = layer.sampleColorMap(3);
+    expect(samples).toHaveLength(3);
+    expect(samples[1]![3] ?? 1).toBeGreaterThan(0);
+    expect(layer.getColorKeyRange()).toEqual([0, 10]);
+    expect(() => layer.sampleColorMap(0)).toThrow(RangeError);
+  });
+});
+
 function overlayContext() {
   const gradient = { addColorStop: vi.fn() };
   const fills: Array<{ style: string; rect: number[] }> = [];
@@ -277,6 +328,7 @@ function exportFixture(): ExportFixture {
   viewer.stylePreset = getStylePreset('report');
   viewer.config = { preset: 'report' } as never;
   viewer.selectedLayerId = null;
+  viewer.selectedSurfaceId = null;
   viewer.annotations = { list: () => [] } as never;
   viewer.resize = vi.fn() as never;
   viewer.render = vi.fn() as never;
@@ -333,6 +385,29 @@ describe('NeuroSurfaceViewer figure colour key', () => {
       expect(viewer.getFigureColorbarSource()).toBeNull();
     } finally {
       surface.dispose();
+    }
+  });
+
+  it('takes a shared layer id from the selected surface', () => {
+    const { viewer, surface } = exportFixture();
+    const right = new MultiLayerNeuroSurface(geometry());
+    right.addLayer(new DataLayer('activation', new Float32Array([0, 1, 2, 3]), null, 'viridis', {
+      range: [-8, 8],
+      presentation: { label: 'Right activation' }
+    }));
+    (viewer.surfaces as Map<string, unknown>).set('rh', right);
+    try {
+      viewer.selectedLayerId = 'activation';
+      viewer.selectedSurfaceId = 'rh';
+      expect(viewer.getFigureColorbarSource()!.label).toBe('Right activation');
+      expect(viewer.getFigureColorbarSource('activation')!.range).toEqual([-8, 8]);
+      viewer.selectedSurfaceId = 'lh';
+      expect(viewer.getFigureColorbarSource()!.label).toBe('Task activation (z)');
+      viewer.selectedSurfaceId = null;
+      expect(viewer.getFigureColorbarSource('activation')!.range).toEqual([-3, 5]);
+    } finally {
+      surface.dispose();
+      right.dispose();
     }
   });
 

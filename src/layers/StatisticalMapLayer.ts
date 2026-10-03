@@ -507,6 +507,24 @@ export class StatisticalMapLayer extends DataLayer {
     this.clearCorrection();
   }
 
+  /**
+   * In dual-threshold mode the key spans both scales, from the low end of
+   * the negative range to the high end of the positive range.
+   */
+  override getColorKeyRange(): [number, number] {
+    const dual = this._dualThreshold;
+    if (!dual) return this.getRange();
+    return [dual.negativeRange[0], dual.positiveRange[1]];
+  }
+
+  /** Same lookup as getRGBAData, without the masks. */
+  protected override colorKeyColor(value: number): ColorArray {
+    if (this._dualThreshold && value < 0 && this._negativeColorMap) {
+      return this._negativeColorMap.getUnmaskedColor(value);
+    }
+    return this._positiveColorMap.getUnmaskedColor(value);
+  }
+
   // ---------------------------------------------------------------------------
   // Core rendering override
   // ---------------------------------------------------------------------------

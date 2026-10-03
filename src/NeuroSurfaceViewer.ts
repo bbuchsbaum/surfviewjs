@@ -2801,37 +2801,39 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   }
 
   /**
-   * What a figure's colour key should show: the colormap, display range,
+   * What a figure's colour key should show: the colormap, value range,
    * threshold band and cap markers of `layerId`, or by default of the active
    * layer (the selected layer when it is a visible scalar layer, otherwise the
-   * top-most visible scalar layer on a visible surface). Null when no scalar
-   * layer is shown. Throws when an explicit `layerId` names no scalar layer.
+   * top-most visible scalar layer on a visible surface). Where several
+   * surfaces hold a layer with that id, the selected surface's wins. Null when
+   * no scalar layer is shown. Throws when an explicit `layerId` names no
+   * scalar layer.
    */
   getFigureColorbarSource(layerId?: string): FigureColorbarSource | null {
-    let layer: Layer | null = null;
-    if (layerId !== undefined) {
-      for (const surface of this.surfaces.values()) {
-        if (!(surface instanceof MultiLayerNeuroSurface)) continue;
-        const match = surface.getOrderedLayers().find(candidate => candidate.id === layerId);
-        if (match && isColorKeyLayer(match)) {
-          layer = match;
-          break;
-        }
+    const entries: Array<{ surfaceId: string; layer: Layer & ColorKeyLayer; shown: boolean }> = [];
+    for (const [surfaceId, surface] of this.surfaces) {
+      if (!(surface instanceof MultiLayerNeuroSurface)) continue;
+      const surfaceShown = surface.mesh?.visible !== false;
+      const ordered = surface.getOrderedLayers();
+      for (let i = ordered.length - 1; i >= 0; i--) {
+        const layer = ordered[i]!;
+        if (isColorKeyLayer(layer)) entries.push({ surfaceId, layer, shown: surfaceShown && layer.visible });
       }
-      if (!layer) throw new Error(`No scalar layer "${layerId}" to describe in the colour key`);
-    } else {
-      const shown: Layer[] = [];
-      for (const surface of this.surfaces.values()) {
-        if (!(surface instanceof MultiLayerNeuroSurface) || surface.mesh?.visible === false) continue;
-        const ordered = surface.getOrderedLayers();
-        for (let i = ordered.length - 1; i >= 0; i--) {
-          const candidate = ordered[i]!;
-          if (candidate.visible && isColorKeyLayer(candidate)) shown.push(candidate);
-        }
-      }
-      layer = shown.find(candidate => candidate.id === this.selectedLayerId) ?? shown[0] ?? null;
     }
-    return layer ? colorKeyFromLayer(layer as Layer & ColorKeyLayer) : null;
+    const preferSelectedSurface = (candidates: typeof entries) =>
+      candidates.find(entry => entry.surfaceId === this.selectedSurfaceId) ?? candidates[0];
+
+    if (layerId !== undefined) {
+      const match = preferSelectedSurface(entries.filter(entry => entry.layer.id === layerId));
+      if (!match) throw new Error(`No scalar layer "${layerId}" to describe in the colour key`);
+      return colorKeyFromLayer(match.layer);
+    }
+    const shown = entries.filter(entry => entry.shown);
+    const selected = this.selectedLayerId === null
+      ? undefined
+      : preferSelectedSurface(shown.filter(entry => entry.layer.id === this.selectedLayerId));
+    const active = selected ?? shown[0];
+    return active ? colorKeyFromLayer(active.layer) : null;
   }
 
   private annotationLabelsForExport(): FigureExportLabel[] {
@@ -3336,6 +3338,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
 interface ColorKeyLayer {
   getRange(): [number, number];
   getThreshold(): [number, number];
+  getColorKeyRange?(): [number, number];
   sampleColorMap(count?: number): Array<readonly number[]> | null;
 }
 
@@ -3349,7 +3352,7 @@ function isColorKeyLayer(layer: Layer): layer is Layer & ColorKeyLayer {
 function colorKeyFromLayer(layer: Layer & ColorKeyLayer): FigureColorbarSource | null {
   const samples = layer.sampleColorMap(256);
   if (!samples || samples.length === 0) return null;
-  const range = layer.getRange();
+  const range = layer.getColorKeyRange ? layer.getColorKeyRange() : layer.getRange();
   const threshold = layer.getThreshold();
   const channel = (value: number | undefined): number =>
     Math.round(Math.min(1, Math.max(0, value ?? 0)) * 255);

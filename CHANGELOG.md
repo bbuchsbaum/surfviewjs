@@ -52,8 +52,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   active layer (or `colorbarLayer`): its colormap, display range, label and
   units, the masked threshold interval as a striped band with its bounds, and
   cap triangles where its data extend beyond the colour scale; see
-  `NeuroSurfaceViewer.getFigureColorbarSource`, `DataLayer.sampleColorMap` and
-  `ColorMap.getUnmaskedColor`.
+  `NeuroSurfaceViewer.getFigureColorbarSource`, `DataLayer.sampleColorMap` /
+  `getColorKeyRange` (dual-threshold statistical maps key both scales; volume
+  projection layers are keyed too) and `ColorMap.getUnmaskedColor`.
 
 ### Changed
 - Removed unused Gulp, Webpack CLI, `node-fetch`, direct Rollup 2 plugins, and
