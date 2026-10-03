@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Threshold edge coverage</title>
+  <style>
+    body { margin: 0; background: #ffffff; font: 12px ui-monospace, Menlo, monospace; }
+    pre { margin: 8px; }
+  </style>
+</head>
+<body>
+  <div id="stage"></div>
+  <pre id="log"></pre>
+  <script type="module">
+    // Renders a thresholded data layer on a flat grid whose vertices sit on
+    // pixel centres, then reads back the pixel under every vertex. The layer
+    // colour is pure red over a grey base with full overlay emission and a
+    // linear output, so (red - green) at a pixel is the overlay coverage there.
+    import { THREE, SurfaceGeometry, MultiLayerNeuroSurface, DataLayer } from '../src/index.ts';
+
+    const SIZE = 256;          // canvas pixels
+    const SPACING = 6;         // pixels between neighbouring vertices
+    const N = Math.floor(SIZE / SPACING) - 1;
+    const THRESHOLD = 1;
+    const result = { skipped: false };
+
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = SIZE;
+      canvas.height = SIZE;
+      document.getElementById('stage').appendChild(canvas);
+      const gl = canvas.getContext('webgl2', { antialias: false, preserveDrawingBuffer: true });
+      if (!gl) throw Object.assign(new Error('WebGL2 unavailable'), { skip: true });
+      const renderer = new THREE.WebGLRenderer({ canvas, context: gl, antialias: false });
+      renderer.setPixelRatio(1);
+      renderer.setSize(SIZE, SIZE, false);
+      renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+      renderer.setClearColor(0xffffff, 1);
+
+      // Vertex (i, j) at pixel centre (x, y) = (SPACING * (i + 1) + 0.5, ...).
+      const vertices = new Float32Array(N * N * 3);
+      const values = new Float32Array(N * N);
+      let seed = 12345;
+      const random = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296);
+      for (let j = 0; j < N; j++) {
+        for (let i = 0; i < N; i++) {
+          const v = j * N + i;
+          vertices[v * 3] = SPACING * (i + 1) + 0.5;
+          vertices[v * 3 + 1] = SPACING * (j + 1) + 0.5;
+          vertices[v * 3 + 2] = 0;
+          // Rough data: many vertices lie close to the threshold with steep
+          // neighbours, the case where symmetric anti-aliasing leaks colour.
+          values[v] = 2 * random();
+        }
+      }
+      // Force a band of near-threshold values on both sides.
+      for (let v = 0; v < values.length; v += 5) values[v] = THRESHOLD + (random() - 0.5) * 0.1;
+      const faces = [];
+      for (let j = 0; j < N - 1; j++) {
+        for (let i = 0; i < N - 1; i++) {
+          const a = j * N + i, b = a + 1, c = a + N, d = c + 1;
+          faces.push(a, b, d, a, d, c);
+        }
+      }
+      const geometry = new SurfaceGeometry(vertices, new Uint32Array(faces), 'lh');
+      const surface = new MultiLayerNeuroSurface(geometry, { baseColor: 0x808080 });
+      surface.setShading({ overlayEmission: 1, silhouetteDarkening: 0, thresholdOutline: 0 });
+      const layer = new DataLayer('map', values, null, ['#ff0000', '#ff0000'], {
+        range: [0, 2],
+        threshold: [-THRESHOLD, THRESHOLD]
+      });
+      surface.addLayer(layer);
+      surface.updateColors();
+
+      const scene = new THREE.Scene();
+      scene.add(new THREE.AmbientLight(0xffffff, 1));
+      scene.add(surface.mesh);
+      const camera = new THREE.OrthographicCamera(0, SIZE, SIZE, 0, -10, 10);
+      camera.position.set(0, 0, 5);
+      camera.lookAt(0, 0, 0);
+      camera.updateProjectionMatrix();
+
+      // Vertices on the grid border sit on the mesh's own outline, where the
+      // rasteriser's fill rule may leave the pixel to the background.
+      const interior = (v) => {
+        const i = v % N, j = Math.floor(v / N);
+        return i > 0 && j > 0 && i < N - 1 && j < N - 1;
+      };
+      const pixels = new Uint8Array(SIZE * SIZE * 4);
+      const coverage = () => {
+        renderer.render(scene, camera);
+        gl.readPixels(0, 0, SIZE, SIZE, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+        const out = new Float32Array(N * N);
+        for (let v = 0; v < N * N; v++) {
+          const x = Math.floor(vertices[v * 3]);
+          const y = Math.floor(vertices[v * 3 + 1]);
+          const o = (y * SIZE + x) * 4;
+          out[v] = (pixels[o] - pixels[o + 1]) / 255;
+        }
+        return out;
+      };
+      const summarise = (cover) => {
+        const stats = { shown: 0, shownColoured: 0, nearShown: 0, nearShownColoured: 0,
+          hidden: 0, hiddenTinted: 0, nearHidden: 0, nearHiddenTinted: 0 };
+        for (let v = 0; v < values.length; v++) {
+          if (!interior(v)) continue;
+          const value = values[v];
+          const shown = value > THRESHOLD;
+          const near = Math.abs(value - THRESHOLD) <= 0.05;
+          if (shown) {
+            stats.shown++;
+            // "Coloured at its pixel": at least half coverage (8-bit rounding slack).
+            if (cover[v] >= 0.49) stats.shownColoured++;
+            if (near) { stats.nearShown++; if (cover[v] >= 0.49) stats.nearShownColoured++; }
+          } else {
+            stats.hidden++;
+            // Any visible tint counts as leakage.
+            if (cover[v] > 0.02) stats.hiddenTinted++;
+            if (near) { stats.nearHidden++; if (cover[v] > 0.02) stats.nearHiddenTinted++; }
+          }
+        }
+        return stats;
+      };
+
+      result.initial = summarise(coverage());
+      // Thresholds change interactively; the signs must follow.
+      layer.setThreshold([-1.5, 1.5]);
+      surface.updateColors();
+      const moved = coverage();
+      let movedMismatch = 0;
+      for (let v = 0; v < values.length; v++) {
+        if (!interior(v)) continue;
+        const shown = values[v] > 1.5;
+        if (shown ? moved[v] < 0.49 : moved[v] > 0.02) movedMismatch++;
+      }
+      result.afterThresholdChange = { mismatches: movedMismatch, vertices: values.length };
+      surface.dispose();
+      renderer.dispose();
+    } catch (error) {
+      result.skipped = Boolean(error && error.skip);
+      result.error = String(error && error.message || error);
+    }
+    window.__THRESHOLD_EDGE_TEST__ = result;
+    document.getElementById('log').textContent = JSON.stringify(result, null, 2);
+  </script>
+</body>
+</html>
