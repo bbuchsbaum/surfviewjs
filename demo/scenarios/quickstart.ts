@@ -51,7 +51,7 @@ export const quickstart: Scenario = {
     );
 
     viewer.addSurface(surface, 'quick-surface');
-    viewer.centerCamera();
+    viewer.fitToView();
     ctx.status('Ready - random field on sphere');
 
     ctx.panel.innerHTML = `
@@ -62,6 +62,7 @@ export const quickstart: Scenario = {
           <button id="regen-data" class="primary">Regenerate data</button>
           <button id="toggle-interaction" class="ghost">Disable interaction</button>
           <button id="spin-view" class="ghost">Re-center view</button>
+          <button id="fit-view" class="ghost">Fit to view</button>
         </div>
       </div>
       <div class="panel-section">
@@ -73,6 +74,7 @@ export const quickstart: Scenario = {
     const regenBtn = ctx.panel.querySelector('#regen-data');
     const interactionBtn = ctx.panel.querySelector<HTMLButtonElement>('#toggle-interaction');
     const spinBtn = ctx.panel.querySelector('#spin-view');
+    const fitBtn = ctx.panel.querySelector('#fit-view');
     const info = ctx.panel.querySelector('#qs-status');
 
     const setInfo = (msg: string) => {
@@ -96,6 +98,11 @@ export const quickstart: Scenario = {
     spinBtn?.addEventListener('click', () => {
       viewer.centerCamera();
       viewer.setViewpoint('lateral');
+    });
+
+    fitBtn?.addEventListener('click', () => {
+      viewer.fitToView();
+      setInfo('Fitted visible surface to view');
     });
 
     return () => {

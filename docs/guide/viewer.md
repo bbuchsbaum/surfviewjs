@@ -50,6 +50,14 @@ required runtime default. Invalid numeric values throw
 `NumericValidationError` and do not change the camera, renderer, revision, or
 events.
 
+Style presets provide defaults. Explicit style options in the constructor or in
+the same `updateConfig()` call (background, lighting, rim, SSAO, metalness and
+roughness) take precedence over the preset and are recorded in `viewer.stylePreset`,
+so surfaces added later inherit them. An explicit background with a preset selects
+a solid background. A later color-only
+`updateConfig({ backgroundColor })` retains the current transparency; use
+`setFigureBackground(color, transparent)` to change transparency explicitly.
+
 SurfView's published declarations use TypeScript exact optional-property
 semantics: omit an option to preserve or select its default. Explicit
 `undefined` is not a reset value and is rejected by TypeScript. Where an API
@@ -83,6 +91,10 @@ disposed directly, the viewer observes its disposal and unregisters it.
 // Center camera on all surfaces
 viewer.centerCamera();
 
+// Frame visible surfaces in the current viewing direction with 8% padding.
+viewer.fitToView();
+viewer.fitToView({ padding: 0.05, surfaceId: 'brain' });
+
 // Set a specific viewpoint
 viewer.setViewpoint('lateral');  // lateral, medial, dorsal, ventral, anterior, posterior
 
@@ -109,6 +121,14 @@ viewer.setInteractionEnabled(true);
 // Access the interaction controller when direct tuning is necessary
 viewer.cameraControls.rotateSpeed = 1.5;
 ```
+
+`fitToView()` returns `false` when there is no visible target surface. It uses
+the current viewport shape, so call it again after `resize()` when you want to
+refit the scene. `padding` is the fraction reserved on each edge, from 0 to
+less than 0.5. An unknown `surfaceId` or invalid padding throws.
+Clipping planes cover the fitted bounding sphere throughout the camera control's
+zoom range, allowing subsequent orbit and dolly without refitting depth planes.
+`setZoom()` beyond that range widens the range and the far plane to match.
 
 Camera position, rotation, target, zoom, and hemisphere separation must be
 finite. A camera-state update validates every supplied tuple before changing

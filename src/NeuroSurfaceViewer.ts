@@ -278,6 +278,35 @@ function normalizeViewerConfig(
   return merged;
 }
 
+/** Let explicitly supplied style options override a preset's defaults. */
+function withExplicitStyleOptions(
+  preset: SurfViewStylePreset,
+  config: Partial<NeuroSurfaceViewerConfig>
+): SurfViewStylePreset {
+  return {
+    ...preset,
+    background: config.backgroundColor === undefined ? preset.background : {
+      clearColor: config.backgroundColor,
+      clearAlpha: 1,
+      css: colorToCSS(config.backgroundColor)
+    },
+    lighting: {
+      ...preset.lighting,
+      ambientColor: config.ambientLightColor ?? preset.lighting.ambientColor,
+      directionalColor: config.directionalLightColor ?? preset.lighting.directionalColor,
+      directionalIntensity: config.directionalLightIntensity ?? preset.lighting.directionalIntensity,
+      rimStrength: config.rimStrength ?? preset.lighting.rimStrength,
+      ssaoRadius: config.ssaoRadius ?? preset.lighting.ssaoRadius,
+      ssaoKernelSize: config.ssaoKernelSize ?? preset.lighting.ssaoKernelSize
+    },
+    material: {
+      ...preset.material,
+      metalness: config.metalness ?? preset.material.metalness,
+      roughness: config.roughness ?? preset.material.roughness
+    }
+  };
+}
+
 export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   container: HTMLElement;
   width!: number;
@@ -452,7 +481,9 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     this.setupPostProcessing();
 
     if (this.config.preset !== 'default') {
-      this.applyStylePreset(this.config.preset);
+      // Resolve style overrides once, without replaying unrelated configuration
+      // through the observable update API during construction.
+      this.applyStylePreset(withExplicitStyleOptions(this.stylePreset, config));
     }
 
     this.cameraInteractionEnabled = true;
@@ -2637,6 +2668,111 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     this.requestRender();
   }
 
+  /** Fit visible surface bounds into the current view without changing its direction. */
+  fitToView(options: { padding?: number; surfaceId?: string } = {}): boolean {
+    const padding = finiteNumber(options.padding ?? 0.08, 'padding', {
+      minimum: 0,
+      maximum: 0.5,
+      maximumExclusive: true
+    });
+    if (this.disposed || this.initializationFailed) return false;
+
+    const selected = options.surfaceId === undefined
+      ? [...this.surfaces.values()]
+      : [this.surfaces.get(options.surfaceId)];
+    if (options.surfaceId !== undefined && !selected[0]) {
+      throw new Error(`Unknown surface: ${options.surfaceId}`);
+    }
+    const bounds = new THREE.Box3();
+    for (const surface of selected) {
+      if (!surface?.mesh || !surface.mesh.visible) continue;
+      surface.mesh.updateWorldMatrix(true, true);
+      bounds.union(new THREE.Box3().setFromObject(surface.mesh));
+    }
+    if (bounds.isEmpty()) return false;
+
+    const center = bounds.getCenter(new THREE.Vector3());
+    const radius = bounds.getSize(new THREE.Vector3()).length() / 2;
+    const previousTarget = this.cameraControls?.target ?? new THREE.Vector3();
+    const direction = this.camera.position.clone().sub(previousTarget);
+    if (direction.lengthSq() < 1e-12) direction.set(0, 0, 1);
+    direction.normalize();
+    const right = new THREE.Vector3().crossVectors(this.camera.up, direction);
+    if (right.lengthSq() < 1e-12) right.set(1, 0, 0);
+    right.normalize();
+    const up = new THREE.Vector3().crossVectors(direction, right).normalize();
+
+    let halfWidth = 0;
+    let halfHeight = 0;
+    const camera = this.camera as THREE.PerspectiveCamera | THREE.OrthographicCamera;
+    const usable = 1 - 2 * padding;
+    const tanVertical = camera instanceof THREE.PerspectiveCamera
+      ? Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * usable
+      : 0;
+    const tanHorizontal = camera instanceof THREE.PerspectiveCamera
+      ? tanVertical * camera.aspect
+      : 0;
+    let distance = 0;
+    for (const x of [bounds.min.x, bounds.max.x]) {
+      for (const y of [bounds.min.y, bounds.max.y]) {
+        for (const z of [bounds.min.z, bounds.max.z]) {
+          const offset = new THREE.Vector3(x, y, z).sub(center);
+          const horizontal = Math.abs(offset.dot(right));
+          const vertical = Math.abs(offset.dot(up));
+          const depth = offset.dot(direction);
+          halfWidth = Math.max(halfWidth, horizontal);
+          halfHeight = Math.max(halfHeight, vertical);
+          if (camera instanceof THREE.PerspectiveCamera) {
+            distance = Math.max(
+              distance,
+              depth + horizontal / tanHorizontal,
+              depth + vertical / tanVertical
+            );
+          }
+        }
+      }
+    }
+
+    if (camera instanceof THREE.OrthographicCamera) {
+      const width = camera.right - camera.left;
+      const height = camera.top - camera.bottom;
+      camera.zoom = Math.min(
+        halfWidth > 0 ? width * usable / (2 * halfWidth) : Infinity,
+        halfHeight > 0 ? height * usable / (2 * halfHeight) : Infinity
+      );
+      if (!Number.isFinite(camera.zoom)) camera.zoom = 1;
+      distance = Math.max(this.camera.position.distanceTo(previousTarget), radius + 1);
+    } else {
+      distance = Math.max(distance, radius + 0.01, 0.01);
+    }
+
+    this.withStateChangeBatch(() => {
+      this.currentAnatomicalView = null;
+      this.sceneBoundsRadius = radius;
+      camera.position.copy(center).addScaledVector(direction, distance);
+      camera.up.copy(up);
+      camera.lookAt(center);
+      // Subsequent orbit/zoom must not inherit planes fitted to the current box
+      // depth. Cover every orientation throughout the control's dolly range;
+      // setZoom widens far itself when asked to exceed maxDistance.
+      const maxDistance = Math.max(radius * 20, distance * 2);
+      camera.near = Math.max(Math.min(distance, radius) / 1000, 0.001);
+      camera.far = Math.max(maxDistance + radius * 1.01, 100);
+      camera.updateProjectionMatrix();
+      if (this.cameraControls) {
+        this.cameraControls.target.copy(center);
+        // Same minimum as setZoom, resetCamera and the anatomical-view fit.
+        (this.cameraControls as any).minDistance = Math.max(radius * 0.6, 0.05);
+        (this.cameraControls as any).maxDistance = maxDistance;
+        this.cameraControls.update();
+      }
+      this.config.initialZoom = distance;
+      this.invalidateState(['camera']);
+      this.requestRender();
+    });
+    return true;
+  }
+
   setZoom(distance: number, options: { updateInitial?: boolean } = {}): void {
     const requestedDistance = finiteNumber(distance, 'distance', {
       minimum: 0,
@@ -2650,6 +2786,15 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
       : Infinity;
     const safeDistance = Math.min(maxClamp, Math.max(minClamp, requestedDistance));
     this.camera.position.copy(target).addScaledVector(dir, safeDistance);
+    if (this.sceneBoundsRadius > 0) {
+      // An explicit zoom may exceed the controls' dolly range: widen that range so
+      // controls.update() does not snap back, and the far plane so nothing clips.
+      const controls = this.cameraControls as any;
+      if (controls && typeof controls.maxDistance === 'number' && controls.maxDistance < safeDistance) {
+        controls.maxDistance = safeDistance;
+      }
+      this.camera.far = Math.max(this.camera.far, safeDistance + this.sceneBoundsRadius * 1.01);
+    }
     this.camera.updateProjectionMatrix();
     if (this.cameraControls?.update) {
       this.cameraControls.update();
@@ -3132,35 +3277,14 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
       ? resolveStylePreset(newConfig.preset)
       : null;
     this.withStateChangeBatch(() => {
-      this.config = normalizedConfig;
-
-      // Apply relevant updates
-      if (newConfig.ambientLightColor !== undefined) {
-        this.updateAmbientLight(normalizedConfig.ambientLightColor);
-      }
-      if (newConfig.directionalLightColor !== undefined) {
-        this.updateDirectionalLight(normalizedConfig.directionalLightColor);
-      }
-      if (newConfig.directionalLightIntensity !== undefined) {
-        this.updateDirectionalLightIntensity(normalizedConfig.directionalLightIntensity);
-      }
-      if (newConfig.backgroundColor !== undefined && this.renderer) {
-        this.renderer.setClearColor(normalizedConfig.backgroundColor);
-      }
-      if (newConfig.metalness !== undefined || newConfig.roughness !== undefined) {
-        this.updateMaterials();
-      }
-      if (newConfig.ssaoRadius !== undefined && this.ssaoPass) {
-        this.ssaoPass.kernelRadius = normalizedConfig.ssaoRadius;
-      }
-      if (newConfig.rimStrength !== undefined) {
-        this.rimStrengthUniforms.forEach(uniform => {
-          uniform.value = normalizedConfig.rimStrength;
-        });
-      }
-
       if (resolvedPreset) {
-        this.applyStylePreset(resolvedPreset);
+        // The preset carries the explicit style options, so stylePreset (read by
+        // surfaces added later) and config agree, as after construction.
+        this.applyStylePreset(withExplicitStyleOptions(resolvedPreset, newConfig));
+        this.config = normalizeViewerConfig(newConfig, this.config);
+      } else {
+        this.config = normalizedConfig;
+        this.applyExplicitStyleUpdates(newConfig, normalizedConfig);
       }
 
       const observableKeys = Object.keys(newConfig).filter(key =>
@@ -3171,6 +3295,46 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
       }
       this.requestRender();
     });
+  }
+
+  /** Apply explicitly supplied style options when no preset accompanies them. */
+  private applyExplicitStyleUpdates(
+    newConfig: Partial<NeuroSurfaceViewerConfig>,
+    normalizedConfig: ResolvedNeuroSurfaceViewerConfig
+  ): void {
+    if (newConfig.ambientLightColor !== undefined) {
+      this.updateAmbientLight(normalizedConfig.ambientLightColor);
+    }
+    if (newConfig.directionalLightColor !== undefined) {
+      this.updateDirectionalLight(normalizedConfig.directionalLightColor);
+    }
+    if (newConfig.directionalLightIntensity !== undefined) {
+      this.updateDirectionalLightIntensity(normalizedConfig.directionalLightIntensity);
+    }
+    if (newConfig.backgroundColor !== undefined && this.renderer) {
+      // A color-only edit retains the existing figure alpha, including fractions.
+      const alpha = this.renderer.getClearAlpha();
+      this.renderer.setClearColor(this.config.backgroundColor, alpha);
+      if (this.container?.style) {
+        this.container.style.background = alpha < 1 ? 'transparent' : colorToCSS(this.config.backgroundColor);
+      }
+    }
+    if (newConfig.metalness !== undefined || newConfig.roughness !== undefined) {
+      this.updateMaterials();
+    }
+    if (newConfig.ssaoRadius !== undefined && this.ssaoPass) {
+      this.ssaoPass.kernelRadius = normalizedConfig.ssaoRadius;
+    }
+    if (newConfig.ssaoKernelSize !== undefined && this.ssaoPass &&
+        typeof (this.ssaoPass as any).generateSampleKernel === 'function') {
+      (this.ssaoPass as any).kernelSize = normalizedConfig.ssaoKernelSize;
+      (this.ssaoPass as any).generateSampleKernel(normalizedConfig.ssaoKernelSize);
+    }
+    if (newConfig.rimStrength !== undefined) {
+      this.rimStrengthUniforms.forEach(uniform => {
+        uniform.value = normalizedConfig.rimStrength;
+      });
+    }
   }
 
   /**

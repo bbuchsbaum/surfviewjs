@@ -61,6 +61,7 @@ export interface NeuroSurfaceViewerHandle {
   setLayerOrder(surfaceId: string, layerIds: readonly string[]): LayerOrderResult;
   setViewpoint(viewpoint: string): void;
   centerCamera(): void;
+  fitToView(options?: { padding?: number; surfaceId?: string }): boolean;
   resetCamera(): void;
   setInteractionEnabled(enabled: boolean): void;
   /** @deprecated Controls UI is no longer owned by the viewer. */
@@ -173,6 +174,9 @@ const NeuroSurfaceViewer = forwardRef<
     },
     centerCamera() {
       viewerRef.current?.centerCamera();
+    },
+    fitToView(options) {
+      return viewerRef.current?.fitToView(options) ?? false;
     },
     resetCamera() {
       viewerRef.current?.resetCamera();
