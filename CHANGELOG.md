@@ -7,7 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-10-09
+
 ### Added
+- `projectVolume(volume, surface, options)` samples a scalar volume along
+  anatomical surface normals and returns per-vertex values with valid-sample
+  counts, without creating a layer, texture or DOM element. It has explicit
+  contracts for voxel-centre coordinates, masks, nearest/linear interpolation
+  and `mean`/`max-abs` reduction; see the layers guide and
+  `docs/performance/volume-projection.md`. A Normal Volume Projection demo
+  scenario and `npm run benchmark:volume` accompany it.
+- `NeuroSurfaceViewer.fitToView({ padding, surfaceId })` (also on the React
+  handle) frames the visible surfaces, or one surface, in the current viewing
+  direction for perspective and orthographic cameras. Its clipping planes
+  cover the scene throughout the zoom range, so later orbit and dolly do not
+  clip.
 - Report scenes gain an `anatomical` layout (`mountSurfView(..., { layout:
   'anatomical' })`): both hemispheres keep their RAS placement, separated only
   by `hemisphereGap` at the midline, and whole-brain presets (`left`, `right`,
@@ -70,6 +84,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `getColorKeyRange` (dual-threshold statistical maps key both scales; volume
   projection layers are keyed too) and `ColorMap.getUnmaskedColor`.
 
+- Restored legacy `dist/neurosurface.*` bundle aliases and UMD source maps for
+  downstream `neurosurf` htmlwidget/pkgdown sync targets that still consume the
+  historical artifact names.
+- Explicit style options (background, lighting, rim, SSAO, metalness,
+  roughness) now take precedence over a style preset passed in the same
+  constructor or `updateConfig()` call, and are recorded in
+  `viewer.stylePreset` so later surfaces inherit them. A colour-only
+  `updateConfig({ backgroundColor })` keeps the current transparency, and
+  `ssaoKernelSize` now updates at runtime.
+- `setZoom()` beyond the controls' zoom range widens that range and the far
+  plane instead of clipping the scene or being snapped back by the controls.
+- `VolumeProjectionLayer` rejects unknown `sampling` modes and ribbon
+  `reducer`s instead of silently using a different computation. Its CPU
+  sampling now shares the `projectVolume` core and is bit-identical to the
+  previous implementation.
+
 ### Changed
 - Removed unused Gulp, Webpack CLI, `node-fetch`, direct Rollup 2 plugins, and
   their stale package scripts; application and package builds now use Vite 8
@@ -78,15 +108,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `neurosurface.*` compatibility aliases. Optional entries and the self-contained
   embed no longer duplicate source content in the archive.
 
+- `updateMaterials()` (run by `updateConfig({ metalness, roughness })`) no
+  longer replaces surface materials with `MeshPhysicalMaterial`, which
+  discarded each surface's material type, double-sided rendering, opacity and
+  shininess, and replaced the shader materials of GPU-composited and
+  volume-projected surfaces. It now updates each surface through its own
+  configuration, so viewer `metalness`/`roughness` affect `standard` and
+  `physical` surface materials only; set `materialType` on a surface to use
+  them with the default Phong material.
+
 ### Security
 - Added an exact dependency-audit gate: the published runtime must remain free
   of advisories, critical development findings are rejected, and the remaining
   VitePress-nested Vite advisory is narrowly allowlisted with a dated review.
-
-### Fixed
-- Restored legacy `dist/neurosurface.*` bundle aliases and UMD source maps for
-  downstream `neurosurf` htmlwidget/pkgdown sync targets that still consume the
-  historical artifact names.
+- Updated development dependencies (Vue 3.5.43, source-map-js 1.2.2 and patch
+  releases in the VitePress toolchain) for GHSA-g2v6-rqmx-r4w6 and
+  GHSA-68fv-2mgg-jv7q. The published runtime dependencies are unaffected.
 
 ## [2.2.0] - 2026-06-03
 
@@ -138,6 +175,7 @@ First tagged release; hardened for npm publishing.
   preserved in `DataLayer`.
 - Stabilized the GPU picker crosshair selection.
 
-[Unreleased]: https://github.com/bbuchsbaum/surfviewjs/compare/v2.2.0...HEAD
+[Unreleased]: https://github.com/bbuchsbaum/surfviewjs/compare/v2.3.0...HEAD
+[2.3.0]: https://github.com/bbuchsbaum/surfviewjs/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/bbuchsbaum/surfviewjs/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/bbuchsbaum/surfviewjs/releases/tag/v2.1.0

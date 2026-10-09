@@ -3,7 +3,7 @@ import { serialize } from './StateSerializer';
 import type { ViewerStateV2 } from './ViewerState';
 
 export const SURFVIEW_EXPORT_SCHEMA = 'surfview.scene.v1';
-export const SURFVIEW_VERSION = '2.2.0';
+export const SURFVIEW_VERSION = '2.3.0';
 
 export type SceneAssetType = 'surface' | 'metric' | 'parcellation' | 'roi' | 'volume' | 'transform' | 'scene' | 'other';
 
