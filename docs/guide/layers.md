@@ -96,6 +96,106 @@ surface.updateLayer('volume', { volumeData: nextVolumeData });
 - For direct shader fragment/ribbon projection on one volume overlay, use `VolumeProjectedSurface`.
 - GPU compositing currently supports up to 8 total layers (including the base layer); volume layers count toward this limit.
 
+### Numerical projection along normals
+
+`projectVolume(volume, surface, options)` returns scalar values and valid-sample
+counts. It shares its CPU sampling core with `VolumeProjectionLayer`; it does not
+construct a layer, texture, renderer, or DOM element. No neuroimjs dependency is
+required. Display its output with an ordinary `DataLayer`:
+
+```javascript
+import { projectVolume, DataLayer } from 'surfview';
+
+// Minimal example: three voxel centres at x = 0, 1, 2 mm.
+const volume = {
+  data: new Float32Array([0, 2, 4]),
+  dims: [3, 1, 1],
+  voxelToWorld: [
+    1, 0, 0, 0,
+    0, 1, 0, 0,
+    0, 0, 1, 0,
+    0, 0, 0, 1
+  ]
+};
+const result = projectVolume(volume, {
+  positions: new Float32Array([0, 0, 0]),
+  normals: new Float32Array([1, 0, 0])
+}, {
+  depthMm: [0, 2],
+  steps: 3,
+  interpolation: 'linear',
+  reducer: 'mean'
+});
+// result.values = Float32Array([2]); result.validSamples = Uint32Array([3])
+const projected = new DataLayer('projected', result.values, null, 'viridis', {
+  range: [0, 4]
+});
+// surface.addLayer(projected); // Surface must have the same vertex count/order.
+```
+
+**Volume contract**
+
+- `data` is a borrowed numeric `ArrayLike`, with exactly `nx * ny * nz` entries.
+  Storage is x fastest: `i + nx * (j + ny * k)`. Select one scalar 3D frame before
+  calling; the function does not load files, decompress data, or densify sparse volumes.
+- `dims` contains three positive integers. `voxelToWorld` is a finite, invertible,
+  column-major affine with last row `[0, 0, 0, 1]`, supplied as 16 numbers or an
+  object with `.elements` (including a Three.js `Matrix4`). Integer voxel indices
+  denote **voxel centres**, mapped into anatomical world millimetres.
+- Optional `mask` has the same length as `data`. Zero or non-finite mask entries
+  mark invalid voxels; other entries mark valid voxels.
+- A neuroimjs adapter belongs in the consuming app: pass its scalar data, three
+  dimensions, and affine converted to this layout. Check whether a volume's data
+  accessor copies or densifies; surfview itself neither copies nor scans the volume.
+
+**Surface and sampling contract**
+
+- `positions` and `normals` are matching packed xyz arrays in the same anatomical
+  world frame as the affine. Use positions **before inflation, hemisphere separation,
+  or display transforms**. For an inflated display, project on anatomical vertices
+  and attach the values to corresponding display vertices.
+- Positions must be finite. Normals must be finite and nonzero, are normalized in
+  world space, and retain the orientation supplied by the caller. Positive depth
+  follows the normal. Anisotropic voxel scaling does not change depth units.
+- `depthMm` is a required ordered finite pair. `steps` defaults to 5, accepts
+  integers 1–256, and includes both endpoints; one step samples the midpoint.
+- `interpolation` defaults to `'linear'`. Each axis must lie in `[0, n-1]` for
+  linear interpolation. `'nearest'` accepts `[-0.5, n-0.5)` and uses `floor(x+0.5)`.
+  There is no extrapolation or clamping outside these domains.
+- Genuine zeros are valid. Non-finite values, masked voxels and outside samples are
+  missing. Linear samples require every contributor of **nonzero weight** to be
+  valid; weights are never renormalized around missing data.
+  This can discard many samples near a thin grey-matter mask or a volume edge.
+  For a single-slice axis (`n = 1`), linear sampling requires that coordinate to
+  remain exactly zero: even a small off-plane component of the normal loses depth
+  samples. Nearest sampling accepts the slice's half-voxel extent. Inspect
+  `validSamples` for coverage before interpreting a projected map. Weight
+  renormalization across masked neighbours is not currently supported.
+- `reducer` defaults to `'mean'` over valid depth samples. `'max-abs'` selects the
+  value with greatest absolute magnitude, preserving its sign; ties select the
+  earliest depth. No valid samples gives `NaN` and count 0. Counts measure depth
+  samples, not interpolation neighbours or independent observations.
+- Arithmetic uses doubles; output is `Float32Array` plus `Uint32Array` counts.
+  Invalid input, coordinate overflow, and output outside finite Float32 range throw.
+  Inputs are borrowed only during the synchronous call and are never mutated.
+
+Projection costs O(vertices × steps), with one inverse per call, transformed
+origin/direction per vertex, and no per-sample allocation. It runs synchronously;
+applications may put it in a worker when needed. Run `npm run benchmark:volume` for
+reproducible CPU timings at 32k, 164k and 324k vertices with 5/16 samples. Those
+synthetic Node measurements do not predict browser frame rates. See the
+[measured workload and results](../performance/volume-projection.md).
+
+The existing rendering APIs keep their compatibility rules: CPU layer sampling
+clamps half-voxel edges, ribbons omit `fillValue`, and a one-sample CPU ribbon uses
+the white endpoint. GPU texture filtering defaults to linear, while the layer CPU
+sampler defaults to nearest; shader ribbons use a midpoint for one sample and a
+16-sample limit (CPU layer limit: 32). These existing CPU/GPU differences are not
+changed by numerical projection. Colormap thresholds remain separate display rules.
+
+Try **Normal Volume Projection** in the demo gallery to vary depths, sample count,
+interpolation and reduction on a synthetic signed volume.
+
 ### TemporalDataLayer
 
 For time-varying scalar data with frame interpolation. Extends `DataLayer` with multiple temporal frames. See the full [Temporal Playback](/guide/temporal) guide for details.

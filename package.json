@@ -65,6 +65,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "benchmark:volume": "npm run build && node scripts/benchmark-volume-projection.mjs",
     "benchmark:performance": "npm run build && node --expose-gc scripts/performance-benchmark.mjs",
     "benchmark:check": "node --expose-gc scripts/performance-benchmark.mjs --check",
     "benchmark:browser": "start-server-and-test dev:ci http://localhost:4173 \"playwright test tests/e2e/performance-benchmark.spec.ts\"",

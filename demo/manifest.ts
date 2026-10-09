@@ -10,6 +10,7 @@ import { lighting } from './scenarios/lighting';
 import { fslrFunc } from './scenarios/fslrFunc';
 import { gpuCompositing } from './scenarios/gpuCompositing';
 import { volumeProjection } from './scenarios/volumeProjection';
+import { normalProjection } from './scenarios/normalProjection';
 import { curvature } from './scenarios/curvature';
 import { clipping } from './scenarios/clipping';
 import { colormap2d } from './scenarios/colormap2d';
@@ -54,5 +55,6 @@ export const scenarios: Scenario[] = [
   fslrFunc,
   gpuCompositing,
   volumeProjection,
+  normalProjection,
   fileLoading
 ];

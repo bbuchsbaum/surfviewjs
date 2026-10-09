@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createVoxelSampler, createLineProjector, type VoxelSampler, type LineProjector } from './volumeProjectionCore';
 import ColorMap, { Color, ColorArray } from './ColorMap';
 import ColorMap2D, { ColorMap2DPreset } from './ColorMap2D';
 import { debugLog, isDebugEnabled } from './debug';
@@ -81,6 +82,22 @@ export type VolumeProjectionMode = 'vertex' | 'fragment' | 'ribbon' | 'hybrid';
 export type VolumeSamplingMode = 'nearest' | 'linear';
 export type VolumeProjectionQuality = 'interactive' | 'publication';
 export type RibbonReducer = 'mean' | 'max' | 'min' | 'median';
+
+// The shared CPU core accepts other modes and reducers, so reject strings that
+// the types exclude instead of letting them select a different computation.
+function validateSamplingMode(mode: VolumeSamplingMode): VolumeSamplingMode {
+  if (mode !== 'nearest' && mode !== 'linear') {
+    throw new Error(`VolumeProjectionLayer: unknown sampling mode "${String(mode)}"`);
+  }
+  return mode;
+}
+
+function validateRibbonReducer(reducer: RibbonReducer): RibbonReducer {
+  if (reducer !== 'mean' && reducer !== 'max' && reducer !== 'min' && reducer !== 'median') {
+    throw new Error(`VolumeProjectionLayer: unknown ribbon reducer "${String(reducer)}"`);
+  }
+  return reducer;
+}
 
 export interface RibbonSamplingConfig {
   /** Pial/world-outer surface positions in the same vertex order as the rendered surface. */
@@ -1084,6 +1101,12 @@ export class VolumeProjectionLayer extends Layer {
   private ribbonReducer: RibbonReducer;
   private attachedSurface: { geometry: { vertices: Float32Array }; mesh?: THREE.Mesh } | null = null;
   private rgbaBuffer: Float32Array | null = null;
+  private cpuSamplerCache: {
+    sample: VoxelSampler;
+    data: Float32Array;
+    dims: [number, number, number];
+    sampling: VolumeSamplingMode;
+  } | null = null;
 
   constructor(
     id: string,
@@ -1098,10 +1121,10 @@ export class VolumeProjectionLayer extends Layer {
     this.threshold = finitePair(config.threshold ?? [0, 0], 'threshold');
     this.fillValue = finiteNumber(config.fillValue ?? 0, 'fillValue');
     this.projectionMode = config.projectionMode ?? 'vertex';
-    this.sampling = config.sampling ?? 'nearest';
+    this.sampling = validateSamplingMode(config.sampling ?? 'nearest');
     this.quality = config.quality ?? 'interactive';
     this.ribbonSamples = this.normalizeRibbonSamples(config.ribbon?.samples ?? 7);
-    this.ribbonReducer = config.ribbon?.reducer ?? 'mean';
+    this.ribbonReducer = validateRibbonReducer(config.ribbon?.reducer ?? 'mean');
     if (config.ribbon?.pial || config.ribbon?.white) {
       this.setRibbonSurfaces(config.ribbon.pial ?? null, config.ribbon.white ?? null, {
         samples: this.ribbonSamples,
@@ -1249,7 +1272,7 @@ export class VolumeProjectionLayer extends Layer {
   }
 
   setSamplingMode(mode: VolumeSamplingMode): void {
-    this.sampling = mode;
+    this.sampling = validateSamplingMode(mode);
     this._notifyChange({ sampling: mode });
   }
 
@@ -1263,6 +1286,7 @@ export class VolumeProjectionLayer extends Layer {
     white: Float32Array | number[] | null,
     options: { samples?: number; reducer?: RibbonReducer } = {}
   ): void {
+    if (options.reducer !== undefined) validateRibbonReducer(options.reducer);
     this.ribbonPial = pial ? new Float32Array(pial) : null;
     this.ribbonWhite = white ? new Float32Array(white) : null;
     if ((this.ribbonPial && !this.ribbonWhite) || (!this.ribbonPial && this.ribbonWhite)) {
@@ -1347,6 +1371,8 @@ export class VolumeProjectionLayer extends Layer {
       this.validateRibbonForVertexCount(vertexCount);
     }
 
+    const sampler = this.createCPUSampler();
+    const ribbon = mode === 'ribbon' ? this.createRibbonProjector(we, sampler) : null;
     for (let vi = 0; vi < vertexCount; vi++) {
       const base = vi * 3;
       // Exact vertex-count validation above proves every xyz triplet is present.
@@ -1354,12 +1380,13 @@ export class VolumeProjectionLayer extends Layer {
       const y = vertices[base + 1]!;
       const z = vertices[base + 2]!;
 
-      const value = mode === 'ribbon'
-        ? this.sampleRibbonValue(vi, we)
+      const value = ribbon
+        ? this.sampleRibbonValue(vi, ribbon)
         : this.sampleValueAtWorldCoordinates(
           we[0] * x + we[4] * y + we[8] * z + we[12],
           we[1] * x + we[5] * y + we[9] * z + we[13],
-          we[2] * x + we[6] * y + we[10] * z + we[14]
+          we[2] * x + we[6] * y + we[10] * z + we[14],
+          sampler
         );
 
       if (value === null || !isFinite(value)) continue;
@@ -1401,7 +1428,7 @@ export class VolumeProjectionLayer extends Layer {
     const we = worldMatrix.elements;
     if (this.resolveProjectionMode() === 'ribbon') {
       this.validateRibbonForVertexCount(vertices.length / 3);
-      return this.sampleRibbonValue(vertexIndex, we);
+      return this.sampleRibbonValue(vertexIndex, this.createRibbonProjector(we, this.createCPUSampler()));
     }
     const base = vertexIndex * 3;
     // The safe-integer range check above proves this xyz triplet is present.
@@ -1509,6 +1536,7 @@ export class VolumeProjectionLayer extends Layer {
       this.volumeTexture.dispose();
     }
     this.rgbaBuffer = null;
+    this.cpuSamplerCache = null;
   }
 
   private resolveProjectionMode(): Exclude<VolumeProjectionMode, 'hybrid'> {
@@ -1522,116 +1550,55 @@ export class VolumeProjectionLayer extends Layer {
     return this.projectionMode === 'fragment' ? 'fragment' : this.projectionMode;
   }
 
-  private sampleValueAtWorldCoordinates(wx: number, wy: number, wz: number): number | null {
-    const me = this.worldToIJK.elements;
-    const ijkX = me[0] * wx + me[4] * wy + me[8] * wz + me[12];
-    const ijkY = me[1] * wx + me[5] * wy + me[9] * wz + me[13];
-    const ijkZ = me[2] * wx + me[6] * wy + me[10] * wz + me[14];
-    return this.sampleValueAtIJK(ijkX, ijkY, ijkZ);
-  }
-
-  private sampleValueAtIJK(ijkX: number, ijkY: number, ijkZ: number): number | null {
-    const nx = this.dims[0];
-    const ny = this.dims[1];
-    const nz = this.dims[2];
-
-    const uvwX = (ijkX + 0.5) / nx;
-    const uvwY = (ijkY + 0.5) / ny;
-    const uvwZ = (ijkZ + 0.5) / nz;
-    if (
-      uvwX < 0 || uvwX > 1 ||
-      uvwY < 0 || uvwY > 1 ||
-      uvwZ < 0 || uvwZ > 1
-    ) {
-      return null;
+  private createCPUSampler(): VoxelSampler {
+    const cached = this.cpuSamplerCache;
+    if (cached && cached.data === this.volumeData && cached.sampling === this.sampling &&
+        cached.dims[0] === this.dims[0] && cached.dims[1] === this.dims[1] && cached.dims[2] === this.dims[2]) {
+      return cached.sample;
     }
-
-    return this.sampling === 'linear'
-      ? this.sampleLinear(ijkX, ijkY, ijkZ)
-      : this.sampleNearest(ijkX, ijkY, ijkZ);
+    const sample = createVoxelSampler(this.volumeData, this.dims, this.sampling, 'legacyClamped');
+    this.cpuSamplerCache = { sample, data: this.volumeData, dims: [...this.dims], sampling: this.sampling };
+    return sample;
   }
 
-  private sampleNearest(ijkX: number, ijkY: number, ijkZ: number): number {
-    const nx = this.dims[0];
-    const ny = this.dims[1];
-    const nz = this.dims[2];
-    const i = Math.min(nx - 1, Math.max(0, Math.floor(ijkX + 0.5)));
-    const j = Math.min(ny - 1, Math.max(0, Math.floor(ijkY + 0.5)));
-    const k = Math.min(nz - 1, Math.max(0, Math.floor(ijkZ + 0.5)));
-    // Dimensions and volume length are validated by VolumeTexture3D at construction/update.
-    return this.volumeData[i + nx * j + nx * ny * k]!;
+  private sampleValueAtWorldCoordinates(
+    wx: number, wy: number, wz: number, sample = this.createCPUSampler()
+  ): number | null {
+    const me = this.worldToIJK.elements;
+    return sample(
+      me[0] * wx + me[4] * wy + me[8] * wz + me[12],
+      me[1] * wx + me[5] * wy + me[9] * wz + me[13],
+      me[2] * wx + me[6] * wy + me[10] * wz + me[14]
+    );
   }
 
-  private sampleLinear(ijkX: number, ijkY: number, ijkZ: number): number {
-    const nx = this.dims[0];
-    const ny = this.dims[1];
-    const nz = this.dims[2];
-    const x0 = Math.min(nx - 1, Math.max(0, Math.floor(ijkX)));
-    const y0 = Math.min(ny - 1, Math.max(0, Math.floor(ijkY)));
-    const z0 = Math.min(nz - 1, Math.max(0, Math.floor(ijkZ)));
-    const x1 = Math.min(nx - 1, x0 + 1);
-    const y1 = Math.min(ny - 1, y0 + 1);
-    const z1 = Math.min(nz - 1, z0 + 1);
-    const tx = Math.min(1, Math.max(0, ijkX - x0));
-    const ty = Math.min(1, Math.max(0, ijkY - y0));
-    const tz = Math.min(1, Math.max(0, ijkZ - z0));
-
-    // All coordinates are clamped to validated volume dimensions before lookup.
-    const at = (i: number, j: number, k: number) =>
-      this.volumeData[i + nx * j + nx * ny * k]!;
-    const c00 = at(x0, y0, z0) * (1 - tx) + at(x1, y0, z0) * tx;
-    const c10 = at(x0, y1, z0) * (1 - tx) + at(x1, y1, z0) * tx;
-    const c01 = at(x0, y0, z1) * (1 - tx) + at(x1, y0, z1) * tx;
-    const c11 = at(x0, y1, z1) * (1 - tx) + at(x1, y1, z1) * tx;
-    const c0 = c00 * (1 - ty) + c10 * ty;
-    const c1 = c01 * (1 - ty) + c11 * ty;
-    return c0 * (1 - tz) + c1 * tz;
+  private createRibbonProjector(we: ArrayLike<number>, sample: VoxelSampler): LineProjector {
+    const parameters = new Float64Array(this.ribbonSamples);
+    const denominator = Math.max(1, this.ribbonSamples - 1);
+    for (let s = 0; s < parameters.length; s++) parameters[s] = s / denominator;
+    // Keep the legacy transform order per sample: local interpolation, mesh, then
+    // world-to-voxel. Reassociating these operations can change nearest-voxel ties.
+    return createLineProjector(
+      (x, y, z) => this.sampleValueAtWorldCoordinates(
+        we[0]! * x + we[4]! * y + we[8]! * z + we[12]!,
+        we[1]! * x + we[5]! * y + we[9]! * z + we[13]!,
+        we[2]! * x + we[6]! * y + we[10]! * z + we[14]!,
+        sample
+      ),
+      parameters,
+      this.ribbonReducer,
+      value => Number.isFinite(value) && Math.abs(value - this.fillValue) >= 1e-6
+    );
   }
 
-  private sampleRibbonValue(vertexIndex: number, worldMatrixElements: ArrayLike<number>): number | null {
+  private sampleRibbonValue(vertexIndex: number, project: LineProjector): number | null {
     if (!this.ribbonPial || !this.ribbonWhite) return null;
     const base = vertexIndex * 3;
-    const values: number[] = [];
-    const denom = Math.max(1, this.ribbonSamples - 1);
-    for (let s = 0; s < this.ribbonSamples; s++) {
-      const t = denom === 0 ? 0 : s / denom;
-      // `validateRibbonForVertexCount` proves both aligned xyz triplets are present.
-      const whiteX = this.ribbonWhite[base]!;
-      const whiteY = this.ribbonWhite[base + 1]!;
-      const whiteZ = this.ribbonWhite[base + 2]!;
-      const x = whiteX + (this.ribbonPial[base]! - whiteX) * t;
-      const y = whiteY + (this.ribbonPial[base + 1]! - whiteY) * t;
-      const z = whiteZ + (this.ribbonPial[base + 2]! - whiteZ) * t;
-      // The only caller passes Three.js Matrix4.elements, whose length is always 16.
-      const wx = worldMatrixElements[0]! * x + worldMatrixElements[4]! * y +
-        worldMatrixElements[8]! * z + worldMatrixElements[12]!;
-      const wy = worldMatrixElements[1]! * x + worldMatrixElements[5]! * y +
-        worldMatrixElements[9]! * z + worldMatrixElements[13]!;
-      const wz = worldMatrixElements[2]! * x + worldMatrixElements[6]! * y +
-        worldMatrixElements[10]! * z + worldMatrixElements[14]!;
-      const value = this.sampleValueAtWorldCoordinates(wx, wy, wz);
-      if (value !== null && isFinite(value) && Math.abs(value - this.fillValue) >= 1e-6) {
-        values.push(value);
-      }
-    }
-    if (!values.length) return null;
-    switch (this.ribbonReducer) {
-      case 'max':
-        return Math.max(...values);
-      case 'min':
-        return Math.min(...values);
-      case 'median': {
-        const sorted = [...values].sort((a, b) => a - b);
-        const mid = Math.floor(sorted.length / 2);
-        // `values.length > 0`; both median positions are therefore present.
-        return sorted.length % 2 === 0
-          ? (sorted[mid - 1]! + sorted[mid]!) / 2
-          : sorted[mid]!;
-      }
-      case 'mean':
-      default:
-        return values.reduce((sum, value) => sum + value, 0) / values.length;
-    }
+    // validateRibbonForVertexCount proves both aligned xyz triplets are present.
+    const x = this.ribbonWhite[base]!, y = this.ribbonWhite[base + 1]!, z = this.ribbonWhite[base + 2]!;
+    const result = project(x, y, z,
+      this.ribbonPial[base]! - x, this.ribbonPial[base + 1]! - y, this.ribbonPial[base + 2]! - z);
+    return result.count === 0 ? null : result.value;
   }
 
   private validateRibbonForVertexCount(vertexCount: number): void {

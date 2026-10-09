@@ -82,3 +82,14 @@ void packedCustom;
 void invalidViewerConfig;
 void invalidSurfaceConfig;
 void invalidThresholdReset;
+
+// Public numerical projection is structurally compatible with typed arrays and Matrix4.
+import { projectVolume, type VolumeDescriptor, type ProjectVolumeResult } from 'surfview';
+const scalarVolume: VolumeDescriptor = {
+  data: new Float64Array([0, 1]), dims: [2, 1, 1],
+  voxelToWorld: { elements: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] }
+};
+const normalProjection: ProjectVolumeResult = projectVolume(scalarVolume, {
+  positions: new Float32Array([0, 0, 0]), normals: new Float32Array([1, 0, 0])
+}, { depthMm: [0, 1], steps: 5, interpolation: 'linear', reducer: 'max-abs' });
+void normalProjection;

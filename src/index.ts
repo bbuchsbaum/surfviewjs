@@ -740,3 +740,9 @@ export * from './surfaces/ParcelSurface';
 
 // Export event types
 export * from './events';
+
+// Pure numerical volume projection (no layer or texture construction).
+export { projectVolume } from './projectVolume';
+export type {
+  VolumeDescriptor, ProjectionSurface, ProjectVolumeOptions, ProjectVolumeResult, NormalProjectionReducer
+} from './projectVolume';

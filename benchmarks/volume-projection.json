@@ -1,0 +1,138 @@
+{
+  "bundleSha256": "f147d880b05e472b0331333a9ce20f09e5444d0f5389014b4377574a537b0026",
+  "node": "v26.7.0",
+  "cpu": "Apple M3 Max",
+  "platform": "darwin",
+  "arch": "arm64",
+  "warmup": 2,
+  "repetitions": 7,
+  "dims": [
+    256,
+    256,
+    256
+  ],
+  "volumeBytes": 67108864,
+  "workload": "Fibonacci sphere radius 80 mm; affine scalar field; depth [-2,2]; mean; allocations included; synthetic Node CPU timing, not browser frame timing",
+  "cases": [
+    {
+      "vertices": 32492,
+      "steps": 5,
+      "interpolation": "nearest",
+      "medianMs": 14.526083,
+      "madMs": 2.1520830000000046,
+      "minMs": 7.816875000000039,
+      "maxMs": 19.367290999999966,
+      "outputBytes": 259936
+    },
+    {
+      "vertices": 32492,
+      "steps": 5,
+      "interpolation": "linear",
+      "medianMs": 21.694667000000095,
+      "madMs": 2.5369170000001304,
+      "minMs": 19.157749999999965,
+      "maxMs": 62.413707999999986,
+      "outputBytes": 259936
+    },
+    {
+      "vertices": 32492,
+      "steps": 16,
+      "interpolation": "nearest",
+      "medianMs": 26.879374999999982,
+      "madMs": 1.0797919999999976,
+      "minMs": 22.252500000000055,
+      "maxMs": 35.75133399999993,
+      "outputBytes": 259936
+    },
+    {
+      "vertices": 32492,
+      "steps": 16,
+      "interpolation": "linear",
+      "medianMs": 52.46933400000012,
+      "madMs": 3.730957999999873,
+      "minMs": 45.719333000000006,
+      "maxMs": 63.06758300000001,
+      "outputBytes": 259936
+    },
+    {
+      "vertices": 163842,
+      "steps": 5,
+      "interpolation": "nearest",
+      "medianMs": 58.525082999999995,
+      "madMs": 9.288290999999845,
+      "minMs": 48.677832999999964,
+      "maxMs": 243.70833300000004,
+      "outputBytes": 1310736
+    },
+    {
+      "vertices": 163842,
+      "steps": 5,
+      "interpolation": "linear",
+      "medianMs": 85.63416599999982,
+      "madMs": 2.889666000000034,
+      "minMs": 81.52787500000022,
+      "maxMs": 99.33200000000033,
+      "outputBytes": 1310736
+    },
+    {
+      "vertices": 163842,
+      "steps": 16,
+      "interpolation": "nearest",
+      "medianMs": 109.64249999999993,
+      "madMs": 6.212417000000187,
+      "minMs": 92.15004099999987,
+      "maxMs": 172.1416250000002,
+      "outputBytes": 1310736
+    },
+    {
+      "vertices": 163842,
+      "steps": 16,
+      "interpolation": "linear",
+      "medianMs": 262.9538339999999,
+      "madMs": 33.516458999999486,
+      "minMs": 229.43737500000043,
+      "maxMs": 422.09179099999983,
+      "outputBytes": 1310736
+    },
+    {
+      "vertices": 324002,
+      "steps": 5,
+      "interpolation": "nearest",
+      "medianMs": 93.99341700000059,
+      "madMs": 3.0944579999995767,
+      "minMs": 85.71945800000049,
+      "maxMs": 97.08787500000017,
+      "outputBytes": 2592016
+    },
+    {
+      "vertices": 324002,
+      "steps": 5,
+      "interpolation": "linear",
+      "medianMs": 264.3548329999994,
+      "madMs": 42.86504099999911,
+      "minMs": 180.34504099999867,
+      "maxMs": 354.0961669999997,
+      "outputBytes": 2592016
+    },
+    {
+      "vertices": 324002,
+      "steps": 16,
+      "interpolation": "nearest",
+      "medianMs": 325.8512500000015,
+      "madMs": 75.73387499999808,
+      "minMs": 221.8760000000002,
+      "maxMs": 478.1250409999993,
+      "outputBytes": 2592016
+    },
+    {
+      "vertices": 324002,
+      "steps": 16,
+      "interpolation": "linear",
+      "medianMs": 508.23199999999997,
+      "madMs": 4.2135419999995065,
+      "minMs": 487.84504200000083,
+      "maxMs": 575.6975419999981,
+      "outputBytes": 2592016
+    }
+  ]
+}
