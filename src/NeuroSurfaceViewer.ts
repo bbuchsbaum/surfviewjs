@@ -109,6 +109,7 @@ export interface NeuroSurfaceViewerConfig {
   ssaoRadius?: number;
   ssaoKernelSize?: number;
   rimStrength?: number;
+  /** PBR metalness for `standard`/`physical` surface materials; Phong surfaces ignore it. */
   metalness?: number;
   roughness?: number;
   useShaders?: boolean;
@@ -1202,29 +1203,27 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     }
   }
 
+  /**
+   * Push the viewer's metalness/roughness to every surface. Surfaces keep their
+   * own material type (Phong ignores PBR terms) and custom shader materials are
+   * never replaced.
+   */
   updateMaterials(): void {
+    const { metalness, roughness } = this.config;
     this.surfaces.forEach(surface => {
       if (!surface.mesh) return;
-      if (!surface.mesh.material || !(surface.mesh.material as any).isMeshPhysicalMaterial) {
-        // Convert to MeshPhysicalMaterial
-        const oldMaterial = surface.mesh.material as THREE.Material;
-        const newMaterial = new THREE.MeshPhysicalMaterial({
-          color: (oldMaterial as any).color || 0xffffff,
-          vertexColors: (oldMaterial as any).vertexColors || false,
-          flatShading: (oldMaterial as any).flatShading || false,
-          metalness: this.config.metalness,
-          roughness: this.config.roughness,
-          envMap: this.environmentMap,
-          envMapIntensity: 1.0
-        });
-        surface.mesh.material = newMaterial;
-        oldMaterial.dispose();
+      if (typeof (surface as any).updateConfig === 'function') {
+        // Persist in the surface config so a later mesh rebuild keeps the values.
+        (surface as any).updateConfig({ metalness, roughness });
       } else {
-        // Update existing material
-        const material = surface.mesh.material as THREE.MeshPhysicalMaterial;
-        material.metalness = this.config.metalness;
-        material.roughness = this.config.roughness;
+        const material = surface.mesh.material as any;
+        if (material && typeof material.metalness === 'number') material.metalness = metalness;
+        if (material && typeof material.roughness === 'number') material.roughness = roughness;
+      }
+      const material = surface.mesh.material as any;
+      if (this.environmentMap && material && 'envMap' in material) {
         material.envMap = this.environmentMap;
+        material.needsUpdate = true;
       }
     });
     this.invalidateState(['appearance']);

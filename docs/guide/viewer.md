@@ -41,7 +41,7 @@ const viewer = new NeuroSurfaceViewer(
 | `ssaoRadius` | number | 4 | Finite nonnegative SSAO radius |
 | `ssaoKernelSize` | integer | 32 | SSAO kernel size from 1 through 64 |
 | `rimStrength` | number | 0 | Finite nonnegative rim-light strength |
-| `metalness`, `roughness` | number | 0.1, 0.6 | Finite values in `[0, 1]` |
+| `metalness`, `roughness` | number | 0.1, 0.6 | Finite values in `[0, 1]`; affect `standard`/`physical` surface materials only (Phong ignores them) |
 | `hoverCrosshairSize` | number | 1.2 | Positive finite crosshair size |
 
 The constructor and `updateConfig()` validate the complete normalized

@@ -235,3 +235,29 @@ describe('runtime preset switch with explicit options', () => {
     expect(viewer.stylePreset?.name).toBe('presentation');
   });
 });
+
+describe('updateMaterials', () => {
+  it('delegates to surfaces and never replaces their material type or custom shaders', () => {
+    const viewer = makeViewer();
+    (viewer as any).environmentMap = null;
+    const phong = new THREE.MeshPhongMaterial({ side: THREE.DoubleSide, transparent: true, opacity: 0.5 });
+    const managed = { mesh: new THREE.Mesh(new THREE.BufferGeometry(), phong), updateConfig: vi.fn() };
+    const shader = new THREE.ShaderMaterial();
+    const custom = { mesh: new THREE.Mesh(new THREE.BufferGeometry(), shader) };
+    const standard = new THREE.MeshStandardMaterial();
+    const bare = { mesh: new THREE.Mesh(new THREE.BufferGeometry(), standard) };
+    viewer.surfaces.set('managed', managed as unknown as NeuroSurface);
+    viewer.surfaces.set('custom', custom as unknown as NeuroSurface);
+    viewer.surfaces.set('bare', bare as unknown as NeuroSurface);
+
+    viewer.updateConfig({ metalness: 0.3, roughness: 0.7 });
+
+    expect(managed.updateConfig).toHaveBeenCalledWith({ metalness: 0.3, roughness: 0.7 });
+    expect(managed.mesh.material).toBe(phong);
+    expect(phong.side).toBe(THREE.DoubleSide);
+    expect(custom.mesh.material).toBe(shader);
+    expect(bare.mesh.material).toBe(standard);
+    expect(standard.metalness).toBe(0.3);
+    expect(standard.roughness).toBe(0.7);
+  });
+});
