@@ -462,6 +462,36 @@ describe('SparklineOverlay', () => {
     overlay.dispose();
   });
 
+  it('keeps its rounded, shadowed chrome by default', () => {
+    const overlay = new SparklineOverlay(container);
+    const canvas = container.querySelector('canvas') as HTMLCanvasElement;
+    expect(canvas.style.borderRadius).toBe('4px');
+    expect(canvas.style.boxShadow).toBe('0 2px 8px rgba(0,0,0,0.5)');
+    expect(canvas.className).toBe('');
+    overlay.dispose();
+  });
+
+  it('takes corner radius, shadow and class name from options', () => {
+    const overlay = new SparklineOverlay(container, {
+      cornerRadius: 0,
+      shadow: 'none',
+      className: 'trace-plot'
+    });
+    const canvas = container.querySelector('canvas') as HTMLCanvasElement;
+    expect(canvas.style.borderRadius).toBe('0px');
+    expect(canvas.style.boxShadow).toBe('none');
+    expect(canvas.classList.contains('trace-plot')).toBe(true);
+
+    const ctx = getContextSpy.mock.results[0]!.value as CanvasRenderingContext2D;
+    overlay.show(new Float32Array([0, 1]), [0, 1], 0, 10, 10);
+    expect(ctx.roundRect).toHaveBeenCalledWith(0, 0, 200, 80, 0);
+    overlay.dispose();
+  });
+
+  it('rejects a negative corner radius', () => {
+    expect(() => new SparklineOverlay(container, { cornerRadius: -1 })).toThrow(RangeError);
+  });
+
   it('canvas is hidden by default', () => {
     const overlay = new SparklineOverlay(container);
     const canvas = container.querySelector('canvas') as HTMLCanvasElement;

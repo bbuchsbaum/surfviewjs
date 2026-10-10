@@ -25,7 +25,9 @@ export class CrosshairManager {
   mode: CrosshairMode | null = null;
 
   hoverThrottleMs = 80;
-  lastHoverUpdate = 0;
+  lastHoverUpdate = -Infinity;
+  private pendingHover: (() => void) | null = null;
+  private pendingHoverTimer: ReturnType<typeof setTimeout> | null = null;
 
   private requestRender: () => void;
 
@@ -126,6 +128,41 @@ export class CrosshairManager {
     return true;
   }
 
+  /**
+   * Leading + trailing hover throttle. Runs `run` immediately when the
+   * throttle window has elapsed; otherwise remembers the latest `run` and
+   * invokes it once the window closes, so the final pointer position is never
+   * dropped. Pending work is discarded by {@link cancelPendingHover} and
+   * {@link dispose}.
+   */
+  scheduleHoverUpdate(run: () => void): void {
+    if (this.canHoverUpdate()) {
+      this.cancelPendingHover();
+      run();
+      return;
+    }
+    this.pendingHover = run;
+    if (this.pendingHoverTimer !== null) return;
+    const wait = Math.max(0, this.lastHoverUpdate + this.hoverThrottleMs - performance.now());
+    this.pendingHoverTimer = setTimeout(() => {
+      this.pendingHoverTimer = null;
+      const pending = this.pendingHover;
+      this.pendingHover = null;
+      if (!pending) return;
+      this.lastHoverUpdate = performance.now();
+      pending();
+    }, wait);
+  }
+
+  /** Drop a trailing hover update scheduled by {@link scheduleHoverUpdate}. */
+  cancelPendingHover(): void {
+    if (this.pendingHoverTimer !== null) {
+      clearTimeout(this.pendingHoverTimer);
+      this.pendingHoverTimer = null;
+    }
+    this.pendingHover = null;
+  }
+
   toStateJSON(): { visible: boolean; surfaceId: string | null; vertexIndex: number | null; size: number; color: number; mode: string | null } {
     return {
       visible: this.visible,
@@ -138,9 +175,15 @@ export class CrosshairManager {
   }
 
   /**
-   * Dispose all GPU resources (geometries, material).
+   * Dispose all GPU resources (geometries, material) and drop any pending
+   * trailing hover update.
    */
   dispose(): void {
+    this.cancelPendingHover();
+    this.disposeResources();
+  }
+
+  private disposeResources(): void {
     if (this.group) {
       if (this.group.parent) {
         this.group.parent.remove(this.group);
@@ -171,7 +214,7 @@ export class CrosshairManager {
       if (this.group && this.parent) {
         this.parent.remove(this.group);
       }
-      this.dispose();
+      this.disposeResources();
       this.group = this.buildGroup(desiredSize, desiredColor);
       const firstLine = this.group.children[0] as THREE.Line;
       this.material = firstLine.material as THREE.LineBasicMaterial;

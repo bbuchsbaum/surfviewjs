@@ -39,7 +39,15 @@ export interface PairedAnatomicalViewOptions {
   readonly groupId: string;
   /** Fit the registered pair to the viewport. Defaults to true. */
   readonly fit?: boolean;
-  /** Adapter-specific space between paired hemispheres. Must be finite and non-negative. */
+  /**
+   * Space between the paired hemispheres' medial edges, in world (mesh) units,
+   * usually millimetres. When given, each hemisphere is translated along the
+   * left-right (x) axis so its medial edge lies `hemisphereGap / 2` from the
+   * pair's midline (x = 0); the other axes are untouched and repeated calls are
+   * idempotent. When omitted, mesh positions are left as they are (e.g. as set
+   * by `separateHemispheres()`). Report scenes interpret the gap for their own
+   * layouts. Must be finite and non-negative.
+   */
   readonly hemisphereGap?: number;
 }
 

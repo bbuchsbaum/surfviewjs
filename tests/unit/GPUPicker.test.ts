@@ -116,3 +116,64 @@ describe('GPUPicker helpers', () => {
     picker.dispose();
   });
 });
+
+describe('GPUPicker throttling', () => {
+  function pickerFixture() {
+    let renders = 0;
+    const renderer = {
+      domElement: { getBoundingClientRect: () => ({ left: 0, top: 0, width: 100, height: 100 }) },
+      getPixelRatio: () => 1,
+      getContext: () => ({ drawingBufferWidth: 100, drawingBufferHeight: 100 }),
+      getRenderTarget: () => null,
+      getClearColor: (target: THREE.Color) => target,
+      getClearAlpha: () => 1,
+      setRenderTarget: () => {},
+      setClearColor: () => {},
+      clear: () => {},
+      render: () => { renders++; },
+      // Encoded face id 0: the first face of the first registered surface.
+      readRenderTargetPixels: (_t: unknown, _x: number, _y: number, _w: number, _h: number, buffer: Uint8Array) => {
+        buffer.set([0, 0, 0, 255]);
+      }
+    } as unknown as THREE.WebGLRenderer;
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute([
+      -1, -1, 0,
+      1, -1, 0,
+      0, 1, 0
+    ], 3));
+    const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial());
+    mesh.updateMatrixWorld(true);
+    const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
+    camera.position.set(0, 0, 5);
+    camera.lookAt(0, 0, 0);
+    camera.updateMatrixWorld(true);
+    const picker = new GPUPicker(renderer);
+    picker.addSurface('lh', mesh);
+    return { picker, camera, renders: () => renders };
+  }
+
+  it('never turns a hit into a miss for back-to-back explicit picks', () => {
+    const { picker, camera, renders } = pickerFixture();
+    picker.setThrottleMs(1000);
+    const first = picker.pick(50, 50, camera);
+    const second = picker.pick(50, 50, camera);
+    expect(first.surfaceId).toBe('lh');
+    expect(second.surfaceId).toBe('lh');
+    expect(second.vertexIndex).toBe(first.vertexIndex);
+    expect(renders()).toBe(2);
+    picker.dispose();
+  });
+
+  it('rate-limits throttled picks by reusing the latest result instead of a miss', () => {
+    const { picker, camera, renders } = pickerFixture();
+    picker.setThrottleMs(1000);
+    const first = picker.pick(50, 50, camera, undefined, { throttle: true });
+    const second = picker.pick(52, 50, camera, undefined, { throttle: true });
+    expect(first.surfaceId).toBe('lh');
+    expect(second).toEqual(first);
+    expect(second.point).not.toBe(first.point);
+    expect(renders()).toBe(1);
+    picker.dispose();
+  });
+});

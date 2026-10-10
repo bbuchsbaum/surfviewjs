@@ -9,7 +9,6 @@ export function anatomy(viewer: NeuroSurfaceViewer, lh: MultiLayerNeuroSurface, 
 
   const inflated = LaplacianSmoothing.smooth(pial.vertices.slice(), pial.faces, 25, 0.6);
   const morph = new MorphableSurface(pial, { morphTargets: [{ name: 'inflated', positions: inflated }] });
-  morph.mesh!.geometry.morphTargetsRelative = true; // targets are stored as deltas (see report)
   void morph.morphTo('inflated', { duration: 900 }); // or morph.setMorphValue(0.5)
 
   const set = new SurfaceSet({ hemi: 'left', faces: pial.faces, defaultVariant: 'folded', variants: { folded: pial.vertices, inflated } });

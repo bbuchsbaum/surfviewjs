@@ -2,6 +2,7 @@ import { NeuroSurfaceViewer } from '../NeuroSurfaceViewer';
 import { SurfaceGeometry } from '../classes';
 import { MultiLayerNeuroSurface } from '../MultiLayerNeuroSurface';
 import { DataLayer } from '../layers';
+import type { LayerPresentation } from '../layers';
 import type { FigureExportOptions, SurfViewStylePresetName } from '../StylePresets';
 import {
   ANATOMICAL_VIEWS,
@@ -21,6 +22,7 @@ import {
 } from '../scene';
 import type {
   SceneTypedArray,
+  SurfViewSceneLayerManifest,
   SurfViewSceneManifest
 } from '../scene';
 import {
@@ -145,6 +147,45 @@ function finiteSize(value: number | undefined, fallback: number): number {
   return value !== undefined && Number.isFinite(value) && value > 0
     ? value
     : fallback;
+}
+
+/**
+ * Builds the scalar layer a report mount shows for one manifest layer on one
+ * geometry. The manifest's presentation travels with the layer, so figure
+ * export and `getFigureColorbarSource()` label the colour key with the legend
+ * title (or label) and units, the same names the report control target shows.
+ *
+ * @param manifest - Manifest layer entry.
+ * @param values - Decoded per-vertex (or per-index) values for this geometry.
+ * @param indices - Optional vertex indices for sparse values.
+ * @param visible - Whether the layer starts visible.
+ */
+export function createSceneDataLayer(
+  manifest: SurfViewSceneLayerManifest,
+  values: Float32Array,
+  indices: Uint32Array | null,
+  visible: boolean
+): DataLayer {
+  const label = manifest.legend?.title ?? manifest.label;
+  const units = manifest.legend?.units ?? manifest.units;
+  const presentation: Partial<LayerPresentation> = {
+    ...(label === undefined ? {} : { label }),
+    ...(units === undefined ? {} : { units }),
+    ...(manifest.provenance === undefined ? {} : { provenance: manifest.provenance })
+  };
+  return new DataLayer(
+    manifest.id,
+    values,
+    indices,
+    manifest.colorMap,
+    {
+      range: manifest.limits,
+      opacity: manifest.opacity ?? 1,
+      visible,
+      presentation,
+      ...(manifest.threshold === undefined ? {} : { threshold: manifest.threshold })
+    }
+  );
 }
 
 class SceneMount implements SurfViewMountHandle {
@@ -536,19 +577,11 @@ class SceneMount implements SurfViewMountHandle {
             }
           }
         }
-        surface.addLayer(new DataLayer(
-          layerManifest.id,
+        surface.addLayer(createSceneDataLayer(
+          layerManifest,
           values,
           indices,
-          layerManifest.colorMap,
-          {
-            range: layerManifest.limits,
-            opacity: layerManifest.opacity ?? 1,
-            visible: layerManifest.id === this.selectedLayer,
-            ...(layerManifest.threshold === undefined
-              ? {}
-              : { threshold: layerManifest.threshold })
-          }
+          layerManifest.id === this.selectedLayer
         ));
       }
       this.currentViewer.addSurface(surface, geometryManifest.id);

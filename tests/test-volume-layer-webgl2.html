@@ -443,8 +443,6 @@
       const material = compositor.getMaterial();
       if (!material) throw new Error('GPULayerCompositor did not create a material');
       material.uniforms.baseColor.value.copy(baseColor);
-      material.uniforms.ambientLight.value.setRGB(1, 1, 1);
-      material.uniforms.directionalLight.value.setRGB(0, 0, 0);
       material.transparent = false;
       material.depthTest = false;
       material.depthWrite = false;
@@ -455,6 +453,8 @@
 
       const scene = new THREE.Scene();
       scene.add(points);
+      // Unlit read-back: Phong ambient irradiance of PI returns the diffuse colour.
+      scene.add(new THREE.AmbientLight(0xffffff, Math.PI));
 
       const camera = makeOrthoCameraForGrid({ width, height, worldPositions });
 

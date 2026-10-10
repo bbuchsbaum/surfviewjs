@@ -70,6 +70,53 @@ describe('FlatMapView', () => {
     flatmap.dispose();
   });
 
+  it('preserves the map aspect ratio and centres it in a non-square canvas', () => {
+    // A 4 x 2 map on a 200 x 200 canvas: x fills the width, y is scaled equally and centred.
+    const geometry = {
+      vertices: new Float32Array([
+        -2, -1, 0,
+        2, -1, 0,
+        2, 1, 0,
+        -2, 1, 0
+      ]),
+      faces: new Uint32Array([0, 1, 2, 0, 2, 3])
+    };
+    const flatmap = new FlatMapView(document.createElement('div'), geometry, {
+      width: 200,
+      height: 200,
+      padding: 0,
+      autoRender: false
+    });
+    expect(flatmap.projectVertex(0)).toEqual({ x: 0, y: 150 });
+    expect(flatmap.projectVertex(2)).toEqual({ x: 200, y: 50 });
+
+    // Taller-than-wide canvas, with padding: the scale is set by the narrower axis.
+    flatmap.resize(120, 300);
+    const lowerLeft = flatmap.projectVertex(0);
+    const upperRight = flatmap.projectVertex(2);
+    expect(upperRight.x - lowerLeft.x).toBeCloseTo(120);
+    expect(lowerLeft.y - upperRight.y).toBeCloseTo(60);
+    expect((lowerLeft.y + upperRight.y) / 2).toBeCloseTo(150);
+    flatmap.dispose();
+  });
+
+  it('stretches each axis to the canvas when fit is "stretch"', () => {
+    const geometry = {
+      vertices: new Float32Array([-2, -1, 0, 2, -1, 0, 2, 1, 0, -2, 1, 0]),
+      faces: new Uint32Array([0, 1, 2, 0, 2, 3])
+    };
+    const flatmap = new FlatMapView(document.createElement('div'), geometry, {
+      width: 200,
+      height: 200,
+      padding: 0,
+      fit: 'stretch',
+      autoRender: false
+    });
+    expect(flatmap.projectVertex(0)).toEqual({ x: 0, y: 200 });
+    expect(flatmap.projectVertex(2)).toEqual({ x: 200, y: 0 });
+    flatmap.dispose();
+  });
+
   it('emits hover and selection events with map coordinates', () => {
     const container = document.createElement('div');
     const flatmap = new FlatMapView(container, makeGeometry(), {

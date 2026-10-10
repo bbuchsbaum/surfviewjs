@@ -47,8 +47,11 @@ export class ViewerPickingController {
       this.updateScreenPosition(options.x, options.y);
     }
 
+    // A disabled picker stays allocated for cheap re-enabling; it must not
+    // shadow the CPU raycast path, which is the documented fallback.
     const gpuPicker = this.host.getGPUPicker();
-    if ((options.useGPU ?? true) && gpuPicker && options.x !== undefined && options.y !== undefined) {
+    if ((options.useGPU ?? true) && gpuPicker?.isEnabled() &&
+        options.x !== undefined && options.y !== undefined) {
       const result = gpuPicker.pick(options.x, options.y, this.host.getCamera());
       return {
         surfaceId: result.surfaceId,

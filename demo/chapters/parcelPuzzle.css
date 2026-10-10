@@ -14,28 +14,23 @@
   }
 }
 
-/*
- * The library's puzzle styles are fixed light colours with no custom properties, so the film
- * world is applied here by override. The 3D stage colour is set through viewer.setFigureBackground.
- */
+/* The film world reaches the library's puzzle through its custom properties. */
 
 #app[data-scenario='parcel-puzzle'] .sv-parcel-puzzle {
-  border-radius: 0;
-  background: var(--d0);
-  color: var(--ink);
-  font-family: var(--font-ui);
-  font-size: 14px;
-}
-
-#app[data-scenario='parcel-puzzle'] .sv-parcel-puzzle-status {
-  color: var(--ink-lo);
-  font-family: var(--font-ui);
-  font-size: 13px;
-}
-
-#app[data-scenario='parcel-puzzle'] .sv-parcel-puzzle-detail {
-  border-left: 1px solid var(--d2);
-  background: var(--d1);
+  --sv-parcel-puzzle-radius: 0;
+  --sv-parcel-puzzle-preview-radius: 0;
+  --sv-parcel-puzzle-color: var(--ink);
+  --sv-parcel-puzzle-muted-color: var(--ink-lo);
+  --sv-parcel-puzzle-status-color: var(--ink-lo);
+  --sv-parcel-puzzle-font-family: var(--font-ui);
+  --sv-parcel-puzzle-detail-background: var(--d1);
+  --sv-parcel-puzzle-border-color: var(--d2);
+  --sv-parcel-puzzle-control-background: transparent;
+  --sv-parcel-puzzle-control-color: var(--ink-hi);
+  --sv-parcel-puzzle-control-border-color: var(--d3);
+  --sv-parcel-puzzle-control-hover-background: var(--d2);
+  --sv-parcel-puzzle-control-radius: 0;
+  --sv-parcel-puzzle-focus-color: var(--mark);
 }
 
 #app[data-scenario='parcel-puzzle'] .sv-parcel-puzzle-detail h2 {
@@ -45,12 +40,6 @@
   font-stretch: 76%;
 }
 
-#app[data-scenario='parcel-puzzle'] .sv-parcel-puzzle-detail p,
-#app[data-scenario='parcel-puzzle'] .sv-parcel-puzzle-help,
-#app[data-scenario='parcel-puzzle'] .sv-parcel-puzzle-custom dt {
-  color: var(--ink-lo);
-}
-
 #app[data-scenario='parcel-puzzle'] .sv-parcel-puzzle-detail label {
   color: var(--ink);
   font-size: 13.5px;
@@ -58,53 +47,24 @@
 
 #app[data-scenario='parcel-puzzle'] .sv-parcel-puzzle-detail select {
   padding: 7px 30px 7px 10px;
-  border: 1px solid var(--d3);
-  border-radius: 0;
   background:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%2393a6b4' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 10px center / 12px,
     var(--d0);
-  color: var(--ink-hi);
   appearance: none;
 }
 
 #app[data-scenario='parcel-puzzle'] .sv-parcel-puzzle-detail button {
   padding: 6px 12px 7px;
-  border: 1px solid var(--d3);
-  border-radius: 0;
-  background: transparent;
-  color: var(--ink-hi);
   font-size: 13px;
   font-stretch: 88%;
 }
 
 #app[data-scenario='parcel-puzzle'] .sv-parcel-puzzle-detail button:hover {
   border-color: var(--ink-lo);
-  background: var(--d2);
-}
-
-#app[data-scenario='parcel-puzzle'] .sv-parcel-puzzle-detail button:focus-visible,
-#app[data-scenario='parcel-puzzle'] .sv-parcel-puzzle-detail select:focus-visible,
-#app[data-scenario='parcel-puzzle'] .sv-parcel-puzzle canvas:focus-visible {
-  outline: 2px solid var(--mark);
-}
-
-#app[data-scenario='parcel-puzzle'] .sv-parcel-puzzle-preview {
-  border-radius: 0;
-}
-
-#app[data-scenario='parcel-puzzle'] .sv-parcel-puzzle-custom {
-  border-top: 1px solid var(--d2);
 }
 
 #app[data-scenario='parcel-puzzle'] .sv-parcel-puzzle-custom dd {
   color: var(--ink-hi);
   font-family: var(--font-data);
   font-size: 12.5px;
-}
-
-@media (max-width: 720px) {
-  #app[data-scenario='parcel-puzzle'] .sv-parcel-puzzle-detail {
-    border-left: 0;
-    border-top: 1px solid var(--d2);
-  }
 }

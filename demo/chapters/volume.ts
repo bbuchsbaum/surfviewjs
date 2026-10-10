@@ -121,11 +121,12 @@ export const volume: Scenario = {
     for (let i = 0; i < white.length; i++) white[i] = positions[i]! - RIBBON_MM * normals[i]!;
     const vol = syntheticVolume(positions);
 
-    // CPU compositing on purpose: the GPU compositor's shader material carries its own fixed
-    // lighting (dark ambient, white specular) and ignores the viewer's lights, so the cortex
-    // would not match the other films. VolumeProjectionLayer then samples on the CPU per vertex.
+    // GPU compositing where WebGL2 allows it: VolumeProjectionLayer's vertex mode then samples
+    // the volume as a 3D texture in the vertex shader. The GPU material is lit like the CPU one.
     const webgl2 = viewer.capabilities.webgl2 && VolumeTexture3D.isSupported(viewer.renderer, { requireLinearFiltering: false });
+    const floatLinear = webgl2 && VolumeTexture3D.supportsLinearFiltering(viewer.renderer);
     const surface = new MultiLayerNeuroSurface(geometry, {
+      useGPUCompositing: webgl2,
       baseColor: 0xb7c0c8,
       curvature: curvatureOf('fsaverage5Left', geometry),
       showCurvature: true,
@@ -192,8 +193,15 @@ export const volume: Scenario = {
       const resolved = state.projectionMode === 'hybrid'
         ? (state.quality === 'publication' ? 'ribbon' : 'vertex')
         : state.projectionMode;
+      const gpu = surface.getCompositingMode() === 'GPU';
       let text: string;
-      if (resolved === 'vertex') {
+      if (resolved === 'vertex' && gpu) {
+        // Float 3D textures filter linearly only with OES_texture_float_linear; the library
+        // falls back to nearest without it.
+        text = state.sampling === 'linear' && !floatLinear
+          ? 'GPU 3D texture, nearest (no float linear filtering)'
+          : `GPU 3D texture, ${state.sampling}`;
+      } else if (resolved === 'vertex') {
         text = `CPU per vertex, ${state.sampling}`;
       } else if (resolved === 'ribbon') {
         text = `CPU ribbon, ${state.ribbonSamples} samples white→pial, ${state.ribbonReducer}`;
@@ -299,8 +307,8 @@ export const volume: Scenario = {
 
     const layerSection = section(ctx.panel, 'Volume layer');
     layerSection.dataset.method = 'layer';
-    note(layerSection, webgl2
-      ? 'Composited on the CPU here, so every mode is sampled per vertex. With GPU compositing (surface.setCompositingMode(true), WebGL2) vertex mode samples the volume as a 3D texture in the vertex shader instead.'
+    note(layerSection, surface.getCompositingMode() === 'GPU'
+      ? 'Composited on the GPU here (useGPUCompositing, WebGL2): vertex mode samples the volume as a 3D texture in the vertex shader, nearest or linear between voxel centres. Fragment and ribbon modes are sampled on the CPU per vertex.'
       : 'WebGL2 is not available in this browser, so there is no 3D texture path: every mode is sampled on the CPU per vertex.');
     select(layerSection, {
       id: 'volume-mode', label: 'Projection mode',
@@ -314,7 +322,7 @@ export const volume: Scenario = {
       onChange: next => { state.projectionMode = next; updateVolumeLayer(); }
     });
     select(layerSection, {
-      id: 'volume-sampling', label: 'Sampling (CPU paths)',
+      id: 'volume-sampling', label: 'Sampling',
       options: [{ value: 'linear', label: 'Linear' }, { value: 'nearest', label: 'Nearest' }],
       value: state.sampling,
       onChange: next => { state.sampling = next; updateVolumeLayer(); }
@@ -399,7 +407,7 @@ export const volume: Scenario = {
 
     project();
     setMethod('normals');
-    ctx.perf(`${vertexCount.toLocaleString('en-US')} vertices · ${(vol.data.length).toLocaleString('en-US')} voxels · CPU compositing`);
+    ctx.perf(`${vertexCount.toLocaleString('en-US')} vertices · ${(vol.data.length).toLocaleString('en-US')} voxels · ${surface.getCompositingMode()} compositing`);
     ctx.setBusy(false);
     return () => {
       viewer.off('vertex:hover', onHover);

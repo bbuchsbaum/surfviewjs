@@ -33,6 +33,7 @@ test.describe('Controls panel chapter', () => {
     await expect(controls.locator('[data-surface-id="lh"] [data-layer-id="contrast"]')).toHaveCount(1);
     await expect(controls.locator('[data-surface-id="rh"] [data-layer-id="reliability"]')).toHaveCount(1);
     await expect(controls.locator('.selected-layer-section .selected-layer-title')).toHaveText('Synthetic contrast');
+    await expect(controls.getByRole('combobox', { name: 'Synthetic contrast colormap' })).toHaveValue('coolwarm');
     await expect(controls.locator('.selection-section')).toHaveAttribute('data-empty', 'true');
     await expect(controls.locator('.figure-section')).toHaveCount(1);
 

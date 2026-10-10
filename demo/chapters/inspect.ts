@@ -11,6 +11,8 @@ type SurfaceId = 'lh' | 'rh';
 
 /** Chinagraph yellow (--mark) for the user's marks and pinned selection; ink for the moving cursor. */
 const MARK = 0xf2c230;
+/** Marks keep one colour whether or not they are the active mark. */
+const MARK_STYLE = { radius: 1.8, colorOn: MARK, colorOff: MARK };
 const CURSOR = 0xedf2f5;
 const CROSSHAIR_SIZE = 5;
 
@@ -76,7 +78,6 @@ export const inspect: Scenario = {
     viewer.registerBilateralSurfaceGroup({ id: 'cortex', leftSurfaceId: 'lh', rightSurfaceId: 'rh' });
     viewer.setAnatomicalView('lateral', { layout: 'paired', groupId: 'cortex', fit: true });
     viewer.fitToView({ padding: 0.05 });
-    viewer.annotations.setDefaults({ radius: 1.8, colorOn: MARK, colorOff: MARK });
 
     const film = ctx.film;
     film.trackOrientation(viewer);
@@ -99,10 +100,10 @@ export const inspect: Scenario = {
       value: useGPU ? 'gpu' : 'cpu',
       print: { film, corner: 'tr', key: 'picker', label: 'Picker' },
       onChange: next => {
-        // The choice applies to the timed pick below. The GPU picker stays enabled for the
-        // viewer's own hover and click picks: after disableGPUPicking(), viewer.pick() without
-        // an explicit useGPU: false returns a miss instead of raycasting (library bug).
+        // The choice drives every pick: the timed pick below and the viewer's own hover and click.
         useGPU = next === 'gpu' && gpuAvailable;
+        if (useGPU) viewer.enableGPUPicking();
+        else viewer.disableGPUPicking();
         if (next === 'gpu' && !gpuAvailable) {
           pickerChoice.set('cpu');
           unsupported.hidden = false;
@@ -127,7 +128,7 @@ export const inspect: Scenario = {
     const canvas = viewer.renderer.domElement;
     const onMove = (event: PointerEvent) => {
       const start = performance.now();
-      const hit = viewer.pick({ x: event.clientX, y: event.clientY, useGPU });
+      const hit = viewer.pick({ x: event.clientX, y: event.clientY });
       const elapsed = performance.now() - start;
       stats.count++;
       stats.total += elapsed;
@@ -290,7 +291,7 @@ export const inspect: Scenario = {
         return;
       }
       const label = labelInput.value.trim() || `M${nextNumber}`;
-      const markId = viewer.addAnnotation(id, event.vertexIndex, { label });
+      const markId = viewer.addAnnotation(id, event.vertexIndex, { label }, MARK_STYLE);
       if (!markId) return;
       nextNumber++;
       labelInput.value = '';

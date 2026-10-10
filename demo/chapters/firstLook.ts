@@ -74,7 +74,7 @@ export const firstLook: Scenario = {
     }
     viewer.registerBilateralSurfaceGroup({ id: 'cortex', leftSurfaceId: 'lh', rightSurfaceId: 'rh' });
     const showView = (next: AnatomicalView) => {
-      viewer.setAnatomicalView(next, { layout: 'paired', groupId: 'cortex', fit: true });
+      viewer.setAnatomicalView(next, { layout: 'paired', groupId: 'cortex', fit: true, hemisphereGap: 6 });
       viewer.fitToView({ padding: 0.05 });
     };
     showView('lateral');

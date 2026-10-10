@@ -66,4 +66,10 @@ export interface SparklineOptions {
   bgColor?: string;
   timeMarkerColor?: string;
   padding?: number;
+  /** Corner radius in CSS pixels of the canvas and its painted background. Default 4. */
+  cornerRadius?: number;
+  /** CSS `box-shadow` of the canvas; `'none'` removes it. Default `'0 2px 8px rgba(0,0,0,0.5)'`. */
+  shadow?: string;
+  /** Class name(s) added to the overlay canvas for application styling. Default none. */
+  className?: string;
 }

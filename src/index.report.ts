@@ -6,8 +6,10 @@
  */
 export {
   createReportSceneControlTarget,
+  DEFAULT_REPORT_OBLIQUE,
   layoutReportAnatomicalMeshes,
   mountSurfView,
+  REPORT_BRAIN_VIEWS,
   ReportSceneController,
   ReportSceneControlTarget
 } from './index';
@@ -15,6 +17,8 @@ export {
 export type {
   MountSurfViewOptions,
   ReportAnatomicalMesh,
+  ReportBrainView,
+  ReportObliqueAngle,
   ReportSceneControlTargetOptions,
   ReportSceneControllerOptions,
   ReportSceneControllerState,

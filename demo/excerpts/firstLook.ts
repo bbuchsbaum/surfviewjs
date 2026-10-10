@@ -13,7 +13,10 @@ export async function showMap(container: HTMLElement, values: { lh: Float32Array
     }));
   }
   viewer.registerBilateralSurfaceGroup({ id: 'cortex', leftSurfaceId: 'lh', rightSurfaceId: 'rh' });
-  viewer.setAnatomicalView('lateral', { layout: 'paired', groupId: 'cortex', fit: true });
+  viewer.setAnatomicalView('lateral', {
+    layout: 'paired', groupId: 'cortex', fit: true,
+    hemisphereGap: 6 // mm between the medial walls
+  });
   viewer.startRenderLoop();
   return viewer;
 }

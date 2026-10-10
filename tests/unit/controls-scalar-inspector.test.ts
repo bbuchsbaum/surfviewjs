@@ -301,6 +301,20 @@ describe('SurfView controls scalar selected-layer inspector', () => {
     fixture.target.dispose();
   });
 
+  it('selects the layer colormap on first render even when it is not the first option', async () => {
+    const fixture = await mountFixture();
+    const colormap = fixture.element.shadowRoot!.querySelector<HTMLSelectElement>(
+      '[aria-label="Task activation colormap"]'
+    )!;
+
+    expect(colormap.options[0].value).toBe('plasma');
+    expect(colormap.value).toBe('viridis');
+    expect(colormap.selectedOptions[0]?.textContent).toBe('Viridis');
+
+    fixture.session.dispose();
+    fixture.target.dispose();
+  });
+
   it('applies colormap and exact numeric range commands while rejecting invalid pairs', async () => {
     const fixture = await mountFixture();
     const root = fixture.element.shadowRoot!;

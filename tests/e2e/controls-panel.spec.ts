@@ -229,6 +229,8 @@ test.describe('first-party controls visual fixture', () => {
     await expect(selectedLayer.locator('.mask-band')).toHaveCount(1);
 
     const colormap = controls.getByRole('combobox', { name: 'Activation colormap' });
+    // The fixture builds the layer with 'hot', which is not the first option.
+    await expect(colormap).toHaveValue('hot');
     await colormap.focus();
     await colormap.press('v');
     await colormap.press('i');

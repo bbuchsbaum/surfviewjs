@@ -117,7 +117,7 @@ describe('GPULayerCompositor surface material', () => {
     expect(material.depthTest).toBe(true);
     expect(material.depthWrite).toBe(true);
     expect(material.fragmentShader).toContain(
-      `if (finalColor.a < ${SURFACE_ALPHA_DISCARD_THRESHOLD.toFixed(8)})`
+      `if (diffuseColor.a < ${SURFACE_ALPHA_DISCARD_THRESHOLD.toFixed(8)}) discard;`
     );
     compositor.dispose();
   });

@@ -141,7 +141,10 @@ export interface VolumeProjectionLayerConfig extends DataLayerConfig {
   fillValue?: number;
   /** Projection path. Defaults to 'vertex' for current fast behavior. */
   projectionMode?: VolumeProjectionMode;
-  /** Scalar sampling method for CPU/publication paths. Defaults to 'nearest' for compatibility. */
+  /**
+   * Scalar sampling method for every path: the CPU sampler and the GPU vertex
+   * path's 3D texture filter. Defaults to 'nearest' for compatibility.
+   */
   sampling?: VolumeSamplingMode;
   /** Quality hint used by hybrid mode. Defaults to 'interactive'. */
   quality?: VolumeProjectionQuality;
@@ -1138,7 +1141,10 @@ export class VolumeProjectionLayer extends Layer {
       dims[0],
       dims[1],
       dims[2],
-      config.useHalfFloat === undefined ? {} : { useHalfFloat: config.useHalfFloat }
+      {
+        filter: this.sampling,
+        ...(config.useHalfFloat === undefined ? {} : { useHalfFloat: config.useHalfFloat })
+      }
     );
 
     this.worldToIJK = this.computeWorldToIJK(config);
@@ -1271,8 +1277,13 @@ export class VolumeProjectionLayer extends Layer {
     this._notifyChange({ projectionMode: mode });
   }
 
+  /**
+   * Set scalar sampling for every path: the CPU sampler and, on the GPU vertex
+   * path, the 3D texture filter (nearest or linear between voxel centres).
+   */
   setSamplingMode(mode: VolumeSamplingMode): void {
     this.sampling = validateSamplingMode(mode);
+    this.volumeTexture.setFilter(this.sampling);
     this._notifyChange({ sampling: mode });
   }
 

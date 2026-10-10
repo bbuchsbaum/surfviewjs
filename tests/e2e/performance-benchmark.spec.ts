@@ -100,11 +100,11 @@ test('cortical-scale GPU update, draw, pick, and resize budgets', async ({ page 
         const compositor = new GPULayerCompositor(vertexCount, layerCount);
         const material = compositor.getMaterial();
         if (!material) throw new Error('GPU material unavailable');
-        material.uniforms.ambientLight.value.setRGB(1, 1, 1);
-        material.uniforms.directionalLight.value.setRGB(0, 0, 0);
         const mesh = new THREE.Mesh(geometry, material);
         const scene = new THREE.Scene();
         scene.add(mesh);
+        // The compositor material follows scene lights; ambient only, as before.
+        scene.add(new THREE.AmbientLight(0xffffff, Math.PI));
 
         const fullUploadAndDraw = measure(() => {
           layers.forEach(layer => { layer.needsUpdate = true; });

@@ -124,8 +124,10 @@ import {
 } from './scene';
 import {
   createReportSceneControlTarget,
+  DEFAULT_REPORT_OBLIQUE,
   layoutReportAnatomicalMeshes,
   mountSurfView,
+  REPORT_BRAIN_VIEWS,
   ReportSceneController,
   ReportSceneControlTarget
 } from './report';
@@ -207,6 +209,8 @@ export {
   loadSceneAsset,
   mountSurfView,
   layoutReportAnatomicalMeshes,
+  REPORT_BRAIN_VIEWS,
+  DEFAULT_REPORT_OBLIQUE,
   StatisticalMapLayer,
   ParcelValueLayer,
   ParcelConnectivityLayer,
@@ -397,7 +401,7 @@ export type { OutlineLayerOptions, OutlineLayerUpdate } from './OutlineLayer';
 export type { AnnotationOptions, AnnotationRecord } from './annotations';
 export type { CrosshairMode, CrosshairOptions } from './CrosshairManager';
 export type { PickInfo } from './utils/Picking';
-export type { GPUPickResult } from './utils/GPUPicker';
+export type { GPUPickResult, GPUPickOptions } from './utils/GPUPicker';
 export type { ClipAxis, ClipPlaneConfig } from './utils/ClipPlane';
 export type { ViewerCapabilities } from './utils/capabilities';
 export type {

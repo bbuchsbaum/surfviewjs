@@ -271,8 +271,7 @@ describe('viewer anatomical camera adapter', () => {
       const result = viewer.setAnatomicalView(view, {
         layout: 'paired',
         groupId: 'cortex',
-        fit: true,
-        hemisphereGap: 8
+        fit: true
       });
       const expected = new THREE.Vector3(...getAnatomicalViewAxes('left', view).direction);
       expect(result).toMatchObject({ ok: true, view, layout: 'paired' });

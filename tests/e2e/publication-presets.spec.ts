@@ -20,9 +20,10 @@ test('figures chapter applies style presets and downloads an exported PNG', asyn
   const viewerShot = await page.locator('#viewer-slot').screenshot();
   expect(viewerShot.length).toBeGreaterThan(5000);
   expect(viewerShot.equals(before)).toBe(false);
-  // The live film keeps its base colour; the preset background is an export choice.
+  // The live film keeps its base colour (the --d0 token, FILM_BASE #0b1118);
+  // the preset background is an export choice.
   expect(await page.evaluate(() => getComputedStyle(document.querySelector('.film-viewer')!).backgroundColor))
-    .toBe('rgb(14, 21, 29)');
+    .toBe('rgb(11, 17, 24)');
 
   // The colour key describes the map itself.
   await expect(page.locator('#figures-key')).toHaveText(/Synthetic contrast \(z\): −5\.0 to 5\.0, masked −1\.65 to 1\.65/);

@@ -188,7 +188,6 @@ export const layers: Scenario = {
 
     /** Which layer gets fragment-level threshold edges, mirroring the library's rule. */
     const edgeState = () => {
-      if (mode() === 'GPU') return 'per vertex (GPU)';
       if (!shading.thresholdEdges) return 'off';
       const visible = surface.getOrderedLayers().filter(layer => layer.visible);
       const top = visible[visible.length - 1];
@@ -372,7 +371,7 @@ export const layers: Scenario = {
 
     // ── Threshold edge shading (2.3.0)
     const edges = section(ctx.panel, 'Threshold edges');
-    note(edges, 'The top layer, when it is a thresholded data layer with normal blending, is drawn with a per-fragment isoline at its threshold instead of a per-vertex staircase. CPU compositing only.');
+    note(edges, 'The top layer, when it is a thresholded data layer with normal blending, is drawn with a per-fragment isoline at its threshold instead of a per-vertex staircase, on CPU and GPU compositing alike.');
     toggle(edges, {
       id: 'layers-edges',
       label: 'Fragment isoline at threshold',

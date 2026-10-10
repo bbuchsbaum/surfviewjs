@@ -27,12 +27,6 @@
   height: 96px;
 }
 
-/* SparklineOverlay styles its canvas inline with a radius and shadow; the film refuses both. */
-#app[data-scenario='time-series'] .ts-trace-plot canvas {
-  border-radius: 0 !important;
-  box-shadow: none !important;
-}
-
 #app[data-scenario='time-series'] .ts-band {
   fill: var(--d2);
 }

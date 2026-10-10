@@ -38,7 +38,10 @@ import { finiteNumber, finitePair } from '../utils/validation';
 // ---------------------------------------------------------------------------
 
 export interface StatisticalMapLayerConfig extends DataLayerConfig {
-  /** Per-vertex p-values (same length as data) */
+  /**
+   * Per-vertex two-sided p-values (same length as data). `getVertexStatInfo`
+   * converts them to z with the sign of the statistic (unsigned for `fstat`).
+   */
   pValues?: Float32Array;
   /** Type of statistic stored in data */
   statType?: StatType;
@@ -64,7 +67,11 @@ export interface VertexStatInfo {
   value: number;
   /** P-value (null if p-values not provided) */
   pValue: number | null;
-  /** Approximate z-score (null if cannot be computed) */
+  /**
+   * Signed z-score (null if it cannot be computed). From a supplied two-sided
+   * p-value when one is valid, signed like the statistic (non-negative for
+   * `fstat`); otherwise from the t statistic (`tstat`) or the value (`zstat`).
+   */
   zScore: number | null;
   /** Cluster ID (-1 if no cluster assignment) */
   clusterIndex: number;
@@ -444,7 +451,10 @@ export class StatisticalMapLayer extends DataLayer {
     // Compute z-score
     let zScore: number | null = null;
     if (pValue !== null && isFinite(pValue) && pValue > 0 && pValue < 1) {
-      zScore = pToZ(pValue);
+      // Supplied p-values are two-sided, so pToZ gives |z|. Directional
+      // statistics carry their sign over; F is non-directional.
+      const magnitude = pToZ(pValue);
+      zScore = this._statType !== 'fstat' && value < 0 ? -magnitude : magnitude;
     } else if (this._statType === 'tstat' && isFinite(value)) {
       zScore = tToZ(value, this._degreesOfFreedom);
     } else if (this._statType === 'zstat' && isFinite(value)) {

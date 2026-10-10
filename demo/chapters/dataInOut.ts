@@ -294,8 +294,7 @@ async function runShare(ctx: ScenarioRunContext, panel: HTMLElement): Promise<()
     label: 'Restore from link',
     onClick: () => {
       if (!linkField.value) return;
-      // fromURL decodes a hash fragment, so pass the link's #svjs=… part.
-      const report = viewer.fromURL(new URL(linkField.value).hash);
+      const report = viewer.fromURL(linkField.value);
       syncControls();
       linkStatus.set(describeRestore(report));
     }

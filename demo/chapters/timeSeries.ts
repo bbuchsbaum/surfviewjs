@@ -268,7 +268,10 @@ export const timeSeries: Scenario = {
       padding: TRACE.padding,
       lineColor: '#edf2f5',
       bgColor: 'rgba(0, 0, 0, 0)',
-      timeMarkerColor: '#f2c230'
+      timeMarkerColor: '#f2c230',
+      // The film keeps square, unshadowed prints.
+      cornerRadius: 0,
+      shadow: 'none'
     });
     const plot = () => {
       const series = layers.get(hovered.id)!.getTimeSeries(hovered.vertex);

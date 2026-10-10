@@ -20,16 +20,10 @@
   inset: 0;
 }
 
-#app[data-scenario='anatomy'] .anat-cell-flat {
-  display: grid;
-  place-items: center;
-  container-type: size;
-}
-
+/* FlatMapView keeps the map's aspect ratio, so the sheet simply fills the cell. */
 #app[data-scenario='anatomy'] .anat-flat-sheet {
-  position: relative;
-  width: calc(100cqmin - 72px);
-  height: calc(100cqmin - 72px);
+  position: absolute;
+  inset: 36px;
 }
 
 #app[data-scenario='anatomy'] .anat-flat-sheet canvas {
@@ -96,7 +90,6 @@
   }
 
   #app[data-scenario='anatomy'] .anat-flat-sheet {
-    width: calc(100cqmin - 40px);
-    height: calc(100cqmin - 40px);
+    inset: 20px;
   }
 }

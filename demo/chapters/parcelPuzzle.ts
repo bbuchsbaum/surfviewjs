@@ -92,13 +92,14 @@ export const parcelPuzzle: Scenario = {
         separation: Number(separation.input.value),
         relief: Number(relief.input.value),
         view: currentView,
+        // Stage and detail preview both print on the film base.
+        background: FILM_BASE,
+        previewBackground: FILM_BASE,
         renderDetail,
         labelText: parcel => shortParcelName(parcel.label),
         color: parcel => mutedNetworkColors[networkOf(parcel.label) ?? ''] ??
           (typeof parcel.color === 'string' ? parcel.color : '#aac1c9')
       });
-      // The library defaults to a light stage; its public viewer takes the film base instead.
-      view.viewer.setFigureBackground(FILM_BASE);
       view.on('parcel:hover', onHover);
       view.on('selection:changed', onSelect);
       atlasNote.textContent = `${data.parcels.length} real parcels · left hemisphere · fs_LR 32k inflated surface.`;

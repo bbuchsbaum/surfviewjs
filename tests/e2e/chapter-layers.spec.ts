@@ -91,7 +91,8 @@ test.describe('Layers & thresholds chapter', () => {
 
     await page.getByRole('radio', { name: 'GPU (WebGL2)' }).check();
     await expect(page.locator('#status-text')).toContainText('Switched compositing to GPU');
-    await expect(page.locator('.film-corner-tr')).toContainText('per vertex (GPU)');
+    // Threshold edges are drawn per fragment on the GPU path too.
+    await expect(page.locator('.film-corner-tr')).toContainText('Func isoline');
     await expect(perf).toContainText(/GPU compositing · 3 overlays · [1-9]\d* fps/, { timeout: 5_000 });
 
     await page.locator('#layers-animate').uncheck();

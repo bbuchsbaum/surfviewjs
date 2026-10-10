@@ -1,6 +1,5 @@
 import { SurfaceGeometry, computeMeanCurvature, loadSurface, normalizeCurvature } from '@src/index.js';
-
-type Hemisphere = NonNullable<Parameters<typeof loadSurface>[2]>;
+import type { Hemisphere } from '@src/index.js';
 
 /** Real meshes shipped with the repository (see tests/data and demo/data READMEs). */
 export const MESH_URLS = {

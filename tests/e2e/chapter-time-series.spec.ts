@@ -59,6 +59,9 @@ test.describe('Time series chapter', () => {
     // Plotted at rest, in the margin (off the cortex), with a time axis in seconds.
     const trace = page.locator('#panel .ts-trace');
     await expect(trace.locator('canvas')).toBeVisible();
+    // Square, unshadowed print through SparklineOverlay options rather than CSS overrides.
+    await expect(trace.locator('canvas')).toHaveCSS('border-radius', '0px');
+    await expect(trace.locator('canvas')).toHaveCSS('box-shadow', 'none');
     await expect(trace).toContainText('time (s)');
     await expect(trace).toContainText('%');
     const caption = page.locator('#ts-trace-caption');

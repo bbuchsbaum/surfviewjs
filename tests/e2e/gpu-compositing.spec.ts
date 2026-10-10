@@ -64,8 +64,6 @@ test('GPU compositor matches the straight-RGBA oracle through production blendin
     const compositor = new GPULayerCompositor(1);
     const material = compositor.getMaterial();
     if (!material) throw new Error('GPU compositor did not create a material');
-    material.uniforms.ambientLight.value.setRGB(1, 1, 1);
-    material.uniforms.directionalLight.value.setRGB(0, 0, 0);
 
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute([
@@ -82,6 +80,8 @@ test('GPU compositor matches the straight-RGBA oracle through production blendin
     const mesh = new THREE.Mesh(geometry, material);
     const scene = new THREE.Scene();
     scene.add(mesh);
+    // Unlit read-back: Phong ambient irradiance of PI returns the diffuse colour.
+    scene.add(new THREE.AmbientLight(0xffffff, Math.PI));
     const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
     camera.position.z = 1;
 
@@ -239,4 +239,82 @@ test('GPU compositor matches the straight-RGBA oracle through production blendin
     (result.cases as GPUCaseResult[]).map(testCase => [testCase.name, testCase.actual])
   );
   expect(ordered['red then blue order']).not.toEqual(ordered['blue then red order']);
+});
+
+test('GPU compositor clips the same side as the CPU material for surface clip planes', async ({ page }) => {
+  await page.goto('/');
+
+  const result = await page.evaluate(async () => {
+    const moduleUrl = '/src/index.ts';
+    const { ClipPlaneSet, GPULayerCompositor, RGBALayer, THREE } = await import(moduleUrl);
+
+    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: false });
+    if (!renderer.capabilities.isWebGL2) {
+      renderer.dispose();
+      return { skipped: true, reason: 'WebGL2 unavailable', cases: [] };
+    }
+    renderer.setSize(8, 8, false);
+    renderer.localClippingEnabled = true;
+    const target = new THREE.WebGLRenderTarget(8, 8);
+
+    // A full-screen quad spanning x in [-1, 1] with one opaque layer.
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute([
+      -1, -1, 0, 1, -1, 0, 1, 1, 0,
+      -1, -1, 0, 1, 1, 0, -1, 1, 0
+    ], 3));
+    geometry.setAttribute('normal', new THREE.Float32BufferAttribute(new Array(18).fill(0).map((_, i) => (i % 3 === 2 ? 1 : 0)), 3));
+    geometry.setAttribute('vertexIndex', new THREE.Float32BufferAttribute(new Array(6).fill(0), 1));
+
+    const compositor = new GPULayerCompositor(1);
+    const gpuMaterial = compositor.getMaterial();
+    if (!gpuMaterial) throw new Error('GPU compositor did not create a material');
+    compositor.updateLayers([new RGBALayer('solid', new Float32Array([1, 0, 0, 1]))]);
+    const cpuMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+
+    const scene = new THREE.Scene();
+    scene.add(new THREE.AmbientLight(0xffffff, Math.PI));
+    const mesh = new THREE.Mesh(geometry, gpuMaterial);
+    scene.add(mesh);
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
+    camera.position.z = 1;
+
+    const coverage = (material) => {
+      mesh.material = material;
+      renderer.setRenderTarget(target);
+      renderer.setClearColor(0x000000, 0);
+      renderer.clear(true, true, true);
+      renderer.render(scene, camera);
+      const pixel = new Uint8Array(4);
+      renderer.readRenderTargetPixels(target, 1, 4, 1, 1, pixel);
+      const left = pixel[3] > 0;
+      renderer.readRenderTargetPixels(target, 6, 4, 1, 1, pixel);
+      const right = pixel[3] > 0;
+      return { left, right };
+    };
+
+    const cases = [];
+    for (const flip of [false, true]) {
+      const planes = new ClipPlaneSet();
+      planes.setClipPlane('x', 0, true, flip);
+      // Mirrors MultiLayerNeuroSurface._syncClipPlanes for both materials.
+      compositor.setClipPlanes(planes);
+      for (const material of [gpuMaterial, cpuMaterial]) {
+        material.clippingPlanes = planes.getThreePlanes();
+        material.needsUpdate = true;
+      }
+      cases.push({ flip, gpu: coverage(gpuMaterial), cpu: coverage(cpuMaterial) });
+    }
+
+    target.dispose();
+    renderer.dispose();
+    return { skipped: false, reason: '', cases };
+  });
+
+  test.skip(result.skipped, result.reason);
+  for (const { flip, gpu, cpu } of result.cases) {
+    // Exactly one side survives the plane, and it is the CPU path's side.
+    expect(cpu.left !== cpu.right, `cpu coverage flip=${flip}`).toBe(true);
+    expect(gpu, `gpu coverage flip=${flip}`).toEqual(cpu);
+  }
 });

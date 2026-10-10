@@ -3,7 +3,8 @@ import {
   createSceneAsset,
   getStylePreset,
   listStylePresets,
-  mountSurfView
+  mountSurfView,
+  REPORT_BRAIN_VIEWS
 } from '@src/index.js';
 import type {
   FigureBackground,
@@ -29,17 +30,21 @@ type Mode = 'viewer' | 'report';
 type BackgroundChoice = 'preset' | 'viewer' | 'transparent';
 type SizeChoice = 'preset' | '1200x900' | '640x480';
 
-const BRAIN_VIEWS: ReadonlyArray<{ value: ReportBrainView; label: string }> = [
-  { value: 'oblique', label: 'Oblique' },
-  { value: 'left', label: 'Left' },
-  { value: 'right', label: 'Right' },
-  { value: 'left-medial', label: 'Left medial' },
-  { value: 'right-medial', label: 'Right medial' },
-  { value: 'dorsal', label: 'Dorsal' },
-  { value: 'ventral', label: 'Ventral' },
-  { value: 'anterior', label: 'Anterior' },
-  { value: 'posterior', label: 'Posterior' }
-];
+const BRAIN_VIEW_LABELS: Record<ReportBrainView, string> = {
+  oblique: 'Oblique',
+  left: 'Left',
+  right: 'Right',
+  'left-medial': 'Left medial',
+  'right-medial': 'Right medial',
+  dorsal: 'Dorsal',
+  ventral: 'Ventral',
+  anterior: 'Anterior',
+  posterior: 'Posterior'
+};
+
+/** The library's whole-brain views, oblique (the default pose) first. */
+const BRAIN_VIEWS = ['oblique' as const, ...REPORT_BRAIN_VIEWS.filter(view => view !== 'oblique')]
+  .map(value => ({ value, label: BRAIN_VIEW_LABELS[value] }));
 
 const REPORT_MAPS = [
   { value: 'contrast', label: 'Visual–motor contrast' },
@@ -96,8 +101,9 @@ async function buildReportManifest(): Promise<SurfViewSceneManifest> {
     assets,
     geometries,
     layers: {
-      contrast: layer('contrast', 'Visual–motor contrast (synthetic)'),
-      frontoparietal: layer('frontoparietal', 'Frontoparietal contrast (synthetic)')
+      // The colour key reads these labels; provenance records that both maps are synthetic.
+      contrast: layer('contrast', REPORT_MAPS[0].label),
+      frontoparietal: layer('frontoparietal', REPORT_MAPS[1].label)
     },
     selectedLayer: 'contrast',
     provenance: { generator: 'SurfView demo, Figures chapter', meshes: 'fsaverage5 pial' }
@@ -114,19 +120,11 @@ function dataUrlBytes(dataUrl: string): number {
   return Math.floor((base64.length * 3) / 4) - (base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0);
 }
 
-function describeKey(source: FigureColorbarSource | null, label = source?.label): string {
+function describeKey(source: FigureColorbarSource | null): string {
   if (!source) return 'no scalar layer shown';
   const [low, high] = source.range;
   const mask = source.threshold ? `, masked ${fmt(source.threshold[0], 2)} to ${fmt(source.threshold[1], 2)}` : '';
-  return `${label}: ${fmt(low, 1)} to ${fmt(high, 1)}${mask}`;
-}
-
-/**
- * Report mounts build their layers without the manifest's label and units, so the key
- * would read the layer id; the chapter passes the manifest label as `colorbarLabel`.
- */
-function reportKeyLabel(map: ReportMap): string {
-  return `${REPORT_MAPS.find(entry => entry.value === map)!.label} (z)`;
+  return `${source.label}: ${fmt(low, 1)} to ${fmt(high, 1)}${mask}`;
 }
 
 function textField(parent: HTMLElement, options: { id: string; label: string; value: string; onInput: (value: string) => void }) {
@@ -299,7 +297,7 @@ export const figures: Scenario = {
       const source = state.mode === 'report'
         ? report?.viewer?.getFigureColorbarSource(state.reportMap) ?? null
         : viewer?.getFigureColorbarSource('contrast') ?? null;
-      keyReadout.set(describeKey(source, state.mode === 'report' ? reportKeyLabel(state.reportMap) : source?.label));
+      keyReadout.set(describeKey(source));
       film.set('bl', 'key', 'Key', source ? `${fmt(source.range[0], 1)} to ${fmt(source.range[1], 1)}` : '—');
       film.set('bl', 'mask', 'Masked', source?.threshold ? `±${fmt(source.threshold[1], 2)}` : 'none');
     }
@@ -418,7 +416,6 @@ export const figures: Scenario = {
         background,
         colorbar: state.colorbar,
         colorbarLayer: state.mode === 'report' ? state.reportMap : 'contrast',
-        ...(state.mode === 'report' ? { colorbarLabel: reportKeyLabel(state.reportMap) } : {}),
         roiLabels: false,
         scaleBar: false,
         downloadFilename: FILENAME,

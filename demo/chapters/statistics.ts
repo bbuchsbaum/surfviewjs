@@ -79,7 +79,6 @@ interface Hemisphere {
   geometry: SurfaceGeometry;
   surface: MultiLayerNeuroSurface;
   t: Float32Array;
-  z: Float32Array;
   p: Float32Array;
   q: Float32Array;
   stat: StatisticalMapLayer;
@@ -108,13 +107,11 @@ function syntheticTMap(vertices: Float32Array, side: Side) {
     const gaussian = Math.sqrt(-2 * Math.log(1 - random())) * Math.cos(2 * Math.PI * random());
     t[v] = t[v]! + 0.6 * gaussian;
   }
-  const z = new Float32Array(t.length);
   const p = new Float32Array(t.length);
   for (let v = 0; v < t.length; v++) {
-    z[v] = tToZ(t[v]!, DF);
-    p[v] = Math.min(1, Math.max(Number.MIN_VALUE, erfc(Math.abs(z[v]!) / Math.SQRT2)));
+    p[v] = Math.min(1, Math.max(Number.MIN_VALUE, erfc(Math.abs(tToZ(t[v]!, DF)) / Math.SQRT2)));
   }
-  return { t, z, p, q: bhAdjust(p) };
+  return { t, p, q: bhAdjust(p) };
 }
 
 function formatP(p: number): string {
@@ -447,7 +444,7 @@ export const statistics: Scenario = {
       } else if (state.correction === 'cluster') {
         survives &&= !!info && info.clusterIndex >= 0 && info.clusterSize >= state.clusterSize;
       }
-      film.set('br', 'value', 't', `${fmt(t, 2)} · z ${fmt(hemi.z[v]!, 2)}${survives ? '' : ' (hidden)'}`);
+      film.set('br', 'value', 't', `${fmt(t, 2)} · z ${fmt(info?.zScore ?? 0, 2)}${survives ? '' : ' (hidden)'}`);
       film.set('br', 'p', 'p', `${formatP(p)}${corrected}`);
       const cluster = state.correction === 'cluster' && info && info.clusterIndex >= 0
         ? `#${info.clusterIndex}, ${info.clusterSize} vertices`

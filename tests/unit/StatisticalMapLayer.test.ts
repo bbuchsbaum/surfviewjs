@@ -487,6 +487,36 @@ describe('StatisticalMapLayer', () => {
       expect(layer.getVertexStatInfo(0)!.zScore).toBeCloseTo(1.959963986, 7);
     });
 
+    it('signs the z from a supplied two-sided p-value by the statistic', () => {
+      const layer = new StatisticalMapLayer('signed-p', new Float32Array([-5, 5, -2]), null, 'hot', {
+        pValues: new Float32Array([1e-5, 1e-5, 0.05]),
+        statType: 'tstat',
+        degreesOfFreedom: 28
+      });
+
+      const negative = layer.getVertexStatInfo(0)!.zScore!;
+      expect(negative).toBeLessThan(0);
+      expect(negative).toBeCloseTo(-4.41717341, 5);
+      expect(layer.getVertexStatInfo(1)!.zScore).toBeCloseTo(4.41717341, 5);
+      expect(layer.getVertexStatInfo(2)!.zScore).toBeCloseTo(-1.959963986, 7);
+    });
+
+    it('signs supplied-p z for z and generic maps, but not for F maps', () => {
+      const pValues = new Float32Array([0.05]);
+      for (const statType of ['zstat', 'generic'] as const) {
+        const layer = new StatisticalMapLayer(statType, new Float32Array([-1.96]), null, 'hot', {
+          pValues,
+          statType
+        });
+        expect(layer.getVertexStatInfo(0)!.zScore).toBeCloseTo(-1.959963986, 7);
+      }
+      const f = new StatisticalMapLayer('f', new Float32Array([3.84]), null, 'hot', {
+        pValues,
+        statType: 'fstat'
+      });
+      expect(f.getVertexStatInfo(0)!.zScore).toBeCloseTo(1.959963986, 7);
+    });
+
     it('should return null for out-of-range vertex', () => {
       const data = new Float32Array([1, 2, 3]);
       const layer = new StatisticalMapLayer('info', data, null, 'hot');

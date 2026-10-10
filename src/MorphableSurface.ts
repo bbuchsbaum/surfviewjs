@@ -111,6 +111,10 @@ export class MorphableSurface extends MultiLayerNeuroSurface {
     if (this.mesh && this.mesh.geometry) {
       const bufferGeometry = this.mesh.geometry as THREE.BufferGeometry;
       bufferGeometry.morphAttributes.position = [];
+      bufferGeometry.morphAttributes.normal = [];
+      // Targets are stored as deltas from the base (see addMorphTarget), so
+      // three.js must add them to the base rather than blend absolute positions.
+      bufferGeometry.morphTargetsRelative = true;
 
       // Enable morphing on the material (if supported by material type)
       // In Three.js r152+, morphing is enabled automatically when morphAttributes exist
@@ -222,11 +226,15 @@ export class MorphableSurface extends MultiLayerNeuroSurface {
 
     const attribute = new THREE.Float32BufferAttribute(morphPositions, 3);
     attribute.name = name;
+    const normalAttribute = this.morphNormalDelta(bufferGeometry, posArray);
+    normalAttribute.name = name;
 
     // Add to morph attributes
     const morphAttrs = bufferGeometry.morphAttributes.position as THREE.BufferAttribute[];
+    const morphNormals = (bufferGeometry.morphAttributes.normal ??= []) as THREE.BufferAttribute[];
     const index = morphAttrs.length;
     morphAttrs.push(attribute);
+    morphNormals.push(normalAttribute);
 
     // Update dictionary
     this.morphTargetDictionary[name] = index;
@@ -246,8 +254,7 @@ export class MorphableSurface extends MultiLayerNeuroSurface {
     // Update mesh's morphTargetDictionary
     this.mesh.morphTargetDictionary = { ...this.morphTargetDictionary };
 
-    // Recompute morph normals
-    bufferGeometry.computeVertexNormals();
+    this.morphAttributesChanged(bufferGeometry);
 
     this.emit('geometry:updated', { surface: this });
     this.emit('render:needed', { surface: this });
@@ -272,6 +279,7 @@ export class MorphableSurface extends MultiLayerNeuroSurface {
 
     // Remove from arrays
     morphAttrs.splice(index, 1);
+    (bufferGeometry.morphAttributes.normal as THREE.BufferAttribute[] | undefined)?.splice(index, 1);
     this.morphTargetNames.splice(this.morphTargetNames.indexOf(name), 1);
     this.mesh.morphTargetInfluences?.splice(index, 1);
 
@@ -289,10 +297,45 @@ export class MorphableSurface extends MultiLayerNeuroSurface {
     // Remove curvature
     delete this.morphTargetCurvatures[name];
 
+    this.morphAttributesChanged(bufferGeometry);
+
     this.emit('geometry:updated', { surface: this });
     this.emit('render:needed', { surface: this });
     debugLog('Removed morph target', name);
     return true;
+  }
+
+  /**
+   * Vertex normals of a target shape, stored (like positions) as deltas from
+   * the base normals so three.js blends them with the same weights.
+   */
+  private morphNormalDelta(bufferGeometry: THREE.BufferGeometry, positions: Float32Array): THREE.BufferAttribute {
+    if (!bufferGeometry.getAttribute('normal')) {
+      bufferGeometry.computeVertexNormals();
+    }
+    const baseNormals = bufferGeometry.getAttribute('normal').array as ArrayLike<number>;
+    const target = new THREE.BufferGeometry();
+    target.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    if (bufferGeometry.index) target.setIndex(bufferGeometry.index);
+    target.computeVertexNormals();
+    const delta = target.getAttribute('normal').array as Float32Array;
+    for (let i = 0; i < delta.length; i++) {
+      delta[i] = delta[i]! - baseNormals[i]!;
+    }
+    target.dispose();
+    return new THREE.Float32BufferAttribute(delta, 3);
+  }
+
+  /**
+   * Refresh state that depends on the set of morph targets: bounds that cover
+   * every target (frustum culling and raycasting test them before morphing)
+   * and three.js's cached morph texture, which is rebuilt only on dispose or
+   * when the target count changes.
+   */
+  private morphAttributesChanged(bufferGeometry: THREE.BufferGeometry): void {
+    bufferGeometry.computeBoundingBox();
+    bufferGeometry.computeBoundingSphere();
+    bufferGeometry.dispose();
   }
 
   /**

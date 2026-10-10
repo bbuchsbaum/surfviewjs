@@ -29,9 +29,12 @@ test.describe('Inspect & annotate chapter', () => {
     await page.locator('#inspect-picker').getByRole('radio', { name: 'CPU (raycast)' }).check();
     await expect(page.locator('#inspect-pick-count')).toHaveText('0');
     await expect(page.locator('.film-corner-tr')).toContainText('CPU (raycast)');
-    await hoverCortex(page);
+    const cpuPoint = await hoverCortex(page);
     await expect(page.locator('#inspect-pick-count')).not.toHaveText('0');
     await expect(page.locator('.film-corner-bl')).toContainText('CPU');
+    // With GPU picking disabled the viewer's own click pick falls back to raycasting.
+    await page.mouse.click(cpuPoint.x, cpuPoint.y);
+    await expect(page.locator('#status-text')).toContainText(/Selected|Marked/);
     expect(errors).toEqual([]);
   });
 

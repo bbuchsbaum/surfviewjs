@@ -7,7 +7,10 @@ const DEFAULTS: Required<SparklineOptions> = {
   lineColor: '#00ccff',
   bgColor: 'rgba(0, 0, 0, 0.85)',
   timeMarkerColor: '#ff4444',
-  padding: 8
+  padding: 8,
+  cornerRadius: 4,
+  shadow: '0 2px 8px rgba(0,0,0,0.5)',
+  className: ''
 };
 
 /**
@@ -36,7 +39,8 @@ export class SparklineOverlay {
       ...merged,
       width: finiteNumber(merged.width, 'width', { minimum: 1, integer: true }),
       height: finiteNumber(merged.height, 'height', { minimum: 1, integer: true }),
-      padding: finiteNumber(merged.padding, 'padding', { minimum: 0 })
+      padding: finiteNumber(merged.padding, 'padding', { minimum: 0 }),
+      cornerRadius: finiteNumber(merged.cornerRadius, 'cornerRadius', { minimum: 0 })
     };
     if (this.opts.padding * 2 >= Math.min(this.opts.width, this.opts.height)) {
       throw new RangeError('padding must leave a positive sparkline drawing area.');
@@ -50,9 +54,10 @@ export class SparklineOverlay {
       pointer-events: none;
       display: none;
       z-index: 10000;
-      border-radius: 4px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
     `;
+    this.canvas.style.borderRadius = `${this.opts.cornerRadius}px`;
+    this.canvas.style.boxShadow = this.opts.shadow;
+    if (this.opts.className) this.canvas.className = this.opts.className;
 
     this.ctx = this.canvas.getContext('2d');
     this.container.appendChild(this.canvas);
@@ -163,7 +168,7 @@ export class SparklineOverlay {
     currentTime: number,
     factor: FactorDescriptor | null
   ): void {
-    const { width, height, padding, bgColor, lineColor, timeMarkerColor } = this.opts;
+    const { width, height, padding, bgColor, lineColor, timeMarkerColor, cornerRadius } = this.opts;
     const ctx = this.ctx;
     if (!ctx) return;
 
@@ -172,7 +177,7 @@ export class SparklineOverlay {
     // Background
     ctx.fillStyle = bgColor;
     ctx.beginPath();
-    ctx.roundRect(0, 0, width, height, 4);
+    ctx.roundRect(0, 0, width, height, cornerRadius);
     ctx.fill();
 
     const plotX = padding;

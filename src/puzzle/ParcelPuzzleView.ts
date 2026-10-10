@@ -23,6 +23,41 @@ export interface ParcelPuzzleViewOptions extends ParcelPuzzleOptions {
   /** Follow the system preference by default. */
   reducedMotion?: boolean;
   view?: 'lateral' | 'medial' | 'oblique';
+  /**
+   * Clear colour of the puzzle stage as 0xRRGGBB. Defaults to 0xf0f3f4. Also sets
+   * `--sv-parcel-puzzle-background` on the puzzle element so the chrome matches the canvas.
+   */
+  background?: number;
+  /**
+   * Clear colour of the selected-piece preview as 0xRRGGBB. Defaults to 0xedf1f2. Also sets
+   * `--sv-parcel-puzzle-preview-background` on the puzzle element.
+   */
+  previewBackground?: number;
+}
+
+const DEFAULT_STAGE_BACKGROUND = 0xf0f3f4;
+const DEFAULT_PREVIEW_BACKGROUND = 0xedf1f2;
+
+function rgbOption(value: number | undefined, fallback: number, name: string): number {
+  if (value === undefined) return fallback;
+  if (!Number.isInteger(value) || value < 0 || value > 0xffffff) {
+    throw new RangeError(`${name} must be an integer 0xRRGGBB colour`);
+  }
+  return value;
+}
+
+/** Resolve the stage and preview clear colours of a puzzle view, validating explicit options. */
+export function resolveParcelPuzzleBackgrounds(
+  options: Pick<ParcelPuzzleViewOptions, 'background' | 'previewBackground'>
+): { background: number; previewBackground: number } {
+  return {
+    background: rgbOption(options.background, DEFAULT_STAGE_BACKGROUND, 'background'),
+    previewBackground: rgbOption(options.previewBackground, DEFAULT_PREVIEW_BACKGROUND, 'previewBackground')
+  };
+}
+
+function cssHex(color: number): string {
+  return `#${color.toString(16).padStart(6, '0')}`;
 }
 
 export interface ParcelPuzzleViewEvents {
@@ -69,14 +104,22 @@ export class ParcelPuzzleView extends EventEmitter<ParcelPuzzleViewEvents> {
   private lastFrame = 0;
   private disposed = false;
   private readonly media: MediaQueryList | null;
+  private readonly backgrounds: { background: number; previewBackground: number };
 
   constructor(container: HTMLElement, input: ParcelPuzzleInput, options: ParcelPuzzleViewOptions = {}) {
     super();
     if (options.view !== undefined && !['lateral', 'medial', 'oblique'].includes(options.view)) throw new RangeError('Unknown puzzle viewpoint');
+    this.backgrounds = resolveParcelPuzzleBackgrounds(options);
     this.options = { ...options };
     this.puzzle = new ParcelPuzzle(input, options);
     this.element = document.createElement('div');
     this.element.className = 'sv-parcel-puzzle';
+    if (options.background !== undefined) {
+      this.element.style.setProperty('--sv-parcel-puzzle-background', cssHex(this.backgrounds.background));
+    }
+    if (options.previewBackground !== undefined) {
+      this.element.style.setProperty('--sv-parcel-puzzle-preview-background', cssHex(this.backgrounds.previewBackground));
+    }
     const style = document.createElement('style'); style.textContent = puzzleStyles;
     this.stage = document.createElement('div'); this.stage.className = 'sv-parcel-puzzle-stage';
     this.status = document.createElement('div'); this.status.className = 'sv-parcel-puzzle-status';
@@ -96,7 +139,7 @@ export class ParcelPuzzleView extends EventEmitter<ParcelPuzzleViewEvents> {
     this.element.append(style, this.stage, this.detail);
     container.appendChild(this.element);
     this.viewer = new NeuroSurfaceViewer(this.stage, this.stage.clientWidth || 640, this.stage.clientHeight || 600, {
-      backgroundColor: 0xf0f3f4, useShaders: false, ambientLightColor: 0xffffff,
+      backgroundColor: this.backgrounds.background, useShaders: false, ambientLightColor: 0xffffff,
       directionalLightIntensity: 2.4, hoverCrosshair: false
     });
     if (this.viewer.initializationFailed) {
@@ -284,7 +327,7 @@ export class ParcelPuzzleView extends EventEmitter<ParcelPuzzleViewEvents> {
     this.detailDisposers.push(this.listen(reset, 'click', () => this.puzzle.resetSelectedRotation()));
     this.detailDisposers.push(this.listen(close, 'click', () => this.selectParcel(null)));
     this.detailViewer = new NeuroSurfaceViewer(preview, preview.clientWidth || 240, preview.clientHeight || 220, {
-      backgroundColor: 0xedf1f2, useShaders: false, ambientLightColor: 0xffffff,
+      backgroundColor: this.backgrounds.previewBackground, useShaders: false, ambientLightColor: 0xffffff,
       directionalLightIntensity: 2.4, hoverCrosshair: false
     });
     if (this.detailViewer.initializationFailed) {

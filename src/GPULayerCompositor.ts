@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Layer, VolumeProjectionLayer } from './layers';
 import { ClipPlaneSet, ClipPlane } from './utils/ClipPlane';
 import { debugLog } from './debug';
+import type { VolumeTexture3D } from './textures/VolumeTexture3D';
 import { SURFACE_ALPHA_DISCARD_THRESHOLD } from './utils/rgbaCompositing';
 
 type ShaderUniforms = THREE.ShaderMaterial['uniforms'];
@@ -21,6 +22,21 @@ export interface GPUCompositorCapacity {
   readonly availableVertexTextureUnits: number;
   readonly requiredTextureSize: number;
   readonly availableTextureSize: number;
+}
+
+/**
+ * Light response of a GPU-composited surface; the fields mirror the
+ * MeshPhongMaterial used by CPU compositing.
+ */
+export interface GPUMaterialResponse {
+  /** Diffuse colour multiplying the composited layer colour. */
+  readonly color?: THREE.ColorRepresentation;
+  readonly specular?: THREE.ColorRepresentation;
+  readonly shininess?: number;
+  readonly emissive?: THREE.ColorRepresentation;
+  readonly emissiveIntensity?: number;
+  readonly opacity?: number;
+  readonly flatShading?: boolean;
 }
 
 function requireUniform<T>(uniforms: ShaderUniforms, name: string): THREE.IUniform<T> {
@@ -43,7 +59,12 @@ export class GPULayerCompositor {
   private layerTexture!: THREE.DataArrayTexture;
   private volumeColormapsTexture!: THREE.DataArrayTexture;
   private material: THREE.ShaderMaterial | null = null;
+  private clipPlanes: Partial<Record<'x' | 'y' | 'z', ClipPlane>> = {};
   private readonly layerSlots: Array<Layer | null>;
+  /** Volume textures bound per slot, prepared for the drawing renderer. */
+  private readonly volumeSlots: Array<VolumeTexture3D | null>;
+  private readonly emissive = new THREE.Color(0x000000);
+  private emissiveIntensity = 1;
   private lastUpdateStats: GPUCompositorUpdateStats = Object.freeze({
     visibleLayers: 0,
     renderedLayers: 0,
@@ -101,6 +122,7 @@ export class GPULayerCompositor {
     this.vertexCount = vertexCount;
     this.maxLayers = maxLayers;
     this.layerSlots = Array.from({ length: maxLayers }, () => null);
+    this.volumeSlots = Array.from({ length: maxLayers }, () => null);
     this.initializeTextures();
     this.createShaderMaterial();
   }
@@ -146,22 +168,18 @@ export class GPULayerCompositor {
   }
 
   /**
-   * Create custom shader material for layer compositing
+   * Create the compositing material: three.js's Phong shader (so scene
+   * lights, style presets, morph targets, clipping and fragment patches such
+   * as surface shading and rim lighting apply exactly as on the CPU path's
+   * MeshPhongMaterial) with the layer stack composited per vertex into the
+   * vertex colour.
    */
   private createShaderMaterial(): void {
     const textureSize = this.layerTextureSize;
 
-    // Vertex shader - passes through vertex colors and UVs with lighting support
-    const vertexShader = `
-      precision highp float;
-      precision highp sampler3D;
-
-      in float vertexIndex;
-
-      out vec3 vNormal;
-      out vec3 vViewPosition;
-      out vec3 vWorldPosition;
-      out vec4 vLayerColor;
+    // Declarations and compositing helpers, injected after <common>.
+    const vertexDeclarations = /* glsl */ `
+      attribute float vertexIndex;
 
       uniform sampler2DArray layerTextures;
 
@@ -192,6 +210,8 @@ export class GPULayerCompositor {
       uniform float textureSize;
       uniform vec3 baseColor;
       uniform float baseAlpha;
+
+      varying vec3 vWorldPosition;
 
       vec4 sampleLayerTexture(int layerIndex, vec2 texCoord) {
         return texture(layerTextures, vec3(texCoord, float(layerIndex)));
@@ -278,18 +298,16 @@ export class GPULayerCompositor {
           : vec4(0.0);
       }
 
-      void main() {
-        vNormal = normalize(normalMatrix * normal);
-        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-        vWorldPosition = worldPosition.xyz;
+      // Composite in the vertex shader so each vertex gets its exact layer
+      // colours rather than interpolated texture lookups.
+      vec4 compositeLayers() {
+        // Volumes are sampled at the undeformed vertex, like the CPU path.
+        vWorldPosition = (modelMatrix * vec4(position, 1.0)).xyz;
 
-        // Calculate texture coordinates from vertex index in vertex shader
-        // This ensures we get the exact vertex color, not interpolated
         float x = mod(vertexIndex, textureSize);
         float y = floor(vertexIndex / textureSize);
         vec2 texCoord = vec2(x + 0.5, y + 0.5) / textureSize;
 
-        // Composite layers in vertex shader to avoid interpolation issues
         vec4 finalColor = vec4(baseColor, baseAlpha);
         for (int i = 0; i < 8; i++) {
           if (i >= layerCount) break;
@@ -298,84 +316,28 @@ export class GPULayerCompositor {
             finalColor = blendColors(finalColor, layerColor, layerBlendMode[i], layerOpacity[i]);
           }
         }
-        vLayerColor = finalColor;
-
-        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-        vViewPosition = -mvPosition.xyz;
-        gl_Position = projectionMatrix * mvPosition;
-        gl_PointSize = 1.0;
+        return finalColor;
       }
     `;
 
-    // Fragment shader - applies lighting to pre-computed vertex colors
-    const fragmentShader = `
-      precision highp float;
+    const phong = THREE.ShaderLib.phong;
+    const vertexShader = phong.vertexShader
+      .replace('#include <common>', `#include <common>\n${vertexDeclarations}`)
+      // Keep the <color_vertex> include so other patches can hook it.
+      .replace('#include <color_vertex>', '#include <color_vertex>\n\tvColor = compositeLayers();')
+      // Points (used by parity tests) need an explicit size.
+      .replace('#include <project_vertex>', '#include <project_vertex>\n\tgl_PointSize = 1.0;');
+    const fragmentShader = phong.fragmentShader
+      // Fully transparent fragments must not write depth (see material setup).
+      .replace(
+        '#include <alphatest_fragment>',
+        `if (diffuseColor.a < ${SURFACE_ALPHA_DISCARD_THRESHOLD.toFixed(8)}) discard;`
+      );
 
-      uniform vec3 ambientLight;
-      uniform vec3 directionalLight;
-      uniform vec3 lightDirection;
-      uniform float shininess;
-
-      // Clip plane uniforms (up to 3 planes: X, Y, Z)
-      uniform vec3 clipPlaneNormalX;
-      uniform vec3 clipPlanePointX;
-      uniform bool clipPlaneEnabledX;
-      uniform vec3 clipPlaneNormalY;
-      uniform vec3 clipPlanePointY;
-      uniform bool clipPlaneEnabledY;
-      uniform vec3 clipPlaneNormalZ;
-      uniform vec3 clipPlanePointZ;
-      uniform bool clipPlaneEnabledZ;
-
-      in vec3 vNormal;
-      in vec3 vViewPosition;
-      in vec3 vWorldPosition;
-      in vec4 vLayerColor;
-
-      out vec4 outColor;
-
-      void main() {
-        // Apply clip planes - discard fragments on the clipped side
-        if (clipPlaneEnabledX && dot(vWorldPosition - clipPlanePointX, clipPlaneNormalX) > 0.0) {
-          discard;
-        }
-        if (clipPlaneEnabledY && dot(vWorldPosition - clipPlanePointY, clipPlaneNormalY) > 0.0) {
-          discard;
-        }
-        if (clipPlaneEnabledZ && dot(vWorldPosition - clipPlanePointZ, clipPlaneNormalZ) > 0.0) {
-          discard;
-        }
-
-        // Use pre-computed color from vertex shader (avoids interpolation issues)
-        vec4 finalColor = vLayerColor;
-        // Fully transparent fragments must not write depth (see material setup).
-        if (finalColor.a < ${SURFACE_ALPHA_DISCARD_THRESHOLD.toFixed(8)}) {
-          discard;
-        }
-
-        // Apply lighting
-        vec3 normal = normalize(vNormal);
-        vec3 viewDir = normalize(vViewPosition);
-
-        // Ambient
-        vec3 ambient = ambientLight * finalColor.rgb;
-
-        // Diffuse (Lambertian)
-        float diff = max(dot(normal, lightDirection), 0.0);
-        vec3 diffuse = directionalLight * diff * finalColor.rgb;
-
-        // Specular (Blinn-Phong)
-        vec3 halfDir = normalize(lightDirection + viewDir);
-        float spec = pow(max(dot(normal, halfDir), 0.0), shininess);
-        vec3 specular = directionalLight * spec * 0.3;
-
-        vec3 litColor = ambient + diffuse + specular;
-        outColor = vec4(litColor, finalColor.a);
-      }
-    `;
-
-    // Create uniforms
-    const uniforms: any = {
+    const uniforms: ShaderUniforms = {
+      // Phong material and scene-light uniforms; three.js fills the light
+      // uniforms from the scene because `lights` is true.
+      ...THREE.UniformsUtils.clone(phong.uniforms),
       baseColor: { value: new THREE.Color(0xcccccc) },
       baseAlpha: { value: 0.0 },
       textureSize: { value: textureSize },
@@ -390,21 +352,7 @@ export class GPULayerCompositor {
       volumeThreshold: { value: Array.from({ length: 8 }, () => new THREE.Vector2(0, 0)) },
       volumeFillValue: { value: new Float32Array(8).fill(0.0) },
       volumeColormaps: { value: this.volumeColormapsTexture },
-      // Lighting uniforms
-      ambientLight: { value: new THREE.Color(0x404040) },
-      directionalLight: { value: new THREE.Color(0xffffff) },
-      lightDirection: { value: new THREE.Vector3(0.5, 0.5, 1).normalize() },
-      shininess: { value: 30.0 },
       // Clip plane uniforms
-      clipPlaneNormalX: { value: new THREE.Vector3(1, 0, 0) },
-      clipPlanePointX: { value: new THREE.Vector3(0, 0, 0) },
-      clipPlaneEnabledX: { value: false },
-      clipPlaneNormalY: { value: new THREE.Vector3(0, 1, 0) },
-      clipPlanePointY: { value: new THREE.Vector3(0, 0, 0) },
-      clipPlaneEnabledY: { value: false },
-      clipPlaneNormalZ: { value: new THREE.Vector3(0, 0, 1) },
-      clipPlanePointZ: { value: new THREE.Vector3(0, 0, 0) },
-      clipPlaneEnabledZ: { value: false }
     };
 
     // Add volume texture uniforms (sampler3D is not array-indexable in WebGL2 reliably across drivers).
@@ -416,8 +364,11 @@ export class GPULayerCompositor {
       uniforms,
       vertexShader,
       fragmentShader,
-      glslVersion: THREE.GLSL3,
-      vertexColors: true,
+      // The composite is carried in the Phong shader's vColor (vec4).
+      defines: { USE_COLOR_ALPHA: '' },
+      lights: true,
+      fog: true,
+      clipping: true,
       transparent: true,
       depthTest: true,
       // A closed cortical mesh must occlude itself; without depth writes its
@@ -427,6 +378,67 @@ export class GPULayerCompositor {
       blending: THREE.NormalBlending,
       premultipliedAlpha: false,
       side: THREE.DoubleSide
+    });
+    // Defaults match the CPU path's MeshPhongMaterial before a surface
+    // supplies its own settings through setMaterialResponse().
+    this.setMaterialResponse({ color: 0xffffff, specular: 0x111111, shininess: 30 });
+    this.material.onBeforeRender = (renderer: THREE.WebGLRenderer) => {
+      for (const volume of this.volumeSlots) volume?.prepareForRenderer(renderer);
+    };
+  }
+
+  /**
+   * Set how the composited surface responds to light, mirroring the
+   * MeshPhongMaterial properties of the CPU compositing path. Omitted fields
+   * are left unchanged. The diffuse `color` multiplies the composited layer
+   * colour, as a Phong material's colour multiplies vertex colours.
+   */
+  public setMaterialResponse(response: GPUMaterialResponse): void {
+    const material = this.material;
+    if (!material) return;
+    const uniforms = material.uniforms;
+    if (response.color !== undefined) {
+      requireUniform<THREE.Color>(uniforms, 'diffuse').value.set(response.color);
+    }
+    if (response.specular !== undefined) {
+      requireUniform<THREE.Color>(uniforms, 'specular').value.set(response.specular);
+    }
+    if (response.shininess !== undefined) {
+      // MeshPhongMaterial floors shininess at 1e-4 the same way.
+      requireUniform<number>(uniforms, 'shininess').value = Math.max(response.shininess, 1e-4);
+    }
+    if (response.emissive !== undefined) this.emissive.set(response.emissive);
+    if (response.emissiveIntensity !== undefined) this.emissiveIntensity = response.emissiveIntensity;
+    if (response.emissive !== undefined || response.emissiveIntensity !== undefined) {
+      requireUniform<THREE.Color>(uniforms, 'emissive').value
+        .copy(this.emissive)
+        .multiplyScalar(this.emissiveIntensity);
+    }
+    if (response.opacity !== undefined) {
+      requireUniform<number>(uniforms, 'opacity').value = response.opacity;
+    }
+    // three.js reads flatShading from any material, ShaderMaterial included.
+    const shading = material as THREE.ShaderMaterial & { flatShading?: boolean };
+    if (response.flatShading !== undefined && shading.flatShading !== response.flatShading) {
+      shading.flatShading = response.flatShading;
+      material.needsUpdate = true;
+    }
+  }
+
+  /**
+   * Copy the light response of an existing surface material (typically the
+   * CPU path's MeshPhongMaterial) so switching paths does not change the look.
+   */
+  public copyMaterialResponse(source: THREE.Material): void {
+    const phong = source as Partial<THREE.MeshPhongMaterial>;
+    this.setMaterialResponse({
+      ...(phong.color ? { color: phong.color } : {}),
+      ...(phong.specular ? { specular: phong.specular } : {}),
+      ...(typeof phong.shininess === 'number' ? { shininess: phong.shininess } : {}),
+      ...(phong.emissive ? { emissive: phong.emissive } : {}),
+      ...(typeof phong.emissiveIntensity === 'number' ? { emissiveIntensity: phong.emissiveIntensity } : {}),
+      opacity: source.opacity,
+      ...(typeof phong.flatShading === 'boolean' ? { flatShading: phong.flatShading } : {})
     });
   }
 
@@ -480,6 +492,7 @@ export class GPULayerCompositor {
         layerKind[i] = 0;
         if (previousLayer instanceof VolumeProjectionLayer && previousLayer.usesGPUVertexProjection()) {
           requireUniform<THREE.Data3DTexture | null>(uniforms, `volume${i}`).value = null;
+          this.volumeSlots[i] = null;
         }
         if (contentChanged) {
           this.updateLayerTexture(i, layer);
@@ -496,6 +509,7 @@ export class GPULayerCompositor {
       if (this.layerSlots[i]) {
         this.clearLayerTexture(i);
         requireUniform<THREE.Data3DTexture | null>(uniforms, `volume${i}`).value = null;
+        this.volumeSlots[i] = null;
         this.layerSlots[i] = null;
         clearedLayerSlices += 1;
         textureBytesMarkedForUpload += layerSliceBytes;
@@ -547,8 +561,9 @@ export class GPULayerCompositor {
     if (!this.material) return;
     const uniforms = this.material.uniforms;
 
-    requireUniform<THREE.Data3DTexture | null>(uniforms, `volume${textureIndex}`).value =
-      layer.getVolumeTexture().texture;
+    const volume = layer.getVolumeTexture();
+    requireUniform<THREE.Data3DTexture | null>(uniforms, `volume${textureIndex}`).value = volume.texture;
+    this.volumeSlots[textureIndex] = volume;
     this.updateVolumeColormapSlice(textureIndex, layer.getColormapTexture());
 
     const worldToIJK = requireUniform<THREE.Matrix4[]>(uniforms, 'volumeWorldToIJK').value;
@@ -672,56 +687,40 @@ export class GPULayerCompositor {
   }
 
   /**
-   * Update clip planes from a ClipPlaneSet
+   * Update clip planes from a ClipPlaneSet. Clipping uses three.js's own
+   * `material.clippingPlanes`, exactly as the CPU material does, so both paths
+   * keep the same side of each plane and clip the deformed (morphed) surface.
+   * The renderer needs `localClippingEnabled` (the viewer sets it).
    */
   public setClipPlanes(clipPlanes: ClipPlaneSet): void {
-    if (!this.material) return;
-
-    const uniforms = this.material.uniforms;
-
-    // X plane
-    const xPlane = clipPlanes.x;
-    requireUniform<THREE.Vector3>(uniforms, 'clipPlaneNormalX').value.copy(xPlane.normal);
-    requireUniform<THREE.Vector3>(uniforms, 'clipPlanePointX').value.copy(xPlane.point);
-    requireUniform<boolean>(uniforms, 'clipPlaneEnabledX').value = xPlane.enabled;
-
-    // Y plane
-    const yPlane = clipPlanes.y;
-    requireUniform<THREE.Vector3>(uniforms, 'clipPlaneNormalY').value.copy(yPlane.normal);
-    requireUniform<THREE.Vector3>(uniforms, 'clipPlanePointY').value.copy(yPlane.point);
-    requireUniform<boolean>(uniforms, 'clipPlaneEnabledY').value = yPlane.enabled;
-
-    // Z plane
-    const zPlane = clipPlanes.z;
-    requireUniform<THREE.Vector3>(uniforms, 'clipPlaneNormalZ').value.copy(zPlane.normal);
-    requireUniform<THREE.Vector3>(uniforms, 'clipPlanePointZ').value.copy(zPlane.point);
-    requireUniform<boolean>(uniforms, 'clipPlaneEnabledZ').value = zPlane.enabled;
+    this.clipPlanes = { x: clipPlanes.x, y: clipPlanes.y, z: clipPlanes.z };
+    this.applyClipPlanes();
   }
 
   /**
    * Update a single clip plane
    */
   public setClipPlane(axis: 'x' | 'y' | 'z', plane: ClipPlane): void {
-    if (!this.material) return;
-
-    const uniforms = this.material.uniforms;
-    const suffix = axis.toUpperCase();
-
-    requireUniform<THREE.Vector3>(uniforms, `clipPlaneNormal${suffix}`).value.copy(plane.normal);
-    requireUniform<THREE.Vector3>(uniforms, `clipPlanePoint${suffix}`).value.copy(plane.point);
-    requireUniform<boolean>(uniforms, `clipPlaneEnabled${suffix}`).value = plane.enabled;
+    this.clipPlanes[axis] = plane;
+    this.applyClipPlanes();
   }
 
   /**
    * Clear all clip planes (disable them)
    */
   public clearClipPlanes(): void {
-    if (!this.material) return;
+    this.clipPlanes = {};
+    this.applyClipPlanes();
+  }
 
-    const uniforms = this.material.uniforms;
-    requireUniform<boolean>(uniforms, 'clipPlaneEnabledX').value = false;
-    requireUniform<boolean>(uniforms, 'clipPlaneEnabledY').value = false;
-    requireUniform<boolean>(uniforms, 'clipPlaneEnabledZ').value = false;
+  private applyClipPlanes(): void {
+    if (!this.material) return;
+    const planes = (['x', 'y', 'z'] as const)
+      .map(axis => this.clipPlanes[axis])
+      .filter((plane): plane is ClipPlane => plane !== undefined && plane.enabled)
+      .map(plane => plane.getThreePlane());
+    this.material.clippingPlanes = planes.length > 0 ? planes : null;
+    this.material.needsUpdate = true;
   }
 
   /**
@@ -741,5 +740,9 @@ export class GPULayerCompositor {
       this.material = null;
     }
 
+    // Drop references to layers and their volume textures (owned by the layers).
+    this.layerSlots.fill(null);
+    this.volumeSlots.fill(null);
+    this.clipPlanes = {};
   }
 }

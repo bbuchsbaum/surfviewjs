@@ -17,6 +17,18 @@ export interface GPUPickResult {
   faceIndex: number | null;
 }
 
+/** Options for {@link GPUPicker.pick}. */
+export interface GPUPickOptions {
+  /**
+   * Rate-limit this pick (for hover-driven callers). A throttled pick made
+   * within the throttle window of the previous rendered pick reuses that
+   * pick's result instead of rendering again; it never reports a miss merely
+   * because it was throttled. Defaults to `false`: explicit picks, such as
+   * clicks, always render and return an exact result.
+   */
+  throttle?: boolean;
+}
+
 export interface FacePickGeometry {
   geometry: THREE.BufferGeometry;
   faceCount: number;
@@ -222,7 +234,8 @@ export class GPUPicker {
   private surfaces: Map<string, PickableSurface> = new Map();
   private pickMaterial: THREE.ShaderMaterial;
   private enabled: boolean = true;
-  private lastPickTime: number = 0;
+  private lastPickTime: number = -Infinity;
+  private lastPickResult: GPUPickResult | null = null;
   private pickThrottleMs: number = 16; // ~60fps max pick rate
   private nextFaceBaseId: number = 0;
 
@@ -287,6 +300,7 @@ export class GPUPicker {
 
     this.pickScene.add(pickMesh);
 
+    this.lastPickResult = null;
     this.surfaces.set(id, {
       mesh,
       pickMesh,
@@ -309,6 +323,7 @@ export class GPUPicker {
     this.pickScene.remove(surface.pickMesh);
     surface.pickMesh.geometry.dispose();
     this.surfaces.delete(id);
+    this.lastPickResult = null;
 
     debugLog('GPUPicker: Removed surface', id);
     return true;
@@ -346,7 +361,8 @@ export class GPUPicker {
   }
 
   /**
-   * Set the minimum time between pick operations (for throttling).
+   * Set the minimum time between rendered picks for throttled picks
+   * (`pick(..., { throttle: true })`). Unthrottled picks ignore it.
    */
   setThrottleMs(ms: number): void {
     this.pickThrottleMs = finiteNumber(ms, 'throttleMs', { minimum: 0 });
@@ -359,25 +375,40 @@ export class GPUPicker {
    * @param cssY - Y coordinate in CSS pixels (from event.clientY)
    * @param camera - The camera to pick from
    * @param rect - Optional bounding rect of the canvas (auto-detected if not provided)
+   * @param options - Pick options; see {@link GPUPickOptions.throttle}
    * @returns Pick result with surface ID, vertex index, and world position
    */
   pick(
     cssX: number,
     cssY: number,
     camera: THREE.Camera,
-    rect?: DOMRect
+    rect?: DOMRect,
+    options: GPUPickOptions = {}
   ): GPUPickResult {
     // Return no-hit if disabled
     if (!this.enabled) {
       return { surfaceId: null, vertexIndex: null, point: null, faceIndex: null };
     }
 
-    // Throttle picks
+    // Throttled (hover) picks reuse the latest rendered result inside the
+    // window; a throttle must never turn a real hit into a miss.
     const now = performance.now();
-    if (now - this.lastPickTime < this.pickThrottleMs) {
-      return { surfaceId: null, vertexIndex: null, point: null, faceIndex: null };
+    if (options.throttle && this.lastPickResult &&
+        now - this.lastPickTime < this.pickThrottleMs) {
+      return cloneResult(this.lastPickResult);
     }
     this.lastPickTime = now;
+    const result = this.renderPick(cssX, cssY, camera, rect);
+    this.lastPickResult = cloneResult(result);
+    return result;
+  }
+
+  private renderPick(
+    cssX: number,
+    cssY: number,
+    camera: THREE.Camera,
+    rect?: DOMRect
+  ): GPUPickResult {
 
     // Get canvas rect if not provided
     if (!rect) {
@@ -483,12 +514,13 @@ export class GPUPicker {
   pickNDC(
     ndcX: number,
     ndcY: number,
-    camera: THREE.Camera
+    camera: THREE.Camera,
+    options: GPUPickOptions = {}
   ): GPUPickResult {
     const rect = this.renderer.domElement.getBoundingClientRect();
     const cssX = ((ndcX + 1) / 2) * rect.width + rect.left;
     const cssY = ((-ndcY + 1) / 2) * rect.height + rect.top;
-    return this.pick(cssX, cssY, camera, rect);
+    return this.pick(cssX, cssY, camera, rect, options);
   }
 
   private findSurfaceByFaceId(encodedFaceId: number): PickableSurface | null {
@@ -528,3 +560,7 @@ export class GPUPicker {
 }
 
 export default GPUPicker;
+
+function cloneResult(result: GPUPickResult): GPUPickResult {
+  return { ...result, point: result.point ? result.point.clone() : null };
+}

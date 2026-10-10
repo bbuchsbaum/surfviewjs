@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { NeuroSurfaceViewer } from '@src/index.js';
-
-type NeuroSurfaceViewerConfig = NonNullable<ConstructorParameters<typeof NeuroSurfaceViewer>[3]>;
+import type { NeuroSurfaceViewerConfig } from '@src/index.js';
 
 /** The film base the viewer renders onto: the darkest exposure step of the room. */
 export const FILM_BASE = 0x0b1118;

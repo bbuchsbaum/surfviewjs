@@ -55,10 +55,24 @@ test('volume layer modes report the sampling path they use', async ({ page }) =>
   await page.getByRole('radio', { name: 'Volume layer' }).check();
   await expect(page.locator('#normal-steps')).toBeHidden();
   const path = page.locator('#volume-path');
-  await expect(path).toHaveText('CPU per vertex, linear');
-  await expect(page.locator('#perf-text')).toContainText('CPU compositing');
+  const perf = page.locator('#perf-text');
+  await expect(perf).toContainText(/(CPU|GPU) compositing/);
+  // With WebGL2 the chapter composites on the GPU, so vertex mode samples a 3D texture.
+  const gpu = (await perf.textContent())!.includes('GPU compositing');
+  await expect(path).toHaveText(gpu
+    ? /^GPU 3D texture, (linear|nearest \(no float linear filtering\))$/
+    : 'CPU per vertex, linear');
   await expect(page.locator('.film-corner-tr')).toContainText('VolumeProjectionLayer, vertex');
   const vertexImage = await settledShot(page);
+
+  if (gpu && (await path.textContent()) === 'GPU 3D texture, linear') {
+    // The sampling mode drives the 3D texture filter on the GPU vertex path.
+    await page.locator('#volume-sampling').selectOption('nearest');
+    await expect(path).toHaveText('GPU 3D texture, nearest');
+    expect((await settledShot(page)).equals(vertexImage)).toBe(false);
+    await page.locator('#volume-sampling').selectOption('linear');
+    await expect(path).toHaveText('GPU 3D texture, linear');
+  }
 
   await page.locator('#volume-mode').selectOption('ribbon');
   await expect(path).toContainText('CPU ribbon, 7 samples white→pial, mean');

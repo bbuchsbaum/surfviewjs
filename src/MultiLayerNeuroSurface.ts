@@ -1118,7 +1118,11 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     const visibleLayers = this.layerStack
       .getVisibleLayers()
       .filter(layer => !(layer instanceof OutlineLayer) && !(layer instanceof ConnectivityLayer));
-    this.gpuCompositor.updateLayers(visibleLayers);
+    // As on the CPU path, the top thresholded data layer is drawn per fragment
+    // (threshold edges) rather than composited per vertex.
+    const edgeLayer = this.thresholdEdgeLayer(visibleLayers);
+    this.gpuCompositor.updateLayers(visibleLayers.filter(layer => layer !== edgeLayer));
+    this.applyThresholdEdges(edgeLayer);
     visibleLayers.forEach(layer => (layer.needsUpdate = false));
     
     // Mark as updated
@@ -1392,6 +1396,41 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
   }
 
   /**
+   * Ready the compositor's material to replace `cpuMaterial`: same light
+   * response and the same fragment shading patch, so switching compositing
+   * paths does not change how the surface looks.
+   */
+  private prepareGPUMaterial(compositor: GPULayerCompositor, cpuMaterial: THREE.Material): THREE.Material {
+    const material = compositor.getMaterial()!;
+    compositor.copyMaterialResponse(cpuMaterial);
+    installSurfaceShading(material, this.shadingUniforms);
+    return material;
+  }
+
+  /**
+   * Update material settings. On the GPU path the compositor's Phong-based
+   * shader receives the same Phong properties a CPU material would.
+   */
+  updateConfig(newConfig: Partial<SurfaceConfig>): void {
+    super.updateConfig(newConfig);
+    const compositor = this.gpuCompositor;
+    if (!this.useGPUCompositing || !compositor || !this.mesh ||
+        this.mesh.material !== compositor.getMaterial()) {
+      return;
+    }
+    const config = this.config;
+    compositor.setMaterialResponse({
+      color: config.color,
+      specular: config.specularColor,
+      shininess: config.shininess,
+      emissive: config.emissive,
+      emissiveIntensity: config.emissiveIntensity,
+      opacity: config.alpha,
+      flatShading: config.flatShading
+    });
+  }
+
+  /**
    * Create mesh with proper material settings
    */
   createMesh(): THREE.Mesh {
@@ -1414,7 +1453,13 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
 
     if (this.useGPUCompositing && this.gpuCompositor) {
       // Use GPU shader material for compositing
-      material = this.gpuCompositor.getMaterial() || this.createFallbackMaterial();
+      const cpuMaterial = this.createFallbackMaterial();
+      if (this.gpuCompositor.getMaterial()) {
+        material = this.prepareGPUMaterial(this.gpuCompositor, cpuMaterial);
+        cpuMaterial.dispose();
+      } else {
+        material = cpuMaterial;
+      }
     } else {
       // Use standard material for CPU compositing
       material = this.createFallbackMaterial();
@@ -1474,13 +1519,16 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
       
       // Replace material with shader material
       if (this.mesh && this.gpuCompositor) {
-        const oldMaterial = this.mesh.material;
-        this.mesh.material = this.gpuCompositor.getMaterial() || this.createFallbackMaterial();
+        const oldMaterial = this.mesh.material as THREE.Material;
+        this.mesh.material = this.gpuCompositor.getMaterial()
+          ? this.prepareGPUMaterial(this.gpuCompositor, oldMaterial)
+          : this.createFallbackMaterial();
         
         // Dispose old material
         if (oldMaterial && 'dispose' in oldMaterial) {
-          (oldMaterial as THREE.Material).dispose();
+          oldMaterial.dispose();
         }
+        this._syncClipPlanes();
       }
     } else {
       // Switch to CPU compositing

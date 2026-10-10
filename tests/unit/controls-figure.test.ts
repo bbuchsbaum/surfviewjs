@@ -79,7 +79,7 @@ function snapshot(
 }
 
 class FigureTarget implements SurfViewControlTarget {
-  private current = snapshot();
+  constructor(private current = snapshot()) {}
   private readonly listeners = new Set<SurfViewControlSnapshotListener>();
   private disposed = false;
   readonly presetRequests: string[] = [];
@@ -211,6 +211,22 @@ afterEach(() => {
 });
 
 describe('Figure controls', () => {
+  it('selects the current style preset on first render even when it is not the first option', async () => {
+    const initial = snapshot();
+    const fixture = mountFigureControls(new FigureTarget(snapshot({
+      preset: initial.figure.availablePresets[1]
+    })));
+    await fixture.element.updateComplete;
+    const preset = fixture.element.shadowRoot!.querySelector<HTMLSelectElement>(
+      'select[aria-label="Figure style preset"]'
+    )!;
+
+    expect(preset.options[0].value).toBe('default');
+    expect(preset.value).toBe('paper-light');
+
+    fixture.session.dispose();
+  });
+
   it('keeps export-only fields in a closed dialog and synchronizes preset/background state', async () => {
     const fixture = mountFigureControls();
     await fixture.element.updateComplete;

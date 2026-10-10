@@ -368,10 +368,6 @@ async function morphMode({ ctx, film, panel, isCurrent }: ModeContext): Promise<
         { name: 'very-inflated', positions: inflated(mesh, geometry, VERY_INFLATE_ITERATIONS) }
       ]
     });
-    // MorphableSurface stores targets as deltas from the base but leaves the geometry's
-    // morphTargetsRelative false, so three.js reads them as absolute positions and the
-    // surface collapses toward the origin (library bug). Declare them relative here.
-    surface.mesh!.geometry.morphTargetsRelative = true;
     surface.hemisphere = hemisphere;
     viewer.addSurface(surface, id);
     surfaces[id] = surface;
@@ -524,7 +520,11 @@ async function flatmapMode({ ctx, film, panel, isCurrent }: ModeContext): Promis
   viewer.setAnatomicalView('lateral', { layout: 'single', surfaceId: 'lh', fit: true });
   viewer.fitToView({ padding: 0.06 });
 
-  const side = () => Math.max(64, Math.floor(Math.min(sheet.clientWidth, sheet.clientHeight) || 420));
+  const sheetSize = () => [
+    Math.max(64, Math.floor(sheet.clientWidth || 420)),
+    Math.max(64, Math.floor(sheet.clientHeight || 420))
+  ] as const;
+  const [initialWidth, initialHeight] = sheetSize();
   // FlatMapView draws one flat fill, so the folding pattern is painted on a canvas beneath
   // it from the same projected vertices (projectVertex), and the map itself is transparent.
   const underlay = document.createElement('canvas');
@@ -533,8 +533,8 @@ async function flatmapMode({ ctx, film, panel, isCurrent }: ModeContext): Promis
   sheet.append(underlay);
   const shade = curvatureToGrayscale(curvatureOf('fsaverage5Left', pial), { brightness: 0.5, contrast: 0.7 });
   const flatmap = new FlatMapView(sheet, { surfaceId: 'lh', vertices: flat.vertices, faces: flat.faces }, {
-    width: side(),
-    height: side(),
+    width: initialWidth,
+    height: initialHeight,
     padding: 18,
     background: 'rgba(0, 0, 0, 0)',
     fillStyle: 'rgba(0, 0, 0, 0)',
@@ -580,9 +580,9 @@ async function flatmapMode({ ctx, film, panel, isCurrent }: ModeContext): Promis
   const observer = new ResizeObserver(() => {
     cancelAnimationFrame(resizeFrame);
     resizeFrame = requestAnimationFrame(() => {
-      const next = side();
-      if (next !== flatmap.canvas.width) {
-        flatmap.resize(next, next);
+      const [width, height] = sheetSize();
+      if (width !== flatmap.canvas.width || height !== flatmap.canvas.height) {
+        flatmap.resize(width, height);
         paintUnderlay();
       }
     });

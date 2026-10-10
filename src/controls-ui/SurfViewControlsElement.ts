@@ -1498,6 +1498,8 @@ export class SurfViewControlsElement extends LitElement {
             role="img"
             aria-label=${`Colormap preview: ${scalar.colorMap.label}`}
           ></span>
+          <!-- Options render after the select's own bindings, so each option
+               also carries its selectedness; .value alone is lost on first render. -->
           <select
             .value=${scalar.colorMap.id}
             aria-label=${`${layer.label} colormap`}
@@ -1512,6 +1514,7 @@ export class SurfViewControlsElement extends LitElement {
               .map(option => html`
                 <option
                   value=${option.id}
+                  .selected=${option.id === scalar.colorMap.id}
                   ?disabled=${!option.availability.enabled}
                   title=${option.availability.reason ?? ''}
                 >${option.label}</option>
@@ -1906,6 +1909,7 @@ export class SurfViewControlsElement extends LitElement {
               ${presets.map(option => html`
                 <option
                   value=${option.id}
+                  .selected=${option.id === figure.preset.id}
                   ?disabled=${!option.availability.enabled}
                   title=${option.availability.reason ?? ''}
                 >${option.label}</option>

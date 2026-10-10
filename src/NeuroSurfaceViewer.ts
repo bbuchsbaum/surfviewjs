@@ -893,8 +893,14 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
       });
     }
 
+    // A paired gap moves each hemisphere along the left-right (RAS x) axis so
+    // its medial edge sits hemisphereGap / 2 from the pair's midline, matching
+    // the report anatomical-brain layout. Offsets are computed up front so the
+    // camera fits the separated pair and failures leave the meshes untouched.
+    const gap = options.layout === 'paired' ? options.hemisphereGap : undefined;
+    const gapOffsets: Array<{ mesh: THREE.Mesh; dx: number }> = [];
     const bounds = new THREE.Box3();
-    for (const surfaceId of surfaceIds) {
+    for (const [memberIndex, surfaceId] of surfaceIds.entries()) {
       const surface = this.surfaces?.get(surfaceId);
       if (!surface) {
         return Object.freeze({
@@ -903,8 +909,21 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
           message: `Surface "${surfaceId}" was not found.`
         });
       }
-      surface.mesh?.updateMatrixWorld(true);
-      if (surface.mesh) bounds.expandByObject(surface.mesh);
+      if (!surface.mesh) continue;
+      surface.mesh.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(surface.mesh);
+      if (gap !== undefined && !box.isEmpty()) {
+        // The medial edge comes from the cortex as displayed: child markers
+        // and the crosshair, and inactive morph targets, must not move it.
+        const cortex = displayedVertexBox(surface.mesh);
+        // surfaceIds is [left, right] for a registered bilateral group.
+        const dx = memberIndex === 0 ? -gap / 2 - cortex.max.x : gap / 2 - cortex.min.x;
+        if (dx !== 0) {
+          gapOffsets.push({ mesh: surface.mesh, dx });
+          box.translate(new THREE.Vector3(dx, 0, 0));
+        }
+      }
+      bounds.union(box);
     }
     const target = bounds.isEmpty()
       ? new THREE.Vector3()
@@ -928,6 +947,15 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     }
 
     this.withStateChangeBatch(() => {
+      for (const { mesh, dx } of gapOffsets) {
+        const delta = new THREE.Vector3(dx, 0, 0);
+        if (mesh.parent) {
+          delta.applyMatrix3(new THREE.Matrix3().setFromMatrix4(mesh.parent.matrixWorld).invert());
+        }
+        mesh.position.add(delta);
+        mesh.updateMatrixWorld(true);
+      }
+      if (gapOffsets.length > 0) this.invalidateState(['surfaces']);
       this.camera.position.copy(target).addScaledVector(direction, distance);
       this.camera.up.copy(up);
       this.camera.lookAt(target);
@@ -1786,7 +1814,9 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
       position: this.mouse.clone(),
       intersection: this.getIntersectionPoint().clone()
     });
-    this.updateHoverCrosshair(event);
+    this.crosshair.scheduleHoverUpdate(() => {
+      if (!this.disposed) this.updateHoverCrosshair(event);
+    });
   }
 
   private setupSurfaceClick(): void {
@@ -1856,8 +1886,6 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   }
 
   private updateHoverCrosshair(event?: MouseEvent): void {
-    if (!this.crosshair.canHoverUpdate()) return;
-
     const rect = this.renderer.domElement.getBoundingClientRect();
     const x = event ? event.clientX : (rect.left + rect.width / 2);
     const y = event ? event.clientY : (rect.top + rect.height / 2);
@@ -2982,7 +3010,12 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
 
   private annotationLabelsForExport(): FigureExportLabel[] {
     return this.annotations.list().map(record => {
-      const projected = record.position.clone().project(this.camera);
+      // Record positions are mesh-local; surfaces may be moved (e.g. by a
+      // paired hemisphereGap), so project the vertex in world space.
+      const world = record.position.clone();
+      const mesh = this.surfaces.get(record.surfaceId)?.mesh;
+      if (mesh) world.applyMatrix4(mesh.matrixWorld);
+      const projected = world.project(this.camera);
       const text = String(
         record.data?.label ??
         record.data?.name ??
@@ -3003,7 +3036,11 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     link.click();
   }
 
-  /** Encode the current viewer state as a URL hash fragment. */
+  /**
+   * Encode the current viewer state as a shareable link: `baseUrl` (default:
+   * the current page without its hash) followed by `#svjs=...`. Pass the
+   * result, or any part of it from the `#` on, to {@link fromURL}.
+   */
   toURL(baseUrl?: string): string {
     const state = this.toJSON();
     const hash = encode(state);
@@ -3011,9 +3048,24 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     return `${base}#${hash}`;
   }
 
-  /** Restore viewer state from a URL hash fragment. */
-  fromURL(url?: string): RestorationReport {
-    const src = url ?? (typeof window !== 'undefined' ? window.location.hash : '');
+  /**
+   * Restore viewer state from a link produced by {@link toURL}.
+   *
+   * Accepts a full URL string (`https://host/page#svjs=...`), a `URL` object,
+   * a hash (`#svjs=...`), or a bare fragment (`svjs=...`). With no argument the
+   * current `window.location` is used. Throws when the input carries no
+   * surfview state fragment or the fragment cannot be decoded.
+   */
+  fromURL(url?: string | URL): RestorationReport {
+    let src: string;
+    if (url === undefined) {
+      src = typeof window !== 'undefined' ? window.location.hash : '';
+    } else if (typeof url === 'string') {
+      const hashIndex = url.indexOf('#');
+      src = hashIndex >= 0 ? url.slice(hashIndex) : url;
+    } else {
+      src = url.hash;
+    }
     const state = decode(src);
     return this.fromJSON(state);
   }
@@ -3534,4 +3586,17 @@ function colorKeyFromLayer(layer: Layer & ColorKeyLayer): FigureColorbarSource |
       high: summary?.maximum !== null && summary?.maximum !== undefined && summary.maximum > high
     }
   };
+}
+
+/** World-space bounds of a mesh's vertices as drawn (morphs applied, children excluded). */
+function displayedVertexBox(mesh: THREE.Mesh): THREE.Box3 {
+  const box = new THREE.Box3();
+  const position = mesh.geometry.getAttribute('position');
+  if (!position) return box;
+  const vertex = new THREE.Vector3();
+  for (let i = 0; i < position.count; i++) {
+    mesh.getVertexPosition(i, vertex);
+    box.expandByPoint(vertex.applyMatrix4(mesh.matrixWorld));
+  }
+  return box;
 }

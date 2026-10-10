@@ -7,6 +7,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `REPORT_BRAIN_VIEWS` and `DEFAULT_REPORT_OBLIQUE` are exported from the
+  root entry and `surfview/report` (with the `ReportBrainView` and
+  `ReportObliqueAngle` types on the report subpath).
+- `ParcelPuzzleView` options `background` and `previewBackground`; its
+  stylesheet reads `--sv-parcel-puzzle-*` custom properties whose fallbacks
+  are the previous values.
+- `SparklineOptions.cornerRadius`, `shadow` and `className`.
+- `FlatMapView` option `fit: 'contain' | 'stretch'`.
+- `GPUPicker.pick(..., { throttle: true })` (and `pickNDC`) for hover-driven
+  callers; `GPUPickOptions` is exported.
+- `VolumeTexture3D` `filter` option, `setFilter()` and `getFilter()`.
+
+### Changed
+- `VolumeProjectionLayer` `sampling` now also sets the GPU vertex path's 3D
+  texture filter. The default `sampling` is still `'nearest'`, so GPU vertex
+  projection without an explicit `sampling` now samples nearest voxels instead
+  of interpolating; pass `sampling: 'linear'` for the previous look. Where
+  `OES_texture_float_linear` is unavailable, float textures fall back to
+  nearest filtering.
+- The GPU compositing material is built on three.js's Phong shader: it follows
+  the scene's lights and the surface's material settings like the CPU path,
+  and supports threshold edge shading. Its private `ambientLight`,
+  `directionalLight` and `lightDirection` uniforms are gone; light the scene
+  instead.
+- `new VolumeTexture3D(..., { magFilter: THREE.NearestFilter })` without a
+  `minFilter` now samples nearest in both directions (minification used to
+  stay linear); pass `minFilter` explicitly for a mixed setup.
+- `FlatMapView` preserves the map's aspect ratio by default (`fit:
+  'contain'`); `fit: 'stretch'` restores per-axis scaling.
+- `NeuroSurfaceViewer.fromURL()` accepts a full URL string, a `URL`, a hash or
+  a bare `svjs=` fragment.
+- Explicit `GPUPicker.pick()` calls are no longer throttled; only picks that
+  request `throttle` are, and those reuse the latest result instead of
+  reporting a miss.
+- `annotations.activate(id, { exclusive: false })` keeps earlier annotations
+  in their active colour.
+
+### Fixed
+- `disableGPUPicking()` now falls back to CPU raycasting instead of returning
+  no hit.
+- `setAnatomicalView(..., { layout: 'paired', hemisphereGap })` applies the
+  gap: each hemisphere's medial edge, measured from its displayed vertices,
+  sits `hemisphereGap / 2` from the midline.
+- Per-annotation `colorOn` / `colorOff` are honoured.
+- Hover picking runs a trailing update, so the last pointer position is not
+  dropped.
+- `MorphableSurface` morph targets are relative (they no longer collapse the
+  mesh toward the origin) and carry morph normals.
+- `StatisticalMapLayer.getVertexStatInfo().zScore` keeps the statistic's sign
+  when p-values are supplied (p-values are two-sided; F stays unsigned).
+- Report mounts pass manifest label, units and legend to their layers, so
+  exported colour keys carry the map label.
+- `<surfview-controls>` shows the layer's colormap and the current style
+  preset on first render instead of the first option.
+- Surface clip planes on the GPU compositing path keep the same side as the
+  CPU path (they previously kept the opposite side) and clip the morphed
+  surface. `GPULayerCompositor.setClipPlanes` now drives
+  `material.clippingPlanes`; the `clipPlane*` uniforms are gone.
+- Figure exports place annotation labels at their markers when a surface has
+  been moved.
+- Annotation markers: markers added before the manager switched to instanced
+  drawing are recoloured on activation; `setDefaults()` colours repaint
+  existing markers that have no colours of their own; instanced drawing no
+  longer draws unused slots at the surface origin, grows past its initial
+  capacity instead of dropping markers, stops drawing removed markers, and
+  keeps its culling bounds current as markers are added or moved.
+- `VolumeTexture3D` keeps explicit `minFilter`/`magFilter` options through a
+  linear-filtering fallback (and falls back when either needs linear
+  filtering) until `setFilter` replaces them.
+- `GPULayerCompositor.dispose()` releases its references to layers and their
+  volume textures.
+
 ## [2.3.0] - 2026-10-09
 
 ### Added

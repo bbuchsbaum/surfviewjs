@@ -28,6 +28,13 @@ export interface FlatMapViewOptions {
   selectionStyle?: string;
   pointRadius?: number;
   autoRender?: boolean;
+  /**
+   * How map coordinates fill the drawable area (canvas minus padding).
+   * `'contain'` (default) scales both axes equally and centres the map, so shapes,
+   * distances and drawn ROIs are not distorted. `'stretch'` scales x and y
+   * independently to fill the area (the earlier behaviour).
+   */
+  fit?: 'contain' | 'stretch';
 }
 
 export interface FlatMapVertexEvent extends VertexHoverEvent {
@@ -158,6 +165,9 @@ export class FlatMapView extends EventEmitter<FlatMapEventMap> {
     if (padding * 2 >= Math.min(width, height)) {
       throw new RangeError('padding must leave a positive drawable width and height.');
     }
+    if (options.fit !== undefined && options.fit !== 'contain' && options.fit !== 'stretch') {
+      throw new RangeError('fit must be "contain" or "stretch".');
+    }
     this.options = {
       width,
       height,
@@ -171,7 +181,8 @@ export class FlatMapView extends EventEmitter<FlatMapEventMap> {
         minimum: 0,
         minimumExclusive: true
       }),
-      autoRender: options.autoRender ?? true
+      autoRender: options.autoRender ?? true,
+      fit: options.fit ?? 'contain'
     };
     this.canvas.width = this.options.width;
     this.canvas.height = this.options.height;
@@ -476,9 +487,17 @@ export class FlatMapView extends EventEmitter<FlatMapEventMap> {
     const padding = this.options.padding;
     const spanX = Math.max(1e-6, this.bounds.maxX - this.bounds.minX);
     const spanY = Math.max(1e-6, this.bounds.maxY - this.bounds.minY);
+    const drawableX = Math.max(1, width - padding * 2);
+    const drawableY = Math.max(1, height - padding * 2);
+    let scaleX = drawableX / spanX;
+    let scaleY = drawableY / spanY;
+    if (this.options.fit === 'contain') scaleX = scaleY = Math.min(scaleX, scaleY);
+    // Centre the map on the axis it does not fill.
+    const offsetX = padding + (drawableX - spanX * scaleX) / 2;
+    const offsetY = padding + (drawableY - spanY * scaleY) / 2;
     return {
-      x: padding + ((x - this.bounds.minX) / spanX) * Math.max(1, width - padding * 2),
-      y: height - padding - ((y - this.bounds.minY) / spanY) * Math.max(1, height - padding * 2)
+      x: offsetX + (x - this.bounds.minX) * scaleX,
+      y: height - offsetY - (y - this.bounds.minY) * scaleY
     };
   }
 

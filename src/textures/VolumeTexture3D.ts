@@ -1,4 +1,10 @@
 import * as THREE from 'three';
+import { debugLog } from '../debug';
+
+/** How a {@link VolumeTexture3D} is sampled between voxel centres. */
+export type VolumeTextureFilter = 'nearest' | 'linear';
+
+const linearFilteringSupport = new WeakMap<object, { float: boolean }>();
 
 export interface VolumeTexture3DOptions {
   /**
@@ -7,8 +13,14 @@ export interface VolumeTexture3DOptions {
    */
   useHalfFloat?: boolean;
   /**
-   * 3D texture filtering. For FloatType with linear filtering, WebGL needs
-   * OES_texture_float_linear. If unsupported, use NearestFilter.
+   * Sampling between voxel centres (default 'linear'). Float textures need
+   * OES_texture_float_linear for linear filtering; where a renderer lacks it,
+   * {@link VolumeTexture3D.prepareForRenderer} falls back to nearest.
+   */
+  filter?: VolumeTextureFilter;
+  /**
+   * Explicit three.js filters. They override `filter` until `setFilter`
+   * replaces both; a linear-filtering fallback restores them afterwards.
    */
   minFilter?: THREE.MinificationTextureFilter;
   magFilter?: THREE.MagnificationTextureFilter;
@@ -26,6 +38,13 @@ export class VolumeTexture3D {
   readonly dims: THREE.Vector3;
   readonly texture: THREE.Data3DTexture;
   private readonly useHalfFloat: boolean;
+  private requestedFilter: VolumeTextureFilter;
+  private degradedToNearest = false;
+  /** Explicit three.js filters from the options, until `setFilter` replaces them. */
+  private explicitFilters: {
+    min?: THREE.MinificationTextureFilter;
+    mag?: THREE.MagnificationTextureFilter;
+  };
 
   constructor(
     data: Float32Array | ArrayLike<number>,
@@ -50,13 +69,99 @@ export class VolumeTexture3D {
     this.texture = new THREE.Data3DTexture(gpuData, nx, ny, nz);
     this.texture.format = THREE.RedFormat;
     this.texture.type = gpuType;
-    this.texture.minFilter = options.minFilter ?? THREE.LinearFilter;
-    this.texture.magFilter = options.magFilter ?? THREE.LinearFilter;
+    this.requestedFilter = options.filter ??
+      (options.magFilter === THREE.NearestFilter ? 'nearest' : 'linear');
+    this.explicitFilters = {
+      ...(options.minFilter !== undefined ? { min: options.minFilter } : {}),
+      ...(options.magFilter !== undefined ? { mag: options.magFilter } : {})
+    };
+    const [minFilter, magFilter] = this.intendedFilters();
+    this.texture.minFilter = minFilter;
+    this.texture.magFilter = magFilter;
     this.texture.wrapS = options.wrapS ?? THREE.ClampToEdgeWrapping;
     this.texture.wrapT = options.wrapT ?? THREE.ClampToEdgeWrapping;
     this.texture.wrapR = options.wrapR ?? THREE.ClampToEdgeWrapping;
     this.texture.unpackAlignment = 1;
     this.texture.generateMipmaps = false;
+    this.texture.needsUpdate = true;
+  }
+
+  /** The requested sampling between voxel centres. */
+  getFilter(): VolumeTextureFilter {
+    return this.requestedFilter;
+  }
+
+  /**
+   * The sampling the texture actually uses: the requested filter, or
+   * 'nearest' after {@link prepareForRenderer} found linear unsupported.
+   */
+  getEffectiveFilter(): VolumeTextureFilter {
+    return this.degradedToNearest ? 'nearest' : this.requestedFilter;
+  }
+
+  /**
+   * Set sampling between voxel centres. Changing it re-uploads the texture.
+   */
+  setFilter(filter: VolumeTextureFilter): void {
+    if (filter !== 'nearest' && filter !== 'linear') {
+      throw new Error(`VolumeTexture3D: unknown filter "${String(filter)}"`);
+    }
+    this.requestedFilter = filter;
+    this.explicitFilters = {};
+    this.applyFilters();
+  }
+
+  /**
+   * Make the texture complete on `renderer`: a linearly filtered float 3D
+   * texture without OES_texture_float_linear samples as black, so linear is
+   * replaced by nearest there (and restored on a renderer that supports it).
+   * Cheap enough to call before every draw; GPU materials do so.
+   */
+  prepareForRenderer(renderer: THREE.WebGLRenderer): void {
+    const needsLinear = this.intendedFilters()
+      .some(filter => filter !== THREE.NearestFilter && filter !== THREE.NearestMipmapNearestFilter);
+    const degrade = needsLinear &&
+      !VolumeTexture3D.supportsLinearFiltering(renderer, { useHalfFloat: this.useHalfFloat });
+    if (degrade === this.degradedToNearest) return;
+    this.degradedToNearest = degrade;
+    if (degrade) {
+      debugLog('VolumeTexture3D: OES_texture_float_linear unavailable; sampling with NearestFilter');
+    }
+    this.applyFilters();
+  }
+
+  /**
+   * Whether `renderer` can linearly filter this kind of volume texture.
+   * WebGL2 filters half-float textures natively; float textures need
+   * OES_texture_float_linear.
+   */
+  static supportsLinearFiltering(
+    renderer: THREE.WebGLRenderer,
+    options: { useHalfFloat?: boolean } = {}
+  ): boolean {
+    if (options.useHalfFloat) return true;
+    const gl = renderer.getContext();
+    let support = linearFilteringSupport.get(gl);
+    if (!support) {
+      support = { float: gl.getExtension('OES_texture_float_linear') !== null };
+      linearFilteringSupport.set(gl, support);
+    }
+    return support.float;
+  }
+
+  /** The filters the texture should use when linear filtering is available. */
+  private intendedFilters(): [THREE.MinificationTextureFilter, THREE.MagnificationTextureFilter] {
+    const threeFilter = this.requestedFilter === 'nearest' ? THREE.NearestFilter : THREE.LinearFilter;
+    return [this.explicitFilters.min ?? threeFilter, this.explicitFilters.mag ?? threeFilter];
+  }
+
+  private applyFilters(): void {
+    const [minFilter, magFilter] = this.degradedToNearest
+      ? [THREE.NearestFilter, THREE.NearestFilter]
+      : this.intendedFilters();
+    if (this.texture.minFilter === minFilter && this.texture.magFilter === magFilter) return;
+    this.texture.minFilter = minFilter;
+    this.texture.magFilter = magFilter;
     this.texture.needsUpdate = true;
   }
 
@@ -100,9 +205,7 @@ export class VolumeTexture3D {
     if ((renderer.capabilities.maxVertexTextures ?? 0) <= 0) return false;
     if (!requireLinearFiltering) return true;
 
-    const gl = renderer.getContext();
-    const extName = useHalfFloat ? 'OES_texture_half_float_linear' : 'OES_texture_float_linear';
-    return gl.getExtension(extName) !== null;
+    return VolumeTexture3D.supportsLinearFiltering(renderer, { useHalfFloat });
   }
 
   dispose(): void {
