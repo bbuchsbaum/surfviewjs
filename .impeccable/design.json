@@ -1,0 +1,415 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-10T17:48:06.743339+00:00",
+  "title": "Design System: SurfView demo gallery",
+  "extensions": {
+    "colorMeta": {
+      "room": {
+        "role": "neutral",
+        "displayName": "Unlit Room",
+        "tonalRamp": [
+          "#06080b",
+          "#0b1118",
+          "#0f1720",
+          "#16212b",
+          "#213040",
+          "#93a6b4",
+          "#c3ced6",
+          "#edf2f5"
+        ]
+      },
+      "box": {
+        "role": "neutral",
+        "displayName": "Viewbox Daylight",
+        "tonalRamp": [
+          "oklch(15% 0.012 235)",
+          "oklch(25% 0.012 235)",
+          "oklch(35% 0.012 235)",
+          "oklch(45% 0.012 235)",
+          "oklch(58% 0.012 235)",
+          "oklch(70% 0.012 235)",
+          "oklch(82% 0.012 235)",
+          "oklch(95% 0.012 235)"
+        ]
+      },
+      "box-ink": {
+        "role": "neutral",
+        "displayName": "Box Ink",
+        "tonalRamp": [
+          "oklch(15% 0.025 245)",
+          "oklch(25% 0.025 245)",
+          "oklch(35% 0.025 245)",
+          "oklch(45% 0.025 245)",
+          "oklch(58% 0.025 245)",
+          "oklch(70% 0.025 245)",
+          "oklch(82% 0.025 245)",
+          "oklch(95% 0.025 245)"
+        ]
+      },
+      "d0": {
+        "role": "neutral",
+        "displayName": "Film Base D0",
+        "tonalRamp": [
+          "#06080b",
+          "#0b1118",
+          "#0f1720",
+          "#16212b",
+          "#213040",
+          "#93a6b4",
+          "#c3ced6",
+          "#edf2f5"
+        ]
+      },
+      "d1": {
+        "role": "neutral",
+        "displayName": "Film Density D1",
+        "tonalRamp": [
+          "#06080b",
+          "#0b1118",
+          "#0f1720",
+          "#16212b",
+          "#213040",
+          "#93a6b4",
+          "#c3ced6",
+          "#edf2f5"
+        ]
+      },
+      "d2": {
+        "role": "neutral",
+        "displayName": "Film Density D2",
+        "tonalRamp": [
+          "#06080b",
+          "#0b1118",
+          "#0f1720",
+          "#16212b",
+          "#213040",
+          "#93a6b4",
+          "#c3ced6",
+          "#edf2f5"
+        ]
+      },
+      "d3": {
+        "role": "neutral",
+        "displayName": "Film Density D3",
+        "tonalRamp": [
+          "#06080b",
+          "#0b1118",
+          "#0f1720",
+          "#16212b",
+          "#213040",
+          "#93a6b4",
+          "#c3ced6",
+          "#edf2f5"
+        ]
+      },
+      "ink-hi": {
+        "role": "neutral",
+        "displayName": "Ink High",
+        "tonalRamp": [
+          "#06080b",
+          "#0b1118",
+          "#0f1720",
+          "#16212b",
+          "#213040",
+          "#93a6b4",
+          "#c3ced6",
+          "#edf2f5"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "tonalRamp": [
+          "#06080b",
+          "#0b1118",
+          "#0f1720",
+          "#16212b",
+          "#213040",
+          "#93a6b4",
+          "#c3ced6",
+          "#edf2f5"
+        ]
+      },
+      "ink-lo": {
+        "role": "neutral",
+        "displayName": "Ink Low",
+        "tonalRamp": [
+          "#06080b",
+          "#0b1118",
+          "#0f1720",
+          "#16212b",
+          "#213040",
+          "#93a6b4",
+          "#c3ced6",
+          "#edf2f5"
+        ]
+      },
+      "mark": {
+        "role": "primary",
+        "displayName": "Chinagraph Yellow",
+        "tonalRamp": [
+          "oklch(15% 0.16 88)",
+          "oklch(25% 0.16 88)",
+          "oklch(35% 0.16 88)",
+          "oklch(45% 0.16 88)",
+          "oklch(58% 0.16 88)",
+          "oklch(70% 0.16 88)",
+          "oklch(82% 0.16 88)",
+          "oklch(95% 0.16 88)"
+        ]
+      },
+      "mark-ink": {
+        "role": "neutral",
+        "displayName": "Pencil Ink",
+        "tonalRamp": [
+          "oklch(15% 0.03 88)",
+          "oklch(25% 0.03 88)",
+          "oklch(35% 0.03 88)",
+          "oklch(45% 0.03 88)",
+          "oklch(58% 0.03 88)",
+          "oklch(70% 0.03 88)",
+          "oklch(82% 0.03 88)",
+          "oklch(95% 0.03 88)"
+        ]
+      },
+      "alert": {
+        "role": "secondary",
+        "displayName": "Chinagraph Red",
+        "tonalRamp": [
+          "oklch(15% 0.16 33)",
+          "oklch(25% 0.16 33)",
+          "oklch(35% 0.16 33)",
+          "oklch(45% 0.16 33)",
+          "oklch(58% 0.16 33)",
+          "oklch(70% 0.16 33)",
+          "oklch(82% 0.16 33)",
+          "oklch(95% 0.16 33)"
+        ]
+      },
+      "cortex": {
+        "role": "neutral",
+        "displayName": "Cortex Grey",
+        "tonalRamp": [
+          "oklch(15% 0.012 240)",
+          "oklch(25% 0.012 240)",
+          "oklch(35% 0.012 240)",
+          "oklch(45% 0.012 240)",
+          "oklch(58% 0.012 240)",
+          "oklch(70% 0.012 240)",
+          "oklch(82% 0.012 240)",
+          "oklch(95% 0.012 240)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Chapter title at the top of the margin; one per screen."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "SurfView wordmark."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Base text."
+      },
+      "body-note": {
+        "displayName": "Summary",
+        "purpose": "Chapter summary in the margin, max 62ch."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Frame titles, control labels, buttons."
+      },
+      "label-section": {
+        "displayName": "Section label",
+        "purpose": "Uppercase margin control-group headings in Ink Low."
+      },
+      "data-corner": {
+        "displayName": "Corner data",
+        "purpose": "Film corner overlay lines; tabular figures."
+      },
+      "data-edge": {
+        "displayName": "Edge data",
+        "purpose": "Uppercase edge printing along the film's bottom."
+      },
+      "data-code": {
+        "displayName": "Code",
+        "purpose": "Code excerpts."
+      }
+    },
+    "shadows": [],
+    "motion": [
+      {
+        "name": "clock",
+        "value": "640ms",
+        "purpose": "The one shared motion clock: hanging a film, drawing the active frame tick."
+      },
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Easing for every transition and animation."
+      },
+      {
+        "name": "state",
+        "value": "160–220ms",
+        "purpose": "Hover and control state transitions (borders, grounds, toggle knob)."
+      },
+      {
+        "name": "expose",
+        "value": "900ms",
+        "purpose": "A changed corner value flashes chinagraph yellow and settles to Ink High."
+      },
+      {
+        "name": "hang",
+        "value": "opacity 0.25 → 1, brightness(1.8) contrast(0.7) → none, on the clock",
+        "purpose": "A newly hung film fades up from an over-bright flash."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "1ms",
+        "purpose": "All animation and transition durations collapse under prefers-reduced-motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "stacked",
+        "value": "1100px"
+      },
+      {
+        "name": "narrow",
+        "value": "620px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Chapter Frame",
+      "kind": "nav",
+      "refersTo": "frame",
+      "description": "Small hung film in the chapter strip; the active one is D3 with a yellow tick.",
+      "html": "<div class=\"ds-strip\"><button class=\"ds-frame ds-active\">First look<span>viewer</span></button><button class=\"ds-frame\">Layers<span>compositing</span></button><button class=\"ds-frame\">Statistics<span>inference</span></button></div>",
+      "css": ":host{--room:#06080b;--box:#dde6ec;--box-ink:#23303b;--d0:#0b1118;--d1:#0f1720;--d2:#16212b;--d3:#213040;--ink-hi:#edf2f5;--ink:#c3ced6;--ink-lo:#93a6b4;--mark:#f2c230;--mark-ink:#1a1405;--alert:#ec6a52;--font-ui:'Archivo Variable','Archivo',system-ui,sans-serif;--font-data:'JetBrains Mono Variable','JetBrains Mono',ui-monospace,monospace;--clock:640ms;--ease-out:cubic-bezier(0.16,1,0.3,1)} .ds-strip{display:flex;gap:6px;padding:6px 6px 0;background:var(--box)} .ds-frame{position:relative;display:grid;gap:2px;min-width:64px;min-height:56px;padding:9px 12px 13px;border:0;border-radius:0;background:var(--d1);color:var(--ink);font-family:var(--font-ui);font-size:13.5px;font-weight:520;font-stretch:84%;line-height:1.2;text-align:left;cursor:pointer;transition:background-color 180ms var(--ease-out),color 180ms var(--ease-out)} .ds-frame span{color:var(--ink-lo);font-size:11.5px;font-weight:450;font-stretch:88%} .ds-frame::after{content:'';position:absolute;left:12px;right:12px;bottom:6px;height:2px;background:var(--mark);transform:scaleX(0);transform-origin:left center;transition:transform var(--clock) var(--ease-out)} .ds-frame:hover{background:var(--d2);color:var(--ink-hi)} .ds-frame.ds-active{background:var(--d3);color:var(--ink-hi)} .ds-frame.ds-active::after{transform:scaleX(1)} .ds-frame:focus-visible{outline:2px solid var(--mark);outline-offset:-4px}"
+    },
+    {
+      "name": "Action",
+      "kind": "button",
+      "refersTo": "action",
+      "description": "Default square bordered action in the margin.",
+      "html": "<button class=\"ds-action\">Fit to view</button> <button class=\"ds-action\" aria-pressed=\"true\">Pin</button>",
+      "css": ":host{--room:#06080b;--box:#dde6ec;--box-ink:#23303b;--d0:#0b1118;--d1:#0f1720;--d2:#16212b;--d3:#213040;--ink-hi:#edf2f5;--ink:#c3ced6;--ink-lo:#93a6b4;--mark:#f2c230;--mark-ink:#1a1405;--alert:#ec6a52;--font-ui:'Archivo Variable','Archivo',system-ui,sans-serif;--font-data:'JetBrains Mono Variable','JetBrains Mono',ui-monospace,monospace;--clock:640ms;--ease-out:cubic-bezier(0.16,1,0.3,1)} .ds-action{padding:7px 13px 8px;border:1px solid var(--d3);border-radius:0;background:transparent;color:var(--ink-hi);font-family:var(--font-ui);font-size:13.5px;font-weight:520;font-stretch:88%;cursor:pointer;transition:border-color 160ms var(--ease-out),background-color 160ms var(--ease-out)} .ds-action:hover{border-color:var(--ink-lo);background:var(--d2)} .ds-action:active{background:var(--d3)} .ds-action:focus-visible{outline:2px solid var(--mark);outline-offset:2px} .ds-action[aria-pressed='true']{border-color:var(--mark);color:var(--mark)}"
+    },
+    {
+      "name": "Primary Action",
+      "kind": "button",
+      "refersTo": "action-primary",
+      "description": "The single main action of a panel, filled with viewbox daylight.",
+      "html": "<button class=\"ds-action-primary\">Export figure</button>",
+      "css": ":host{--room:#06080b;--box:#dde6ec;--box-ink:#23303b;--d0:#0b1118;--d1:#0f1720;--d2:#16212b;--d3:#213040;--ink-hi:#edf2f5;--ink:#c3ced6;--ink-lo:#93a6b4;--mark:#f2c230;--mark-ink:#1a1405;--alert:#ec6a52;--font-ui:'Archivo Variable','Archivo',system-ui,sans-serif;--font-data:'JetBrains Mono Variable','JetBrains Mono',ui-monospace,monospace;--clock:640ms;--ease-out:cubic-bezier(0.16,1,0.3,1)} .ds-action-primary{padding:7px 13px 8px;border:1px solid var(--box);border-radius:0;background:var(--box);color:var(--d0);font-family:var(--font-ui);font-size:13.5px;font-weight:520;font-stretch:88%;cursor:pointer;transition:border-color 160ms var(--ease-out),background-color 160ms var(--ease-out)} .ds-action-primary:hover{border-color:#ffffff;background:#ffffff} .ds-action-primary:focus-visible{outline:2px solid var(--mark);outline-offset:2px}"
+    },
+    {
+      "name": "Choice Group",
+      "kind": "chip",
+      "refersTo": "choice",
+      "description": "Segmented radio set; the checked option is drawn in chinagraph yellow.",
+      "html": "<div class=\"ds-choices\"><label><input type=\"radio\" name=\"v\" checked><span>Lateral</span></label><label><input type=\"radio\" name=\"v\"><span>Medial</span></label><label><input type=\"radio\" name=\"v\"><span>Dorsal</span></label></div>",
+      "css": ":host{--room:#06080b;--box:#dde6ec;--box-ink:#23303b;--d0:#0b1118;--d1:#0f1720;--d2:#16212b;--d3:#213040;--ink-hi:#edf2f5;--ink:#c3ced6;--ink-lo:#93a6b4;--mark:#f2c230;--mark-ink:#1a1405;--alert:#ec6a52;--font-ui:'Archivo Variable','Archivo',system-ui,sans-serif;--font-data:'JetBrains Mono Variable','JetBrains Mono',ui-monospace,monospace;--clock:640ms;--ease-out:cubic-bezier(0.16,1,0.3,1)} .ds-choices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;font-family:var(--font-ui)} .ds-choices label{position:relative;cursor:pointer} .ds-choices input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer} .ds-choices span{display:block;text-align:center;padding:6px 10px;border:1px solid var(--d3);color:var(--ink);font-size:13px;font-stretch:88%;transition:border-color 160ms var(--ease-out),color 160ms var(--ease-out)} .ds-choices label:hover span{border-color:var(--ink-lo);color:var(--ink-hi)} .ds-choices input:checked+span{border-color:var(--mark);color:var(--mark)} .ds-choices input:focus-visible+span{outline:2px solid var(--mark);outline-offset:2px}"
+    },
+    {
+      "name": "Select",
+      "kind": "input",
+      "refersTo": "select",
+      "description": "Square select on film base with a thin chevron.",
+      "html": "<select class=\"ds-select\"><option>Cool–warm (diverging)</option><option>Viridis</option></select>",
+      "css": ":host{--room:#06080b;--box:#dde6ec;--box-ink:#23303b;--d0:#0b1118;--d1:#0f1720;--d2:#16212b;--d3:#213040;--ink-hi:#edf2f5;--ink:#c3ced6;--ink-lo:#93a6b4;--mark:#f2c230;--mark-ink:#1a1405;--alert:#ec6a52;--font-ui:'Archivo Variable','Archivo',system-ui,sans-serif;--font-data:'JetBrains Mono Variable','JetBrains Mono',ui-monospace,monospace;--clock:640ms;--ease-out:cubic-bezier(0.16,1,0.3,1)} .ds-select{width:100%;padding:7px 30px 7px 10px;border:1px solid var(--d3);border-radius:0;background:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%2393a6b4' stroke-width='1.5'/%3E%3C/svg%3E\") no-repeat right 10px center/12px,var(--d0);color:var(--ink-hi);font-family:var(--font-ui);font-size:13.5px;appearance:none;cursor:pointer} .ds-select:hover{border-color:var(--ink-lo)} .ds-select:focus-visible{outline:2px solid var(--mark);outline-offset:2px} .ds-select option{background:var(--d1);color:var(--ink-hi)}"
+    },
+    {
+      "name": "Slider Readout",
+      "kind": "input",
+      "refersTo": "slider",
+      "description": "Label with mono value, 2px track, square bar thumb that turns yellow in hand.",
+      "html": "<div class=\"ds-slider\"><label for=\"ds-w\">Colour window (±z)</label><output>±5.0</output><input id=\"ds-w\" type=\"range\" min=\"1\" max=\"10\" value=\"5\"></div>",
+      "css": ":host{--room:#06080b;--box:#dde6ec;--box-ink:#23303b;--d0:#0b1118;--d1:#0f1720;--d2:#16212b;--d3:#213040;--ink-hi:#edf2f5;--ink:#c3ced6;--ink-lo:#93a6b4;--mark:#f2c230;--mark-ink:#1a1405;--alert:#ec6a52;--font-ui:'Archivo Variable','Archivo',system-ui,sans-serif;--font-data:'JetBrains Mono Variable','JetBrains Mono',ui-monospace,monospace;--clock:640ms;--ease-out:cubic-bezier(0.16,1,0.3,1)} .ds-slider{display:grid;grid-template-columns:1fr auto;align-items:baseline;row-gap:6px;font-family:var(--font-ui)} .ds-slider label{color:var(--ink);font-size:13.5px} .ds-slider output{color:var(--ink-hi);font-family:var(--font-data);font-size:12.5px;font-variant-numeric:tabular-nums} .ds-slider input{grid-column:1/-1;width:100%;height:22px;margin:0;background:transparent;appearance:none;cursor:pointer} .ds-slider input::-webkit-slider-runnable-track{height:2px;background:var(--d3)} .ds-slider input::-webkit-slider-thumb{appearance:none;width:10px;height:18px;margin-top:-8px;border:0;background:var(--ink);transition:background-color 160ms var(--ease-out)} .ds-slider input:hover::-webkit-slider-thumb{background:var(--ink-hi)} .ds-slider input:active::-webkit-slider-thumb,.ds-slider input:focus-visible::-webkit-slider-thumb{background:var(--mark)} .ds-slider input::-moz-range-track{height:2px;background:var(--d3)} .ds-slider input::-moz-range-thumb{width:10px;height:18px;border:0;border-radius:0;background:var(--ink)} .ds-slider input:focus-visible{outline:2px solid var(--mark);outline-offset:0}"
+    },
+    {
+      "name": "Toggle",
+      "kind": "input",
+      "refersTo": "toggle",
+      "description": "Square track and knob; checked is drawn in chinagraph yellow.",
+      "html": "<div class=\"ds-toggle\"><input id=\"ds-t\" type=\"checkbox\" checked><label for=\"ds-t\">Camera interaction</label></div>",
+      "css": ":host{--room:#06080b;--box:#dde6ec;--box-ink:#23303b;--d0:#0b1118;--d1:#0f1720;--d2:#16212b;--d3:#213040;--ink-hi:#edf2f5;--ink:#c3ced6;--ink-lo:#93a6b4;--mark:#f2c230;--mark-ink:#1a1405;--alert:#ec6a52;--font-ui:'Archivo Variable','Archivo',system-ui,sans-serif;--font-data:'JetBrains Mono Variable','JetBrains Mono',ui-monospace,monospace;--clock:640ms;--ease-out:cubic-bezier(0.16,1,0.3,1)} .ds-toggle{display:flex;align-items:center;gap:10px;font-family:var(--font-ui);color:var(--ink);font-size:13.5px} .ds-toggle input{appearance:none;flex:none;width:30px;height:16px;margin:0;border:1px solid var(--ink-lo);background:var(--d0);position:relative;cursor:pointer;transition:background-color 160ms var(--ease-out),border-color 160ms var(--ease-out)} .ds-toggle input::after{content:'';position:absolute;top:2px;left:2px;width:10px;height:10px;background:var(--ink);transition:transform 220ms var(--ease-out),background-color 160ms var(--ease-out)} .ds-toggle input:checked{border-color:var(--mark);background:color-mix(in srgb,var(--mark) 18%,var(--d0))} .ds-toggle input:checked::after{transform:translateX(14px);background:var(--mark)} .ds-toggle input:focus-visible{outline:2px solid var(--mark);outline-offset:2px}"
+    },
+    {
+      "name": "Film Sheet with Corner Overlay",
+      "kind": "custom",
+      "refersTo": "film",
+      "description": "Signature: D0 film in a daylight seam, notch-coded top-right edge, mono corner lines, orientation letters, edge printing.",
+      "html": "<div class=\"ds-box\"><figure class=\"ds-film\"><div class=\"ds-img\"><div class=\"ds-c ds-tl\"><div><b>SURFACE</b> fsaverage5 pial, L + R</div><div><b>VERTICES</b> 20,484</div></div><div class=\"ds-c ds-br\"><div><b>VERTEX</b> <i class=\"ds-x\">LH 4531</i></div><div><b>VALUE</b> -0.34 z</div></div><span class=\"ds-o ds-ot\">S</span><span class=\"ds-o ds-ol\">A</span><span class=\"ds-o ds-or\">P</span></div><figcaption class=\"ds-edge\"><span>SURFVIEW 2.3.0</span><span>RUNNING: FIRST LOOK</span><span class=\"ds-perf\">20,484 VERTICES</span></figcaption></figure></div>",
+      "css": ":host{--room:#06080b;--box:#dde6ec;--box-ink:#23303b;--d0:#0b1118;--d1:#0f1720;--d2:#16212b;--d3:#213040;--ink-hi:#edf2f5;--ink:#c3ced6;--ink-lo:#93a6b4;--mark:#f2c230;--mark-ink:#1a1405;--alert:#ec6a52;--font-ui:'Archivo Variable','Archivo',system-ui,sans-serif;--font-data:'JetBrains Mono Variable','JetBrains Mono',ui-monospace,monospace;--clock:640ms;--ease-out:cubic-bezier(0.16,1,0.3,1)} .ds-box{background:var(--box);padding:6px} .ds-film{position:relative;margin:0;background:var(--d0);display:grid;grid-template-rows:220px auto;clip-path:polygon(0 0,calc(100% - 30px) 0,calc(100% - 30px) 7px,calc(100% - 20px) 7px,calc(100% - 20px) 0,100% 0,100% 100%,0 100%)} .ds-img{position:relative} .ds-c{position:absolute;display:grid;gap:2px;font-family:var(--font-data);font-size:11.5px;line-height:1.35;font-variant-numeric:tabular-nums;color:var(--ink-hi)} .ds-c b{font-weight:400;color:var(--ink-lo);letter-spacing:0.08em;margin-right:6px} .ds-c i{font-style:normal} .ds-tl{top:14px;left:16px} .ds-br{bottom:12px;right:16px;text-align:right} .ds-x{animation:ds-expose 900ms var(--ease-out) infinite alternate} @keyframes ds-expose{from{color:var(--mark)}to{color:var(--ink-hi)}} .ds-o{position:absolute;font-family:var(--font-ui);font-size:15px;font-weight:600;font-stretch:78%;color:var(--ink-lo)} .ds-ot{top:12px;left:50%} .ds-ol{left:16px;top:50%} .ds-or{right:16px;top:50%} .ds-edge{display:flex;gap:22px;padding:8px 16px 9px;border-top:1px solid var(--d2);font-family:var(--font-data);font-size:10.5px;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-lo);white-space:nowrap} .ds-edge span:first-child{color:var(--ink)} .ds-perf{margin-left:auto}"
+    },
+    {
+      "name": "Code Excerpt",
+      "kind": "card",
+      "refersTo": "code-excerpt",
+      "description": "Margin disclosure between hairline rules; open, a D0 mono block with a Copy action.",
+      "html": "<details class=\"ds-code\" open><summary>Code</summary><div class=\"ds-body\"><pre>const viewer = new NeuroSurfaceViewer(host, w, h);\nviewer.addSurface(surface);</pre><button class=\"ds-copy\">Copy</button></div></details>",
+      "css": ":host{--room:#06080b;--box:#dde6ec;--box-ink:#23303b;--d0:#0b1118;--d1:#0f1720;--d2:#16212b;--d3:#213040;--ink-hi:#edf2f5;--ink:#c3ced6;--ink-lo:#93a6b4;--mark:#f2c230;--mark-ink:#1a1405;--alert:#ec6a52;--font-ui:'Archivo Variable','Archivo',system-ui,sans-serif;--font-data:'JetBrains Mono Variable','JetBrains Mono',ui-monospace,monospace;--clock:640ms;--ease-out:cubic-bezier(0.16,1,0.3,1)} .ds-code{border-top:1px solid var(--d2);border-bottom:1px solid var(--d2);padding:11px 0;font-family:var(--font-ui)} .ds-code summary{display:flex;align-items:center;gap:8px;color:var(--ink);font-size:13.5px;cursor:pointer;list-style:none} .ds-code summary::-webkit-details-marker{display:none} .ds-code summary::before{content:'';width:7px;height:7px;border-right:1.5px solid var(--ink-lo);border-bottom:1.5px solid var(--ink-lo);transform:rotate(-45deg);transition:transform 220ms var(--ease-out)} .ds-code[open] summary::before{transform:rotate(45deg)} .ds-code summary:hover{color:var(--ink-hi)} .ds-code summary:focus-visible{outline:2px solid var(--mark);outline-offset:2px} .ds-body{position:relative;margin-top:10px} .ds-body pre{margin:0;padding:14px 14px 16px;background:var(--d0);color:var(--ink);font-family:var(--font-data);font-size:12px;line-height:1.6} .ds-copy{position:absolute;top:6px;right:6px;padding:4px 9px 5px;border:1px solid var(--d3);border-radius:0;background:var(--d1);color:var(--ink-hi);font-family:var(--font-ui);font-size:12px;cursor:pointer} .ds-copy:hover{border-color:var(--ink-lo);background:var(--d2)}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Reading Room Lightbox",
+    "overview": "Every chapter is one radiology film hung on a backlit viewbox in an unlit room. The rendered cortex is the subject of the sheet; the sheet's live state (surface, layer, window, threshold, vertex under the cursor) is printed into its four corners in a data mono, the way a scanner prints its overlay. The lit viewbox never fills a panel: it shows only as the seams between sheets (the chapter strip, the 6px border around the film). Everything else sits in the dark room.\n\nProminence is one exposure scale. Four film densities (D0 to D3) carry every surface from film base to the lightest hung sheet, and hover and selection move an element one step brighter rather than adding color. Color proper is chinagraph pencil: yellow for what the user marked or is operating, red for errors. Controls live in the unlit margin to the right of the film as plain readouts separated by hairline rules, not as boxed panels.\n\nThe world rejects the category default of a sidebar, boxed dark panels, and a cyan accent dashboard. Corners are square, there are no shadows, and nothing floats.",
+    "keyCharacteristics": [
+      "One large film per chapter, ~70% width, with corner overlays and anatomical edge letters.",
+      "A single-row chapter strip of small film frames, grouped into banks on the lit box.",
+      "One exposure scale (D0 to D3) for all prominence; chinagraph yellow only for user marks and the active control.",
+      "Condensed grotesk for labels and prose; data mono for anything the instrument prints.",
+      "Square corners, hairline rules, no shadows.",
+      "One motion clock (640ms, expo-out) for hanging films and drawing the active tick."
+    ],
+    "rules": [
+      {
+        "name": "The Chinagraph Rule",
+        "body": "Yellow means the user did it or is doing it. If an element is not a user mark, a selected value, or the control in hand, it does not get yellow.",
+        "section": "colors"
+      },
+      {
+        "name": "The Exposure Rule",
+        "body": "State changes move one step up the D scale (D1 rest, D2 hover, D3 active). No new hue for hover, no tinted panels.",
+        "section": "colors"
+      },
+      {
+        "name": "The Seam Rule",
+        "body": "The viewbox's daylight appears only between and around sheets, never as a panel background for content.",
+        "section": "colors"
+      },
+      {
+        "name": "The Instrument Voice Rule",
+        "body": "Anything the viewer measures or reports (values, vertex ids, counts, status, code) is set in the data mono with tabular figures. Prose and control names are never mono.",
+        "section": "typography"
+      },
+      {
+        "name": "The Lightbox Rule",
+        "body": "Nothing casts a shadow. A sheet is separated from what is around it by the seam or by a density step.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do take every surface color from the D scale and every text color from the three inks; hover and active move one D step.",
+      "Do reserve Chinagraph Yellow for user marks, the selected value, and the control in hand, and Chinagraph Red for errors.",
+      "Do print live state into the film corners with the shared overlay, so a control's value appears on the sheet as it moves.",
+      "Do set measured values, counts, status and code in the data mono with tabular figures.",
+      "Do keep corners square (0) and separate regions with 1px D2 hairlines.",
+      "Do time sheet-level transitions on the one motion clock (640ms, expo-out) and honor reduced motion.",
+      "Do render meshes in Cortex Grey with curvature shading on the film base."
+    ],
+    "donts": [
+      "Don't fill a content panel with Viewbox Daylight; the lit box shows only at seams and in the one primary action.",
+      "Don't box the margin into cards or panels; controls are readouts on the dark room separated by rules.",
+      "Don't add shadows or rounded corners, including to library components dropped into a chapter.",
+      "Don't use yellow for decoration or emphasis; beyond the wordmark's pencil stroke, it marks only what the user did or holds.",
+      "Don't introduce a cyan or other accent hue for UI state."
+    ]
+  }
+}

@@ -56,3 +56,7 @@ docs/.vitepress/cache/
 
 # TypeDoc generated API docs (regenerated on build)
 docs/api/
+
+# Impeccable design workflow: local evidence and server logs
+.impeccable/review/
+.impeccable/questions/

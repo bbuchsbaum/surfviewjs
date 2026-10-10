@@ -1,0 +1,153 @@
+{
+  "title": "Choose the visual world for the SurfView demo",
+  "question": "The roll assigned The Reading Room Lightbox. Keep it, take an alternate, or re-roll.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "The Reading Room Lightbox",
+      "kicker": "THE ROLL",
+      "lineage": "Radiology film hung on a backlit viewbox in a dim reading room",
+      "thesis": "Every capability is hung as a film on the viewbox, its state printed in the corners like a scan's own overlay.",
+      "palette": ["#0b1118", "#1c2732", "#8fa3b3", "#e9f0f4", "#f2c230", "#d6452e"],
+      "materials": ["blue-tinted film base", "backlit daylight viewbox", "chinagraph pencil marks", "film edge printing"],
+      "viewport": "A dark reading room: the chosen chapter's brain fills one large film sheet with corner overlays (surface, layer, window/level, vertex) and L/R/S/I orientation letters at its edges; chapters hang as a slim strip of small films along the top, the lit gap between sheets is the only bright field, and the controls sit in the film's lower margin as window/level readouts.",
+      "risk": "Dark again, like the current demo; it only escapes the dark-dashboard look if the film, corner overlays and lit gaps are committed fully.",
+      "raised": [
+        { "from": "challenger-cracktro", "raise": "One exposure scale: every element's prominence is a single film-density step, D0 to D3, mapped by one token set." },
+        { "from": "challenger-drum-machine", "raise": "One motion clock: playback, morphs and view transitions share one timeline, with nothing animated separately." },
+        { "from": "challenger-punk-pasteup", "raise": "Chinagraph yellow is reserved for marks the user makes (selection, ROI, annotations) and the active control; nothing else uses it." },
+        { "from": "challenger-ikebana", "raise": "One subject per sheet, surrounded by unlit film; no panel crowds the brain." },
+        { "from": "challenger-curved-crease", "raise": "Registered pairs: where geometry changes (lateral and medial, folded and flat), both views are hung together on the box." }
+      ],
+      "comp": ".impeccable/mocks/decision/assigned.webp",
+      "wireframe": { "cols": 12, "rows": 10, "regions": [
+        { "label": "chapter film strip", "x": 0, "y": 0, "w": 12, "h": 1 },
+        { "label": "film sheet: brain with corner overlays + L/R/S/I", "x": 0, "y": 1, "w": 9, "h": 7, "accent": true },
+        { "label": "notes and collapsible code", "x": 9, "y": 1, "w": 3, "h": 7 },
+        { "label": "lower-margin controls (window/level)", "x": 0, "y": 8, "w": 9, "h": 2 },
+        { "label": "status edge print", "x": 9, "y": 8, "w": 3, "h": 2 }
+      ] }
+    },
+    {
+      "id": "model-pick",
+      "label": "The Figure Plate",
+      "kicker": "IMPECCABLE’S PICK",
+      "lineage": "Multi-panel figures in neuroscience journals",
+      "thesis": "Each chapter is a journal figure: lettered panels, a colour key and a caption, rendered live.",
+      "palette": ["#ffffff", "#f2f3f1", "#1a1d21", "#5f6670", "#c2352b", "#2b5ea8"],
+      "materials": ["matte white page", "panel letters", "7 pt sans captions", "hairline colour keys"],
+      "viewport": "A white page with the chapter as figure 1: panel a (large brain), b and c (paired views or flatmap), a caption block below, and controls set as the figure's legend.",
+      "risk": "Familiar: this is where most scientific-tool demos land, and a white ground is tiring for long viewing of rendered brains.",
+      "comp": ".impeccable/mocks/decision/model-pick.webp",
+      "wireframe": { "cols": 12, "rows": 10, "regions": [
+        { "label": "figure title + chapter list", "x": 0, "y": 0, "w": 12, "h": 1 },
+        { "label": "panel a: brain", "x": 0, "y": 1, "w": 7, "h": 6, "accent": true },
+        { "label": "panel b", "x": 7, "y": 1, "w": 5, "h": 3 },
+        { "label": "panel c", "x": 7, "y": 4, "w": 5, "h": 3 },
+        { "label": "caption and legend controls", "x": 0, "y": 7, "w": 12, "h": 3 }
+      ] }
+    },
+    {
+      "id": "challenger-curved-crease",
+      "label": "Curved-Crease Shell",
+      "verdict": "declined",
+      "lineage": "Curved-crease paper folding",
+      "thesis": "One crease turns a flat sheet into a rigid shell.",
+      "palette": ["#efe6d6", "#2b2b2b", "#8a8478"],
+      "materials": ["cream cotton paper", "charcoal arc", "graphite shadow"],
+      "viewport": "Plan and section views of a folding sheet, registered side by side.",
+      "case": "Folding speaks to cortical inflation and flatmaps, but the cream-paper serif world is a common default and speaks to only two chapters.",
+      "kept": "Registered paired views wherever the geometry changes.",
+      "risk": "Lands in the cream-and-serif default.",
+      "hero": "https://impeccable.style/worlds/cards/paper-folds-pleats-deployable-curved-crease-shell-hero.webp"
+    },
+    {
+      "id": "challenger-drum-machine",
+      "label": "Step Sequencer Row",
+      "verdict": "declined",
+      "lineage": "Early-80s rhythm machines",
+      "thesis": "A sixteen-step row under a running chase light.",
+      "palette": ["#2a2a2c", "#d8432f", "#ef8a2b", "#f2d04a", "#f3f1ea"],
+      "materials": ["charcoal panel", "lit step keys", "segmented readout"],
+      "viewport": "A step row as the page's one unbroken line.",
+      "case": "Fits only the time-series chapter; neuroimaging audiences don't recognise themselves in it.",
+      "kept": "One motion clock shared by every animated element.",
+      "risk": "Novelty outside temporal data.",
+      "hero": "https://impeccable.style/worlds/cards/signals-instruments-drum-machine-step-row-hero.webp"
+    },
+    {
+      "id": "challenger-cracktro",
+      "label": "Cracktro Scroller",
+      "verdict": "declined",
+      "lineage": "Demoscene title screens",
+      "thesis": "Rank is depth; nothing is ever boxed.",
+      "palette": ["#000000", "#5a5a5a", "#e8e2d0", "#f0a52a"],
+      "materials": ["emissive void", "bitmap type", "drifting dust"],
+      "viewport": "One still line of text over drifting star fields.",
+      "case": "Unrelated to the audience's world and obscures controls.",
+      "kept": "State as one consistent density scale.",
+      "risk": "Unreadable for an operating surface.",
+      "hero": "https://impeccable.style/worlds/cards/operate-c-cracktro-scroller-queue-hero.webp"
+    },
+    {
+      "id": "challenger-punk-pasteup",
+      "label": "Punk Paste-up Zine",
+      "verdict": "declined",
+      "lineage": "Photocopied gig flyers",
+      "thesis": "Hierarchy is whatever got cut out biggest.",
+      "palette": ["#111111", "#f4f2ee", "#ff3d8b"],
+      "materials": ["xerox toner", "torn paper", "biro"],
+      "viewport": "A crooked paste-up spread.",
+      "case": "Undermines scientific trust and legibility.",
+      "kept": "One reserved colour for the user's own marks.",
+      "risk": "Wrong register for scientific tooling.",
+      "hero": "https://impeccable.style/worlds/cards/design-canon-punk-pasteup-table-hero.webp"
+    },
+    {
+      "id": "challenger-ikebana",
+      "label": "Ikebana Alcove",
+      "verdict": "declined",
+      "lineage": "Tokonoma arrangement",
+      "thesis": "Emptiness made active around one branch.",
+      "palette": ["#e9e3d6", "#6d6355", "#3e5ea8", "#3a2e22"],
+      "materials": ["plaster", "pine", "bronze"],
+      "viewport": "One arrangement off-centre in a quiet alcove.",
+      "case": "Too sparse for dense control panels and foreign to the audience.",
+      "kept": "One subject per sheet, with charged empty space.",
+      "risk": "Starves the controls of room.",
+      "hero": "https://impeccable.style/worlds/cards/growth-metamorphosis-branching-ikebana-ma-arrangement-hero.webp"
+    },
+    {
+      "id": "challenger-synthwave",
+      "label": "Grid Horizon Sunset",
+      "verdict": "declined",
+      "lineage": "Retro synth covers",
+      "thesis": "Everything on one receding horizon.",
+      "palette": ["#2b0f4c", "#c3238d", "#29e3f2", "#f7a531"],
+      "materials": ["wireframe grid", "banded sun"],
+      "viewport": "Extruded title over a perspective grid.",
+      "case": "Pure costume; it says nothing about cortical data.",
+      "kept": "Total palette commitment.",
+      "risk": "Kitsch.",
+      "hero": "https://impeccable.style/worlds/cards/digital-design-canon-grid-horizon-sunset-hero.webp"
+    }
+  ],
+  "reroll": { "registers": ["safer", "bolder"] },
+  "buildPath": { "value": "code", "toggle": true },
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard",
+    "thesis": "A neuroimaging viewer dashboard (sidebar, viewer, control panel), done to full craft.",
+    "palette": ["#121417", "#1d2125", "#e6e9eb", "#6aa9c4"],
+    "materials": ["flat dark panels", "workhorse UI sans", "native controls"],
+    "viewport": "Left chapter list, large viewer, right control panel, as niivue- and Workbench-style tools do.",
+    "risk": "Indistinguishable from other viewer demos by design.",
+    "comp": ".impeccable/mocks/decision/canon.webp",
+    "wireframe": { "cols": 12, "rows": 10, "regions": [
+      { "label": "chapter list", "x": 0, "y": 0, "w": 2, "h": 10 },
+      { "label": "viewer", "x": 2, "y": 0, "w": 7, "h": 10, "accent": true },
+      { "label": "controls", "x": 9, "y": 0, "w": 3, "h": 10 }
+    ] }
+  },
+  "steer": true
+}
