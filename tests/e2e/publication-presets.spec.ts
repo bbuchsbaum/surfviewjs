@@ -1,28 +1,107 @@
+import { readFile } from 'node:fs/promises';
 import { test, expect } from '@playwright/test';
 
-test('publication preset demo renders and exports a PNG figure', async ({ page }) => {
-  await page.goto('/demo/index.html');
+test('figures chapter applies style presets and downloads an exported PNG', async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.goto('/demo/index.html?scenario=publication-presets');
+  await expect(page.locator('#status-text')).toHaveText('Running: Figures', { timeout: 20_000 });
+  const status = page.locator('[data-publication-status]');
+  await expect(status).toContainText('Ready');
 
-  await page.getByRole('button', { name: /publication presets/i }).click();
-  await expect(page.locator('[data-publication-status]')).toContainText('Ready', { timeout: 10000 });
+  // Every preset from listStylePresets() is offered, including the 2.3.0 report preset.
+  const presets = page.locator('#figures-preset');
+  await expect(presets.getByRole('radio')).toHaveCount(9);
+  await expect(presets.getByRole('radio', { name: 'Report' })).toHaveCount(1);
 
-  await page.getByRole('button', { name: /talk dark/i }).click();
-  await expect(page.locator('[data-publication-status]')).toContainText('Talk Dark');
-
+  const before = await page.locator('#viewer-slot canvas').screenshot();
+  await presets.getByRole('radio', { name: 'Talk Dark', exact: true }).check();
+  await expect(status).toContainText('Talk Dark');
+  await expect(page.locator('#viewer-frame')).toContainText(/Preset\s*Talk Dark/);
   const viewerShot = await page.locator('#viewer-slot').screenshot();
   expect(viewerShot.length).toBeGreaterThan(5000);
+  expect(viewerShot.equals(before)).toBe(false);
+  // The live film keeps its base colour; the preset background is an export choice.
+  expect(await page.evaluate(() => getComputedStyle(document.querySelector('.film-viewer')!).backgroundColor))
+    .toBe('rgb(14, 21, 29)');
 
-  const dataUrl = await page.evaluate(() => {
-    const demo = (window as any).__surfviewPublicationDemo;
-    if (!demo) return null;
-    return demo.exportPNG();
-  });
+  // The colour key describes the map itself.
+  await expect(page.locator('#figures-key')).toHaveText(/Synthetic contrast \(z\): −5\.0 to 5\.0, masked −1\.65 to 1\.65/);
 
-  expect(dataUrl).toMatch(/^data:image\/png;base64,/);
-  expect(dataUrl!.length).toBeGreaterThan(10000);
-
+  await page.locator('#figures-size').selectOption('640x480');
+  const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: /export png/i }).click();
-  await expect(page.locator('[data-publication-status]')).toContainText(/PNG \d+ chars/);
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe('surfview-figure.png');
+  const bytes = await readFile((await download.path())!);
+  expect(bytes.subarray(1, 4).toString('ascii')).toBe('PNG');
+  expect(bytes.readUInt32BE(16)).toBe(640);
+  expect(bytes.readUInt32BE(20)).toBe(480);
+  expect(bytes.length).toBeGreaterThan(10_000);
+  await expect(status).toContainText(/PNG 640 × 480 px, \d+ KB, saved as surfview-figure\.png/);
+
+  // The margin preview shows the file that was written, on the preset's opaque background.
+  const preview = page.locator('img.figure-preview');
+  await expect(preview).toBeVisible();
+  const corner = await preview.evaluate(async (image: HTMLImageElement) => {
+    await image.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext('2d')!;
+    context.drawImage(image, 0, 0);
+    return { size: [image.naturalWidth, image.naturalHeight], pixel: Array.from(context.getImageData(1, 1, 1, 1).data) };
+  });
+  expect(corner.size).toEqual([640, 480]);
+  const talkDark = await page.evaluate(async () => {
+    const { getStylePreset } = await import('/src/index.ts');
+    return getStylePreset('talk-dark').background.clearColor;
+  });
+  expect(corner.pixel).toEqual([(talkDark >> 16) & 255, (talkDark >> 8) & 255, talkDark & 255, 255]);
+
+  // Transparent background really exports alpha.
+  await page.locator('#figures-background').getByRole('radio', { name: 'Transparent', exact: true }).check();
+  const transparentDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: /export png/i }).click();
+  await transparentDownload;
+  const alpha = await preview.evaluate(async (image: HTMLImageElement) => {
+    await new Promise(resolve => (image.complete ? resolve(null) : image.addEventListener('load', resolve, { once: true })));
+    await image.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext('2d')!;
+    context.drawImage(image, 0, 0);
+    return context.getImageData(1, 1, 1, 1).data[3];
+  });
+  expect(alpha).toBe(0);
+});
+
+test('figures chapter mounts an anatomical report scene and exports from it', async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.goto('/demo/index.html?scenario=figures');
+  await expect(page.locator('#status-text')).toHaveText('Running: Figures', { timeout: 20_000 });
+  await page.locator('#figures-mode').getByRole('radio', { name: 'Report scene', exact: true }).check();
+  await expect(page.locator('.figure-report .surfview-mount')).toHaveCount(1);
+  await expect(page.locator('#status-text')).toHaveText('Report scene ready', { timeout: 20_000 });
+  await expect(page.locator('#viewer-frame')).toContainText(/Source\s*mountSurfView, anatomical/);
+  await expect(page.locator('#figures-key')).toHaveText('Visual–motor contrast (z): −6.0 to 6.0, masked −2.30 to 2.30');
+
+  const canvas = page.locator('.figure-report canvas');
+  await expect(canvas).toHaveCount(1);
+  const oblique = await canvas.screenshot();
+  await page.locator('#figures-brain-view').getByRole('radio', { name: 'Left medial', exact: true }).check();
+  await expect(page.locator('#viewer-frame')).toContainText(/View\s*Left medial/);
+  await expect.poll(async () => (await canvas.screenshot()).equals(oblique)).toBe(false);
+
+  await page.locator('#figures-report-map').selectOption('frontoparietal');
+  await expect(page.locator('#figures-key')).toContainText('Frontoparietal contrast (z)');
+
+  await page.locator('#figures-size').selectOption('640x480');
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: /export png/i }).click();
+  const bytes = await readFile((await (await downloadPromise).path())!);
+  expect(bytes.readUInt32BE(16)).toBe(640);
+  await expect(page.locator('[data-publication-status]')).toContainText(/PNG 640 × 480 px/);
 });
 
 test('explicit background wins over presentation preset at construction', async ({ page }) => {

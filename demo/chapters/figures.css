@@ -1,0 +1,45 @@
+/* Figures chapter: a title field, the exported-figure preview, and the report-scene host. */
+
+#app[data-scenario='figures'] .control-text {
+  display: grid;
+  gap: 6px;
+}
+
+#app[data-scenario='figures'] .control-text label {
+  color: var(--ink);
+  font-size: 13.5px;
+}
+
+#app[data-scenario='figures'] .control-text input {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--d3);
+  border-radius: 0;
+  background: var(--d0);
+  color: var(--ink-hi);
+  font: inherit;
+  font-size: 13.5px;
+}
+
+#app[data-scenario='figures'] .control-text input:hover {
+  border-color: var(--ink-lo);
+}
+
+#app[data-scenario='figures'] .control-readout output {
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+/* The exported PNG at margin width, on the film base so transparency reads as film. */
+#app[data-scenario='figures'] .figure-preview {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--d2);
+  background: var(--d0);
+}
+
+#app[data-scenario='figures'] .figure-report {
+  position: absolute;
+  inset: 0;
+}

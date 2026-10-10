@@ -1,60 +1,51 @@
+import { firstLook } from './chapters/firstLook';
+import { layers } from './chapters/layers';
+import { statistics } from './chapters/statistics';
+import { volume } from './chapters/volume';
+import { timeSeries } from './chapters/timeSeries';
+import { anatomy } from './chapters/anatomy';
+import { inspect } from './chapters/inspect';
+import { atlasPlates } from './chapters/atlasPlates';
+import { parcelPuzzle } from './chapters/parcelPuzzle';
+import { parcelMapLab } from './chapters/parcelMapLab';
+import { connectivity } from './chapters/connectivity';
+import { figures } from './chapters/figures';
+import { controls } from './chapters/controls';
+import { dataInOut } from './chapters/dataInOut';
 import type { Scenario } from './types';
-import { atlasIllustration } from './scenarios/atlasIllustration';
-import { parcelPuzzle } from './scenarios/parcelPuzzle';
-import { parcelMapLab } from './scenarios/parcelMapLab';
-import { quickstart } from './scenarios/quickstart';
-import { multilayer } from './scenarios/multilayer';
-import { hemispheres } from './scenarios/hemispheres';
-import { fileLoading } from './scenarios/fileLoading';
-import { lighting } from './scenarios/lighting';
-import { fslrFunc } from './scenarios/fslrFunc';
-import { gpuCompositing } from './scenarios/gpuCompositing';
-import { volumeProjection } from './scenarios/volumeProjection';
-import { normalProjection } from './scenarios/normalProjection';
-import { curvature } from './scenarios/curvature';
-import { clipping } from './scenarios/clipping';
-import { colormap2d } from './scenarios/colormap2d';
-import { morphing } from './scenarios/morphing';
-import { gpupicking } from './scenarios/gpupicking';
-import { temporalPlayback } from './scenarios/temporalPlayback';
-import { statisticalMap } from './scenarios/statisticalMap';
-import { connectivity } from './scenarios/connectivity';
-import { parcelConnectivity } from './scenarios/parcelConnectivity';
-import { stateSerialization } from './scenarios/stateSerialization';
-import { topologyLens } from './scenarios/topologyLens';
-import { linkedFlatmap } from './scenarios/linkedFlatmap';
-import { alignmentQA } from './scenarios/alignmentQA';
-import { publicationPresets } from './scenarios/publicationPresets';
-import { controlsPanel } from './scenarios/controlsPanel';
-import { controlsGallery } from './scenarios/controlsGallery';
 
+/** Chapter order on the viewbox strip. The first chapter opens by default. */
 export const scenarios: Scenario[] = [
-  quickstart,
-  atlasIllustration,
+  firstLook,
+  layers,
+  statistics,
+  volume,
+  timeSeries,
+  anatomy,
+  inspect,
+  atlasPlates,
   parcelPuzzle,
   parcelMapLab,
-  controlsPanel,
-  controlsGallery,
-  multilayer,
-  curvature,
-  clipping,
-  colormap2d,
-  morphing,
-  gpupicking,
-  temporalPlayback,
-  statisticalMap,
   connectivity,
-  parcelConnectivity,
-  topologyLens,
-  linkedFlatmap,
-  alignmentQA,
-  publicationPresets,
-  stateSerialization,
-  lighting,
-  hemispheres,
-  fslrFunc,
-  gpuCompositing,
-  volumeProjection,
-  normalProjection,
-  fileLoading
+  figures,
+  controls,
+  dataInOut
 ];
+
+/** The one-word subject printed under each chapter's title on the strip. */
+export const STRIP_SUBJECTS: Readonly<Record<string, string>> = {
+  'first-look': 'viewer',
+  layers: 'compositing',
+  statistics: 'inference',
+  volume: 'projection',
+  'time-series': 'playback',
+  anatomy: 'geometry',
+  inspect: 'picking',
+  'atlas-illustration': 'vector',
+  'parcel-puzzle': 'pieces',
+  'parcel-map-lab': 'flatmap',
+  connectivity: 'networks',
+  figures: 'export',
+  controls: 'panel',
+  data: 'files'
+};

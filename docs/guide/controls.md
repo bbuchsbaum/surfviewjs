@@ -21,11 +21,15 @@ mounting the panel:
 npm install surfview three
 ```
 
-The [interactive configuration gallery](https://bbuchsbaum.github.io/surfviewjs/demo/?scenario=controls-gallery)
-shows the panel with dense and sparse data, one and many layers, light and dark
-themes, compact and comfortable density, and narrow layouts. For a quieter
-product view, open the [desktop layer workflow](https://bbuchsbaum.github.io/surfviewjs/demo/?scenario=controls-gallery&mode=product&task=layers)
-or the [narrow view workflow](https://bbuchsbaum.github.io/surfviewjs/demo/?scenario=controls-gallery&mode=product&task=view).
+The [Controls panel chapter](https://bbuchsbaum.github.io/surfviewjs/demo/?scenario=controls)
+of the demo mounts the full panel over both fsaverage5 hemispheres, themed
+through the CSS custom properties described below. For a task-focused panel,
+open the [layer workflow](https://bbuchsbaum.github.io/surfviewjs/demo/?scenario=controls&mode=product&task=layers)
+or the [view workflow](https://bbuchsbaum.github.io/surfviewjs/demo/?scenario=controls&mode=product&task=view).
+Dense and sparse data, one and many layers, light and dark themes, compact and
+comfortable density, and narrow layouts are exercised by test fixture pages in
+the repository (`tests/controls-gallery.html`, `tests/controls-fixture.html`),
+which the browser tests in `tests/e2e/controls-*.spec.ts` drive.
 
 ## Canonical mounting API
 

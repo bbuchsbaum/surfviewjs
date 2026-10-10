@@ -14,27 +14,80 @@ function collectErrors(page: Page): string[] {
   return errors;
 }
 
-test('gallery opens the featured Glasser puzzle and full-width 2D map, then cleans up on reset and navigation', async ({ page }) => {
+const chapter = (page: Page, title: string) =>
+  page.getByRole('group', { name: /Surfaces|Atlases|Workflows/ }).getByRole('button', { name: title, exact: true });
+
+/** Distinct colours in a canvas screenshot: a rendered brain has many, a blank film has one. */
+async function distinctColours(page: Page, selector: string): Promise<number> {
+  const png = await page.locator(selector).screenshot();
+  return page.evaluate(async bytes => {
+    const blob = new Blob([new Uint8Array(bytes)], { type: 'image/png' });
+    const bitmap = await createImageBitmap(blob);
+    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+    const context = canvas.getContext('2d')!;
+    context.drawImage(bitmap, 0, 0);
+    const { data } = context.getImageData(0, 0, bitmap.width, bitmap.height);
+    const colours = new Set<number>();
+    for (let i = 0; i < data.length; i += 4 * 7) colours.add((data[i]! << 16) | (data[i + 1]! << 8) | data[i + 2]!);
+    return colours.size;
+  }, [...png]);
+}
+
+test('opens First look by default with a rendered cortex, live film overlays and a public-API excerpt', async ({ page }) => {
+  test.setTimeout(60000);
+  const errors = collectErrors(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/demo/');
+
+  await expect(page.locator('#active-title')).toHaveText('First look');
+  await expect(page.locator('#status-text')).toHaveText('Running: First look', { timeout: 30000 });
+  await expect(page).toHaveURL(/scenario=first-look/);
+  await expect(page.getByRole('group', { name: 'Surfaces' })).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Atlases' })).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Workflows' })).toBeVisible();
+  await expect(page.locator('.frame')).toHaveCount(14);
+  await expect(chapter(page, 'First look')).toHaveAttribute('aria-current', 'page');
+
+  await expect(page.locator('#viewer-slot canvas')).toBeVisible();
+  expect(await distinctColours(page, '#viewer-slot canvas')).toBeGreaterThan(40);
+  await expect(page.locator('.film-corner-tl')).toContainText('fsaverage5');
+  await expect(page.locator('.film-orient-left')).toHaveText('A');
+  await expect(page.locator('.film-orient-right')).toHaveText('P');
+
+  const threshold = page.getByLabel('Hide values within (±z)');
+  await threshold.fill('3');
+  await expect(page.locator('.film-corner-bl')).toContainText('±3.0');
+  await page.getByRole('radio', { name: 'Medial' }).check();
+  await expect(page.locator('.film-corner-tr')).toContainText('Medial');
+
+  await expect(page.locator('#active-synthetic')).toContainText('not a result');
+  await page.locator('#code-block summary').click();
+  await expect(page.locator('#code-text')).toContainText("from 'surfview'");
+  await expect(page.locator('#code-text')).not.toContainText('@src');
+  expect(errors).toEqual([]);
+});
+
+test('old scenario ids open the chapter that absorbed them', async ({ page }) => {
+  await page.goto('/demo/?scenario=quickstart');
+  await expect(page.locator('#active-title')).toHaveText('First look');
+  await expect(page).toHaveURL(/scenario=first-look/);
+  await page.goto('/demo/?scenario=no-such-chapter');
+  await expect(page.locator('#active-title')).toHaveText('First look');
+});
+
+test('opens the Glasser puzzle and the full-width map lab, then cleans up on reset and navigation', async ({ page }) => {
   test.setTimeout(90000);
   const errors = collectErrors(page);
   await page.setViewportSize({ width: 1500, height: 940 });
-  await page.goto('/demo/');
+  await page.goto('/demo/?scenario=parcel-puzzle&atlas=glasser');
 
-  const featured = page.locator('.scenario-btn-featured');
-  await expect(featured).toHaveCount(3);
-  await expect(featured.filter({ hasText: 'Glasser atlas plates' })).toBeVisible();
-  await expect(featured.filter({ hasText: 'Glasser parcel puzzle' })).toBeVisible();
-  await expect(featured.filter({ hasText: '2D parcel map laboratory' })).toBeVisible();
-
-  await featured.filter({ hasText: 'Glasser parcel puzzle' }).click();
-  await expect(page).toHaveURL(/scenario=parcel-puzzle/);
-  await expect(page).toHaveURL(/atlas=glasser/);
   await expect(page.locator('.sv-parcel-puzzle[data-ready="true"]')).toBeVisible({ timeout: 30000 });
+  await expect(chapter(page, 'Parcel puzzle')).toHaveAttribute('aria-current', 'page');
   await expect(page.getByLabel('Puzzle atlas', { exact: true })).toHaveValue('glasser');
   await expect(page.getByLabel('Inspect a parcel', { exact: true }).locator('option')).toHaveCount(181);
 
   const firstPuzzle = await page.locator('.sv-parcel-puzzle').elementHandle();
-  await page.getByRole('button', { name: 'Reset', exact: true }).click();
+  await page.getByRole('button', { name: 'Reset chapter', exact: true }).click();
   await expect(page.locator('.sv-parcel-puzzle[data-ready="true"]')).toBeVisible({ timeout: 30000 });
   await expect(page.getByLabel('Puzzle atlas', { exact: true })).toHaveValue('glasser');
   expect(await firstPuzzle!.evaluate(element => element.isConnected)).toBe(false);
@@ -43,18 +96,17 @@ test('gallery opens the featured Glasser puzzle and full-width 2D map, then clea
   await page.getByLabel('Puzzle atlas', { exact: true }).selectOption('schaefer400-7');
   await expect(page).toHaveURL(/atlas=schaefer400-7/);
   await expect(page.getByLabel('Inspect a parcel', { exact: true }).locator('option')).toHaveCount(201);
-  await expect(page.locator('.scenario-btn-featured').filter({ hasText: 'Glasser parcel puzzle' })).not.toHaveAttribute('aria-current', 'page');
-  await page.getByRole('button', { name: 'Reset', exact: true }).click();
+  await page.getByRole('button', { name: 'Reset chapter', exact: true }).click();
   await expect(page.getByLabel('Puzzle atlas', { exact: true })).toHaveValue('schaefer400-7');
   await page.reload();
   await expect(page.locator('.sv-parcel-puzzle[data-ready="true"]')).toBeVisible({ timeout: 30000 });
   await expect(page.getByLabel('Puzzle atlas', { exact: true })).toHaveValue('schaefer400-7');
 
-  await page.locator('.scenario-btn-featured').filter({ hasText: '2D parcel map laboratory' }).click();
+  await chapter(page, 'Parcel map lab').click();
+  await expect(page).toHaveURL(/scenario=parcel-map-lab/);
+  await expect(page).not.toHaveURL(/atlas=/);
   const map = page.locator('.parcel-map-lab');
   await expect(map).toHaveAttribute('data-ready', 'true', { timeout: 30000 });
-  await expect(map).toHaveAttribute('data-dataset', 'glasser');
-  await expect(page.getByLabel('Map dataset', { exact: true })).toHaveValue('glasser');
   await expect(page.locator('.workspace')).toHaveAttribute('data-layout', 'wide');
   await expect(page.locator('#panel')).toBeHidden();
   await expect(page.getByLabel('Map experiment controls', { exact: true })).toBeVisible();
@@ -62,8 +114,8 @@ test('gallery opens the featured Glasser puzzle and full-width 2D map, then clea
   expect(mapBox!.width).toBeGreaterThan(900);
 
   const oldMap = await map.elementHandle();
-  await page.locator('.scenario-btn:not(.scenario-btn-featured)[data-id="quickstart"]').click();
-  await expect(page.locator('[data-scenario-host="quickstart"] canvas')).toBeVisible({ timeout: 30000 });
+  await chapter(page, 'First look').click();
+  await expect(page.locator('[data-scenario-host="first-look"] canvas')).toBeVisible({ timeout: 30000 });
   await expect(page.locator('.workspace')).toHaveAttribute('data-layout', 'standard');
   await expect(page.locator('#panel')).toBeVisible();
   expect(await oldMap!.evaluate(element => element.isConnected)).toBe(false);
@@ -71,54 +123,43 @@ test('gallery opens the featured Glasser puzzle and full-width 2D map, then clea
   expect(errors).toEqual([]);
 });
 
-test('featured parcel tools remain keyboard accessible without horizontal page overflow on a small screen', async ({ page }) => {
+test('chapters stay keyboard accessible without horizontal page overflow on a small screen', async ({ page }) => {
   test.setTimeout(90000);
   const errors = collectErrors(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/demo/?scenario=parcel-puzzle&atlas=glasser');
   await expect(page.locator('.sv-parcel-puzzle[data-ready="true"]')).toBeVisible({ timeout: 30000 });
   await expect(page.locator('.nav')).toBeVisible();
-  await expect(page.getByLabel('Puzzle atlas', { exact: true })).toHaveValue('glasser');
 
-  const search = page.getByLabel('Search demonstrations', { exact: true });
-  await search.focus();
-  const focusStyle = await search.evaluate(element => {
+  const lab = chapter(page, 'Parcel map lab');
+  await lab.focus();
+  const focusStyle = await lab.evaluate(element => {
     const style = getComputedStyle(element);
     return { style: style.outlineStyle, width: parseFloat(style.outlineWidth) };
   });
   expect(focusStyle.style).not.toBe('none');
   expect(focusStyle.width).toBeGreaterThanOrEqual(2);
-
-  await page.reload();
-  await expect(page.locator('.sv-parcel-puzzle[data-ready="true"]')).toBeVisible({ timeout: 30000 });
-  await expect(page.getByLabel('Puzzle atlas', { exact: true })).toHaveValue('glasser');
-  await search.fill('flatmap');
-  await expect(page.locator('.scenario-btn[data-id="parcel-map-lab"]')).toHaveCount(2);
-  await search.clear();
-
-  const labButton = page.locator('.scenario-btn-featured').filter({ hasText: '2D parcel map laboratory' });
-  await labButton.scrollIntoViewIfNeeded();
-  await labButton.focus();
   await page.keyboard.press('Enter');
+
   const map = page.locator('.parcel-map-lab');
   await expect(map).toHaveAttribute('data-ready', 'true', { timeout: 30000 });
-  await expect(map).toHaveAttribute('data-dataset', 'glasser');
   await expect(page.getByLabel('Map experiment controls', { exact: true })).toBeVisible();
-  await expect(page.locator('#panel')).toBeHidden();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 
   await page.goBack();
   await expect(page.locator('.sv-parcel-puzzle[data-ready="true"]')).toBeVisible({ timeout: 30000 });
   await expect(page.getByLabel('Puzzle atlas', { exact: true })).toHaveValue('glasser');
   await page.goForward();
-  await expect(page.locator('.parcel-map-lab[data-ready="true"]')).toHaveAttribute('data-dataset', 'glasser', { timeout: 30000 });
+  await expect(page.locator('.parcel-map-lab[data-ready="true"]')).toBeVisible({ timeout: 30000 });
 
+  // Rapid successive navigation must leave exactly the last chapter mounted.
   await page.evaluate(() => {
-    (document.querySelector('.scenario-btn-featured[data-id="parcel-puzzle"]') as HTMLButtonElement).click();
-    (document.querySelector('.scenario-btn:not(.scenario-btn-featured)[data-id="quickstart"]') as HTMLButtonElement).click();
+    (document.querySelector('.frame[data-id="parcel-puzzle"]') as HTMLButtonElement).click();
+    (document.querySelector('.frame[data-id="first-look"]') as HTMLButtonElement).click();
   });
-  await expect(page.locator('[data-scenario-host="quickstart"] canvas')).toBeVisible({ timeout: 30000 });
+  await expect(page.locator('[data-scenario-host="first-look"] canvas')).toBeVisible({ timeout: 30000 });
   await expect(page.locator('.sv-parcel-puzzle')).toHaveCount(0);
   await expect(page.locator('.parcel-map-lab')).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   expect(errors).toEqual([]);
 });

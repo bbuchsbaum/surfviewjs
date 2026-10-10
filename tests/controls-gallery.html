@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SurfView Controls design gallery fixture</title>
+  <!-- Test-only QA page hosting the controls design gallery inside the pre-redesign demo shell. -->
+  <link rel="stylesheet" href="./controls-legacy-shell.css" />
+  <link rel="stylesheet" href="./controls-gallery.css" />
+</head>
+<body>
+  <div id="app">
+    <aside class="nav">
+      <div class="brand">
+        <div class="mark"></div>
+        <div>
+          <div class="label">SurfView</div>
+          <div class="sub">Test fixture</div>
+        </div>
+      </div>
+      <div class="nav-section nav-scenarios">
+        <div class="nav-section-title">Fixture</div>
+        <div id="scenario-list" class="scenario-list"></div>
+      </div>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <div class="crumb" id="active-title">Controls design gallery fixture</div>
+          <div class="subtitle" id="active-desc"></div>
+        </div>
+        <div class="top-actions">
+          <span class="tag" id="active-tags">test fixture</span>
+        </div>
+      </header>
+      <section class="workspace">
+        <div id="viewer-frame">
+          <div id="viewer-slot"></div>
+          <div id="status-block">
+            <div id="status-text">Idle</div>
+            <div id="perf-text"></div>
+          </div>
+        </div>
+        <div id="panel"></div>
+      </section>
+    </main>
+  </div>
+  <script type="module" src="./controls-gallery.ts"></script>
+</body>
+</html>

@@ -1,0 +1,321 @@
+/* Atlas plates: printed vector plates hung on the film; the scan corners keep bands above and below. */
+
+#app[data-scenario='atlas-illustration'] .atlas-stage {
+  position: absolute;
+  inset: 58px 16px 56px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+#app[data-scenario='atlas-illustration'] .atlas-sheet {
+  display: grid;
+  gap: 22px;
+  min-width: 0;
+  padding-bottom: 8px;
+}
+
+#app[data-scenario='atlas-illustration'] .atlas-sheet-heading {
+  display: grid;
+  gap: 4px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--d2);
+}
+
+#app[data-scenario='atlas-illustration'] .atlas-title {
+  margin: 0;
+  color: var(--ink-hi);
+  font-size: clamp(24px, 2.4vw, 34px);
+  font-weight: 620;
+  font-stretch: 72%;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+
+#app[data-scenario='atlas-illustration'] .atlas-subtitle,
+#app[data-scenario='atlas-illustration'] .atlas-key {
+  margin: 0;
+  font-size: 13.5px;
+}
+
+#app[data-scenario='atlas-illustration'] .atlas-subtitle {
+  color: var(--ink);
+}
+
+#app[data-scenario='atlas-illustration'] .atlas-key {
+  color: var(--ink-lo);
+}
+
+#app[data-scenario='atlas-illustration'] .atlas-network-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin-top: 6px;
+  color: var(--ink);
+  font-size: 12.5px;
+}
+
+#app[data-scenario='atlas-illustration'] .atlas-network-legend:empty {
+  display: none;
+}
+
+#app[data-scenario='atlas-illustration'] .atlas-network-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+#app[data-scenario='atlas-illustration'] .atlas-network-legend i {
+  width: 10px;
+  height: 10px;
+}
+
+#app[data-scenario='atlas-illustration'] .atlas-views {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 22px;
+}
+
+#app[data-scenario='atlas-illustration'] .atlas-views[data-columns='2'] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+#app[data-scenario='atlas-illustration'] .atlas-figure {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+#app[data-scenario='atlas-illustration'] .atlas-figure-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+}
+
+#app[data-scenario='atlas-illustration'] .atlas-figure-heading h3 {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  margin: 0 auto 0 0;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 520;
+}
+
+#app[data-scenario='atlas-illustration'] .atlas-figure-heading h3 span {
+  color: var(--ink-hi);
+  font-size: 20px;
+  font-weight: 680;
+  font-stretch: 72%;
+}
+
+#app[data-scenario='atlas-illustration'] .atlas-export,
+#app[data-scenario='atlas-illustration'] .atlas-zoom-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+#app[data-scenario='atlas-illustration'] .atlas-zoom-tools .action {
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+}
+
+#app[data-scenario='atlas-illustration'] .atlas-zoom-tools svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
+
+#app[data-scenario='atlas-illustration'] .atlas-figure-heading .action,
+#app[data-scenario='atlas-illustration'] .atlas-focus-heading .action {
+  padding: 4px 10px 5px;
+  font-size: 12.5px;
+}
+
+#app[data-scenario='atlas-illustration'] .atlas-zoom-tools output {
+  min-width: 28px;
+  text-align: center;
+  color: var(--ink-hi);
+  font-family: var(--font-data);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+#app[data-scenario='atlas-illustration'] .atlas-figure-summary {
+  margin: 0;
+  color: var(--ink-lo);
+  font-size: 12.5px;
+}
+
+#app[data-scenario='atlas-illustration'] .atlas-sheet-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--d2);
+  color: var(--ink-lo);
+  font-size: 12.5px;
+}
+
+#app[data-scenario='atlas-illustration'] .atlas-focus {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--d3);
+  background: var(--d1);
+}
+
+#app[data-scenario='atlas-illustration'] .atlas-focus[hidden] {
+  display: none;
+}
+
+#app[data-scenario='atlas-illustration'] .atlas-focus-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+#app[data-scenario='atlas-illustration'] .atlas-focus h2 {
+  margin: 0 0 4px;
+  color: var(--ink-hi);
+  font-size: 20px;
+  font-weight: 620;
+  font-stretch: 76%;
+  overflow-wrap: anywhere;
+}
+
+#app[data-scenario='atlas-illustration'] .atlas-focus p {
+  margin: 0;
+  color: var(--ink-lo);
+  font-size: 12.5px;
+}
+
+#app[data-scenario='atlas-illustration'] .atlas-focus-canvas {
+  width: 100%;
+  max-width: 650px;
+  margin: 0 auto;
+}
+
+/* the plates are library SVG prints; only focus marks and selection behaviour are set here */
+
+#app[data-scenario='atlas-illustration'] .atlas-figure .surfview-atlas-plate {
+  width: 100%;
+  max-width: var(--plate-fit, none);
+  justify-self: center;
+}
+
+/* once zoomed, a plate takes its column's full width and the stage scrolls */
+#app[data-scenario='atlas-illustration'] .atlas-figure[data-zoomed='true'] .surfview-atlas-plate {
+  max-width: none;
+}
+
+#app[data-scenario='atlas-illustration'] .surfview-atlas-plate {
+  user-select: none;
+}
+
+#app[data-scenario='atlas-illustration'] .surfview-atlas-plate [role='button']:focus {
+  outline: none;
+}
+
+#app[data-scenario='atlas-illustration'] .surfview-atlas-plate [role='button']:focus > path {
+  stroke: var(--mark);
+  stroke-width: 3px;
+}
+
+#app[data-scenario='atlas-illustration'] .surfview-atlas-plate text[tabindex]:focus {
+  outline: 1px dashed var(--mark);
+}
+
+/* margin controls that the kit does not provide */
+
+#app[data-scenario='atlas-illustration'] .control-text,
+#app[data-scenario='atlas-illustration'] .atlas-fill-control {
+  display: grid;
+  gap: 6px;
+}
+
+#app[data-scenario='atlas-illustration'] .control-text label,
+#app[data-scenario='atlas-illustration'] .atlas-fill-control label {
+  color: var(--ink);
+  font-size: 13.5px;
+}
+
+#app[data-scenario='atlas-illustration'] .control-text input {
+  width: 100%;
+  min-width: 0;
+  padding: 7px 10px;
+  border: 1px solid var(--d3);
+  border-radius: 0;
+  background: var(--d0);
+  color: var(--ink-hi);
+  font-size: 13.5px;
+}
+
+#app[data-scenario='atlas-illustration'] .control-text input:hover,
+#app[data-scenario='atlas-illustration'] .atlas-fill-control input:hover {
+  border-color: var(--ink-lo);
+}
+
+#app[data-scenario='atlas-illustration'] .atlas-fill-control input {
+  width: 64px;
+  height: 32px;
+  padding: 3px;
+  border: 1px solid var(--d3);
+  border-radius: 0;
+  background: var(--d0);
+  cursor: pointer;
+}
+
+#app[data-scenario='atlas-illustration'] .atlas-fill-control input::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+#app[data-scenario='atlas-illustration'] .atlas-fill-control input::-webkit-color-swatch {
+  border: 0;
+  border-radius: 0;
+}
+
+#app[data-scenario='atlas-illustration'] select:disabled,
+#app[data-scenario='atlas-illustration'] .control-toggle input:disabled,
+#app[data-scenario='atlas-illustration'] .control-toggle input:disabled + label {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+#app[data-scenario='atlas-illustration'] .atlas-selected {
+  margin: 0;
+  color: var(--ink-hi);
+  font-size: 20px;
+  font-weight: 620;
+  font-stretch: 76%;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+#app[data-scenario='atlas-illustration'] .atlas-composer-status {
+  color: var(--ink);
+}
+
+#app[data-scenario='atlas-illustration'] .atlas-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+}
+
+@media (max-width: 620px) {
+  /* the right-hand corner stacks under the left one on narrow films */
+  #app[data-scenario='atlas-illustration'] .atlas-stage {
+    inset: 96px 12px 56px;
+  }
+
+  #app[data-scenario='atlas-illustration'] .atlas-views[data-columns='2'] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -1,0 +1,4 @@
+/* Sections belonging to the inactive display mode are hidden. */
+#app[data-scenario='statistics'] .margin-section[hidden] {
+  display: none;
+}

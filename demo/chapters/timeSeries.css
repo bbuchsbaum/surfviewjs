@@ -1,0 +1,62 @@
+/* The time course hangs in the margin as a small ruled plate: blocks, axes, trace, playhead. */
+#app[data-scenario='time-series'] .ts-trace {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+#app[data-scenario='time-series'] .ts-trace-frame {
+  position: relative;
+  width: 316px;
+  max-width: 100%;
+  height: 144px;
+  overflow: hidden;
+}
+
+#app[data-scenario='time-series'] .ts-trace-frame svg {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+
+#app[data-scenario='time-series'] .ts-trace-plot {
+  position: absolute;
+  top: 14px;
+  left: 44px;
+  width: 272px;
+  height: 96px;
+}
+
+/* SparklineOverlay styles its canvas inline with a radius and shadow; the film refuses both. */
+#app[data-scenario='time-series'] .ts-trace-plot canvas {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+#app[data-scenario='time-series'] .ts-band {
+  fill: var(--d2);
+}
+
+#app[data-scenario='time-series'] .ts-band-label,
+#app[data-scenario='time-series'] .ts-tick,
+#app[data-scenario='time-series'] .ts-unit {
+  fill: var(--ink-lo);
+  font-family: var(--font-data);
+  font-size: 9.5px;
+}
+
+#app[data-scenario='time-series'] .ts-axis {
+  stroke: var(--d3);
+  stroke-width: 1;
+}
+
+#app[data-scenario='time-series'] .ts-zero {
+  stroke: var(--d3);
+  stroke-dasharray: 2 3;
+}
+
+#app[data-scenario='time-series'] .ts-trace figcaption {
+  color: var(--ink-lo);
+  font-family: var(--font-data);
+  font-size: 11px;
+}

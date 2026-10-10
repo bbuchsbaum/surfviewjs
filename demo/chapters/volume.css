@@ -1,0 +1,4 @@
+/* Sections belonging to the inactive projection method are hidden. */
+#app[data-scenario='volume'] .margin-section[hidden] {
+  display: none;
+}

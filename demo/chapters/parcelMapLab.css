@@ -1,0 +1,288 @@
+/* Parcel map lab: the planar map fills the film; its controls are a lit-margin column inside the film. */
+
+#app[data-scenario='parcel-map-lab'] {
+  --pml-controls: 340px;
+  --pml-stage-narrow: 440px;
+}
+
+#app[data-scenario='parcel-map-lab'] .parcel-map-lab {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--pml-controls);
+  min-width: 0;
+}
+
+#app[data-scenario='parcel-map-lab'] .parcel-map-lab [hidden] {
+  display: none !important;
+}
+
+/* the scan corners on the right sit over the map, not over the controls */
+#app[data-scenario='parcel-map-lab'] .film-corner-tr,
+#app[data-scenario='parcel-map-lab'] .film-corner-br {
+  right: calc(var(--pml-controls) + 16px);
+}
+
+#app[data-scenario='parcel-map-lab'] .pml-stage {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+#app[data-scenario='parcel-map-lab'] .pml-stage > canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+#app[data-scenario='parcel-map-lab'] .pml-legend {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 40%;
+  margin: 0;
+  color: var(--ink-lo);
+  font-size: 12.5px;
+  line-height: 1.4;
+  text-align: center;
+  pointer-events: none;
+}
+
+#app[data-scenario='parcel-map-lab'] .pml-tooltip {
+  position: absolute;
+  z-index: 4;
+  max-width: 224px;
+  padding: 5px 9px 6px;
+  background: var(--d2);
+  color: var(--ink-hi);
+  font-size: 12.5px;
+  pointer-events: none;
+}
+
+#app[data-scenario='parcel-map-lab'] .pml-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  padding: 40px;
+  background: color-mix(in srgb, var(--d0) 94%, transparent);
+  color: var(--ink-lo);
+  font-size: 14px;
+  text-align: center;
+}
+
+#app[data-scenario='parcel-map-lab'] .pml-detail {
+  position: absolute;
+  z-index: 4;
+  top: 72px;
+  right: 16px;
+  width: 248px;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--d3);
+  background: var(--d1);
+}
+
+#app[data-scenario='parcel-map-lab'] .pml-detail-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+#app[data-scenario='parcel-map-lab'] .pml-detail h3 {
+  margin: 2px 0 0;
+  color: var(--ink-hi);
+  font-size: 15px;
+  font-weight: 620;
+  font-stretch: 80%;
+  overflow-wrap: anywhere;
+}
+
+#app[data-scenario='parcel-map-lab'] .pml-detail .action {
+  padding: 3px 9px 4px;
+  font-size: 12px;
+}
+
+#app[data-scenario='parcel-map-lab'] [data-preview] {
+  position: relative;
+  height: 170px;
+  overflow: hidden;
+  background: var(--d0);
+}
+
+#app[data-scenario='parcel-map-lab'] [data-preview] canvas {
+  touch-action: none;
+}
+
+#app[data-scenario='parcel-map-lab'] [data-detail-values] {
+  margin: 0;
+  color: var(--ink-hi);
+  font-family: var(--font-data);
+  font-size: 11.5px;
+}
+
+#app[data-scenario='parcel-map-lab'] .pml-detail-help {
+  margin: 0;
+  color: var(--ink-lo);
+  font-size: 12px;
+}
+
+#app[data-scenario='parcel-map-lab'] .pml-controls {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 18px 18px 22px;
+  border-left: 1px solid var(--d2);
+  background: var(--d1);
+}
+
+#app[data-scenario='parcel-map-lab'] .pml-state {
+  color: var(--ink);
+  font-size: 12.5px;
+}
+
+#app[data-scenario='parcel-map-lab'] .pml-comparisons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+#app[data-scenario='parcel-map-lab'] .pml-comparisons:empty {
+  display: none;
+}
+
+#app[data-scenario='parcel-map-lab'] .pml-snapshot {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 5px 5px 7px;
+  border: 1px solid var(--d3);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 160ms var(--ease-out);
+}
+
+#app[data-scenario='parcel-map-lab'] .pml-snapshot:hover {
+  border-color: var(--ink-lo);
+}
+
+#app[data-scenario='parcel-map-lab'] .pml-snapshot img {
+  width: 100%;
+  height: 84px;
+  object-fit: contain;
+  background: var(--d0);
+}
+
+#app[data-scenario='parcel-map-lab'] .pml-snapshot strong {
+  color: var(--ink-hi);
+  font-size: 12.5px;
+  font-weight: 560;
+}
+
+#app[data-scenario='parcel-map-lab'] .pml-snapshot span {
+  color: var(--ink-lo);
+  font-family: var(--font-data);
+  font-size: 10.5px;
+}
+
+#app[data-scenario='parcel-map-lab'] .pml-notes summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+  font-size: 13px;
+  cursor: pointer;
+  list-style: none;
+}
+
+#app[data-scenario='parcel-map-lab'] .pml-notes summary::-webkit-details-marker {
+  display: none;
+}
+
+/* the same border-drawn chevron as the shell's code excerpt */
+#app[data-scenario='parcel-map-lab'] .pml-notes summary::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid var(--ink-lo);
+  border-bottom: 1.5px solid var(--ink-lo);
+  transform: rotate(-45deg);
+  transition: transform 220ms var(--ease-out);
+}
+
+#app[data-scenario='parcel-map-lab'] .pml-notes[open] summary::before {
+  transform: rotate(45deg);
+}
+
+#app[data-scenario='parcel-map-lab'] .pml-notes summary:hover {
+  color: var(--ink-hi);
+}
+
+#app[data-scenario='parcel-map-lab'] .pml-notes p {
+  margin: 8px 0 0;
+  color: var(--ink-lo);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+@media (max-width: 1100px) {
+  #app[data-scenario='parcel-map-lab'] {
+    --pml-controls: 300px;
+  }
+}
+
+@media (max-width: 760px) {
+  /* narrow films grow with the lab: map first, then its controls */
+  #app[data-scenario='parcel-map-lab'] .scenario-mount {
+    position: relative;
+  }
+
+  #app[data-scenario='parcel-map-lab'] .parcel-map-lab {
+    position: relative;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  #app[data-scenario='parcel-map-lab'] .pml-stage {
+    height: var(--pml-stage-narrow);
+  }
+
+  #app[data-scenario='parcel-map-lab'] .pml-controls {
+    overflow: visible;
+    border-left: 0;
+    border-top: 1px solid var(--d2);
+  }
+
+  /* the colour key competes with the stacked corners on a narrow film; the mode select names it */
+  #app[data-scenario='parcel-map-lab'] .pml-legend {
+    display: none;
+  }
+
+  #app[data-scenario='parcel-map-lab'] .pml-detail {
+    top: 108px;
+    right: 12px;
+    width: 210px;
+  }
+
+  #app[data-scenario='parcel-map-lab'] .film-corner-tr,
+  #app[data-scenario='parcel-map-lab'] .film-corner-br {
+    right: 16px;
+  }
+
+  /* bottom corners stay on the map, which is now the top of a taller film */
+  #app[data-scenario='parcel-map-lab'] .film-corner-bl,
+  #app[data-scenario='parcel-map-lab'] .film-corner-br {
+    top: calc(var(--pml-stage-narrow) - 76px);
+    bottom: auto;
+  }
+}

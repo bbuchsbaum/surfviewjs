@@ -1,0 +1,20 @@
+/* Parcels & connectivity: the margin shows only the active mode's controls. */
+
+#app[data-scenario='connectivity'] .margin-section[hidden] {
+  display: none;
+}
+
+#app[data-scenario='connectivity'] .conn-matrix {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  aspect-ratio: 1;
+  image-rendering: pixelated;
+  cursor: crosshair;
+  background: var(--d0);
+}
+
+#app[data-scenario='connectivity'] .control-readout output {
+  text-align: right;
+  overflow-wrap: anywhere;
+}

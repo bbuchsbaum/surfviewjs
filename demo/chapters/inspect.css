@@ -1,0 +1,79 @@
+/* Label field for the next mark: a ruled line, like the margin's other readouts. */
+#app[data-scenario='inspect'] .inspect-label {
+  display: grid;
+  gap: 6px;
+}
+
+#app[data-scenario='inspect'] .inspect-label label {
+  color: var(--ink);
+  font-size: 13.5px;
+}
+
+#app[data-scenario='inspect'] .inspect-label input {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--d3);
+  border-radius: 0;
+  background: var(--d0);
+  color: var(--mark);
+  font-family: var(--font-data);
+  font-size: 12.5px;
+}
+
+#app[data-scenario='inspect'] .inspect-label input::placeholder {
+  color: var(--ink-lo);
+}
+
+#app[data-scenario='inspect'] .inspect-label input:focus-visible {
+  outline: 2px solid var(--mark);
+  outline-offset: 2px;
+}
+
+/* The user's marks, written in chinagraph on the margin. */
+#app[data-scenario='inspect'] .inspect-marks {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--d2);
+}
+
+#app[data-scenario='inspect'] .inspect-marks li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--d2);
+}
+
+#app[data-scenario='inspect'] .inspect-mark-text {
+  display: grid;
+  min-width: 0;
+}
+
+#app[data-scenario='inspect'] .inspect-mark-text strong {
+  overflow: hidden;
+  color: var(--mark);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#app[data-scenario='inspect'] .inspect-mark-data {
+  color: var(--ink-lo);
+  font-family: var(--font-data);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+#app[data-scenario='inspect'] .inspect-marks li[aria-current='true'] .inspect-mark-data {
+  color: var(--ink-hi);
+}
+
+#app[data-scenario='inspect'] .inspect-marks .action {
+  padding: 4px 8px 5px;
+  font-size: 12.5px;
+}

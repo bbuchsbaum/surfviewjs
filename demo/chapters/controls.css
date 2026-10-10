@@ -1,0 +1,32 @@
+/*
+ * Controls chapter: <surfview-controls> themed through its public CSS custom
+ * properties so the panel reads as part of the margin. Rules on the host element
+ * take precedence over the component's built-in theme values.
+ */
+
+/* "Style with page tokens" off (.controls-host-library) leaves the component's own dark theme. */
+#app[data-scenario='controls'] .controls-host:not(.controls-host-library) surfview-controls {
+  --surfview-controls-background: var(--d1);
+  --surfview-controls-control-background: var(--d0);
+  --surfview-controls-color: var(--ink-hi);
+  --surfview-controls-muted: var(--ink-lo);
+  --surfview-controls-border: var(--d2);
+  --surfview-controls-border-strong: var(--d3);
+  --surfview-controls-subtle: var(--d2);
+  --surfview-controls-focus: var(--mark);
+  --surfview-controls-focus-soft: color-mix(in srgb, var(--mark) 16%, var(--d0));
+  --surfview-controls-focus-text: var(--ink-hi);
+  --surfview-controls-error: var(--alert);
+  --surfview-controls-histogram: var(--ink-lo);
+  --surfview-controls-mask: color-mix(in srgb, var(--ink-lo) 30%, transparent);
+  --surfview-controls-mask-border: var(--ink-lo);
+  --surfview-controls-radius: 0;
+}
+
+#app[data-scenario='controls'] .controls-host surfview-controls {
+  font-size: 13.5px;
+}
+
+#app[data-scenario='controls'] .controls-host {
+  margin-top: 4px;
+}

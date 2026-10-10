@@ -3,52 +3,61 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SurfView demonstration gallery</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='1' y='1' width='30' height='30' rx='3' fill='%2320272b' stroke='%2371818a'/%3E%3Cpath d='M16 8v16M8 16h16' stroke='%238eb8c6' stroke-width='2'/%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="./style.css" />
+  <meta name="color-scheme" content="dark" />
+  <title>SurfView · cortical surfaces in the browser</title>
+  <meta name="description" content="Interactive chapters showing SurfView, a Three.js library for cortical surface data: layers, thresholds, atlases, volume projection, time series and figure export." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230b1118'/%3E%3Crect x='5' y='7' width='22' height='18' fill='%231c2732' stroke='%23e9f0f4' stroke-width='1.5'/%3E%3Cpath d='M10 19c2-6 9-8 12-4' fill='none' stroke='%23f2c230' stroke-width='2'/%3E%3C/svg%3E" />
 </head>
 <body>
-  <div id="app">
-    <aside class="nav">
-      <div class="brand">
-        <div class="mark"></div>
-        <div>
-          <div class="label">SurfView</div>
-          <div class="sub">Demonstration gallery</div>
-        </div>
+  <div id="app" class="room">
+    <header class="room-head">
+      <a class="brand" href="./" aria-label="SurfView demo home">
+        <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="4.5" width="19" height="15" /><path d="M7 15c1.6-4.6 7-6.2 9.8-3.1" /></svg>
+        <span class="brand-name">SurfView</span>
+      </a>
+      <p class="room-tag">Cortical surface data in the browser, chapter by chapter.</p>
+      <nav class="room-links" aria-label="Project links">
+        <a href="https://bbuchsbaum.github.io/surfviewjs/">Guide</a>
+        <a href="https://bbuchsbaum.github.io/surfviewjs/api/">API</a>
+        <a href="https://github.com/bbuchsbaum/surfviewjs">Source</a>
+        <a href="https://www.npmjs.com/package/surfview" id="npm-link">npm</a>
+      </nav>
+    </header>
+
+    <nav class="strip nav" aria-label="Chapters">
+      <div id="scenario-list" class="strip-banks"></div>
+    </nav>
+
+    <main class="box workspace" data-layout="standard">
+      <div class="viewbox">
+      <figure id="viewer-frame" class="film" aria-busy="false">
+        <div id="viewer-slot" class="film-image"></div>
+        <figcaption id="status-block" class="film-edge">
+          <span class="edge-mark" id="edge-mark">SURFVIEW</span>
+          <span id="status-text" role="status">Idle</span>
+          <span id="perf-text"></span>
+        </figcaption>
+      </figure>
       </div>
-      <div class="nav-search">
-        <label class="sr-only" for="scenario-search">Search demonstrations</label>
-        <input id="scenario-search" type="search" placeholder="Search demonstrations" />
-      </div>
-      <div class="nav-section nav-scenarios">
-        <div class="nav-section-title">Explore</div>
-        <div id="scenario-list" class="scenario-list"></div>
-      </div>
-    </aside>
-    <main class="main">
-      <header class="topbar">
-        <div>
-          <div class="crumb" id="active-title">Pick a scenario</div>
-          <div class="subtitle" id="active-desc">Choose a demonstration from the navigation.</div>
-        </div>
-        <div class="top-actions">
-          <span class="tag" id="active-tags"></span>
-          <button id="reset-btn" class="ghost" disabled>Reset</button>
-        </div>
-      </header>
-      <section class="workspace">
-        <div id="viewer-frame">
-          <div id="viewer-slot"></div>
-          <div id="status-block">
-            <div id="status-text">Idle</div>
-            <div id="perf-text"></div>
+
+      <aside class="margin" aria-labelledby="active-title">
+        <header class="margin-head">
+          <h1 id="active-title">SurfView</h1>
+          <p id="active-desc"></p>
+          <p id="active-synthetic" class="synthetic" hidden></p>
+        </header>
+        <details id="code-block" class="code-block" hidden>
+          <summary>Code</summary>
+          <div class="code-body">
+            <pre><code id="code-text"></code></pre>
+            <button type="button" class="action code-copy" id="code-copy">Copy</button>
           </div>
-        </div>
-        <div id="panel">
-          <div class="panel-empty">Scenario controls will appear here.</div>
-        </div>
-      </section>
+        </details>
+        <div id="panel" class="margin-controls"></div>
+        <footer class="margin-foot">
+          <button id="reset-btn" type="button" class="action" disabled>Reset chapter</button>
+        </footer>
+      </aside>
     </main>
   </div>
   <script type="module" src="./main.ts"></script>

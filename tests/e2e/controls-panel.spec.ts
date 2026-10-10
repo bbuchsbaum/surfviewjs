@@ -28,8 +28,8 @@ test.describe('first-party controls visual fixture', () => {
       await route.abort('blockedbyclient');
     });
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto('/demo/index.html');
-    await page.getByRole('button', { name: /first-party controls panel/i }).click();
+    // The QA fixture page hosts the panel in the shell its goldens were recorded in.
+    await page.goto('/tests/controls-fixture.html');
 
     const controls = page.locator('[data-visual-qa="controls-panel"]');
     await expect(controls).toBeVisible({ timeout: 15000 });

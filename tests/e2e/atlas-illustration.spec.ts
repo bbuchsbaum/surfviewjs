@@ -16,7 +16,7 @@ test('composes a saved figure and inspects parcels without changing its framing'
   const originalX = Number(await label.getAttribute('x'));
   await label.scrollIntoViewIfNeeded();
   const box = (await label.boundingBox())!;
-  const unitsPerPixel = await lateral.locator('svg').evaluate(svg => 1200 / svg.getBoundingClientRect().width);
+  const unitsPerPixel = await lateral.locator('.surfview-atlas-plate svg').evaluate(svg => 1200 / svg.getBoundingClientRect().width);
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down(); await page.mouse.move(box.x + box.width / 2 + 24, box.y + box.height / 2 + 12, { steps: 5 }); await page.mouse.up();
   const moved = lateral.locator(`.atlas-labels text[data-parcel-id="${id}"]`);
@@ -55,12 +55,12 @@ test('composes a saved figure and inspects parcels without changing its framing'
   await expect(lateral.locator('.surfview-atlas-plate')).toHaveAttribute('data-zoom', '2');
   const detailedIds = await names.evaluateAll(nodes => nodes.map(node => node.getAttribute('data-parcel-id')));
   expect(detailedIds.some(id => !overviewIds.includes(id))).toBe(true);
-  const beforePan = await lateral.locator('svg').getAttribute('viewBox');
-  await lateral.locator('svg').scrollIntoViewIfNeeded();
-  const viewportBox = (await lateral.locator('svg').boundingBox())!;
+  const beforePan = await lateral.locator('.surfview-atlas-plate svg').getAttribute('viewBox');
+  await lateral.locator('.surfview-atlas-plate svg').scrollIntoViewIfNeeded();
+  const viewportBox = (await lateral.locator('.surfview-atlas-plate svg').boundingBox())!;
   await page.mouse.move(viewportBox.x + 150, viewportBox.y + 120);
   await page.mouse.down(); await page.mouse.move(viewportBox.x + 210, viewportBox.y + 140, { steps: 4 }); await page.mouse.up();
-  expect(await lateral.locator('svg').getAttribute('viewBox')).not.toBe(beforePan);
+  expect(await lateral.locator('.surfview-atlas-plate svg').getAttribute('viewBox')).not.toBe(beforePan);
   // Figure export uses the overview despite live pan/zoom, and keeps pinned text.
   await page.getByLabel('Region fills').selectOption('muted');
   await page.getByLabel('Panel arrangement').selectOption('2');
@@ -73,7 +73,7 @@ test('composes a saved figure and inspects parcels without changing its framing'
   expect(svg).not.toMatch(/<(?:script|image|foreignObject)\b/);
   const small = await lateral.locator('metadata').evaluate(el => JSON.parse(el.textContent!).unlabeledParcelIds[0]);
   await page.getByLabel('Find a region').selectOption({ value: String(small) });
-  const frame = await lateral.locator('svg').getAttribute('viewBox');
+  const frame = await lateral.locator('.surfview-atlas-plate svg').getAttribute('viewBox');
   await page.getByRole('button', { name: 'Inspect selected region' }).click();
   await expect(page.locator('.atlas-focus')).toBeVisible();
   await expect(page.locator('.atlas-focus h2')).toContainText(String(small));
@@ -83,7 +83,7 @@ test('composes a saved figure and inspects parcels without changing its framing'
     return font * scale;
   });
   expect(readable).toBeGreaterThanOrEqual(11.9);
-  expect(await lateral.locator('svg').getAttribute('viewBox')).toBe(frame);
+  expect(await lateral.locator('.surfview-atlas-plate svg').getAttribute('viewBox')).toBe(frame);
   await page.screenshot({ path: testInfo.outputPath('atlas-composer-detail.png'), fullPage: true });
   await page.getByRole('button', { name: 'Close region detail' }).click();
   await expect(page.locator('.atlas-focus .surfview-atlas-plate')).toHaveCount(0);

@@ -1,9 +1,50 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Parcel map laboratory · SurfView</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='1' y='1' width='30' height='30' rx='3' fill='%2320272b' stroke='%2371818a'/%3E%3Cpath d='M16 8v16M8 16h16' stroke='%238eb8c6' stroke-width='2'/%3E%3C/svg%3E">
-<style>*{box-sizing:border-box}body{margin:0;background:#e6edef;color:#263d49;font:14px/1.5 system-ui,-apple-system,sans-serif}.map-page{max-width:1800px;margin:auto;padding:22px 28px}.map-header{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:19px}.map-header h1{font-size:24px;letter-spacing:-.4px;font-weight:600;margin:0}.map-header p{margin:3px 0 0;color:#5a7380;font-size:12px}.map-header a{color:#446f81;font-size:12px}#map-lab-panel{display:none}@media(max-width:760px){.map-page{padding:16px}.map-header{display:block}.map-header a{display:inline-block;margin-top:8px}}</style></head>
-<body><main class="map-page"><header class="map-header"><div><h1>Parcel map laboratory</h1><p>Explore how anatomy, area and compactness compete.</p></div><nav><a href="./?scenario=parcel-map-lab&amp;dataset=glasser">Gallery</a> · <a href="./puzzle.html">Open the 3D puzzle ↗</a></nav></header>
-<div id="map-lab-mount"></div><div id="map-lab-panel"></div></main>
-<script type="module" src="./map-lab.ts"></script></body></html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <title>Parcel map lab · SurfView</title>
+  <meta name="description" content="Flatten Schaefer or Glasser parcels into one connected 2D map and compare geometric trade-offs, rendered with SurfView." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230b1118'/%3E%3Crect x='5' y='7' width='22' height='18' fill='%231c2732' stroke='%23e9f0f4' stroke-width='1.5'/%3E%3Cpath d='M10 19c2-6 9-8 12-4' fill='none' stroke='%23f2c230' stroke-width='2'/%3E%3C/svg%3E" />
+</head>
+<body>
+  <div id="app" class="room">
+    <header class="room-head">
+      <a class="brand" href="./" aria-label="SurfView demo home">
+        <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="4.5" width="19" height="15" /><path d="M7 15c1.6-4.6 7-6.2 9.8-3.1" /></svg>
+        <span class="brand-name">SurfView</span>
+      </a>
+      <p class="room-tag">How anatomy, area and compactness compete on a flat map.</p>
+      <nav class="room-links" aria-label="Project links">
+        <a href="./?scenario=parcel-map-lab">Gallery</a>
+        <a href="./puzzle.html">Parcel puzzle</a>
+        <a href="https://github.com/bbuchsbaum/surfviewjs">Source</a>
+      </nav>
+    </header>
+
+    <main class="box workspace" data-layout="wide">
+      <div class="viewbox">
+      <figure id="viewer-frame" class="film" aria-busy="true">
+        <div id="viewer-slot" class="film-image"><div id="viewer-mount" class="scenario-mount"></div></div>
+        <figcaption id="status-block" class="film-edge">
+          <span class="edge-mark" id="edge-mark">SURFVIEW</span>
+          <span id="status-text" role="status">Loading</span>
+          <span id="perf-text"></span>
+        </figcaption>
+      </figure>
+      </div>
+
+      <aside class="margin" aria-labelledby="active-title">
+        <header class="margin-head">
+          <h1 id="active-title">Parcel map lab</h1>
+          <p id="active-desc"></p>
+          <p id="active-synthetic" class="synthetic" hidden></p>
+        </header>
+        <div id="panel" class="margin-controls" hidden></div>
+      </aside>
+    </main>
+  </div>
+  <script type="module" src="./map-lab.ts"></script>
+</body>
+</html>

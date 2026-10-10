@@ -1,10 +1,11 @@
 import { expect, test } from '@playwright/test';
 
+// The gallery is a QA fixture page (tests/controls-gallery.html), not a public demo chapter.
 test.describe('controls design gallery', () => {
   test('offers a product mode with one canvas-dominant task panel and no QA chrome', async ({ page }) => {
     test.setTimeout(60_000);
     await page.setViewportSize({ width: 1440, height: 1000 });
-    await page.goto('/demo/index.html?scenario=controls-gallery&mode=product');
+    await page.goto('/tests/controls-gallery.html?mode=product');
 
     const product = page.locator('[data-gallery-mode="product"]');
     await expect(product).toHaveAttribute('data-gallery-state', 'ready', {
@@ -51,7 +52,7 @@ test.describe('controls design gallery', () => {
     test.setTimeout(60_000);
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(
-      '/demo/index.html?scenario=controls-gallery&mode=product&task=view'
+      '/tests/controls-gallery.html?mode=product&task=view'
     );
 
     const product = page.locator('[data-gallery-mode="product"]');
@@ -123,7 +124,7 @@ test.describe('controls design gallery', () => {
     test.setTimeout(60_000);
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.goto(
-      '/demo/index.html?scenario=controls-gallery&mode=product&task=layers'
+      '/tests/controls-gallery.html?mode=product&task=layers'
     );
 
     const product = page.locator('[data-gallery-mode="product"]');
@@ -144,7 +145,7 @@ test.describe('controls design gallery', () => {
   test('renders six real immutable control sessions across gallery states', async ({ page }) => {
     test.setTimeout(60_000);
     await page.setViewportSize({ width: 1440, height: 1000 });
-    await page.goto('/demo/index.html?scenario=controls-gallery');
+    await page.goto('/tests/controls-gallery.html');
 
     const gallery = page.locator('[data-gallery-state]');
     await expect(gallery).toHaveAttribute('data-gallery-state', 'ready', {

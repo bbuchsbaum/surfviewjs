@@ -1,174 +1,144 @@
+import '@fontsource-variable/archivo/wdth.css';
+import '@fontsource-variable/jetbrains-mono/wght.css';
 import './style.css';
-import { scenarios } from './manifest';
-import type { Scenario, ScenarioCleanup, ScenarioRunContext } from './types';
+import { SURFVIEW_VERSION } from '@src/index.js';
+import { STRIP_SUBJECTS, scenarios } from './manifest';
+import { FilmOverlay } from './kit/film';
+import type { Scenario, ScenarioCleanup, ScenarioGroup, ScenarioRunContext } from './types';
 
-const app = document.getElementById('app');
-const workspace = document.querySelector<HTMLElement>('.workspace');
-const listEl = document.getElementById('scenario-list');
-const searchEl = document.getElementById('scenario-search') as HTMLInputElement | null;
-const statusEl = document.getElementById('status-text');
-const perfEl = document.getElementById('perf-text');
-const titleEl = document.getElementById('active-title');
-const descEl = document.getElementById('active-desc');
-const tagsEl = document.getElementById('active-tags');
-const resetBtn = document.getElementById('reset-btn') as HTMLButtonElement | null;
-const viewerSlot = document.getElementById('viewer-slot');
-const panel = document.getElementById('panel');
-const viewerFrame = document.getElementById('viewer-frame');
+const app = document.getElementById('app')!;
+const workspace = document.querySelector<HTMLElement>('.workspace')!;
+const listEl = document.getElementById('scenario-list')!;
+const statusEl = document.getElementById('status-text')!;
+const perfEl = document.getElementById('perf-text')!;
+const titleEl = document.getElementById('active-title')!;
+const descEl = document.getElementById('active-desc')!;
+const syntheticEl = document.getElementById('active-synthetic')!;
+const resetBtn = document.getElementById('reset-btn') as HTMLButtonElement;
+const viewerSlot = document.getElementById('viewer-slot')!;
+const panel = document.getElementById('panel')!;
+const viewerFrame = document.getElementById('viewer-frame')!;
+const codeBlock = document.getElementById('code-block') as HTMLDetailsElement;
+const codeText = document.getElementById('code-text')!;
+const codeCopy = document.getElementById('code-copy') as HTMLButtonElement;
 
+document.getElementById('edge-mark')!.textContent = `SURFVIEW ${SURFVIEW_VERSION}`;
+document.getElementById('npm-link')!.textContent = `npm ${SURFVIEW_VERSION}`;
+
+const film = new FilmOverlay(viewerFrame);
 const scenarioMap = new Map(scenarios.map(scenario => [scenario.id, scenario]));
-const featuredPresets: Array<{
-  scenarioId: string;
-  title: string;
-  description: string;
-  params: Record<string, string>;
-}> = [
-  {
-    scenarioId: 'atlas-illustration',
-    title: 'Glasser atlas plates',
-    description: 'Publication-oriented HCP–MMP1.0 plates with labels, provenance, and vector export.',
-    params: { atlas: 'glasser' }
-  },
-  {
-    scenarioId: 'parcel-puzzle',
-    title: 'Glasser parcel puzzle',
-    description: 'Inspect 180 HCP–MMP1.0 regions as separable, rotatable pieces on real fsLR geometry.',
-    params: { atlas: 'glasser' }
-  },
-  {
-    scenarioId: 'parcel-map-lab',
-    title: '2D parcel map laboratory',
-    description: 'Flatten Glasser or Schaefer parcels into a connected map and inspect the tradeoffs.',
-    params: { dataset: 'glasser' }
-  }
+const aliasMap = new Map(scenarios.flatMap(scenario => (scenario.aliases ?? []).map(alias => [alias, scenario.id] as const)));
+/** Query parameters a chapter understands; everything else is dropped on navigation. */
+const CHAPTER_PARAMS = ['atlas', 'dataset', 'mode', 'task'];
+
+const BANKS: ReadonlyArray<{ group: ScenarioGroup; label: string }> = [
+  { group: 'surfaces', label: 'Surfaces' },
+  { group: 'atlases', label: 'Atlases' },
+  { group: 'workflows', label: 'Workflows' }
 ];
 
 let activeCleanup: (() => Promise<void>) | null = null;
 let activeId: string | null = null;
 let navigationRevision = 0;
 
-function updateStatus(message: string) {
-  if (statusEl) statusEl.textContent = message;
-}
-
-function updatePerf(message: string) {
-  if (perfEl) perfEl.textContent = message;
+function resolveId(id: string | null): string | null {
+  if (!id) return null;
+  if (scenarioMap.has(id)) return id;
+  return aliasMap.get(id) ?? null;
 }
 
 function setBusy(busy: boolean, label?: string) {
-  viewerFrame?.classList.toggle('busy', busy);
-  viewerFrame?.setAttribute('aria-busy', String(busy));
-  if (label) updateStatus(label);
+  viewerFrame.classList.toggle('busy', busy);
+  viewerFrame.setAttribute('aria-busy', String(busy));
+  if (label) statusEl.textContent = label;
 }
 
-function scenarioMatches(scenario: Scenario, needle: string): boolean {
-  const searchable = [scenario.title, scenario.description, ...scenario.tags].join(' ').toLowerCase();
-  return searchable.includes(needle);
-}
-
-function presetIsActive(scenarioId: string, params: Record<string, string>): boolean {
-  if (activeId !== scenarioId) return false;
-  const query = new URLSearchParams(location.search);
-  return Object.entries(params).every(([name, value]) => query.get(name) === value);
-}
-
-function createScenarioButton(
-  scenario: Scenario,
-  copy: { title: string; description: string },
-  params?: Record<string, string>,
-  featured = false
-): HTMLButtonElement {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = `scenario-btn${featured ? ' scenario-btn-featured' : ''}`;
-  const isActive = params ? presetIsActive(scenario.id, params) : scenario.id === activeId;
-  button.classList.toggle('active', isActive);
-  if (isActive) button.setAttribute('aria-current', 'page');
-  button.dataset.id = scenario.id;
-
-  const title = document.createElement('span');
-  title.className = 'scenario-title';
-  title.textContent = copy.title;
-  const description = document.createElement('span');
-  description.className = 'scenario-desc';
-  description.textContent = copy.description;
-  const tags = document.createElement('span');
-  tags.className = 'scenario-tags';
-  for (const tagName of scenario.tags.slice(0, featured ? 3 : 4)) {
-    const tag = document.createElement('span');
-    tag.className = 'tag';
-    tag.textContent = tagName;
-    tags.append(tag);
-  }
-  button.append(title, description, tags);
-  button.addEventListener('click', () => {
-    void runScenario(scenario.id, { history: 'push', params });
+function renderStrip() {
+  const banks = BANKS.map(bank => {
+    const members = scenarios.filter(scenario => scenario.group === bank.group);
+    if (members.length === 0) return null;
+    const element = document.createElement('div');
+    element.className = 'bank';
+    element.style.setProperty('--bank-size', String(members.length));
+    element.setAttribute('role', 'group');
+    element.setAttribute('aria-label', bank.label);
+    const label = document.createElement('span');
+    label.className = 'bank-label';
+    label.textContent = bank.label;
+    label.setAttribute('aria-hidden', 'true');
+    const frames = document.createElement('div');
+    frames.className = 'bank-frames';
+    for (const scenario of members) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'frame scenario-btn';
+      button.dataset.id = scenario.id;
+      button.setAttribute('aria-label', scenario.title);
+      button.title = scenario.title;
+      const title = document.createElement('span');
+      title.className = 'frame-title';
+      title.textContent = scenario.short;
+      button.append(title);
+      const subject = STRIP_SUBJECTS[scenario.id];
+      if (subject) {
+        const line = document.createElement('span');
+        line.className = 'frame-subject';
+        line.textContent = subject;
+        button.append(line);
+      }
+      button.addEventListener('click', () => {
+        if (scenario.id !== activeId) void runScenario(scenario.id, { history: 'push' });
+      });
+      frames.append(button);
+    }
+    element.append(label, frames);
+    return element;
   });
-  return button;
+  listEl.replaceChildren(...banks.filter((bank): bank is HTMLDivElement => bank !== null));
 }
 
-function appendGroup(title: string, buttons: HTMLButtonElement[]) {
-  if (!listEl || buttons.length === 0) return;
-  const heading = document.createElement('div');
-  heading.className = 'scenario-group-title';
-  heading.textContent = title;
-  listEl.append(heading, ...buttons);
-}
-
-function renderList(filter = '') {
-  if (!listEl) return;
-  listEl.replaceChildren();
-  const needle = filter.trim().toLowerCase();
-  const featuredButtons = featuredPresets.flatMap(preset => {
-    const scenario = scenarioMap.get(preset.scenarioId);
-    if (!scenario) return [];
-    const searchable = `${preset.title} ${preset.description} ${scenario.tags.join(' ')}`.toLowerCase();
-    if (needle && !searchable.includes(needle)) return [];
-    return [createScenarioButton(scenario, preset, preset.params, true)];
-  });
-  const scenarioButtons = scenarios
-    .filter(scenario => !needle || scenarioMatches(scenario, needle))
-    .map(scenario => createScenarioButton(scenario, scenario));
-
-  appendGroup('Featured atlas tools', featuredButtons);
-  appendGroup(needle ? 'Matching scenarios' : 'All scenarios', scenarioButtons);
-  if (listEl.childElementCount === 0) {
-    const empty = document.createElement('p');
-    empty.className = 'scenario-empty';
-    empty.textContent = 'No scenarios match this search.';
-    listEl.append(empty);
+function markActive() {
+  for (const button of listEl.querySelectorAll<HTMLButtonElement>('.frame')) {
+    const active = button.dataset.id === activeId;
+    button.classList.toggle('active', active);
+    if (active) {
+      button.setAttribute('aria-current', 'page');
+      button.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    } else {
+      button.removeAttribute('aria-current');
+    }
   }
 }
 
-function updateHeader(scenarioId: string) {
-  const scenario = scenarioMap.get(scenarioId);
-  if (!scenario) {
-    if (titleEl) titleEl.textContent = 'Pick a scenario';
-    if (descEl) descEl.textContent = 'Choose a demonstration from the navigation.';
-    if (tagsEl) tagsEl.textContent = '';
-    return;
-  }
-  if (titleEl) titleEl.textContent = scenario.title;
-  if (descEl) descEl.textContent = scenario.description;
-  if (tagsEl) tagsEl.textContent = scenario.tags.join(' · ');
+/** Show a public-API excerpt as a consumer would write it. */
+function presentExcerpt(source: string): string {
+  return source
+    .replace(/from '@src\/index\.js'/g, "from 'surfview'")
+    .replace(/from '@src\/controls-ui\/index\.js'/g, "from 'surfview/controls'")
+    .replace(/^\/\/ @excerpt-hide[\s\S]*?\/\/ @excerpt-show\n/gm, '')
+    .trim();
 }
 
-function updateScenarioUrl(
-  scenarioId: string,
-  mode: 'push' | 'replace',
-  params?: Record<string, string>,
-  preserveRelevantParam = false
-) {
+function updateMargin(scenario: Scenario) {
+  titleEl.textContent = scenario.title;
+  descEl.textContent = scenario.summary;
+  syntheticEl.hidden = !scenario.synthetic;
+  syntheticEl.textContent = scenario.synthetic ?? '';
+  codeBlock.hidden = !scenario.excerpt;
+  codeBlock.open = false;
+  codeText.textContent = scenario.excerpt ? presentExcerpt(scenario.excerpt) : '';
+  codeCopy.textContent = 'Copy';
+  document.title = `${scenario.title} · SurfView`;
+}
+
+function updateUrl(scenarioId: string, mode: 'push' | 'replace', params?: URLSearchParams) {
   const url = new URL(location.href);
-  const relevantName = scenarioId === 'parcel-puzzle' || scenarioId === 'atlas-illustration'
-    ? 'atlas'
-    : scenarioId === 'parcel-map-lab' ? 'dataset' : null;
-  const preservedValue = preserveRelevantParam && relevantName ? url.searchParams.get(relevantName) : null;
+  for (const name of [...url.searchParams.keys()]) url.searchParams.delete(name);
   url.searchParams.set('scenario', scenarioId);
-  url.searchParams.delete('atlas');
-  url.searchParams.delete('dataset');
-  if (relevantName && preservedValue) url.searchParams.set(relevantName, preservedValue);
-  for (const [name, value] of Object.entries(params ?? {})) url.searchParams.set(name, value);
+  for (const name of CHAPTER_PARAMS) {
+    const value = params?.get(name);
+    if (value) url.searchParams.set(name, value);
+  }
   history[`${mode}State`](history.state, '', url);
 }
 
@@ -181,39 +151,31 @@ function normalizeCleanup(cleanup: ScenarioCleanup): () => Promise<void> {
   };
 }
 
-function applyLayout(scenario: Scenario) {
-  const layout = scenario.layout ?? 'standard';
-  if (workspace) workspace.dataset.layout = layout;
-  if (app) app.dataset.scenario = scenario.id;
-  if (panel) {
-    panel.hidden = layout === 'wide';
-    panel.setAttribute('aria-hidden', String(layout === 'wide'));
-  }
-}
-
 async function runScenario(
   id: string,
-  options: {
-    history?: 'push' | 'replace' | 'none';
-    params?: Record<string, string>;
-    preserveRelevantParam?: boolean;
-  } = {}
+  options: { history?: 'push' | 'replace' | 'none'; params?: URLSearchParams } = {}
 ) {
   const scenario = scenarioMap.get(id);
-  if (!scenario || !viewerSlot || !panel) return;
+  if (!scenario) return;
 
   const revision = ++navigationRevision;
   const previousCleanup = activeCleanup;
   activeCleanup = null;
   activeId = scenario.id;
-  if (options.history !== 'none') {
-    updateScenarioUrl(scenario.id, options.history ?? 'push', options.params, options.preserveRelevantParam);
+  const params = new URLSearchParams();
+  for (const name of CHAPTER_PARAMS) {
+    const value = options.params?.get(name);
+    if (value) params.set(name, value);
   }
-  applyLayout(scenario);
-  updateHeader(activeId);
-  renderList(searchEl?.value || '');
-  updatePerf('');
-  resetBtn?.setAttribute('disabled', 'true');
+  if (options.history !== 'none') updateUrl(scenario.id, options.history ?? 'push', params);
+
+  const layout = scenario.layout ?? 'standard';
+  workspace.dataset.layout = layout;
+  app.dataset.scenario = scenario.id;
+  updateMargin(scenario);
+  markActive();
+  perfEl.textContent = '';
+  resetBtn.disabled = true;
   setBusy(true, `Loading ${scenario.title}`);
 
   const mountHost = document.createElement('div');
@@ -221,9 +183,12 @@ async function runScenario(
   mountHost.dataset.scenarioHost = scenario.id;
   const panelHost = document.createElement('div');
   panelHost.className = 'scenario-panel';
-  panelHost.innerHTML = '<div class="panel-empty">Scenario controls will appear here.</div>';
   viewerSlot.replaceChildren(mountHost);
   panel.replaceChildren(panelHost);
+  film.clear();
+  viewerFrame.classList.remove('film-hung');
+  void viewerFrame.offsetWidth;
+  viewerFrame.classList.add('film-hung');
 
   if (previousCleanup) {
     try {
@@ -238,8 +203,10 @@ async function runScenario(
   const ctx: ScenarioRunContext = {
     mount: mountHost,
     panel: panelHost,
-    status: message => { if (isCurrent()) updateStatus(message); },
-    perf: message => { if (isCurrent()) updatePerf(message); },
+    film,
+    params,
+    status: message => { if (isCurrent()) statusEl.textContent = message; },
+    perf: message => { if (isCurrent()) perfEl.textContent = message; },
     setBusy: (busy, label) => { if (isCurrent()) setBusy(busy, label); }
   };
 
@@ -250,56 +217,44 @@ async function runScenario(
       return;
     }
     activeCleanup = cleanup;
-    updateStatus(`Running: ${scenario.title}`);
-    resetBtn?.removeAttribute('disabled');
+    statusEl.textContent = `Running: ${scenario.title}`;
+    resetBtn.disabled = false;
   } catch (error) {
     if (!isCurrent()) return;
     console.error(error);
-    updateStatus('Scenario failed to start');
-    mountHost.innerHTML = '<p class="scenario-error">This scenario could not be started. Check the console for details.</p>';
+    statusEl.textContent = 'Chapter failed to start';
+    const message = document.createElement('p');
+    message.className = 'scenario-error';
+    message.textContent = `This chapter could not start: ${error instanceof Error ? error.message : String(error)}. Reset to try again.`;
+    mountHost.replaceChildren(message);
+    resetBtn.disabled = false;
   } finally {
-    if (isCurrent()) {
-      setBusy(false);
-      renderList(searchEl?.value || '');
-    }
+    if (isCurrent()) setBusy(false);
   }
 }
 
-function bootstrap() {
-  renderList();
-  updateHeader('');
-
-  searchEl?.addEventListener('input', () => renderList(searchEl.value));
-  workspace?.addEventListener('change', event => {
-    const target = event.target;
-    if (target instanceof Element && target.matches('#atlas-dataset, [aria-label="Puzzle atlas"], [aria-label="Map dataset"]')) {
-      renderList(searchEl?.value || '');
-    }
-  });
-  resetBtn?.addEventListener('click', () => {
-    if (activeId) void runScenario(activeId, { history: 'none' });
-  });
-  window.addEventListener('popstate', () => {
-    const requested = new URLSearchParams(location.search).get('scenario');
-    const target = requested && scenarioMap.has(requested) ? requested : scenarios[0]?.id;
-    if (target) void runScenario(target, { history: 'none' });
-  });
-  window.addEventListener('pagehide', () => {
-    navigationRevision++;
-    void activeCleanup?.();
-    activeCleanup = null;
-  }, { once: true });
-
-  const requestedScenario = new URLSearchParams(location.search).get('scenario');
-  const initialScenario = requestedScenario && scenarioMap.has(requestedScenario)
-    ? requestedScenario
-    : scenarios[0]?.id;
-  if (initialScenario) {
-    void runScenario(initialScenario, {
-      history: 'replace',
-      preserveRelevantParam: requestedScenario === initialScenario
-    });
-  }
+function openFromLocation(mode: 'replace' | 'none') {
+  const query = new URLSearchParams(location.search);
+  const target = resolveId(query.get('scenario')) ?? scenarios[0]!.id;
+  void runScenario(target, { history: mode, params: query });
 }
 
-bootstrap();
+renderStrip();
+resetBtn.addEventListener('click', () => {
+  if (activeId) void runScenario(activeId, { history: 'none', params: new URLSearchParams(location.search) });
+});
+codeCopy.addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(codeText.textContent ?? '');
+    codeCopy.textContent = 'Copied';
+  } catch {
+    codeCopy.textContent = 'Select and copy';
+  }
+});
+window.addEventListener('popstate', () => openFromLocation('none'));
+window.addEventListener('pagehide', () => {
+  navigationRevision++;
+  void activeCleanup?.();
+  activeCleanup = null;
+}, { once: true });
+openFromLocation('replace');
