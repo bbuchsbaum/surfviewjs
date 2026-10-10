@@ -581,8 +581,18 @@ function applyCamera(viewer: any, camera: ViewerStateV2['camera']): void {
 
 function applyConfig(viewer: any, config: ViewerStateV2['config']): void {
   if (!config) return;
-  if (config.background !== undefined && viewer.scene) {
-    viewer.scene.background = new (simpleColor())(config.background);
+  if (config.background !== undefined) {
+    // The background is the renderer clear colour (see setFigureBackground), not
+    // scene.background: a plain object there breaks three.js's background pass.
+    if (typeof viewer.setFigureBackground === 'function') {
+      const transparent = typeof viewer.getFigureBackground === 'function'
+        ? Boolean(viewer.getFigureBackground().transparent)
+        : false;
+      viewer.setFigureBackground(config.background, transparent);
+    } else if (typeof viewer.renderer?.setClearColor === 'function') {
+      viewer.renderer.setClearColor(config.background);
+    }
+    if (viewer.config) viewer.config.backgroundColor = config.background;
   }
   if (config.lighting) {
     if (config.lighting.ambientIntensity !== undefined && viewer.ambientLight) {
@@ -595,21 +605,6 @@ function applyConfig(viewer: any, config: ViewerStateV2['config']): void {
       viewer.directionalLight.position.set(...config.lighting.directionalPosition);
     }
   }
-}
-
-function simpleColor(): any {
-  return class SimpleColor {
-    r: number;
-    g: number;
-    b: number;
-    isColor = true;
-
-    constructor(hex: number) {
-      this.r = ((hex >> 16) & 255) / 255;
-      this.g = ((hex >> 8) & 255) / 255;
-      this.b = (hex & 255) / 255;
-    }
-  };
 }
 
 function applySurfaces(

@@ -414,6 +414,34 @@ describe('viewer state serialization', () => {
     });
   });
 
+  describe('background restoration', () => {
+    it('restores the background through the viewer figure background, keeping transparency', () => {
+      const viewer = makeMockViewer() as any;
+      const calls: Array<[number, boolean]> = [];
+      viewer.getFigureBackground = () => ({ color: 0x000000, transparent: true });
+      viewer.setFigureBackground = (color: number, transparent: boolean) => { calls.push([color, transparent]); return true; };
+      const state = makeMinimalState();
+      state.config.background = 0x112233;
+
+      expect(deserialize(viewer, state).success).toBe(true);
+      expect(calls).toEqual([[0x112233, true]]);
+      expect(viewer.config.backgroundColor).toBe(0x112233);
+      expect(viewer.scene.background).toBeNull();
+    });
+
+    it('falls back to the renderer clear colour and never puts a non-Color on scene.background', () => {
+      const viewer = makeMockViewer() as any;
+      const cleared: number[] = [];
+      viewer.renderer = { setClearColor: (color: number) => { cleared.push(color); } };
+      const state = makeMinimalState();
+      state.config.background = 0x445566;
+
+      expect(deserialize(viewer, state).success).toBe(true);
+      expect(cleared).toEqual([0x445566]);
+      expect(viewer.scene.background).toBeNull();
+    });
+  });
+
   describe('validation-first restoration', () => {
     it('treats JavaScript explicit undefined serialized options as omitted', () => {
       const viewer = makeMockViewer();
