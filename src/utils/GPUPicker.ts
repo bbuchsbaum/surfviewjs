@@ -179,7 +179,11 @@ export function pickNearestVertexOnFace(
     position.getZ(cIndex)
   ).applyMatrix4(mesh.matrixWorld);
 
-  const point = ray.intersectTriangle(a, b, c, false, new THREE.Vector3());
+  // The ID buffer shows the face under the pixel centre, but the ray passes
+  // through the exact cursor, so near an edge it can just miss that face. The
+  // face is still the visible one: use the ray's crossing of its plane.
+  const point = ray.intersectTriangle(a, b, c, false, new THREE.Vector3()) ??
+    ray.intersectPlane(new THREE.Plane().setFromCoplanarPoints(a, b, c), new THREE.Vector3());
   if (!point) {
     return { point: null, vertexIndex: null };
   }

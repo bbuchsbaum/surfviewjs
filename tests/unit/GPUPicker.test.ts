@@ -75,6 +75,25 @@ describe('GPUPicker helpers', () => {
     expect(hit.point?.z).toBeCloseTo(0, 5);
   });
 
+  it('resolves a ray that grazes past the GPU-picked face to its nearest vertex', () => {
+    // The ID buffer samples the pixel centre while the ray passes through the
+    // exact cursor, so near an edge the ray can miss the face the pixel shows.
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute([
+      0, 0, 0,
+      1, 0, 0,
+      0, 1, 0
+    ], 3));
+    geometry.setIndex([0, 1, 2]);
+    const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial());
+    mesh.updateMatrixWorld(true);
+
+    const ray = new THREE.Ray(new THREE.Vector3(0.9, 0.2, 1), new THREE.Vector3(0, 0, -1));
+    const hit = pickNearestVertexOnFace(mesh, 0, ray);
+    expect(hit.vertexIndex).toBe(1);
+    expect(hit.point?.toArray()).toEqual([0.9, 0.2, 0].map(v => expect.closeTo(v, 5)));
+  });
+
   it('hides pick meshes of surfaces that are not drawn', () => {
     const picker = new GPUPicker({} as THREE.WebGLRenderer);
     const geometry = new THREE.BufferGeometry();

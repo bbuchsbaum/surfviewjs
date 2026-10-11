@@ -46,6 +46,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in their active colour.
 
 ### Fixed
+- GPU picks near a triangle edge no longer miss: the ID buffer samples the
+  pixel centre while the ray passes through the exact cursor, so the ray could
+  just miss the visible face and return no vertex. Such picks now use the
+  ray's crossing of that face's plane.
 - `disableGPUPicking()` now falls back to CPU raycasting instead of returning
   no hit.
 - `setAnatomicalView(..., { layout: 'paired', hemisphereGap })` applies the
