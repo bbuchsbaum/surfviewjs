@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-10-10
+
+### Upgrading from 2.x
+No API was removed, but default output changes. Each change has an opt-out:
+- Surfaces look different: colours are decoded from sRGB once, `baseColor`
+  no longer tints overlays, and lights follow the camera. Pass
+  `headlight: false` for world-fixed lights.
+- `computeMeanCurvature` returns resolution-independent mean curvature
+  (FreeSurfer sign, smaller magnitudes), and `CurvatureLayer` renders gyri
+  light. Pass `invert: true` for the 2.x shading; FreeSurfer `.curv` data now
+  displays the conventional way without it.
+- GPU volume projection samples nearest voxels by default. Pass
+  `sampling: 'linear'` for smooth maps.
+- `ResolvedNeuroSurfaceViewerConfig` has a required `headlight` field.
+- States saved by 2.3.0 restore their key-light position only into a viewer
+  with `headlight: false`.
+
 ### Added
 - `REPORT_BRAIN_VIEWS` and `DEFAULT_REPORT_OBLIQUE` are exported from the
   root entry and `surfview/report` (with the `ReportBrainView` and
@@ -372,7 +389,8 @@ First tagged release; hardened for npm publishing.
   preserved in `DataLayer`.
 - Stabilized the GPU picker crosshair selection.
 
-[Unreleased]: https://github.com/bbuchsbaum/surfviewjs/compare/v2.3.0...HEAD
+[Unreleased]: https://github.com/bbuchsbaum/surfviewjs/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/bbuchsbaum/surfviewjs/compare/v2.3.0...v3.0.0
 [2.3.0]: https://github.com/bbuchsbaum/surfviewjs/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/bbuchsbaum/surfviewjs/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/bbuchsbaum/surfviewjs/releases/tag/v2.1.0

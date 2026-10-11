@@ -78,7 +78,7 @@ export default defineConfig({
       { text: 'API', link: '/api/', activeMatch: '/api/' },
       { text: 'Demo', link: 'https://bbuchsbaum.github.io/surfviewjs/demo/' },
       {
-        text: 'v2.3.0',
+        text: 'v3.0.0',
         items: [
           { text: 'Release Notes', link: 'https://github.com/bbuchsbaum/surfviewjs/releases' },
           { text: 'npm', link: 'https://www.npmjs.com/package/surfview' },
