@@ -34,6 +34,7 @@ Sample a 3D volume at each surface vertex and map it through a 1D colormap.
 - **Vertex GPU path**: when `MultiLayerNeuroSurface` is in GPU compositing mode and `projectionMode: 'vertex'`, sampling happens in the vertex shader (WebGL2 required).
 - **Quality fallback**: `projectionMode: 'fragment'`, `'ribbon'`, or `'hybrid'` can be configured on the layer API; in the multi-layer compositor these modes render through the CPU RGBA texture path so publication-oriented settings stay available without changing the layer stack.
 - **Ribbon sampling**: provide matching pial and white vertex positions to sample through cortical thickness with `mean`, `max`, `min`, or `median` reducers.
+- **Sampling**: `sampling` defaults to `'nearest'` on both the CPU and GPU paths. Nearest keeps every displayed value one that exists in the volume and is required for labels, atlases and masks, where interpolation invents label IDs at region boundaries. For continuous maps (t, z, beta) shown in figures, `sampling: 'linear'` gives smoother maps and threshold contours instead of voxel-sized patches, at the cost of slightly lower isolated peaks and a slightly shifted suprathreshold extent. On the GPU path, linear filtering of full-float volumes needs `OES_texture_float_linear`; without it the texture falls back to nearest (`getVolumeTexture().getEffectiveFilter()` reports which is in use).
 
 ```javascript
 import { MultiLayerNeuroSurface, VolumeProjectionLayer } from 'surfview';

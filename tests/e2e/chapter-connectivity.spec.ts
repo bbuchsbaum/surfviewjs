@@ -81,7 +81,9 @@ test.describe('Parcels & connectivity chapter', () => {
     const matrix = page.locator('.conn-matrix');
     await matrix.scrollIntoViewIfNeeded();
     const matrixBox = (await matrix.boundingBox())!;
-    const rowY = matrixBox.y + ((4 + 150.5) / 204) * matrixBox.height;
+    // Rows are ~1.6 px tall and Chrome reports integer mouse coordinates, so
+    // click the whole pixel nearest the row centre.
+    const rowY = Math.round(matrixBox.y + ((4 + 150.5) / 204) * matrixBox.height);
     await page.mouse.click(matrixBox.x + matrixBox.width / 2, rowY);
     await expect(page.locator('#conn-locked')).toHaveText(/^151 · /);
     await page.mouse.click(matrixBox.x + matrixBox.width / 2, rowY);

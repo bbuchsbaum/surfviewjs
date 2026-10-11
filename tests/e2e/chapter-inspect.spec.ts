@@ -57,8 +57,23 @@ test.describe('Inspect & annotate chapter', () => {
     await expect(page.locator('#inspect-release')).toBeEnabled();
     await expect(page.locator('.film-corner-br')).toContainText('Marks');
 
+    // TODO(ci-diagnostic): this click is dropped on Linux CI only; record what the canvas sees.
+    await page.evaluate(() => {
+      const log: string[] = [];
+      (window as any).__clickLog = log;
+      const canvas = document.querySelector('#viewer-slot canvas')!;
+      for (const type of ['pointerdown', 'pointerup', 'click']) {
+        canvas.addEventListener(type, event => {
+          const e = event as MouseEvent;
+          log.push(`${type} ${e.clientX},${e.clientY} detail=${e.detail} buttons=${e.buttons}`);
+        }, true);
+      }
+    });
     await page.mouse.click(first.x + 6, first.y + 4);
-    await expect(marks).toHaveCount(2);
+    const clickLog = await page.evaluate(() => (window as any).__clickLog.join(' | '));
+    const statusAfter = await page.locator('#status-text').textContent();
+    const corner = await page.locator('.film-corner-br').textContent();
+    await expect(marks, `events: ${clickLog}; status: ${statusAfter}; corner: ${corner}`).toHaveCount(2);
     await expect(marks.nth(1)).toContainText('M2');
 
     // A drag rotates the camera and must not place a mark.

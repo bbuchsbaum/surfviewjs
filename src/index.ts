@@ -409,7 +409,7 @@ export type {
   VolumeProjectionMaterialOptions
 } from './materials/VolumeProjectionMaterial';
 export type { VolumeProjectedSurfaceOptions } from './surfaces/VolumeProjectedSurface';
-export type { VolumeTexture3DOptions } from './textures/VolumeTexture3D';
+export type { VolumeTexture3DOptions, VolumeTextureFilter } from './textures/VolumeTexture3D';
 export type { CurvatureConfig, CurvatureLayerUpdateData } from './layers/CurvatureLayer';
 
 export {
@@ -702,7 +702,8 @@ export type { FDRResult, BonferroniResult, ClusterResult } from './utils/statist
 export type { StraightRGBA } from './utils/rgbaCompositing';
 export type {
   GPUCompositorCapacity,
-  GPUCompositorUpdateStats
+  GPUCompositorUpdateStats,
+  GPUMaterialResponse
 } from './GPULayerCompositor';
 
 // Export serialization types
