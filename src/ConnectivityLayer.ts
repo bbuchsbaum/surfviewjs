@@ -608,6 +608,8 @@ export class ConnectivityLayer extends Layer {
     const edges = this._filteredEdges;
     const positions = new Float32Array(edges.length * 6);
     const colors = new Float32Array(edges.length * 6);
+    // Colormap colours are display (sRGB) values; vertex colours are linear.
+    const linear = new THREE.Color();
 
     for (const [i, edge] of edges.entries()) {
       const { source, target, weight } = edge;
@@ -623,7 +625,9 @@ export class ConnectivityLayer extends Layer {
       positions[i6 + 4] = vertices[t3 + 1]!;
       positions[i6 + 5] = vertices[t3 + 2]!;
 
-      const [r, g, b] = this._colorMap.getColor(Math.abs(weight));
+      const [sr, sg, sb] = this._colorMap.getColor(Math.abs(weight));
+      linear.setRGB(sr, sg, sb, THREE.SRGBColorSpace);
+      const { r, g, b } = linear;
       colors[i6]     = r;
       colors[i6 + 1] = g;
       colors[i6 + 2] = b;
@@ -708,7 +712,7 @@ export class ConnectivityLayer extends Layer {
       mesh.setMatrixAt(validCount, dummy.matrix);
 
       const [cr, cg, cb] = this._colorMap.getColor(Math.abs(weight));
-      color.setRGB(cr, cg, cb);
+      color.setRGB(cr, cg, cb, THREE.SRGBColorSpace);
       mesh.setColorAt(validCount, color);
       validCount++;
     }

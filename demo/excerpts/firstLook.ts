@@ -4,7 +4,7 @@ export async function showMap(container: HTMLElement, values: { lh: Float32Array
   const viewer = new NeuroSurfaceViewer(container, container.clientWidth, container.clientHeight);
   for (const [id, hemisphere] of [['lh', 'left'], ['rh', 'right']] as const) {
     const geometry = await loadSurface(`fsaverage5-${id}-pial.gii`, 'gifti', hemisphere);
-    const surface = new MultiLayerNeuroSurface(geometry, { baseColor: 0xb7c0c8 });
+    const surface = new MultiLayerNeuroSurface(geometry);
     surface.hemisphere = hemisphere;
     viewer.addSurface(surface, id);
     viewer.addLayer(id, new DataLayer('map', values[id], null, 'coolwarm', {

@@ -2,7 +2,7 @@ import { DataLayer, MultiLayerNeuroSurface } from '@src/index.js';
 import type { SurfacePickEvent } from '@src/index.js';
 import excerpt from '../excerpts/inspect.ts?raw';
 import { action, actions, choice, fmt, note, readout, section, toggle } from '../kit/controls';
-import { FOCI, addFields, blobField, curvatureOf, loadBilateral, mirror, smoothNoise } from '../kit/data';
+import { FOCI, addFields, blobField, CURVATURE_UNDERLAY, curvatureOf, loadBilateral, mirror, smoothNoise } from '../kit/data';
 import { createFilmViewer } from '../kit/film';
 import type { Scenario } from '../types';
 import './inspect.css';
@@ -62,10 +62,9 @@ export const inspect: Scenario = {
       ['rh', right, 'right', 'fsaverage5Right']
     ] as const) {
       const surface = new MultiLayerNeuroSurface(geometry, {
-        baseColor: 0xb7c0c8,
         curvature: curvatureOf(mesh, geometry),
         showCurvature: true,
-        curvatureOptions: { brightness: 0.64, contrast: 0.42 }
+        curvatureOptions: CURVATURE_UNDERLAY
       });
       surface.hemisphere = hemisphere;
       viewer.addSurface(surface, id);

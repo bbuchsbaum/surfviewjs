@@ -1,5 +1,6 @@
-import { SurfaceGeometry, computeMeanCurvature, loadSurface, normalizeCurvature } from '@src/index.js';
+import { SurfaceGeometry, computeMeanCurvature, computeSulcalDepth, loadSurface, normalizeCurvature } from '@src/index.js';
 import type { Hemisphere } from '@src/index.js';
+import { loadGiftiMetric } from './layers-metric';
 
 /** Real meshes shipped with the repository (see tests/data and demo/data READMEs). */
 export const MESH_URLS = {
@@ -10,6 +11,31 @@ export const MESH_URLS = {
 
 export type MeshName = keyof typeof MESH_URLS;
 
+/**
+ * Sulcal depth for meshes that are not themselves folded. The fs_LR 32k inflated
+ * mesh has no folds to measure, so its depth was computed once with
+ * computeSulcalDepth on the fs_LR 32k midthickness surface (same vertices) and
+ * shipped as a 90 KB GIFTI shape file (see tests/data/AGENTS.md).
+ */
+const DEPTH_URLS: Partial<Record<MeshName, string>> = {
+  fsLR32kLeftInflated: new URL('../../tests/data/fs_LR.32k.L.sulcal_depth.shape.gii', import.meta.url).href
+};
+
+/** Meshes that are inflated: their own curvature says nothing about the folds. */
+const INFLATED: ReadonlySet<MeshName> = new Set(['fsLR32kLeftInflated']);
+
+/**
+ * Underlay display for normalised mean curvature on folded surfaces: crisp,
+ * near-binary folding with gyral crowns light and sulcal walls dark.
+ */
+export const CURVATURE_UNDERLAY = { brightness: 0.55, contrast: 0.4, smoothness: 0.5 } as const;
+
+/**
+ * Underlay display for normalised sulcal depth on inflated and flat surfaces:
+ * whole gyri light and whole sulci dark, as in Connectome Workbench.
+ */
+export const DEPTH_UNDERLAY = { brightness: 0.6, contrast: 0.36, smoothness: 0.5 } as const;
+
 interface MeshArrays {
   vertices: Float32Array;
   faces: Uint32Array;
@@ -18,6 +44,7 @@ interface MeshArrays {
 
 const meshCache = new Map<MeshName, Promise<MeshArrays>>();
 const curvatureCache = new Map<MeshName, Float32Array>();
+const depthCache = new Map<MeshName, Promise<Float32Array>>();
 
 function hemisphereOf(name: MeshName): Hemisphere {
   return name === 'fsaverage5Right' ? 'right' : 'left';
@@ -51,14 +78,40 @@ export async function loadBilateral(): Promise<{ left: SurfaceGeometry; right: S
   return { left, right };
 }
 
-/** Normalised mean curvature for a mesh (cached), ready for a curvature underlay. */
+/**
+ * Normalised mean curvature of a folded mesh (cached), ready for a curvature underlay
+ * with CURVATURE_UNDERLAY. Pass the folded geometry; inflated meshes use sulcalDepthOf.
+ */
 export function curvatureOf(name: MeshName, geometry: SurfaceGeometry): Float32Array {
+  if (INFLATED.has(name)) {
+    throw new Error(`${name} is inflated; its own curvature does not show the folds. Use sulcalDepthOf().`);
+  }
   let curvature = curvatureCache.get(name);
   if (!curvature) {
     curvature = normalizeCurvature(computeMeanCurvature(geometry)) as Float32Array;
     curvatureCache.set(name, curvature);
   }
   return curvature.slice();
+}
+
+/**
+ * Normalised sulcal depth (FreeSurfer sign: positive deep), cached: computed on the
+ * folded fsaverage5 pial meshes, read from the shipped shape file for fs_LR inflated.
+ * Use with DEPTH_UNDERLAY on inflated and flat displays.
+ */
+export function sulcalDepthOf(name: MeshName): Promise<Float32Array> {
+  let pending = depthCache.get(name);
+  if (!pending) {
+    const url = DEPTH_URLS[name];
+    pending = (url
+      ? loadGiftiMetric(url).then(metric => metric.values)
+      : loadArrays(name).then(arrays =>
+        computeSulcalDepth(new SurfaceGeometry(arrays.vertices.slice(), arrays.faces.slice(), arrays.hemisphere))))
+      .then(depth => normalizeCurvature(depth) as Float32Array);
+    pending.catch(() => depthCache.delete(name));
+    depthCache.set(name, pending);
+  }
+  return pending.then(depth => depth.slice());
 }
 
 /** A Gaussian blob in the mesh's own millimetre coordinates. */

@@ -300,7 +300,15 @@
       return pixels;
     }
 
-    function comparePixels({ pixels, expectedRGB, tolerance }) {
+    // sRGB EOTF, as the GPU compositor applies it to its display-space composite.
+    function srgbToLinear(c) {
+      return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    }
+
+    // `linear`: the material decodes display (sRGB) colours before lighting, so the
+    // linear render target holds the decoded composite.
+    function comparePixels({ pixels, expectedRGB, tolerance, linear = false }) {
+      if (linear) expectedRGB = expectedRGB.map(srgbToLinear);
       const pixelRGB = new Float32Array(expectedRGB.length);
       for (let i = 0; i < pixels.length; i += 4) {
         const j = (i / 4) * 3;
@@ -460,7 +468,7 @@
 
       const pixels = readPixels(layerConfig.renderer, scene, camera, width, height);
       const tolerance = layerConfig.pixelTolerance ?? 0.06;
-      const { ok: gpuOk, maxDiff: gpuDiff } = comparePixels({ pixels, expectedRGB, tolerance });
+      const { ok: gpuOk, maxDiff: gpuDiff } = comparePixels({ pixels, expectedRGB, tolerance, linear: true });
       appendLog(`gpu maxAbsDiff vs cpu: ${gpuDiff} (tolerance ${tolerance})`);
 
       const ok = matrixDiff <= 1e-6 && typeOk && dataOk && cpuDiff <= 1e-5 && gpuOk;
@@ -543,7 +551,11 @@
       layer.attach({ geometry: { vertices }, mesh: points });
 
       const baseColor = new THREE.Color(0x243040);
-      const { expectedRGB } = expectedRGBFromLayer({ layer, vertexCount, baseColor });
+      // The material lights its (linear) base colour directly; express it in
+      // display values so the comparison decodes every pixel alike.
+      const { expectedRGB } = expectedRGBFromLayer({
+        layer, vertexCount, baseColor: baseColor.clone().convertLinearToSRGB()
+      });
 
       const volumeTexture = new VolumeTexture3D(volumeData, dims[0], dims[1], dims[2], {
         minFilter: THREE.NearestFilter,
@@ -582,7 +594,7 @@
 
       const pixels = readPixels(renderer, scene, camera, width, height);
       const tolerance = pixelTolerance ?? 0.06;
-      const { ok: gpuOk, maxDiff: gpuDiff } = comparePixels({ pixels, expectedRGB, tolerance });
+      const { ok: gpuOk, maxDiff: gpuDiff } = comparePixels({ pixels, expectedRGB, tolerance, linear: true });
       appendLog(`shader ${projectionMode} maxAbsDiff vs cpu: ${gpuDiff} (tolerance ${tolerance})`);
 
       const ok = gpuOk;

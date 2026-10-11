@@ -4,6 +4,7 @@ import { ClipPlaneSet, ClipPlane } from './utils/ClipPlane';
 import { debugLog } from './debug';
 import type { VolumeTexture3D } from './textures/VolumeTexture3D';
 import { SURFACE_ALPHA_DISCARD_THRESHOLD } from './utils/rgbaCompositing';
+import { SRGB_TO_LINEAR_GLSL, SURFACE_LINEAR_VERTEX_COLOR_DEFINE } from './surface/SurfaceShading';
 
 type ShaderUniforms = THREE.ShaderMaterial['uniforms'];
 
@@ -212,6 +213,7 @@ export class GPULayerCompositor {
       uniform float baseAlpha;
 
       varying vec3 vWorldPosition;
+      ${SRGB_TO_LINEAR_GLSL}
 
       vec4 sampleLayerTexture(int layerIndex, vec2 texCoord) {
         return texture(layerTextures, vec3(texCoord, float(layerIndex)));
@@ -324,7 +326,12 @@ export class GPULayerCompositor {
     const vertexShader = phong.vertexShader
       .replace('#include <common>', `#include <common>\n${vertexDeclarations}`)
       // Keep the <color_vertex> include so other patches can hook it.
-      .replace('#include <color_vertex>', '#include <color_vertex>\n\tvColor = compositeLayers();')
+      // Layers composite in display (sRGB) space, as on the CPU path; the
+      // result is decoded to linear once, before lighting.
+      .replace(
+        '#include <color_vertex>',
+        '#include <color_vertex>\n\tvColor = compositeLayers();\n\tvColor.rgb = surfviewSRGBToLinear( vColor.rgb );'
+      )
       // Points (used by parity tests) need an explicit size.
       .replace('#include <project_vertex>', '#include <project_vertex>\n\tgl_PointSize = 1.0;');
     const fragmentShader = phong.fragmentShader
@@ -365,7 +372,7 @@ export class GPULayerCompositor {
       vertexShader,
       fragmentShader,
       // The composite is carried in the Phong shader's vColor (vec4).
-      defines: { USE_COLOR_ALPHA: '' },
+      defines: { USE_COLOR_ALPHA: '', [SURFACE_LINEAR_VERTEX_COLOR_DEFINE]: '' },
       lights: true,
       fog: true,
       clipping: true,
@@ -674,7 +681,11 @@ export class GPULayerCompositor {
    */
   public setBaseColor(color: THREE.ColorRepresentation): void {
     if (this.material) {
-      requireUniform<THREE.Color>(this.material.uniforms, 'baseColor').value = new THREE.Color(color);
+      // The composite is assembled in display (sRGB) values and decoded to
+      // linear after compositing, so the base enters as sRGB components.
+      // Setting the hex "as linear" stores its components unconverted.
+      requireUniform<THREE.Color>(this.material.uniforms, 'baseColor').value =
+        new THREE.Color().setHex(new THREE.Color(color).getHex(), THREE.LinearSRGBColorSpace);
       requireUniform<number>(this.material.uniforms, 'baseAlpha').value = 1;
     }
   }

@@ -575,10 +575,14 @@ export abstract class NeuroSurface extends EventEmitter<SurfaceEventMap> {
         return;
       }
       
-      // Handle color conversions properly
-      if (this.config.color !== undefined) {
-        material.color = this.config.color instanceof THREE.Color 
-          ? this.config.color 
+      // A vertex-coloured material draws its colours from the vertex buffer
+      // (where `color` is the fallback per-vertex colour); a material colour
+      // would multiply, tint and darken all of them, so it stays white.
+      if (material.vertexColors && material.color instanceof THREE.Color) {
+        material.color.setRGB(1, 1, 1);
+      } else if (this.config.color !== undefined) {
+        material.color = this.config.color instanceof THREE.Color
+          ? this.config.color
           : new THREE.Color(this.config.color);
       }
       
@@ -1037,6 +1041,7 @@ export class ColorMappedNeuroSurface extends NeuroSurface {
     debugLog('data', this.data);
 
     const baseSurfaceColor = new THREE.Color(this.config.color);
+    const linear = new THREE.Color();
 
     if (this.data) {
       for (let i = 0; i < this.indices.length; i++) {
@@ -1059,10 +1064,12 @@ export class ColorMappedNeuroSurface extends NeuroSurface {
           colors[colorIndex + 2] = baseSurfaceColor.b;
           colors[colorIndex + 3] = 0; // Transparent for thresholded values
         } else {
-          // Show values outside threshold range with colormap colors
-          colors[colorIndex] = color[0];
-          colors[colorIndex + 1] = color[1];
-          colors[colorIndex + 2] = color[2];
+          // Colormap colours are display (sRGB) values; the colour
+          // attribute is read as linear, so convert them on the way in.
+          linear.setRGB(color[0], color[1], color[2], THREE.SRGBColorSpace);
+          colors[colorIndex] = linear.r;
+          colors[colorIndex + 1] = linear.g;
+          colors[colorIndex + 2] = linear.b;
           colors[colorIndex + 3] = 1; // Opaque for visible values
         }
       }

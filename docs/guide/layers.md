@@ -250,6 +250,63 @@ The foundational layer (automatically created).
 const baseLayer = surface.getLayer('base');
 ```
 
+### CurvatureLayer (anatomical underlay)
+
+A grey underlay that shows the folding pattern beneath data layers, as in
+FreeSurfer, Connectome Workbench or pycortex. Pass per-vertex values in the
+FreeSurfer sign convention — **positive in sulci, negative on gyral crowns** —
+and the layer draws gyri light and sulci dark:
+
+```text
+gray = brightness − clamp(value / smoothness, −0.5, 0.5) · contrast
+```
+
+`invert: true` flips the ramp (the mapping of releases before this one). A small
+`smoothness` (0.2–0.5 on normalised values) gives a crisp, near-binary
+underlay; 1 gives a graded one. Greys are display (sRGB) values.
+
+`CurvatureLayer` state (`brightness`, `contrast`, `smoothness`, `invert`) is
+saved and restored with viewer state.
+
+Choose the values for the surface you show:
+
+- **Folded surfaces** (pial, white, midthickness): `computeMeanCurvature(geometry)`,
+  an edge-normalised mean-curvature estimate in 1/mm (a sphere of radius R gives
+  ≈ −1/R; r ≈ 0.87 against FreeSurfer `lh.curv` on fsaverage5), or a FreeSurfer
+  `.curv` file.
+- **Inflated, very inflated and flat surfaces**: `computeSulcalDepth(folded)`,
+  computed on the folded surface with the same vertices (r ≈ 0.96 against
+  FreeSurfer `lh.sulc` on fsaverage5), or a FreeSurfer `.sulc` file. An inflated
+  mesh has no folds, so curvature computed on it is meaningless.
+
+```javascript
+import { computeMeanCurvature, computeSulcalDepth, normalizeCurvature } from 'surfview';
+
+// Pial display: crisp folds.
+const curvature = normalizeCurvature(computeMeanCurvature(pial));
+const cortex = new MultiLayerNeuroSurface(pial, {
+  curvature,
+  curvatureOptions: { brightness: 0.55, contrast: 0.4, smoothness: 0.5 }
+});
+
+// Inflated display: whole sulci and gyri, measured on the folded mesh.
+const depth = normalizeCurvature(computeSulcalDepth(pial));
+const inflatedCortex = new MultiLayerNeuroSurface(inflated, {
+  curvature: depth,
+  curvatureOptions: { brightness: 0.6, contrast: 0.36, smoothness: 0.5 }
+});
+```
+
+`computeSulcalDepth` smooths a copy of the surface into an envelope and measures
+each vertex's depth below it along the envelope normal, in mesh units (mm),
+median-centred. The smoothing length defaults to 0.2 of the mesh's bounding
+radius (`scale`). It uses two implicit smoothing steps solved by conjugate
+gradients, so its cost grows about as V^1.5: roughly 35 ms for fsaverage5,
+175 ms for fs_LR 32k and 1 s for a 164k-vertex mesh. Compute it once and keep
+it; a solve that reaches `maxIterations` warns and returns an approximate
+estimate. Both functions need outward face winding, which FreeSurfer and GIFTI
+surfaces have.
+
 ## RGBA compositing contract
 
 SurfView stores and exposes **straight-alpha** RGBA. A layer's RGBA buffer
@@ -272,6 +329,12 @@ straight output RGB = premultiplied RGB / Ao   (or zero when Ao is zero)
 Additive mode is Porter-Duff plus-lighter: premultiplied source and destination
 RGB and alpha are added, then clamped to one. This makes partial coverage and
 partial opacity behave correctly instead of adding unweighted straight RGB.
+
+Compositing happens in display (sRGB) values — the space colormaps and hex
+colours are specified in — on both paths. The composite is then decoded to
+linear per vertex before lighting, and the renderer encodes the lit result to
+sRGB once, so a fully lit, camera-facing surface shows layer colours as
+specified. The surface material's own colour is white and never tints layers.
 
 The shader outputs straight alpha. Production materials use Three.js
 `NormalBlending` with `premultipliedAlpha: false`, `depthTest: true`, and

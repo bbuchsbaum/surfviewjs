@@ -18,7 +18,8 @@ describe('cortical contrast rendering', () => {
     const style = getStylePreset('freesurfer');
     const layer = new CurvatureLayer('anatomy', [-0.5, 0, 0.5], style.curvature);
     const rgba = layer.getRGBAData(3);
-    expect([rgba[0], rgba[4], rgba[8]]).toEqual([0.25, 0.5, 0.75]);
+    // FreeSurfer convention: negative (gyral) values light, positive (sulcal) dark.
+    expect([rgba[0], rgba[4], rgba[8]]).toEqual([0.75, 0.5, 0.25]);
     expect([rgba[3], rgba[7], rgba[11]]).toEqual([1, 1, 1]);
     expect(style.lighting.rimStrength).toBe(0);
   });

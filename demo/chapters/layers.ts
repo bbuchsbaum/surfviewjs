@@ -2,7 +2,7 @@ import { DataLayer, MultiLayerNeuroSurface, RGBALayer } from '@src/index.js';
 import type { AnatomicalView } from '@src/index.js';
 import excerpt from '../excerpts/layers.ts?raw';
 import { action, actions, choice, fmt, note, readout, section, select, slider, toggle } from '../kit/controls';
-import { curvatureOf, loadMesh, smoothNoise } from '../kit/data';
+import { DEPTH_UNDERLAY, loadMesh, smoothNoise, sulcalDepthOf } from '../kit/data';
 import { createFilmViewer } from '../kit/film';
 import { METRIC_URLS, loadGiftiMetric } from '../kit/layers-metric';
 import type { Scenario } from '../types';
@@ -27,7 +27,11 @@ const VIEWS: ReadonlyArray<{ value: AnatomicalView; label: string }> = [
   { value: 'posterior', label: 'Posterior' }
 ];
 
-/** Precomputed colours: a translucent tint along the anterior–posterior axis. */
+/**
+ * Precomputed colours: a colour ramp along the anterior–posterior axis whose own
+ * alpha is zero across the middle of the hemisphere, so the tint marks the two
+ * poles as distinct regions and leaves the underlay readable in between.
+ */
 function axisTint(vertices: Float32Array): Float32Array {
   const count = vertices.length / 3;
   let low = Infinity, high = -Infinity;
@@ -39,7 +43,8 @@ function axisTint(vertices: Float32Array): Float32Array {
   const rgba = new Float32Array(count * 4);
   for (let v = 0; v < count; v++) {
     const t = (vertices[v * 3 + 1]! - low) / Math.max(1e-6, high - low);
-    rgba.set([0.22 + 0.6 * t, 0.42 - 0.1 * t, 0.86 - 0.42 * t, 0.42], v * 4);
+    const pole = Math.min(1, Math.max(0, (Math.abs(t - 0.5) - 0.3) / 0.15));
+    rgba.set([0.12 + 0.5 * t, 0.5 - 0.22 * t, 0.78 - 0.02 * t, 0.85 * pole], v * 4);
   }
   return rgba;
 }
@@ -76,24 +81,29 @@ export const layers: Scenario = {
   group: 'surfaces',
   tags: ['MultiLayerNeuroSurface', 'curvature underlay', 'RGBA layer', 'blend modes', 'threshold edges', 'GPU compositing'],
   summary:
-    'The fs_LR 32k inflated left hemisphere with a curvature underlay and three overlays composited in order: an RGBA tint, an additive activation layer and the Gaussian-splat metric read from a GIFTI func file. Pick a layer to change its opacity and threshold, raise or lower it, or take it out of the stack. Threshold edges, the outline band and silhouette darkening are fragment shading on the CPU compositing path; switch to GPU compositing and animate the layers to compare frame cost.',
+    'The fs_LR 32k inflated left hemisphere with a sulcal-depth underlay and three overlays composited in order: an RGBA tint, an additive activation layer and the Gaussian-splat metric read from a GIFTI func file. Pick a layer to change its opacity and threshold, raise or lower it, or take it out of the stack. Threshold edges, the outline band and silhouette darkening are fragment shading on the CPU compositing path; switch to GPU compositing and animate the layers to compare frame cost.',
   synthetic:
-    'The func map (tests/data/gaussian_splat_demo.func.gii) is a synthetic Gaussian-splat pattern; the activation layer is seeded smooth random waves and the tint is a colour ramp along the anterior–posterior axis. Only the mesh is real.',
+    'The func map (tests/data/gaussian_splat_demo.func.gii) is a synthetic Gaussian-splat pattern; the activation layer is seeded smooth random waves and the tint is a colour ramp along the anterior–posterior axis, opaque only at the poles. Only the mesh and its sulcal depth (computed on the fs_LR midthickness surface) are real.',
   excerpt,
   run: async ctx => {
     ctx.setBusy(true, 'Loading fs_LR 32k surface and func metric');
     const { viewer, cleanup } = createFilmViewer(ctx.mount);
-    const [geometry, metric] = await Promise.all([loadMesh('fsLR32kLeftInflated'), loadGiftiMetric(METRIC_URLS.gaussianSplat)]);
+    const [geometry, metric, depth] = await Promise.all([
+      loadMesh('fsLR32kLeftInflated'),
+      loadGiftiMetric(METRIC_URLS.gaussianSplat),
+      sulcalDepthOf('fsLR32kLeftInflated')
+    ]);
     const vertexCount = geometry.vertices.length / 3;
     if (metric.values.length !== vertexCount) {
       throw new Error(`Metric has ${metric.values.length} values for ${vertexCount} vertices`);
     }
 
     const shading = { thresholdEdges: true, thresholdOutline: 0, thresholdOutlineShade: 0.55, silhouetteDarkening: 0.25 };
-    const curvature = { brightness: 0.6, contrast: 0.45, smoothness: 1 };
+    // An inflated mesh has no folds of its own: the underlay is sulcal depth
+    // measured on the folded midthickness surface with the same vertices.
+    const curvature = { ...DEPTH_UNDERLAY };
     const surface = new MultiLayerNeuroSurface(geometry, {
-      baseColor: 0xb7c0c8,
-      curvature: curvatureOf('fsLR32kLeftInflated', geometry),
+      curvature: depth,
       showCurvature: true,
       curvatureOptions: curvature,
       shading
@@ -114,8 +124,11 @@ export const layers: Scenario = {
     const tint = axisTint(geometry.vertices);
 
     const state = {
-      opacity: { func: 0.8, activation: 0.85, tint: 0.6 } as Record<OverlayId, number>,
-      threshold: { func: 0.03, activation: 0.35, tint: 0 } as Record<OverlayId, number>,
+      // Additive light adds to the underlay; a lower opacity keeps the hot ramp
+      // orange-red over light gyri instead of clipping to white.
+      opacity: { func: 0.8, activation: 0.55, tint: 0.75 } as Record<OverlayId, number>,
+      // Peaks only: a wide additive field would lighten most of the cortex.
+      threshold: { func: 0.03, activation: 0.6, tint: 0 } as Record<OverlayId, number>,
       visible: { func: true, activation: true, tint: true } as Record<OverlayId, boolean>,
       editing: 'func' as OverlayId,
       animating: false
@@ -135,7 +148,9 @@ export const layers: Scenario = {
       activation: {
         id: 'activation', name: 'Activation (additive)', short: 'Activation', kind: 'data', maxAbs: maxAbsOf(activation),
         make: () => new DataLayer('activation', activation, null, 'hot', {
-          range: [0, 1.4],
+          // Keep to the red–orange part of 'hot': its yellow–white top only
+          // clips when added to a light underlay.
+          range: [0, 3],
           threshold: [-state.threshold.activation, state.threshold.activation],
           opacity: state.opacity.activation,
           visible: state.visible.activation,
@@ -173,7 +188,7 @@ export const layers: Scenario = {
     const film = ctx.film;
     film.trackOrientation(viewer);
     film.set('tl', 'surface', 'Surface', 'fs_LR 32k inflated, L');
-    film.set('tl', 'underlay', 'Underlay', 'mean curvature');
+    film.set('tl', 'underlay', 'Underlay', 'sulcal depth');
 
     // ── perf readout: compositing mode, overlay count, and frame cost while animating
     const perfState = { frames: 0, compositeMs: 0, since: performance.now(), fps: 0, ms: 0 };
@@ -334,15 +349,15 @@ export const layers: Scenario = {
     });
 
     // ── Curvature underlay
-    const underlay = section(ctx.panel, 'Curvature underlay');
+    const underlay = section(ctx.panel, 'Sulcal-depth underlay');
     const curvatureLayer = () => surface.getCurvatureLayer();
     toggle(underlay, {
       id: 'layers-curvature',
-      label: 'Show curvature (off: flat base colour)',
+      label: 'Show sulcal depth (off: flat base colour)',
       checked: true,
       onChange: checked => {
         surface.showCurvature(checked);
-        film.set('tl', 'underlay', 'Underlay', checked ? 'mean curvature' : 'base colour');
+        film.set('tl', 'underlay', 'Underlay', checked ? 'sulcal depth' : 'base colour');
       }
     });
     slider(underlay, {
@@ -363,7 +378,7 @@ export const layers: Scenario = {
     });
     slider(underlay, {
       id: 'layers-curv-smoothness',
-      label: 'Smoothness (curvature scale)',
+      label: 'Smoothness (underlay scale)',
       min: 0.1, max: 3, step: 0.1, value: curvature.smoothness,
       format: value => fmt(value, 1),
       onInput: value => curvatureLayer()?.setSmoothness(value)

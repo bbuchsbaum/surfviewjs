@@ -2129,9 +2129,12 @@ export class LabelLayer extends Layer {
       const labelId = labels[i] ?? -1;
       const color = map.get(labelId) || defaultColor;
       const offset = i * 4;
-      buffer[offset] = color.r;
-      buffer[offset + 1] = color.g;
-      buffer[offset + 2] = color.b;
+      // Composite buffers hold display (sRGB) colours; THREE.Color stores
+      // linear, so read the colour back as its sRGB hex.
+      const hex = color.getHex();
+      buffer[offset] = ((hex >> 16) & 255) / 255;
+      buffer[offset + 1] = ((hex >> 8) & 255) / 255;
+      buffer[offset + 2] = (hex & 255) / 255;
       buffer[offset + 3] = 1; // alpha; compositing will apply layer opacity
     }
 

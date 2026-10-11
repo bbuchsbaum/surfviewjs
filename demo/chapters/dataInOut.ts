@@ -10,7 +10,7 @@ import {
 import type { AnatomicalView, NeuroSurfaceViewer, RestorationReport, SurfaceGeometry, ViewerStateV2 } from '@src/index.js';
 import excerpt from '../excerpts/dataInOut.ts?raw';
 import { action, actions, choice, fmt, note, readout, section, select, slider } from '../kit/controls';
-import { MESH_URLS, loadMesh } from '../kit/data';
+import { CURVATURE_UNDERLAY, MESH_URLS, loadMesh } from '../kit/data';
 import { syntheticReference, alignmentTransform, TRANSFORMS } from '../kit/data-alignment';
 import type { TransformName } from '../kit/data-alignment';
 import { createFilmViewer } from '../kit/film';
@@ -76,8 +76,7 @@ function showGeometry(viewer: NeuroSurfaceViewer, geometry: SurfaceGeometry) {
   const vertexCount = geometry.vertices.length / 3;
   const curvature = vertexCount >= 500 ? (normalizeCurvature(computeMeanCurvature(geometry)) as Float32Array) : undefined;
   const surface = new MultiLayerNeuroSurface(geometry, {
-    baseColor: 0xb7c0c8,
-    ...(curvature ? { curvature, showCurvature: true, curvatureOptions: { brightness: 0.64, contrast: 0.42 } } : {})
+    ...(curvature ? { curvature, showCurvature: true, curvatureOptions: CURVATURE_UNDERLAY } : {})
   });
   viewer.addSurface(surface, 'loaded');
   viewer.setAnatomicalView('lateral', { layout: 'single', surfaceId: 'loaded', fit: true });

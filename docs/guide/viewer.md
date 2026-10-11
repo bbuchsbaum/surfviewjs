@@ -18,8 +18,8 @@ const viewer = new NeuroSurfaceViewer(
   600,          // height
   {
     backgroundColor: 0x1a1a1a,
-    ambientLightColor: 0x404040,
-    directionalLightIntensity: 0.8
+    ambientLightColor: 0xffffff,
+    directionalLightIntensity: 1.84
   }
 );
 ```
@@ -32,9 +32,10 @@ const viewer = new NeuroSurfaceViewer(
 | `useControls` | boolean | false | Deprecated warning-only flag; enabled values do not create UI |
 | `allowCDNFallback` | boolean | false | Deprecated warning-only flag; runtime CDN loading remains disabled |
 | `backgroundColor` | number | 0x000000 | Scene background color |
-| `ambientLightColor` | number | 0xb5b5b5 | Integer RGB color (`0x000000`-`0xffffff`) |
+| `ambientLightColor` | number | 0xffffff | Integer RGB color (`0x000000`-`0xffffff`) |
 | `directionalLightColor` | number | 0xffffff | Integer RGB color (`0x000000`-`0xffffff`) |
-| `directionalLightIntensity` | number | 1.6 | Finite nonnegative directional-light intensity |
+| `directionalLightIntensity` | number | 1.84 | Finite nonnegative key-light intensity (see [Lighting](#lighting-and-colour)) |
+| `headlight` | boolean | true | Key and fill lights follow the camera; `false` keeps the world-fixed rig of earlier releases |
 | `preset` | string | `default` | Style preset: `presentation`, `paper-light`, `talk-dark`, `clinical-qc`, `retinotopy`, or `glass-brain-surface` |
 | `initialZoom` | number | 12 | Positive finite initial camera distance |
 | `rotationSpeed` | number | 2.0 | Positive finite mouse rotation sensitivity |
@@ -49,6 +50,37 @@ configuration before changing viewer state. Passing `undefined` cannot erase a
 required runtime default. Invalid numeric values throw
 `NumericValidationError` and do not change the camera, renderer, revision, or
 events.
+
+## Lighting and colour
+
+The viewer lights surfaces with an ambient light, a key directional light and a
+weaker fill light. By default (`headlight: true`) the key and fill are held
+fixed relative to the camera — the key about 17° above-right of the line of
+sight, the fill about 31° below-left — so whichever side of the cortex faces the viewer is key-lit and every
+view, preset pose or free rotation is shaded alike. `headlight: false` (or
+`viewer.setHeadlight(false)`) keeps the world-fixed rig of earlier releases: key
+light at the preset's `directionalPosition`, fill at `(-1, -0.5, -1)`.
+
+three.js lights are physically based: a matte surface lit head-on returns its
+colour × irradiance / π. The presets choose ambient, key and fill intensities
+(for example ambient 1.0, key 1.84, fill 0.45) so a camera-facing surface shows
+its layer colours at their nominal values and slopes shade from the key light:
+ambient (weighted by the luminance of its colour) + 0.956·key + 0.854·fill ≈ π,
+the two cosines being those of the key and fill directions to the line of
+sight. If you set your own intensities, keep that sum near π; above it, light
+colours (a white base layer, the top of a colormap) clip.
+
+The headlight setting is part of saved viewer state (`serialize` /
+`deserialize`); while it is on, the key light's position is derived from the
+camera on every render, so it is neither saved nor restored.
+
+Colours are managed so they appear as specified. Layer and colormap colours,
+curvature greys and hex colours are display (sRGB) values; surfaces composite
+them in display space, decode the result to linear before lighting, and the
+renderer encodes the lit image to sRGB once. The material colour of a composited
+surface is white: `baseColor` (and `updateConfig({ color })`) set the base
+layer's colour, which shows wherever no curvature underlay or opaque layer
+covers the surface; it never tints the layers above it.
 
 Style presets provide defaults. Explicit style options in the constructor or in
 the same `updateConfig()` call (background, lighting, rim, SSAO, metalness and

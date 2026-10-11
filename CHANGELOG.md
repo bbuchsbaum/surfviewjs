@@ -19,8 +19,102 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `GPUPicker.pick(..., { throttle: true })` (and `pickNDC`) for hover-driven
   callers; `GPUPickOptions` is exported.
 - `VolumeTexture3D` `filter` option, `setFilter()` and `getFilter()`.
+- `computeSulcalDepth(geometry, { scale?, tolerance?, maxIterations? })`:
+  FreeSurfer `sulc`-like depth (mm, positive deep, median-centred) measured
+  below a smoothed envelope of a folded surface; r = 0.96 against FreeSurfer
+  `lh.sulc` on fsaverage5. Smoothing is two implicit steps solved by
+  conjugate gradients, O(V^1.5) (≈35 ms fsaverage5, ≈175 ms fs_LR 32k, ≈1 s
+  at 164k vertices); a solve that reaches `maxIterations` warns. Use it,
+  computed on the folded mesh, as the underlay of inflated and flat surfaces.
+  `MeanCurvatureOptions` and `SulcalDepthOptions` are exported.
+- `CurvatureLayer` and `curvatureToGrayscale` option `invert`;
+  `CurvatureLayer.setInvert()`; `invert` in `curvatureOptions`,
+  `setCurvature()` options, `LayerUpdate` and the `curvature` registry factory.
+- Viewer option `headlight` (default `true`) and `viewer.setHeadlight()`.
+  Saved viewer state records `config.lighting.headlight`, and restores it
+  through `setHeadlight()`; while the headlight is on, the key light's world
+  position is neither saved nor restored. Type-level change:
+  `ResolvedNeuroSurfaceViewerConfig` (`Required<NeuroSurfaceViewerConfig>`)
+  gains a required `headlight: boolean`, so code that builds a complete
+  resolved config object must add it.
+- `CurvatureLayer.fromStateJSON()`: viewer-state restore now applies saved
+  curvature `brightness`, `contrast`, `smoothness` and `invert` (previously
+  ignored for curvature layers).
+- `MultiLayerNeuroSurface.applyStyleBaseColor()`: a style preset's base colour
+  applies only to surfaces whose base colour the caller did not choose
+  (`baseColor` in the constructor or `updateConfig({ color })`).
 
 ### Changed
+- **Behaviour change (appearance): colour management.** Composited colours are
+  now decoded from sRGB to linear before lighting, on the CPU path (in the
+  surface shading patch, vertex and threshold-edge colours) and the GPU path
+  (after `compositeLayers()`), so the renderer's sRGB output encoding is
+  applied once instead of brightening and flattening every colour. Layer and
+  composite buffers still hold display (sRGB) values; legacy
+  `ColorMappedNeuroSurface` writes linear colour attributes. Hex-anchored
+  colormaps (`coolwarm`, `bwr`, `seismic`, `rdylbu`, `spectral`, `blues`, …)
+  are now interpolated in sRGB like generated colormaps, `LabelLayer` writes
+  sRGB components, and `GPULayerCompositor.setBaseColor()` stores sRGB
+  components. Screenshots and pixel read-backs of every surface change.
+- Connectivity edges convert colormap colours from sRGB to linear (line
+  vertex colours and tube instance colours), so they match the colour key and
+  the surface overlays; `getEdgeColors()` still returns display values.
+- `VolumeProjectedSurface` (`VolumeProjectionMaterial`) decodes colormap
+  texels to linear and encodes its output with the renderer's output colour
+  space, so the base colour is no longer drawn too dark and overlays match the
+  composited surfaces. Its lighting remains its own fixed view-space light
+  (ambient + one light about 30° off the line of sight), not the scene's
+  lights; `headlight` and preset intensities do not affect it.
+- **Behaviour change (appearance): no material tint.** A vertex-coloured
+  surface's material colour is white. `baseColor` (and `updateConfig({ color })`
+  on `MultiLayerNeuroSurface`, including from style presets) now sets the base
+  layer's colour only; previously it also multiplied every layer, curvature and
+  data overlays included, darkening them and tinting them towards the base
+  colour (twice where the base layer showed). The GPU compositing material's
+  diffuse colour is white likewise.
+- **Behaviour change (appearance): camera-attached lighting by default.** The
+  key and fill lights follow the camera (`headlight: true`), so the visible side
+  of the cortex is always key-lit; with world-fixed lights a lateral view of the
+  left hemisphere faced away from the key light and was lit only by ambient and
+  fill. `headlight: false` restores the world-fixed rig. Default and preset
+  light intensities are retuned for three.js physically based lighting (a
+  camera-facing surface receives ≈π irradiance, showing layer colours at
+  nominal value: ambient + 0.956·key + 0.854·fill ≈ π for the key ≈17° and
+  fill ≈31° off the line of sight): default ambient `0xffffff` × 1.0, key
+  1.84, fill 0.45 (was ambient `0xb5b5b5` × 1.25, key 1.6, fill 0.8);
+  `ambientLightColor` and `directionalLightIntensity` defaults change
+  accordingly. The report scene controller now uses the viewer's headlight
+  instead of its own render listener. It still enables it for the anatomical
+  layout and leaves world-fixed lights for split, but the light geometry
+  changed: the key and fill are now aimed at the orbit target from fixed
+  camera-space directions (key `(0.35, 0.5, 2)`, fill `(-0.8, -0.3, 1.4)`)
+  rather than placed at offsets from the camera position (previously
+  `(0.4, 0.6, 0.8)` and `(-0.5, -0.3, 0.6)`), so report renders are lit
+  slightly more frontally. On dispose it hands back the viewer's previous
+  setting only if it changed it and nobody has changed it since.
+- **Behaviour change: curvature sign and estimator.** `CurvatureLayer` and
+  `curvatureToGrayscale` take FreeSurfer-convention input (positive in sulci)
+  and render gyri light, sulci dark (`gray = brightness − scaled · contrast`);
+  pass `invert: true` for the previous mapping. `computeMeanCurvature` keeps
+  the FreeSurfer sign but projects the umbrella vector onto the area-weighted
+  normal and divides by the squared mean edge length, giving mean curvature
+  in inverse mesh units independent of resolution (≈ −1/R on a sphere; r = 0.87
+  against FreeSurfer `lh.curv` on fsaverage5, was 0.81), with 2 smoothing
+  passes by default (`smoothingIterations`). Values are smaller in magnitude
+  and differently distributed than before; pass them through
+  `normalizeCurvature` as before.
+- Demo: pial chapters use the new mean curvature; inflated displays (Layers,
+  Parcels & connectivity, Anatomy › Inflate and the flat-map sheet) use sulcal
+  depth measured on the folded surface — for fs_LR 32k from the shipped
+  `tests/data/fs_LR.32k.L.sulcal_depth.shape.gii` (90 KB, computed on the HCP
+  midthickness), since curvature computed on the inflated mesh only showed
+  noise. The blue-grey `baseColor` is gone, and the Layers chapter's additive
+  activation uses opacity 0.5 over a `[0, 2.2]` range so it no longer clips to
+  white on light gyri.
+- Style presets retune curvature display (`brightness`, `contrast`,
+  `smoothness`) for the new estimator and gyri-light mapping, and the
+  `presentation` preset sets `overlayEmission: 0.25` so overlay hues stay
+  saturated on slopes facing away from the key light.
 - `VolumeProjectionLayer` `sampling` now also sets the GPU vertex path's 3D
   texture filter. The default `sampling` is still `'nearest'`, so GPU vertex
   projection without an explicit `sampling` now samples nearest voxels instead

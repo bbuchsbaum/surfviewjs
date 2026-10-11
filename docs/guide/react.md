@@ -119,8 +119,8 @@ lifecycle details.
   height={window.innerHeight}
   config={{
     backgroundColor: 0x1a1a1a,
-    ambientLightColor: 0x404040,
-    directionalLightIntensity: 0.8
+    ambientLightColor: 0xffffff,
+    directionalLightIntensity: 1.84
   }}
   viewpoint="lateral"
   onReady={(viewer) => console.log('Viewer ready', viewer)}

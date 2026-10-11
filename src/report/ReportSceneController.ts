@@ -66,7 +66,11 @@ export interface ReportSceneControllerOptions {
   readonly layout?: ReportLayout;
   /** Initial whole-brain view for the anatomical layout. Defaults to `oblique`. */
   readonly initialBrainView?: ReportBrainView;
-  /** Keep the key light attached to the camera so every pose is lit alike. */
+  /**
+   * Keep the key and fill lights attached to the camera so every pose is lit
+   * alike (the viewer's `setHeadlight`). Defaults to true for the anatomical
+   * layout and false for split; the viewer's own setting returns on dispose.
+   */
   readonly headlight?: boolean;
   /** Camera fit margin as a fraction of the framed distance (0.1 anatomical, 0.12 split). */
   readonly fitMargin?: number;
@@ -378,6 +382,8 @@ export class ReportSceneController {
   private changingView = false;
   private mutationDepth = 0;
   private disposed = false;
+  /** Set only when the report changed the viewer's headlight. */
+  private headlightHandoff: { previous: boolean | undefined; applied: boolean } | null = null;
 
   constructor(
     readonly viewer: NeuroSurfaceViewer,
@@ -422,31 +428,19 @@ export class ReportSceneController {
       viewer.camera.fov = this.options.fov;
       viewer.camera.updateProjectionMatrix();
     }
-    if (this.options.headlight ?? this.layout === 'anatomical') {
-      // Key light above-right of the camera, fill below-left: fixed in camera
-      // space so every pose and free rotation is lit alike.
-      const keyOffset = new THREE.Vector3(0.4, 0.6, 0.8).normalize();
-      const fillOffset = new THREE.Vector3(-0.5, -0.3, 0.6).normalize();
-      const worldOffset = new THREE.Vector3();
-      const place = (light: THREE.DirectionalLight | undefined, offset: THREE.Vector3) => {
-        const controls = viewer.cameraControls;
-        if (!light || !controls) return;
-        const distance = viewer.camera.position.distanceTo(controls.target) || 1;
-        worldOffset.copy(offset).multiplyScalar(distance).applyQuaternion(viewer.camera.quaternion);
-        light.position.copy(viewer.camera.position).add(worldOffset);
-        light.target.position.copy(controls.target);
-        light.target.updateMatrixWorld();
-      };
-      this.viewerUnsubscribers.push(viewer.on('render:before', () => {
-        place(viewer.directionalLight, keyOffset);
-        place(viewer.fillLight, fillOffset);
-      }));
-    }
     if (!ANATOMICAL_VIEWS.includes(this.initialView)) {
       throw new RangeError(`Unsupported initial report view "${String(this.initialView)}".`);
     }
     if (!Number.isFinite(this.hemisphereGap) || this.hemisphereGap < 0) {
       throw new RangeError('hemisphereGap must be a finite, non-negative number');
+    }
+    // The viewer owns the camera-attached light rig; the report only chooses
+    // it (on for the anatomical layout, world-fixed for split by default) and
+    // hands the viewer's own setting back on disposal.
+    const headlight = this.options.headlight ?? this.layout === 'anatomical';
+    if (viewer.config.headlight !== headlight) {
+      this.headlightHandoff = { previous: viewer.config.headlight, applied: headlight };
+      viewer.setHeadlight(headlight);
     }
     this.displayedLayerId = this.deriveDisplayedLayerId();
     this.viewerUnsubscribers.push(
@@ -778,6 +772,12 @@ export class ReportSceneController {
     if (this.disposed) return;
     this.disposed = true;
     for (const unsubscribe of this.viewerUnsubscribers.splice(0)) unsubscribe();
+    // Hand back only a setting the report made and nobody has changed since.
+    const handoff = this.headlightHandoff;
+    if (handoff && typeof handoff.previous === 'boolean' && !this.viewer.isDisposed() &&
+        this.viewer.config.headlight === handoff.applied) {
+      this.viewer.setHeadlight(handoff.previous);
+    }
     for (const listener of [...this.disposingListeners]) this.deliverDisposing(listener);
     this.disposingListeners.clear();
     this.mutationListeners.clear();

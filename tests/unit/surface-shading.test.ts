@@ -110,7 +110,9 @@ describe('installSurfaceShading', () => {
     const shader = compile(material);
     expect(shader.vertexShader).toContain(`attribute vec4 ${SURFACE_OVERLAY_ATTRIBUTE};`);
     expect(shader.vertexShader).toContain(`attribute float ${SURFACE_EDGE_ATTRIBUTE};`);
-    expect(shader.vertexShader).toContain(`vSurfviewOverlay = ${SURFACE_OVERLAY_ATTRIBUTE};`);
+    expect(shader.vertexShader).toContain(
+      `vSurfviewOverlay = vec4( surfviewSRGBToLinear( ${SURFACE_OVERLAY_ATTRIBUTE}.rgb ), ${SURFACE_OVERLAY_ATTRIBUTE}.a );`
+    );
     expect(shader.vertexShader).toContain(`vSurfviewEdge = ${SURFACE_EDGE_ATTRIBUTE};`);
     for (const name of Object.keys(uniforms)) {
       expect(shader.fragmentShader).toContain(`uniform float ${name};`);

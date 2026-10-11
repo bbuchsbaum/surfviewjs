@@ -188,15 +188,17 @@ void main() {
 
   bool isFill = abs(projectedValue - uFillValue) < 1e-6;
   if (projectedInBounds < 0.5 || isFill || hiddenByThreshold) {
-    outColor = vec4(baseRgb, 1.0);
+    outColor = linearToOutputTexel( vec4( baseRgb, 1.0 ) );
     return;
   }
 
   float t = normalizeValue(projectedValue, uIntensityRange.x, uIntensityRange.y);
-  vec3 overlayRgb = texture(uColormapSampler, vec2(t, 0.5)).rgb;
+  // Colormap texels are display (sRGB) values; shade in linear light.
+  vec3 overlayRgb = sRGBTransferEOTF( texture(uColormapSampler, vec2(t, 0.5)) ).rgb;
   overlayRgb *= shade;
 
   vec3 finalRgb = mix(baseRgb, overlayRgb, uOverlayOpacity);
-  outColor = vec4(finalRgb, 1.0);
+  // uBaseColor is linear (THREE.Color); encode once for the output target.
+  outColor = linearToOutputTexel( vec4( finalRgb, 1.0 ) );
 }
 `;

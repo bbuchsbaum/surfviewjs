@@ -50,7 +50,7 @@ import ColorMap2D from './ColorMap2D';
 import { OutlineLayer } from './OutlineLayer';
 import { CurvatureLayer } from './layers/CurvatureLayer';
 import { GPULayerCompositor } from './GPULayerCompositor';
-import { computeMeanCurvature, normalizeCurvature, curvatureToGrayscale } from './utils/curvature';
+import { computeMeanCurvature, computeSulcalDepth, normalizeCurvature, curvatureToGrayscale } from './utils/curvature';
 import { ClipPlane, ClipPlaneSet } from './utils/ClipPlane';
 import { debugLog, setDebug } from './debug';
 import ColorMap from './ColorMap';
@@ -167,6 +167,7 @@ export {
   CurvatureLayer,
   GPULayerCompositor,
   computeMeanCurvature,
+  computeSulcalDepth,
   normalizeCurvature,
   curvatureToGrayscale,
   ClipPlane,
@@ -411,6 +412,7 @@ export type {
 export type { VolumeProjectedSurfaceOptions } from './surfaces/VolumeProjectedSurface';
 export type { VolumeTexture3DOptions, VolumeTextureFilter } from './textures/VolumeTexture3D';
 export type { CurvatureConfig, CurvatureLayerUpdateData } from './layers/CurvatureLayer';
+export type { MeanCurvatureOptions, SulcalDepthOptions } from './utils/curvature';
 
 export {
   ANATOMICAL_VIEWS,

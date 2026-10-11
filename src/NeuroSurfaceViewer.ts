@@ -94,6 +94,7 @@ import { ViewerRenderScheduler } from './viewer/ViewerRenderScheduler';
 import { drawFigureOverlays } from './viewer/FigureOverlayRenderer';
 import { WebGLContextLifecycle } from './viewer/WebGLContextLifecycle';
 import { ViewerPickingController } from './viewer/ViewerPickingController';
+import { CameraHeadlight, WORLD_FILL_POSITION } from './viewer/CameraHeadlight';
 import {
   devicePixelRatio as normalizeDevicePixelRatio,
   finiteNumber,
@@ -129,7 +130,17 @@ export interface NeuroSurfaceViewerConfig {
   allowCDNFallback?: boolean;
   /** Use GPU-based picking for faster vertex selection on large meshes */
   useGPUPicking?: boolean;
+  /**
+   * Hold the key and fill lights fixed relative to the camera (default true),
+   * so whichever side of the cortex faces the viewer is key-lit. `false`
+   * restores the world-fixed rig of earlier releases: key light at the
+   * preset's `directionalPosition`, fill at (-1, -0.5, -1).
+   */
+  headlight?: boolean;
 }
+
+/** Fill-light intensity when a style preset does not set one. */
+const DEFAULT_FILL_INTENSITY = 0.45;
 
 /** Fully normalized runtime viewer configuration; no required value is undefined. */
 export type ResolvedNeuroSurfaceViewerConfig = Required<NeuroSurfaceViewerConfig>;
@@ -206,9 +217,9 @@ function normalizeLegacyViewerConfig(
 }
 
 const DEFAULT_VIEWER_CONFIG: Readonly<ResolvedNeuroSurfaceViewerConfig> = Object.freeze({
-  ambientLightColor: 0xb5b5b5,
+  ambientLightColor: 0xffffff,
   directionalLightColor: 0xffffff,
-  directionalLightIntensity: 1.6,
+  directionalLightIntensity: 1.84,
   rotationSpeed: 2,
   initialZoom: 12,
   ssaoRadius: 4,
@@ -228,7 +239,8 @@ const DEFAULT_VIEWER_CONFIG: Readonly<ResolvedNeuroSurfaceViewerConfig> = Object
   hoverCrosshairColor: 0x66ccff,
   hoverCrosshairSize: 1.2,
   clickToAddAnnotation: false,
-  useGPUPicking: false
+  useGPUPicking: false,
+  headlight: true
 });
 
 function normalizeViewerConfig(
@@ -276,6 +288,9 @@ function normalizeViewerConfig(
     minimum: 0,
     minimumExclusive: true
   });
+  if (typeof merged.headlight !== 'boolean') {
+    throw new TypeError('headlight must be a boolean');
+  }
   return merged;
 }
 
@@ -332,6 +347,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   directionalLight!: THREE.DirectionalLight;
   /** Secondary light; presets may set its intensity, report scenes keep it camera-relative. */
   fillLight!: THREE.DirectionalLight;
+  private headlight?: CameraHeadlight;
   viewpoints!: Record<string, ViewpointConfig>;
   viewpointState!: ViewpointState | null;
   currentViewpointKey!: string;
@@ -668,8 +684,16 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   }
 
   setupLighting(): void {
-    // Ambient light for overall illumination - bright enough to see surface clearly
-    this.ambientLight = new THREE.AmbientLight(this.config.ambientLightColor, 1.25);
+    // three.js lights are physically based: a Lambertian surface lit head-on
+    // returns albedo × irradiance / π. Preset intensities are chosen so that,
+    // with the headlight, ambient + 0.956·key + 0.854·fill (the cosines of the
+    // key and fill directions to the line of sight) is about π: a
+    // camera-facing surface shows its layer colours at full value.
+    const lighting = this.stylePreset?.lighting;
+    this.ambientLight = new THREE.AmbientLight(
+      this.config.ambientLightColor,
+      lighting?.ambientIntensity ?? 1
+    );
     this.scene.add(this.ambientLight);
 
     // Directional light for shading and definition
@@ -677,17 +701,53 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
       this.config.directionalLightColor, 
       this.config.directionalLightIntensity
     );
-    this.directionalLight.position.set(1, 1, 1);
+    this.directionalLight.position.set(...(lighting?.directionalPosition ?? [1, 1, 1]));
     this.directionalLight.castShadow = false;
     this.scene.add(this.directionalLight);
+    this.scene.add(this.directionalLight.target);
 
-    // Add a fill light from the opposite direction for better visibility
-    const fillLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    fillLight.position.set(-1, -0.5, -1);
+    // Fill light from the opposite side so the key's shadow side is not black.
+    const fillLight = new THREE.DirectionalLight(0xffffff, lighting?.fillIntensity ?? DEFAULT_FILL_INTENSITY);
+    fillLight.position.set(...WORLD_FILL_POSITION);
     this.scene.add(fillLight);
     this.scene.add(fillLight.target);
     this.fillLight = fillLight;
     this.invalidateState(['appearance']);
+  }
+
+  /**
+   * Hold the key and fill lights fixed relative to the camera (`true`, the
+   * default) or fixed in the world (`false`, the rig of earlier releases).
+   */
+  setHeadlight(enabled: boolean): void {
+    if (typeof enabled !== 'boolean') throw new TypeError('headlight must be a boolean');
+    this.config.headlight = enabled;
+    if (!enabled) this.restoreWorldLights();
+    this.invalidateState(['appearance']);
+    this.requestRender();
+  }
+
+  /** Re-aim camera-attached lights for the current pose (called each render). */
+  private updateHeadlight(): void {
+    if (!this.camera || !this.cameraControls) return;
+    this.headlight ??= new CameraHeadlight();
+    this.camera.updateMatrixWorld();
+    this.headlight.update(this.camera, this.cameraControls.target, this.directionalLight, this.fillLight);
+  }
+
+  /** Put the key and fill lights back at their world-fixed positions. */
+  private restoreWorldLights(): void {
+    const position = this.stylePreset?.lighting.directionalPosition ?? [1, 1, 1];
+    for (const [light, at] of [
+      [this.directionalLight, position],
+      [this.fillLight, WORLD_FILL_POSITION]
+    ] as const) {
+      if (!light) continue;
+      light.position.set(at[0], at[1], at[2]);
+      light.target.position.set(0, 0, 0);
+      light.updateMatrixWorld();
+      light.target.updateMatrixWorld();
+    }
   }
 
   setupControls(): void {
@@ -2580,6 +2640,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
         surface.flushPendingColorUpdate();
       }
     }
+    if (this.config.headlight) this.updateHeadlight();
     // Emit before render event
     this.emit('render:before');
     
@@ -3338,6 +3399,8 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
         this.applyExplicitStyleUpdates(newConfig, normalizedConfig);
       }
 
+      if (newConfig.headlight !== undefined) this.setHeadlight(this.config.headlight);
+
       const observableKeys = Object.keys(newConfig).filter(key =>
         key !== 'showControls' && key !== 'useControls' && key !== 'allowCDNFallback'
       );
@@ -3422,7 +3485,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
         this.ambientLight.intensity = style.lighting.ambientIntensity;
       }
       if (this.fillLight) {
-        this.fillLight.intensity = style.lighting.fillIntensity ?? 0.8;
+        this.fillLight.intensity = style.lighting.fillIntensity ?? DEFAULT_FILL_INTENSITY;
       }
       if (this.directionalLight) {
         this.directionalLight.color.setHex(style.lighting.directionalColor);
@@ -3447,8 +3510,11 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
 
       this.surfaces.forEach(surface => {
         if (typeof (surface as any).updateConfig === 'function') {
+          // A composited surface's base colour is the base layer's, and a
+          // colour its owner chose survives presets (applyStyleBaseColor).
+          const layered = surface instanceof MultiLayerNeuroSurface;
           (surface as any).updateConfig({
-            color: style.material.baseColor,
+            ...(layered ? {} : { color: style.material.baseColor }),
             materialType: style.material.materialType,
             metalness: style.material.metalness,
             roughness: style.material.roughness,
@@ -3456,6 +3522,7 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
           });
         }
         if (surface instanceof MultiLayerNeuroSurface) {
+          surface.applyStyleBaseColor(style.material.baseColor);
           const curvature = surface.getCurvatureLayer();
           if (curvature) {
             curvature.setBrightness(style.curvature.brightness);

@@ -595,13 +595,24 @@ function applyConfig(viewer: any, config: ViewerStateV2['config']): void {
     if (viewer.config) viewer.config.backgroundColor = config.background;
   }
   if (config.lighting) {
+    const headlight = config.lighting.headlight;
+    if (typeof headlight === 'boolean') {
+      if (typeof viewer.setHeadlight === 'function') {
+        viewer.setHeadlight(headlight);
+      } else if (viewer.config) {
+        viewer.config.headlight = headlight;
+      }
+    }
     if (config.lighting.ambientIntensity !== undefined && viewer.ambientLight) {
       viewer.ambientLight.intensity = config.lighting.ambientIntensity;
     }
     if (config.lighting.directionalIntensity !== undefined && viewer.directionalLight) {
       viewer.directionalLight.intensity = config.lighting.directionalIntensity;
     }
-    if (config.lighting.directionalPosition && viewer.directionalLight) {
+    // While the headlight is on, the key light is re-aimed from the camera on
+    // every render; a stored world position would be stale.
+    const headlightOn = headlight ?? viewer.config?.headlight === true;
+    if (config.lighting.directionalPosition && viewer.directionalLight && !headlightOn) {
       viewer.directionalLight.position.set(...config.lighting.directionalPosition);
     }
   }

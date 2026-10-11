@@ -63,6 +63,7 @@ export interface MultiLayerSurfaceConfig extends SurfaceConfig {
     brightness?: number;  // Base gray level (0-1), default 0.5
     contrast?: number;    // Curvature influence (0-1), default 0.5
     smoothness?: number;  // Curvature scaling factor, default 1
+    invert?: boolean;     // true: positive values lighter (earlier releases); default gyri light
   };
   /** Fragment-level threshold edges, outline, and silhouette shading. */
   shading?: SurfaceShadingOptions;
@@ -139,6 +140,7 @@ export interface LayerUpdate {
   brightness?: number;
   contrast?: number;
   smoothness?: number;
+  invert?: boolean;
 
   // Temporal layer properties
   frames?: Float32Array[];
@@ -183,6 +185,8 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
   private useWideLines: boolean;
   private shadingUniforms!: SurfaceShadingUniforms;
   private thresholdEdges = true;
+  /** The caller chose the base colour (constructor or updateConfig); style presets keep it. */
+  private baseColorExplicit = false;
   private overlayBuffer: Float32Array | null = null;
   private edgeBuffer: Float32Array | null = null;
 
@@ -212,6 +216,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     this.clipPlanes = new ClipPlaneSet();
     this.shadingUniforms = createSurfaceShadingUniforms(config.shading);
     this.thresholdEdges = config.shading?.thresholdEdges ?? true;
+    this.baseColorExplicit = config.baseColor !== undefined;
     
     // Add curvature layer if provided (renders below base layer)
     if (config.curvature && config.showCurvature !== false) {
@@ -220,7 +225,8 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
         order: -2, // Below base layer
         ...(curvOpts.brightness === undefined ? {} : { brightness: curvOpts.brightness }),
         ...(curvOpts.contrast === undefined ? {} : { contrast: curvOpts.contrast }),
-        ...(curvOpts.smoothness === undefined ? {} : { smoothness: curvOpts.smoothness })
+        ...(curvOpts.smoothness === undefined ? {} : { smoothness: curvOpts.smoothness }),
+        ...(curvOpts.invert === undefined ? {} : { invert: curvOpts.invert })
       });
       this.layerStack.addLayer(curvLayer);
       this.wireLayerChange(curvLayer);
@@ -698,11 +704,11 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
    * Creates curvature layer if it doesn't exist.
    *
    * @param curvature - Curvature values per vertex
-   * @param options - Display options (brightness, contrast, smoothness)
+   * @param options - Display options (brightness, contrast, smoothness, invert)
    */
   setCurvature(
     curvature: Float32Array | number[],
-    options?: { brightness?: number; contrast?: number; smoothness?: number }
+    options?: { brightness?: number; contrast?: number; smoothness?: number; invert?: boolean }
   ): void {
     const existing = this.layerStack.getLayer('curvature');
     if (existing && existing instanceof CurvatureLayer) {
@@ -710,17 +716,36 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
       if (options?.brightness !== undefined) existing.setBrightness(options.brightness);
       if (options?.contrast !== undefined) existing.setContrast(options.contrast);
       if (options?.smoothness !== undefined) existing.setSmoothness(options.smoothness);
+      if (options?.invert !== undefined) existing.setInvert(options.invert);
     } else {
       const layer = new CurvatureLayer('curvature', curvature, {
         order: -2,
         ...(options?.brightness === undefined ? {} : { brightness: options.brightness }),
         ...(options?.contrast === undefined ? {} : { contrast: options.contrast }),
-        ...(options?.smoothness === undefined ? {} : { smoothness: options.smoothness })
+        ...(options?.smoothness === undefined ? {} : { smoothness: options.smoothness }),
+        ...(options?.invert === undefined ? {} : { invert: options.invert })
       });
       this.layerStack.addLayer(layer);
       this.wireLayerChange(layer);
     }
     this.requestColorUpdate();
+  }
+
+  /**
+   * Apply a style preset's base colour unless the caller chose one (in the
+   * constructor's `baseColor` or with `updateConfig({ color })`). Returns
+   * whether the base colour changed.
+   */
+  applyStyleBaseColor(color: THREE.ColorRepresentation): boolean {
+    if (this.baseColorExplicit) return false;
+    return this.setBaseLayerColor(color);
+  }
+
+  private setBaseLayerColor(color: THREE.ColorRepresentation): boolean {
+    const base = this.layerStack.getLayer('base');
+    if (!(base instanceof BaseLayer)) return false;
+    base.setColor(new THREE.Color(color).getHex());
+    return true;
   }
 
   /**
@@ -1039,6 +1064,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
                 ...(props.brightness === undefined ? {} : { brightness: props.brightness }),
                 ...(props.contrast === undefined ? {} : { contrast: props.contrast }),
                 ...(props.smoothness === undefined ? {} : { smoothness: props.smoothness }),
+                ...(props.invert === undefined ? {} : { invert: props.invert }),
                 ...(props.visible === undefined ? {} : { visible: props.visible }),
                 ...(props.opacity === undefined ? {} : { opacity: props.opacity }),
                 ...(props.blendMode === undefined ? {} : { blendMode: props.blendMode })
@@ -1389,7 +1415,9 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
       specular: new THREE.Color(this.config.specularColor ?? 0x111111),
       flatShading: this.config.flatShading ?? false,
       side: THREE.DoubleSide, // Ensure both sides are visible
-      color: new THREE.Color((this.config as MultiLayerSurfaceConfig).baseColor ?? 0xcccccc)
+      // The composited layers carry every colour, the base colour included
+      // (BaseLayer). A non-white material colour would multiply all of them.
+      color: 0xffffff
     });
     installSurfaceShading(material, this.shadingUniforms);
     return material;
@@ -1413,6 +1441,12 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
    */
   updateConfig(newConfig: Partial<SurfaceConfig>): void {
     super.updateConfig(newConfig);
+    // `color` is the colour of the bare surface: the base layer, which shows
+    // wherever no curvature underlay or opaque layer covers it.
+    if (newConfig.color !== undefined) {
+      this.baseColorExplicit = true;
+      this.setBaseLayerColor(newConfig.color);
+    }
     const compositor = this.gpuCompositor;
     if (!this.useGPUCompositing || !compositor || !this.mesh ||
         this.mesh.material !== compositor.getMaterial()) {
@@ -1420,7 +1454,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     }
     const config = this.config;
     compositor.setMaterialResponse({
-      color: config.color,
+      color: 0xffffff,
       specular: config.specularColor,
       shininess: config.shininess,
       emissive: config.emissive,

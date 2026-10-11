@@ -163,7 +163,8 @@ export function makeReportViewer(): NeuroSurfaceViewer {
     metalness: 0.1,
     roughness: 0.6,
     ssaoRadius: 4,
-    ssaoKernelSize: 32
+    ssaoKernelSize: 32,
+    headlight: true
   };
   mutable.stylePreset = getStylePreset('default');
   mutable.viewpoint = 'lateral';

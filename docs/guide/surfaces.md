@@ -275,7 +275,7 @@ All surface types support material configuration:
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `materialType` | string | 'phong' | 'phong', 'standard', or 'physical' |
-| `color` / `baseColor` | number | 0xa9a9a9 | Base surface color |
+| `color` / `baseColor` | number | 0xa9a9a9 (`MultiLayerNeuroSurface`: 0xcccccc) | Colour of the bare surface, where no curvature underlay or layer covers it. On vertex-coloured surfaces it is a per-vertex colour, never a material tint, so it does not darken or recolour data layers |
 | `opacity` / `alpha` | number | 1 | Finite surface opacity in `[0, 1]` |
 | `metalness` | number | 0 | Finite PBR metalness in `[0, 1]` |
 | `roughness` | number | 0.5 | Finite PBR roughness in `[0, 1]` |

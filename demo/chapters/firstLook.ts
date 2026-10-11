@@ -2,7 +2,7 @@ import { DataLayer, MultiLayerNeuroSurface } from '@src/index.js';
 import type { AnatomicalView } from '@src/index.js';
 import excerpt from '../excerpts/firstLook.ts?raw';
 import { action, actions, choice, fmt, section, select, slider, toggle } from '../kit/controls';
-import { FOCI, blobField, curvatureOf, loadBilateral, mirror, smoothNoise, addFields } from '../kit/data';
+import { FOCI, blobField, CURVATURE_UNDERLAY, curvatureOf, loadBilateral, mirror, smoothNoise, addFields } from '../kit/data';
 import { createFilmViewer } from '../kit/film';
 import type { Scenario } from '../types';
 
@@ -59,10 +59,9 @@ export const firstLook: Scenario = {
       ['rh', right, 'right', 'fsaverage5Right']
     ] as const) {
       const surface = new MultiLayerNeuroSurface(geometry, {
-        baseColor: 0xb7c0c8,
         curvature: curvatureOf(mesh, geometry),
         showCurvature: true,
-        curvatureOptions: { brightness: 0.64, contrast: 0.42 }
+        curvatureOptions: CURVATURE_UNDERLAY
       });
       surface.hemisphere = hemisphere;
       viewer.addSurface(surface, id);

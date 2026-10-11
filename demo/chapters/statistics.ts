@@ -8,7 +8,7 @@ import {
 import type { AnatomicalView, ColorMap2DPreset, SurfaceGeometry, TwoDataLayer } from '@src/index.js';
 import excerpt from '../excerpts/statistics.ts?raw';
 import { choice, fmt, note, readout, section, select, slider, toggle } from '../kit/controls';
-import { FOCI, addFields, blobField, curvatureOf, loadBilateral, mirror, seededRandom, smoothNoise } from '../kit/data';
+import { FOCI, addFields, blobField, CURVATURE_UNDERLAY, curvatureOf, loadBilateral, mirror, seededRandom, smoothNoise } from '../kit/data';
 import { createFilmViewer } from '../kit/film';
 import type { Scenario } from '../types';
 import './statistics.css';
@@ -156,10 +156,9 @@ export const statistics: Scenario = {
       ['rh', right, 'right', 'fsaverage5Right']
     ] as const) {
       const surface = new MultiLayerNeuroSurface(geometry, {
-        baseColor: 0xb7c0c8,
         curvature: curvatureOf(mesh, geometry),
         showCurvature: true,
-        curvatureOptions: { brightness: 0.64, contrast: 0.42 }
+        curvatureOptions: CURVATURE_UNDERLAY
       });
       surface.hemisphere = side;
       viewer.addSurface(surface, id);

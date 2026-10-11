@@ -28,7 +28,7 @@ export interface StylePresetLighting {
   rimStrength: number;
   ssaoRadius: number;
   ssaoKernelSize: number;
-  /** Fill light intensity (default 0.8). */
+  /** Fill light intensity (default 0.45). */
   fillIntensity?: number;
   /** Fragment shading of CPU-composited surfaces. */
   silhouetteDarkening?: number;
@@ -194,15 +194,26 @@ export interface ResolvedFigureExportOptions {
   preset: SurfViewStylePreset;
 }
 
+/*
+ * Light levels. three.js lights are physically based: a Lambertian surface lit
+ * head-on returns albedo × irradiance / π. With the default camera-attached
+ * key (≈17° off axis, cos 0.956) and fill (≈31° off axis, cos 0.854),
+ * ambient + 0.956·key + 0.854·fill ≈ π (ambient weighted by the luminance of
+ * its colour) gives a camera-facing surface its full layer colour, so curvature greys and colormap
+ * colours read at their nominal values; slopes then shade from the key light.
+ * Presets differ in that balance (more ambient: flatter; more key: more
+ * relief), not in overall exposure.
+ */
 const defaultLighting: StylePresetLighting = {
-  ambientColor: 0xb5b5b5,
-  ambientIntensity: 1.25,
+  ambientColor: 0xffffff,
+  ambientIntensity: 1.0,
   directionalColor: 0xffffff,
-  directionalIntensity: 1.6,
+  directionalIntensity: 1.84,
   directionalPosition: [1, 1, 1],
   rimStrength: 0,
   ssaoRadius: 4,
-  ssaoKernelSize: 32
+  ssaoKernelSize: 32,
+  fillIntensity: 0.45
 };
 
 const defaultFigure: StylePresetFigure = {
@@ -222,16 +233,18 @@ export const STYLE_PRESETS: Record<SurfViewStylePresetName, SurfViewStylePreset>
     label: 'Cortical Contrast',
     background: { css: '#000000', clearColor: 0x000000, clearAlpha: 1 },
     lighting: {
-      ambientColor: 0xffffff, ambientIntensity: 0.65,
-      directionalColor: 0xffffff, directionalIntensity: 0.65,
+      ambientColor: 0xffffff, ambientIntensity: 0.8,
+      directionalColor: 0xffffff, directionalIntensity: 2.18,
       directionalPosition: [1, 1.25, 1.4],
-      rimStrength: 0, ssaoRadius: 4, ssaoKernelSize: 32
+      rimStrength: 0, ssaoRadius: 4, ssaoKernelSize: 32,
+      fillIntensity: 0.3
     },
     material: {
       baseColor: 0xffffff, materialType: 'phong',
       metalness: 0, roughness: 1, alpha: 1
     },
-    curvature: { brightness: 0.5, contrast: 0.5, smoothness: 1 },
+    // Near-binary, freeview-like folding: |normalised curvature| ≥ 0.1 saturates.
+    curvature: { brightness: 0.5, contrast: 0.5, smoothness: 0.2 },
     roi: {
       strokeColor: '#ffffff', strokeWidth: 1.8, labelDensity: 'sparse',
       labelColor: '#ffffff', labelFont: '11px sans-serif'
@@ -253,7 +266,7 @@ export const STYLE_PRESETS: Record<SurfViewStylePresetName, SurfViewStylePreset>
       roughness: 0.6,
       alpha: 1
     },
-    curvature: { brightness: 0.5, contrast: 0.5, smoothness: 1 },
+    curvature: { brightness: 0.55, contrast: 0.4, smoothness: 0.5 },
     roi: {
       strokeColor: '#ffd166',
       strokeWidth: 2,
@@ -276,14 +289,18 @@ export const STYLE_PRESETS: Record<SurfViewStylePresetName, SurfViewStylePreset>
       clearAlpha: 0
     },
     lighting: {
-      ambientColor: 0xb0b0b0,
-      ambientIntensity: 1.4,
+      ambientColor: 0xffffff,
+      ambientIntensity: 1.0,
       directionalColor: 0xffffff,
-      directionalIntensity: 1.0,
+      directionalIntensity: 1.84,
       directionalPosition: [1.5, 1.2, 1],
       rimStrength: 0.35,
       ssaoRadius: 6,
-      ssaoKernelSize: 32
+      ssaoKernelSize: 32,
+      fillIntensity: 0.45,
+      // A quarter of each overlay colour is emitted rather than lit, so
+      // colormap hues stay saturated on slopes facing away from the key.
+      overlayEmission: 0.25
     },
     material: {
       baseColor: 0xd0d4dc,
@@ -292,7 +309,7 @@ export const STYLE_PRESETS: Record<SurfViewStylePresetName, SurfViewStylePreset>
       roughness: 0.35,
       alpha: 1
     },
-    curvature: { brightness: 0.54, contrast: 0.42, smoothness: 0.7 },
+    curvature: { brightness: 0.58, contrast: 0.38, smoothness: 0.5 },
     roi: {
       strokeColor: '#f59e0b',
       strokeWidth: 2.5,
@@ -311,11 +328,12 @@ export const STYLE_PRESETS: Record<SurfViewStylePresetName, SurfViewStylePreset>
     label: 'Paper Light',
     background: { css: '#ffffff', clearColor: 0xffffff, clearAlpha: 1 },
     lighting: {
-      ambientColor: 0xd6d6d6,
-      ambientIntensity: 1.25,
+      ambientColor: 0xffffff,
+      ambientIntensity: 1.1,
       directionalColor: 0xffffff,
-      directionalIntensity: 1.2,
+      directionalIntensity: 1.78,
       directionalPosition: [1, 1.25, 1.4],
+      fillIntensity: 0.4,
       rimStrength: 0.12,
       ssaoRadius: 4,
       ssaoKernelSize: 32
@@ -327,7 +345,7 @@ export const STYLE_PRESETS: Record<SurfViewStylePresetName, SurfViewStylePreset>
       roughness: 0.72,
       alpha: 1
     },
-    curvature: { brightness: 0.58, contrast: 0.34, smoothness: 0.55 },
+    curvature: { brightness: 0.62, contrast: 0.32, smoothness: 0.5 },
     roi: {
       strokeColor: '#111827',
       strokeWidth: 1.8,
@@ -350,14 +368,14 @@ export const STYLE_PRESETS: Record<SurfViewStylePresetName, SurfViewStylePreset>
     background: { css: '#f3f5f5', clearColor: 0xf3f5f5, clearAlpha: 1 },
     lighting: {
       ambientColor: 0xffffff,
-      ambientIntensity: 0.45,
+      ambientIntensity: 1.0,
       directionalColor: 0xffffff,
-      directionalIntensity: 0.85,
+      directionalIntensity: 1.88,
       directionalPosition: [1, 1.25, 1.4],
       rimStrength: 0,
       ssaoRadius: 4,
       ssaoKernelSize: 32,
-      fillIntensity: 0.3,
+      fillIntensity: 0.4,
       silhouetteDarkening: 0.2,
       thresholdOutline: 1,
       thresholdOutlineShade: 0.55,
@@ -396,11 +414,13 @@ export const STYLE_PRESETS: Record<SurfViewStylePresetName, SurfViewStylePreset>
     label: 'Talk Dark',
     background: { css: '#0b0f14', clearColor: 0x0b0f14, clearAlpha: 1 },
     lighting: {
-      ambientColor: 0x7f8da3,
-      ambientIntensity: 1.35,
+      // Faintly cool ambient against the dark slide background.
+      ambientColor: 0xdde4f0,
+      ambientIntensity: 0.9,
       directionalColor: 0xffffff,
-      directionalIntensity: 1.65,
+      directionalIntensity: 2.24,
       directionalPosition: [1.2, 1.1, 0.9],
+      fillIntensity: 0.35,
       rimStrength: 0.55,
       ssaoRadius: 6,
       ssaoKernelSize: 32
@@ -412,7 +432,7 @@ export const STYLE_PRESETS: Record<SurfViewStylePresetName, SurfViewStylePreset>
       roughness: 0.42,
       alpha: 1
     },
-    curvature: { brightness: 0.42, contrast: 0.52, smoothness: 0.7 },
+    curvature: { brightness: 0.5, contrast: 0.46, smoothness: 0.5 },
     roi: {
       strokeColor: '#fbbf24',
       strokeWidth: 3,
@@ -431,11 +451,12 @@ export const STYLE_PRESETS: Record<SurfViewStylePresetName, SurfViewStylePreset>
     label: 'Clinical QC',
     background: { css: '#f3f4f6', clearColor: 0xf3f4f6, clearAlpha: 1 },
     lighting: {
-      ambientColor: 0xc7ccd4,
-      ambientIntensity: 1.15,
+      ambientColor: 0xffffff,
+      ambientIntensity: 1.05,
       directionalColor: 0xffffff,
-      directionalIntensity: 1.35,
+      directionalIntensity: 1.79,
       directionalPosition: [0.8, 1.4, 1.1],
+      fillIntensity: 0.45,
       rimStrength: 0.2,
       ssaoRadius: 3,
       ssaoKernelSize: 16
@@ -447,7 +468,7 @@ export const STYLE_PRESETS: Record<SurfViewStylePresetName, SurfViewStylePreset>
       roughness: 0.78,
       alpha: 1
     },
-    curvature: { brightness: 0.52, contrast: 0.45, smoothness: 0.6 },
+    curvature: { brightness: 0.55, contrast: 0.42, smoothness: 0.5 },
     roi: {
       strokeColor: '#dc2626',
       strokeWidth: 2.2,
@@ -466,11 +487,12 @@ export const STYLE_PRESETS: Record<SurfViewStylePresetName, SurfViewStylePreset>
     label: 'Retinotopy',
     background: { css: '#111111', clearColor: 0x111111, clearAlpha: 1 },
     lighting: {
-      ambientColor: 0x9ca3af,
-      ambientIntensity: 1.2,
+      ambientColor: 0xffffff,
+      ambientIntensity: 1.0,
       directionalColor: 0xffffff,
-      directionalIntensity: 1.25,
+      directionalIntensity: 1.84,
       directionalPosition: [1, 1, 1.3],
+      fillIntensity: 0.45,
       rimStrength: 0.28,
       ssaoRadius: 4,
       ssaoKernelSize: 32
@@ -482,7 +504,8 @@ export const STYLE_PRESETS: Record<SurfViewStylePresetName, SurfViewStylePreset>
       roughness: 0.58,
       alpha: 1
     },
-    curvature: { brightness: 0.38, contrast: 0.62, smoothness: 0.45 },
+    // Darker, high-contrast folding under saturated phase/eccentricity maps.
+    curvature: { brightness: 0.45, contrast: 0.5, smoothness: 0.4 },
     roi: {
       strokeColor: '#ffffff',
       strokeWidth: 2,
@@ -501,11 +524,12 @@ export const STYLE_PRESETS: Record<SurfViewStylePresetName, SurfViewStylePreset>
     label: 'Glass Surface',
     background: { css: '#f8fafc', clearColor: 0xf8fafc, clearAlpha: 1 },
     lighting: {
-      ambientColor: 0xdbeafe,
-      ambientIntensity: 1.2,
+      ambientColor: 0xe6efff,
+      ambientIntensity: 1.0,
       directionalColor: 0xffffff,
-      directionalIntensity: 1.45,
+      directionalIntensity: 1.99,
       directionalPosition: [1.4, 1.1, 1.2],
+      fillIntensity: 0.45,
       rimStrength: 0.45,
       ssaoRadius: 5,
       ssaoKernelSize: 32
@@ -517,7 +541,7 @@ export const STYLE_PRESETS: Record<SurfViewStylePresetName, SurfViewStylePreset>
       roughness: 0.18,
       alpha: 0.62
     },
-    curvature: { brightness: 0.6, contrast: 0.26, smoothness: 0.8 },
+    curvature: { brightness: 0.62, contrast: 0.26, smoothness: 0.6 },
     roi: {
       strokeColor: '#2563eb',
       strokeWidth: 2.4,

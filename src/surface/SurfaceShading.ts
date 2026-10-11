@@ -15,6 +15,10 @@ import type * as THREE from 'three';
  * - Threshold outline: an optional darker band just inside that isoline.
  * - Silhouette darkening: grazing-angle darkening that separates overlapping
  *   hemispheres and gives the cortex a solid, drawn edge.
+ * - Colour management: vertex and overlay colours are display (sRGB) values,
+ *   as colormaps and hex colours are written; the patch decodes them to linear
+ *   per vertex so lighting happens in linear light and the renderer's sRGB
+ *   output encoding is applied exactly once.
  */
 export interface SurfaceShadingOptions {
   /** Draw thresholded data layers with per-fragment isolines. Default true. */
@@ -42,6 +46,31 @@ export interface SurfaceShadingUniforms {
 }
 
 export const SURFACE_OVERLAY_ATTRIBUTE = 'surfviewOverlay';
+/**
+ * Material define marking a vertex colour that is already linear (the GPU
+ * compositor decodes its composite itself); the shading patch then leaves
+ * `vColor` alone instead of decoding it a second time.
+ */
+export const SURFACE_LINEAR_VERTEX_COLOR_DEFINE = 'SURFVIEW_LINEAR_VERTEX_COLOR';
+
+/**
+ * GLSL sRGB EOTF (display-encoded to linear), usable in vertex and fragment
+ * stages. Composite and layer buffers hold display (sRGB) colours, as
+ * colormaps and hex colours are specified; three.js lights in linear space and
+ * encodes the result to sRGB once on output, so colours are decoded here.
+ */
+export const SRGB_TO_LINEAR_GLSL = `
+#ifndef SURFVIEW_SRGB_TO_LINEAR
+#define SURFVIEW_SRGB_TO_LINEAR
+vec3 surfviewSRGBToLinear( vec3 value ) {
+  return mix(
+    pow( value * 0.9478672986 + vec3( 0.0521327014 ), vec3( 2.4 ) ),
+    value * 0.0773993808,
+    vec3( lessThanEqual( value, vec3( 0.04045 ) ) )
+  );
+}
+#endif
+`;
 export const SURFACE_EDGE_ATTRIBUTE = 'surfviewEdge';
 
 /**
@@ -108,6 +137,18 @@ attribute vec4 ${SURFACE_OVERLAY_ATTRIBUTE};
 attribute float ${SURFACE_EDGE_ATTRIBUTE};
 varying vec4 vSurfviewOverlay;
 varying float vSurfviewEdge;
+${SRGB_TO_LINEAR_GLSL}
+`;
+
+// Runs right after three.js's <color_vertex> has assigned vColor.
+const VERTEX_COLOR = `
+#if defined( USE_COLOR_ALPHA ) || defined( USE_COLOR )
+#ifndef ${SURFACE_LINEAR_VERTEX_COLOR_DEFINE}
+vColor.rgb = surfviewSRGBToLinear( vColor.rgb );
+#endif
+#endif
+vSurfviewOverlay = vec4( surfviewSRGBToLinear( ${SURFACE_OVERLAY_ATTRIBUTE}.rgb ), ${SURFACE_OVERLAY_ATTRIBUTE}.a );
+vSurfviewEdge = ${SURFACE_EDGE_ATTRIBUTE};
 `;
 
 const FRAGMENT_DECLARATIONS = `
@@ -186,10 +227,7 @@ export function installSurfaceShading(
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>\n${VERTEX_DECLARATIONS}`)
-      .replace(
-        '#include <color_vertex>',
-        `#include <color_vertex>\nvSurfviewOverlay = ${SURFACE_OVERLAY_ATTRIBUTE};\nvSurfviewEdge = ${SURFACE_EDGE_ATTRIBUTE};`
-      );
+      .replace('#include <color_vertex>', `#include <color_vertex>\n${VERTEX_COLOR}`);
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>\n${FRAGMENT_DECLARATIONS}`)
       .replace('#include <color_fragment>', FRAGMENT_COLOR)

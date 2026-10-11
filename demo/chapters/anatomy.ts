@@ -15,7 +15,7 @@ import type { AnatomicalView, NeuroSurfaceViewer, SurfaceGeometry, VertexHoverEv
 import excerpt from '../excerpts/anatomy.ts?raw';
 import { inflateMesh, projectFlat } from '../kit/anatomy-geometry';
 import { action, actions, choice, fmt, note, readout, section, select, slider, toggle } from '../kit/controls';
-import { curvatureOf, loadBilateral, loadMesh } from '../kit/data';
+import { CURVATURE_UNDERLAY, DEPTH_UNDERLAY, curvatureOf, loadBilateral, loadMesh, sulcalDepthOf } from '../kit/data';
 import type { MeshName } from '../kit/data';
 import { createFilmViewer } from '../kit/film';
 import type { FilmOverlay } from '../kit/film';
@@ -45,7 +45,10 @@ const VIEWS: ReadonlyArray<{ value: AnatomicalView; label: string }> = [
 /** Chinagraph yellow (--mark): the user's ROIs and pinned selection. Ink-high for the cursor. */
 const MARK = '#f2c230';
 const CURSOR = 0xedf2f5;
-const SURFACE_STYLE = { baseColor: 0xb7c0c8, showCurvature: true, curvatureOptions: { brightness: 0.64, contrast: 0.42 } } as const;
+/** Folded surfaces: crisp mean-curvature underlay. */
+const SURFACE_STYLE = { showCurvature: true, curvatureOptions: CURVATURE_UNDERLAY } as const;
+/** Inflating surfaces: sulcal depth from the folded mesh, which survives inflation. */
+const INFLATED_STYLE = { showCurvature: true, curvatureOptions: DEPTH_UNDERLAY } as const;
 const INFLATE_ITERATIONS = 30;
 const VERY_INFLATE_ITERATIONS = 160;
 
@@ -351,8 +354,13 @@ const OPENING_STAGE = 1;
 const MORPH_GAP = 16;
 
 async function morphMode({ ctx, film, panel, isCurrent }: ModeContext): Promise<ModeCleanup | null> {
-  const { left, right } = await loadBilateral();
+  const [{ left, right }, lhDepth, rhDepth] = await Promise.all([
+    loadBilateral(),
+    sulcalDepthOf('fsaverage5Left'),
+    sulcalDepthOf('fsaverage5Right')
+  ]);
   if (!isCurrent()) return null;
+  const depths: Record<SurfaceId, Float32Array> = { lh: lhDepth, rh: rhDepth };
   ctx.setBusy(true, 'Smoothing the pial meshes');
   await new Promise(resolve => requestAnimationFrame(resolve));
   if (!isCurrent()) return null;
@@ -363,8 +371,8 @@ async function morphMode({ ctx, film, panel, isCurrent }: ModeContext): Promise<
     ['rh', right, 'right', 'fsaverage5Right']
   ] as const) {
     const surface = new MorphableSurface(geometry, {
-      ...SURFACE_STYLE,
-      curvature: curvatureOf(mesh, geometry),
+      ...INFLATED_STYLE,
+      curvature: depths[id],
       morphTargets: [
         { name: 'inflated', positions: inflated(mesh, geometry, INFLATE_ITERATIONS) },
         { name: 'very-inflated', positions: inflated(mesh, geometry, VERY_INFLATE_ITERATIONS) }
@@ -381,7 +389,7 @@ async function morphMode({ ctx, film, panel, isCurrent }: ModeContext): Promise<
 
   film.trackOrientation(viewer);
   film.set('tl', 'surface', 'Surface', 'fsaverage5 pial, L + R');
-  film.set('tl', 'curvature', 'Shading', 'folded curvature');
+  film.set('tl', 'curvature', 'Shading', 'sulcal depth');
   film.set('bl', 'gap', 'Gap', `${MORPH_GAP} mm`);
   const state = { duration: 900, easing: 'easeInOut' as (typeof EASINGS)[number]['value'], transition: 0 };
   let transitions = 0;
@@ -479,7 +487,7 @@ async function morphMode({ ctx, film, panel, isCurrent }: ModeContext): Promise<
 // ───────────────────────────── Flat map ─────────────────────────────
 
 async function flatmapMode({ ctx, film, panel, isCurrent }: ModeContext): Promise<ModeCleanup | null> {
-  const pial = await loadMesh('fsaverage5Left');
+  const [pial, depth] = await Promise.all([loadMesh('fsaverage5Left'), sulcalDepthOf('fsaverage5Left')]);
   if (!isCurrent()) return null;
   ctx.setBusy(true, 'Inflating and projecting the left hemisphere');
   await new Promise(resolve => requestAnimationFrame(resolve));
@@ -541,7 +549,8 @@ async function flatmapMode({ ctx, film, panel, isCurrent }: ModeContext): Promis
   underlay.className = 'anat-flat-underlay';
   underlay.setAttribute('aria-hidden', 'true');
   sheet.append(underlay);
-  const shade = curvatureToGrayscale(curvatureOf('fsaverage5Left', pial), { brightness: 0.5, contrast: 0.7 });
+  // An unlit flat sheet shows depth with more contrast than the lit 3D underlay needs.
+  const shade = curvatureToGrayscale(depth, { brightness: 0.55, contrast: 0.5, smoothness: 0.5 });
   const flatmap = new FlatMapView(sheet, { surfaceId: 'lh', vertices: flat.vertices, faces: flat.faces }, {
     width: initialWidth,
     height: initialHeight,

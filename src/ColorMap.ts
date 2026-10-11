@@ -270,7 +270,14 @@ export class ColorMap extends EventEmitter<ColorMapEventMap> {
   }
 
   private static buildGradient(anchors: number[], nshades: number): ColorArray[] {
-    const anchorColors = anchors.map(hex => new THREE.Color(hex));
+    // Anchors are display (sRGB) colours and the ramp is interpolated in
+    // display space, like the generated colormaps: read the hex components
+    // directly instead of through THREE.Color, which would convert to linear.
+    const anchorColors = anchors.map(hex => ({
+      r: ((hex >> 16) & 255) / 255,
+      g: ((hex >> 8) & 255) / 255,
+      b: (hex & 255) / 255
+    }));
     const segments = anchors.length - 1;
     if (segments <= 0) return [];
 

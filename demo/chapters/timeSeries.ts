@@ -2,7 +2,7 @@ import { MultiLayerNeuroSurface, SparklineOverlay, TemporalDataLayer, TimelineCo
 import type { AnatomicalView, VertexHoverEvent } from '@src/index.js';
 import excerpt from '../excerpts/timeSeries.ts?raw';
 import { action, actions, choice, fmt, readout, section, slider } from '../kit/controls';
-import { FOCI, blobField, curvatureOf, loadBilateral, mirror, seededRandom, smoothNoise } from '../kit/data';
+import { FOCI, blobField, CURVATURE_UNDERLAY, curvatureOf, loadBilateral, mirror, seededRandom, smoothNoise } from '../kit/data';
 import { createFilmViewer } from '../kit/film';
 import type { Scenario } from '../types';
 import './timeSeries.css';
@@ -182,10 +182,9 @@ export const timeSeries: Scenario = {
       ['rh', right, 'right', 'fsaverage5Right']
     ] as const) {
       const surface = new MultiLayerNeuroSurface(geometry, {
-        baseColor: 0xb7c0c8,
         curvature: curvatureOf(mesh, geometry),
         showCurvature: true,
-        curvatureOptions: { brightness: 0.64, contrast: 0.42 }
+        curvatureOptions: CURVATURE_UNDERLAY
       });
       surface.hemisphere = hemisphere;
       viewer.addSurface(surface, id);

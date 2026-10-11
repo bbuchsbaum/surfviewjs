@@ -394,40 +394,58 @@ describe('ReportSceneController camera fit', () => {
 });
 
 describe('ReportSceneController headlight', () => {
+  /** Direction from the light's target towards the light, in camera space. */
+  function viewSpaceDirection(viewer: Scene['viewer'], light: THREE.DirectionalLight): THREE.Vector3 {
+    return light.position.clone().sub(light.target.position).normalize()
+      .applyQuaternion(viewer.camera.quaternion.clone().invert());
+  }
+
   it('keeps key and fill lights camera-relative in the anatomical layout', () => {
     withScene({ layout: 'anatomical' }, ({ viewer, controller }) => {
       const fill = new THREE.DirectionalLight(0xffffff);
       (viewer as unknown as { fillLight: THREE.DirectionalLight }).fillLight = fill;
+      expect(viewer.config.headlight).toBe(true);
       controller.setBrainView('dorsal');
-      viewer.emit('render:before');
+      // The viewer places the lights on each render; the report adds no rig of its own.
+      viewer.render();
       const target = viewer.cameraControls.target;
-      const distance = viewer.camera.position.distanceTo(target);
       for (const light of [viewer.directionalLight, fill]) {
-        expect(light.position.distanceTo(viewer.camera.position)).toBeCloseTo(distance, 6);
         expect(light.target.position.equals(target)).toBe(true);
       }
-      // Key light sits above-right of the camera in view space.
-      const inView = viewer.directionalLight.position.clone()
-        .sub(viewer.camera.position)
-        .applyQuaternion(viewer.camera.quaternion.clone().invert());
-      expect(inView.x).toBeGreaterThan(0);
-      expect(inView.y).toBeGreaterThan(0);
+      // Key light comes from above-right of the line of sight, fill from below-left.
+      const key = viewSpaceDirection(viewer, viewer.directionalLight);
+      expect(key.x).toBeGreaterThan(0);
+      expect(key.y).toBeGreaterThan(0);
+      expect(key.z).toBeGreaterThan(0.8);
+      const fillDirection = viewSpaceDirection(viewer, fill);
+      expect(fillDirection.x).toBeLessThan(0);
+      expect(fillDirection.y).toBeLessThan(0);
+      // Rotating the view keeps the same camera-space lighting.
+      controller.setBrainView('left-lateral');
+      viewer.render();
+      expect(viewSpaceDirection(viewer, viewer.directionalLight).distanceTo(key)).toBeLessThan(1e-6);
     });
   });
 
-  it('leaves lights alone when the headlight is off (split default)', () => {
+  it('switches the viewer to world-fixed lights in the split layout by default', () => {
     withScene({}, ({ viewer }) => {
+      expect(viewer.config.headlight).toBe(false);
       viewer.directionalLight.position.set(1, 2, 3);
-      viewer.emit('render:before');
+      viewer.render();
       expect(viewer.directionalLight.position.toArray()).toEqual([1, 2, 3]);
     });
   });
 
-  it('stops tracking the camera after disposal', () => {
-    const scene = makeScene({ layout: 'anatomical' });
-    scene.dispose();
-    scene.viewer.directionalLight.position.set(1, 2, 3);
-    scene.viewer.emit('render:before');
-    expect(scene.viewer.directionalLight.position.toArray()).toEqual([1, 2, 3]);
+  it('hands the viewer its own headlight setting back after disposal', () => {
+    const split = makeScene({});
+    expect(split.viewer.config.headlight).toBe(false);
+    split.dispose();
+    expect(split.viewer.config.headlight).toBe(true);
+
+    const anatomical = makeScene({ layout: 'anatomical', headlight: false });
+    expect(anatomical.viewer.config.headlight).toBe(false);
+    anatomical.dispose();
+    expect(anatomical.viewer.config.headlight).toBe(true);
   });
 });
+

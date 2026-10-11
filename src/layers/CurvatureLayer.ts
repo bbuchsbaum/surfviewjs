@@ -12,6 +12,12 @@ export interface CurvatureConfig extends LayerConfig {
   contrast?: number;
   /** Divisor for curvature values - higher = more subtle, default 1 */
   smoothness?: number;
+  /**
+   * Reverse the grey ramp so positive values render lighter. Default false:
+   * FreeSurfer-convention data (positive in sulci) renders gyri light and
+   * sulci dark. `true` reproduces the mapping of earlier releases.
+   */
+  invert?: boolean;
 }
 
 /**
@@ -22,18 +28,30 @@ export interface CurvatureLayerUpdateData extends LayerUpdateData {
   brightness?: number;
   contrast?: number;
   smoothness?: number;
+  invert?: boolean;
+}
+
+function booleanOption(value: unknown, name: string): boolean {
+  if (typeof value !== 'boolean') throw new TypeError(`${name} must be a boolean`);
+  return value;
 }
 
 /**
  * Layer that displays mesh curvature as a grayscale underlay.
  *
- * Curvature values are mapped to grayscale using:
- *   gray = clamp(curvature / smoothness, -0.5, 0.5) * contrast + brightness
+ * Values follow the FreeSurfer convention (positive in sulci, negative on
+ * gyral crowns) and are mapped to display (sRGB) grey with gyri light:
+ *   gray = brightness − clamp(curvature / smoothness, −0.5, 0.5) · contrast
+ * `invert: true` flips the ramp (`brightness + …`), the mapping of earlier
+ * releases.
  *
  * Typical usage:
- * - Load curvature from FreeSurfer .curv file or compute from pial surface
+ * - Load FreeSurfer `.curv` or `.sulc`, or compute from the folded surface with
+ *   `computeMeanCurvature` (crisp folds) or `computeSulcalDepth` (whole sulci;
+ *   the usual choice for inflated and flat displays), then `normalizeCurvature`
  * - Display as underlay (order: -2, below base layer) to show sulci/gyri
- * - Works on any surface representation (folded, inflated, flat)
+ * - Works on any surface representation (folded, inflated, flat) as long as the
+ *   values were computed on a folded surface with the same topology
  *
  * @example
  * ```typescript
@@ -50,6 +68,7 @@ export class CurvatureLayer extends Layer {
   private brightness: number;
   private contrast: number;
   private smoothness: number;
+  private invert: boolean;
   private rgbaBuffer: Float32Array | null = null;
 
   constructor(
@@ -80,6 +99,7 @@ export class CurvatureLayer extends Layer {
       minimum: 0,
       minimumExclusive: true
     });
+    this.invert = booleanOption(config.invert ?? false, 'invert');
 
     debugLog('CurvatureLayer', id, ': Created with', this.curvature.length, 'vertices');
   }
@@ -133,13 +153,23 @@ export class CurvatureLayer extends Layer {
   }
 
   /**
+   * Reverse the grey ramp (true: positive values lighter).
+   */
+  setInvert(invert: boolean): void {
+    this.invert = booleanOption(invert, 'invert');
+    this.rgbaBuffer = null;
+    this._notifyChange();
+  }
+
+  /**
    * Get current display parameters
    */
-  getDisplayParams(): { brightness: number; contrast: number; smoothness: number } {
+  getDisplayParams(): { brightness: number; contrast: number; smoothness: number; invert: boolean } {
     return {
       brightness: this.brightness,
       contrast: this.contrast,
-      smoothness: this.smoothness
+      smoothness: this.smoothness,
+      invert: this.invert
     };
   }
 
@@ -157,15 +187,15 @@ export class CurvatureLayer extends Layer {
     const brightness = this.brightness;
     const contrast = this.contrast;
     const smoothness = this.smoothness;
+    const sign = this.invert ? 1 : -1;
 
     for (let i = 0; i < vertexCount; i++) {
       // Get curvature value (default to 0 if out of bounds)
       const curv = i < curvature.length ? curvature[i]! : 0;
 
-      // Apply pycortex-style mapping:
-      // gray = clamp(curvature / smoothness, -0.5, 0.5) * contrast + brightness
+      // gray = brightness ∓ clamp(curvature / smoothness, -0.5, 0.5) * contrast
       const scaled = Math.max(-0.5, Math.min(0.5, curv / smoothness));
-      const gray = Math.max(0, Math.min(1, scaled * contrast + brightness));
+      const gray = Math.max(0, Math.min(1, sign * scaled * contrast + brightness));
 
       const offset = i * 4;
       buffer[offset] = gray;     // R
@@ -183,8 +213,9 @@ export class CurvatureLayer extends Layer {
    */
   update(data: CurvatureLayerUpdateData): void {
     assertLayerUpdateFields(data, 'CurvatureLayer', [
-      'curvature', 'brightness', 'contrast', 'smoothness'
+      'curvature', 'brightness', 'contrast', 'smoothness', 'invert'
     ]);
+    if (data.invert !== undefined) booleanOption(data.invert, 'invert');
     if (data.brightness !== undefined) {
       finiteNumber(data.brightness, 'brightness', { minimum: 0, maximum: 1 });
     }
@@ -207,6 +238,9 @@ export class CurvatureLayer extends Layer {
     if (data.smoothness !== undefined) {
       this.setSmoothness(data.smoothness);
     }
+    if (data.invert !== undefined) {
+      this.setInvert(data.invert);
+    }
     if (data.opacity !== undefined) {
       this.setOpacity(data.opacity);
     }
@@ -224,8 +258,23 @@ export class CurvatureLayer extends Layer {
       type: 'curvature',
       brightness: this.brightness,
       contrast: this.contrast,
-      smoothness: this.smoothness
+      smoothness: this.smoothness,
+      // Omitted at the default so states saved by earlier releases compare equal.
+      ...(this.invert ? { invert: true } : {})
     };
+  }
+
+  /**
+   * Restore display parameters saved by {@link toStateJSON}. `invert` is
+   * omitted from saved state at its default, so a missing value means false.
+   * Values are validated before any is applied.
+   */
+  fromStateJSON(state: Record<string, unknown>): void {
+    const update: CurvatureLayerUpdateData = { invert: (state.invert ?? false) as boolean };
+    if (state.brightness !== undefined) update.brightness = state.brightness as number;
+    if (state.contrast !== undefined) update.contrast = state.contrast as number;
+    if (state.smoothness !== undefined) update.smoothness = state.smoothness as number;
+    this.update(update);
   }
 
   /**

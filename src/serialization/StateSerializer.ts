@@ -86,10 +86,16 @@ function serializeConfig(viewer: any): ViewerConfigState {
   if (viewer.ambientLight) {
     cfg.lighting.ambientIntensity = viewer.ambientLight.intensity;
   }
+  const headlight = viewer.config?.headlight;
+  if (typeof headlight === 'boolean') cfg.lighting.headlight = headlight;
   if (viewer.directionalLight) {
     cfg.lighting.directionalIntensity = viewer.directionalLight.intensity;
-    const p = viewer.directionalLight.position;
-    cfg.lighting.directionalPosition = [p.x, p.y, p.z];
+    // A camera-attached key light's position is a by-product of the camera
+    // pose, re-derived on every render; only a world-fixed one is state.
+    if (headlight !== true) {
+      const p = viewer.directionalLight.position;
+      cfg.lighting.directionalPosition = [p.x, p.y, p.z];
+    }
   }
 
   return cfg;

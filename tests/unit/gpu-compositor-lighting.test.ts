@@ -109,7 +109,10 @@ describe('GPULayerCompositor lighting', () => {
     surface.updateConfig({ shininess: 2, specularColor: 0x010101, color: 0x999999 });
     expect(gpu.uniforms.shininess.value).toBe(2);
     expect(gpu.uniforms.specular.value.getHex()).toBe(0x010101);
-    expect(gpu.uniforms.diffuse.value.getHex()).toBe(0x999999);
+    // The material colour of a composited surface stays white (it would tint
+    // every layer); `color` recolours the base layer instead.
+    expect(gpu.uniforms.diffuse.value.getHex()).toBe(0xffffff);
+    expect(surface.getLayer('base')!.toStateJSON()).toMatchObject({ type: 'base', color: 0x999999 });
     surface.dispose();
   });
 
@@ -155,7 +158,8 @@ describe('GPU compositing fragment shading', () => {
     expect(compositor.getLastUpdateStats().renderedLayers).toBe(2);
     const shader = compiled(gpu);
     expect(shader.fragmentShader).toContain('surfviewEdgeEnabled');
-    expect(shader.vertexShader).toContain('vSurfviewOverlay = surfviewOverlay');
+    // The edge colour is a display (sRGB) value decoded to linear per vertex.
+    expect(shader.vertexShader).toContain('vSurfviewOverlay = vec4( surfviewSRGBToLinear( surfviewOverlay.rgb ), surfviewOverlay.a );');
     expect((shader.uniforms as any).surfviewEdgeEnabled.value).toBe(1);
 
     surface.setShading({ silhouetteDarkening: 0.4, thresholdEdges: false });

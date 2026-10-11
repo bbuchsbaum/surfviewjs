@@ -187,9 +187,13 @@ test('GPU compositor matches the straight-RGBA oracle through production blendin
           layer.opacity
         );
       }
+      // Layers composite in display (sRGB) values; the material decodes the
+      // composite to linear before lighting, and this linear target keeps it.
+      const toLinear = (c: number) => c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+      const surfaceLinear = [toLinear(surfaceColor[0]), toLinear(surfaceColor[1]), toLinear(surfaceColor[2]), surfaceColor[3]];
       const expectedStraight = clear[3] === 0
-        ? surfaceColor
-        : compositeStraightRGBA(clear, surfaceColor, 'normal', 1);
+        ? surfaceLinear
+        : compositeStraightRGBA(clear, surfaceLinear, 'normal', 1);
       const framebuffer = clear[3] === 0
         ? premultiplyStraightRGBA(expectedStraight)
         : expectedStraight;

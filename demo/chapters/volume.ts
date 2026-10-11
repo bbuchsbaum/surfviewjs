@@ -2,7 +2,7 @@ import { DataLayer, MultiLayerNeuroSurface, THREE, VolumeProjectionLayer, Volume
 import type { AnatomicalView, VolumeDescriptor } from '@src/index.js';
 import excerpt from '../excerpts/volume.ts?raw';
 import { choice, fmt, note, readout, section, select, slider } from '../kit/controls';
-import { FOCI, addFields, blobField, curvatureOf, loadMesh, smoothNoise } from '../kit/data';
+import { CURVATURE_UNDERLAY, FOCI, addFields, blobField, curvatureOf, loadMesh, smoothNoise } from '../kit/data';
 import { createFilmViewer } from '../kit/film';
 import type { Scenario } from '../types';
 import './volume.css';
@@ -127,10 +127,9 @@ export const volume: Scenario = {
     const floatLinear = webgl2 && VolumeTexture3D.supportsLinearFiltering(viewer.renderer);
     const surface = new MultiLayerNeuroSurface(geometry, {
       useGPUCompositing: webgl2,
-      baseColor: 0xb7c0c8,
       curvature: curvatureOf('fsaverage5Left', geometry),
       showCurvature: true,
-      curvatureOptions: { brightness: 0.64, contrast: 0.42 }
+      curvatureOptions: CURVATURE_UNDERLAY
     });
     surface.hemisphere = 'left';
     viewer.addSurface(surface, 'lh');

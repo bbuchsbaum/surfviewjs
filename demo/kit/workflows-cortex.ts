@@ -1,6 +1,6 @@
 import { DataLayer, MultiLayerNeuroSurface } from '@src/index.js';
 import type { AnatomicalView, NeuroSurfaceViewer, SurfaceGeometry } from '@src/index.js';
-import { FOCI, addFields, blobField, curvatureOf, loadBilateral, mirror, smoothNoise } from './data';
+import { CURVATURE_UNDERLAY, FOCI, addFields, blobField, curvatureOf, loadBilateral, mirror, smoothNoise } from './data';
 
 /**
  * Shared scene for the workflow chapters (Figures, Controls panel, Data in & out):
@@ -58,10 +58,9 @@ export async function addCortex(viewer: NeuroSurfaceViewer, options: CortexOptio
     ['rh', 'right', right, 'fsaverage5Right']
   ] as const) {
     const surface = new MultiLayerNeuroSurface(geometry, {
-      baseColor: 0xb7c0c8,
       curvature: curvatureOf(mesh, geometry),
       showCurvature: true,
-      curvatureOptions: { brightness: 0.64, contrast: 0.42 }
+      curvatureOptions: CURVATURE_UNDERLAY
     });
     surface.hemisphere = side;
     viewer.addSurface(surface, id);

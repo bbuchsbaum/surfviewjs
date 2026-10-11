@@ -30,7 +30,10 @@ export interface CameraState {
 export interface LightingState {
   ambientIntensity?: number;
   directionalIntensity?: number;
+  /** World position of the key light; recorded only while the headlight is off. */
   directionalPosition?: [number, number, number];
+  /** Camera-attached key and fill lights (absent in states saved by earlier releases). */
+  headlight?: boolean;
 }
 
 export interface ViewerConfigState {
@@ -164,6 +167,9 @@ export function assertValidViewerStateNumbers(state: ViewerState): void {
   }
   if (lighting?.directionalPosition !== undefined) {
     finiteTuple(lighting.directionalPosition, '$.config.lighting.directionalPosition', 3);
+  }
+  if (lighting?.headlight !== undefined && typeof lighting.headlight !== 'boolean') {
+    throw new TypeError('$.config.lighting.headlight must be a boolean');
   }
 
   for (const [surfaceId, surface] of Object.entries(state.surfaces ?? {})) {

@@ -6,7 +6,7 @@ import {
 import type { AnatomicalView, GraphEdge, ParcelData, ParcelInteractionEvent, ParcelSelectionEvent } from '@src/index.js';
 import excerpt from '../excerpts/connectivity.ts?raw';
 import { action, actions, choice, fmt, note, readout, section, select, slider, toggle } from '../kit/controls';
-import { curvatureOf, loadAtlas, loadMesh, seededRandom, smoothNoise, type AtlasFile } from '../kit/data';
+import { DEPTH_UNDERLAY, loadAtlas, loadMesh, sulcalDepthOf, seededRandom, smoothNoise, type AtlasFile } from '../kit/data';
 import { createFilmViewer } from '../kit/film';
 import type { Scenario } from '../types';
 import { mutedNetworkColors, networkNames, networkOf, shortParcelName } from './atlasPalettes';
@@ -138,7 +138,11 @@ export const connectivity: Scenario = {
   excerpt,
   run: async ctx => {
     ctx.setBusy(true, 'Loading fs_LR 32k surface and Schaefer 400 parcels');
-    const [geometry, atlas] = await Promise.all([loadMesh('fsLR32kLeftInflated'), loadAtlas('schaefer400x7') as Promise<Atlas>]);
+    const [geometry, atlas, depth] = await Promise.all([
+      loadMesh('fsLR32kLeftInflated'),
+      loadAtlas('schaefer400x7') as Promise<Atlas>,
+      sulcalDepthOf('fsLR32kLeftInflated')
+    ]);
     const film = ctx.film;
     const labels = atlas.vertexLabels;
     const parcels = describeParcels(geometry.vertices, geometry.faces, labels, atlas);
@@ -164,10 +168,10 @@ export const connectivity: Scenario = {
     const surface = new ParcelSurface(geometry, {
       parcelData: atlas,
       vertexLabels: labels,
-      baseColor: 0xb7c0c8,
-      curvature: curvatureOf('fsLR32kLeftInflated', geometry),
+      // Sulcal depth from the folded midthickness: the inflated mesh has no folds.
+      curvature: depth,
       showCurvature: true,
-      curvatureOptions: { brightness: 0.62, contrast: 0.36 }
+      curvatureOptions: DEPTH_UNDERLAY
     });
     surface.hemisphere = 'left';
     viewer.addSurface(surface, SURFACE_ID);

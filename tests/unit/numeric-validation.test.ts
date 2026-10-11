@@ -248,7 +248,8 @@ describe('transactional numeric validation', () => {
       hoverCrosshairSize: 1.2,
       clickToAddAnnotation: false,
       allowCDNFallback: false,
-      useGPUPicking: false
+      useGPUPicking: false,
+      headlight: true
     };
     const viewer = { config };
 
@@ -312,7 +313,8 @@ describe('transactional numeric validation', () => {
     expect(curvature.getDisplayParams()).toEqual({
       brightness: 0.5,
       contrast: 0.5,
-      smoothness: 1
+      smoothness: 1,
+      invert: false
     });
     expect(curvature.needsUpdate).toBe(false);
     expect(curvatureChange).not.toHaveBeenCalled();
