@@ -348,6 +348,8 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
   /** Secondary light; presets may set its intensity, report scenes keep it camera-relative. */
   fillLight!: THREE.DirectionalLight;
   private headlight?: CameraHeadlight;
+  private headlightOverrides?: Array<{ enabled: boolean }>;
+  private headlightBase?: boolean;
   viewpoints!: Record<string, ViewpointConfig>;
   viewpointState!: ViewpointState | null;
   currentViewpointKey!: string;
@@ -721,6 +723,40 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
    */
   setHeadlight(enabled: boolean): void {
     if (typeof enabled !== 'boolean') throw new TypeError('headlight must be a boolean');
+    // An explicit choice supersedes every temporary override (acquireHeadlight).
+    if (this.headlightOverrides) this.headlightOverrides.length = 0;
+    this.applyHeadlight(enabled);
+  }
+
+  /**
+   * Temporarily set the headlight for as long as the caller needs it (a report
+   * scene, for example) and get a function that releases the override. While
+   * overrides are held the newest one applies; releasing one falls back to the
+   * newest remaining override, and releasing the last restores the setting
+   * from before the first. An explicit {@link setHeadlight} while overrides are
+   * held discards them, so the user's choice outlives them all.
+   */
+  acquireHeadlight(enabled: boolean): () => void {
+    if (typeof enabled !== 'boolean') throw new TypeError('headlight must be a boolean');
+    const overrides = (this.headlightOverrides ??= []);
+    if (overrides.length === 0) this.headlightBase = this.config.headlight;
+    const entry = { enabled };
+    overrides.push(entry);
+    this.applyHeadlight(enabled);
+    return () => {
+      const index = overrides.indexOf(entry);
+      if (index < 0 || this.disposed) return;
+      const wasTop = index === overrides.length - 1;
+      overrides.splice(index, 1);
+      if (!wasTop) return;
+      const top = overrides[overrides.length - 1];
+      const next = top ? top.enabled : this.headlightBase;
+      if (typeof next === 'boolean') this.applyHeadlight(next);
+    };
+  }
+
+  private applyHeadlight(enabled: boolean): void {
+    if (this.config.headlight === enabled) return;
     this.config.headlight = enabled;
     if (!enabled) this.restoreWorldLights();
     this.invalidateState(['appearance']);

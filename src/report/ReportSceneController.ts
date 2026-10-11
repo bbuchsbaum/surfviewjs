@@ -68,8 +68,8 @@ export interface ReportSceneControllerOptions {
   readonly initialBrainView?: ReportBrainView;
   /**
    * Keep the key and fill lights attached to the camera so every pose is lit
-   * alike (the viewer's `setHeadlight`). Defaults to true for the anatomical
-   * layout and false for split; the viewer's own setting returns on dispose.
+   * alike (the viewer's `acquireHeadlight`). Defaults to true for the
+   * anatomical layout and false for split; the override is released on dispose.
    */
   readonly headlight?: boolean;
   /** Camera fit margin as a fraction of the framed distance (0.1 anatomical, 0.12 split). */
@@ -382,8 +382,7 @@ export class ReportSceneController {
   private changingView = false;
   private mutationDepth = 0;
   private disposed = false;
-  /** Set only when the report changed the viewer's headlight. */
-  private headlightHandoff: { previous: boolean | undefined; applied: boolean } | null = null;
+  private readonly releaseHeadlight: () => void;
 
   constructor(
     readonly viewer: NeuroSurfaceViewer,
@@ -434,14 +433,11 @@ export class ReportSceneController {
     if (!Number.isFinite(this.hemisphereGap) || this.hemisphereGap < 0) {
       throw new RangeError('hemisphereGap must be a finite, non-negative number');
     }
-    // The viewer owns the camera-attached light rig; the report only chooses
-    // it (on for the anatomical layout, world-fixed for split by default) and
-    // hands the viewer's own setting back on disposal.
-    const headlight = this.options.headlight ?? this.layout === 'anatomical';
-    if (viewer.config.headlight !== headlight) {
-      this.headlightHandoff = { previous: viewer.config.headlight, applied: headlight };
-      viewer.setHeadlight(headlight);
-    }
+    // The viewer owns the camera-attached light rig; the report holds an
+    // override (on for the anatomical layout, world-fixed for split by default)
+    // that it releases on disposal. Overrides nest, and an explicit
+    // setHeadlight() by the user while the report is live outlives them.
+    this.releaseHeadlight = viewer.acquireHeadlight(this.options.headlight ?? this.layout === 'anatomical');
     this.displayedLayerId = this.deriveDisplayedLayerId();
     this.viewerUnsubscribers.push(
       viewer.on('state:changed', event => {
@@ -772,12 +768,7 @@ export class ReportSceneController {
     if (this.disposed) return;
     this.disposed = true;
     for (const unsubscribe of this.viewerUnsubscribers.splice(0)) unsubscribe();
-    // Hand back only a setting the report made and nobody has changed since.
-    const handoff = this.headlightHandoff;
-    if (handoff && typeof handoff.previous === 'boolean' && !this.viewer.isDisposed() &&
-        this.viewer.config.headlight === handoff.applied) {
-      this.viewer.setHeadlight(handoff.previous);
-    }
+    this.releaseHeadlight();
     for (const listener of [...this.disposingListeners]) this.deliverDisposing(listener);
     this.disposingListeners.clear();
     this.mutationListeners.clear();

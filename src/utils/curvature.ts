@@ -173,10 +173,13 @@ const SULCAL_DEPTH_STEPS = 2;
  * Solve (D + h·(D − A)) x = D·b per coordinate by Jacobi-preconditioned
  * conjugate gradients, warm-started at b, where D is the vertex degree and A
  * the adjacency: one implicit (backward Euler) step of graph-Laplacian
- * smoothing. Returns false if any solve reached `maxIterations`.
+ * smoothing. Each solve stops when the residual falls to `tolerance` × ‖D·b‖;
+ * the caller centres the coordinates so that norm measures the shape, not
+ * the mesh's distance from the origin. Returns false if any solve reached
+ * `maxIterations`.
  */
 function implicitSmoothStep(
-  positions: Float32Array,
+  positions: Float64Array,
   adjacency: CompactAdjacency,
   h: number,
   tolerance: number,
@@ -262,10 +265,11 @@ function implicitSmoothStep(
  * Jacobi-preconditioned conjugate gradients. The number of CG iterations grows
  * with √V (the ratio of brain size to edge length), so the cost is about
  * O(V^1.5), against O(V²) for explicit smoothing at a fixed physical scale.
- * Measured in Node on Apple silicon: ≈35 ms for fsaverage5 (10k vertices),
- * ≈175 ms for fs_LR 32k, ≈1.1 s for 164k vertices (fsaverage resolution) —
- * compute it once and cache it rather than per frame. Agreement with
- * FreeSurfer `lh.sulc` on fsaverage5 is r = 0.96.
+ * Measured under vitest on Apple silicon: ≈70 ms for fsaverage5 (10k
+ * vertices), ≈0.2 s at 41k, ≈1.7 s at 164k (fsaverage resolution) and ≈13 s
+ * at 655k. Compute it once and keep it; never per frame. The result does not
+ * depend on where the mesh sits in space, and vertices in no face are ignored
+ * (depth 0). Agreement with FreeSurfer `lh.sulc` on fsaverage5 is r = 0.96.
  *
  * @param geometry - A folded (white, pial or midthickness) surface with outward winding
  * @param options - Smoothing scale and solver limits
@@ -288,22 +292,34 @@ export function computeSulcalDepth(
   const vertexCount = vertices.length / 3;
   const adjacency = compactAdjacency(geometry);
   const { offset, index } = adjacency;
+  // Vertices in no face carry no surface; they take no part in the bounds,
+  // the scale, the median or the result (depth 0).
+  const referenced = (i: number) => offset[i + 1]! > offset[i]!;
 
   let minX = Infinity, minY = Infinity, minZ = Infinity, maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
-  for (let v = 0; v < vertices.length; v += 3) {
+  for (let i = 0; i < vertexCount; i++) {
+    if (!referenced(i)) continue;
+    const v = i * 3;
     minX = Math.min(minX, vertices[v]!); maxX = Math.max(maxX, vertices[v]!);
     minY = Math.min(minY, vertices[v + 1]!); maxY = Math.max(maxY, vertices[v + 1]!);
     minZ = Math.min(minZ, vertices[v + 2]!); maxZ = Math.max(maxZ, vertices[v + 2]!);
   }
   const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2, cz = (minZ + maxZ) / 2;
+  // Work in float64 about the bounding-box centre. Smoothing commutes with a
+  // translation (the system matrix maps constants to D·constants), so this is
+  // exact, and it keeps the solver's relative tolerance and float precision
+  // independent of where the mesh sits in space.
+  const centred = new Float64Array(vertices.length);
   let radius = 0;
   let edgeSum = 0;
   for (let i = 0; i < vertexCount; i++) {
-    const x = vertices[i * 3]!, y = vertices[i * 3 + 1]!, z = vertices[i * 3 + 2]!;
-    radius = Math.max(radius, Math.hypot(x - cx, y - cy, z - cz));
+    if (!referenced(i)) continue;
+    const x = vertices[i * 3]! - cx, y = vertices[i * 3 + 1]! - cy, z = vertices[i * 3 + 2]! - cz;
+    centred[i * 3] = x; centred[i * 3 + 1] = y; centred[i * 3 + 2] = z;
+    radius = Math.max(radius, Math.hypot(x, y, z));
     for (let k = offset[i]!; k < offset[i + 1]!; k++) {
       const j = index[k]! * 3;
-      edgeSum += Math.hypot(vertices[j]! - x, vertices[j + 1]! - y, vertices[j + 2]! - z);
+      edgeSum += Math.hypot(vertices[j]! - vertices[i * 3]!, vertices[j + 1]! - vertices[i * 3 + 1]!, vertices[j + 2]! - vertices[i * 3 + 2]!);
     }
   }
   const meanEdge = index.length > 0 ? edgeSum / index.length : 0;
@@ -313,7 +329,7 @@ export function computeSulcalDepth(
   // split over the implicit steps.
   const ratio = (scale * radius) / meanEdge;
   const h = (2 * ratio * ratio) / SULCAL_DEPTH_STEPS;
-  const envelope = new Float32Array(vertices);
+  const envelope = Float64Array.from(centred);
   let converged = true;
   for (let step = 0; step < SULCAL_DEPTH_STEPS; step++) {
     converged = implicitSmoothStep(envelope, adjacency, h, tolerance, maxIterations) && converged;
@@ -327,18 +343,24 @@ export function computeSulcalDepth(
 
   const envelopeNormals = vertexNormals(envelope, faces, vertexCount);
   const depth = new Float32Array(vertexCount);
+  const values: number[] = [];
   for (let i = 0; i < vertexCount; i++) {
+    if (!referenced(i)) continue;
     const p = i * 3;
     // Inward displacement from the envelope is depth (FreeSurfer sign).
-    depth[i] = -(
-      (vertices[p]! - envelope[p]!) * envelopeNormals[p]! +
-      (vertices[p + 1]! - envelope[p + 1]!) * envelopeNormals[p + 1]! +
-      (vertices[p + 2]! - envelope[p + 2]!) * envelopeNormals[p + 2]!
+    const d = -(
+      (centred[p]! - envelope[p]!) * envelopeNormals[p]! +
+      (centred[p + 1]! - envelope[p + 1]!) * envelopeNormals[p + 1]! +
+      (centred[p + 2]! - envelope[p + 2]!) * envelopeNormals[p + 2]!
     );
+    depth[i] = d;
+    values.push(d);
   }
-  const sorted = Float32Array.from(depth).sort();
-  const center = vertexCount > 0 ? sorted[Math.floor(vertexCount / 2)]! : 0;
-  for (let i = 0; i < vertexCount; i++) depth[i] = depth[i]! - center;
+  values.sort((a, b) => a - b);
+  const center = values.length > 0 ? values[Math.floor(values.length / 2)]! : 0;
+  for (let i = 0; i < vertexCount; i++) {
+    if (referenced(i)) depth[i] = depth[i]! - center;
+  }
   return depth;
 }
 

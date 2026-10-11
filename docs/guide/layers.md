@@ -301,10 +301,12 @@ const inflatedCortex = new MultiLayerNeuroSurface(inflated, {
 each vertex's depth below it along the envelope normal, in mesh units (mm),
 median-centred. The smoothing length defaults to 0.2 of the mesh's bounding
 radius (`scale`). It uses two implicit smoothing steps solved by conjugate
-gradients, so its cost grows about as V^1.5: roughly 35 ms for fsaverage5,
-175 ms for fs_LR 32k and 1 s for a 164k-vertex mesh. Compute it once and keep
-it; a solve that reaches `maxIterations` warns and returns an approximate
-estimate. Both functions need outward face winding, which FreeSurfer and GIFTI
+gradients, so its cost grows about as V^1.5: roughly 70 ms for fsaverage5,
+0.2 s at 41k vertices, 1–2 s at 164k and 13 s at 655k (measured under vitest
+on Apple silicon). Compute it once and keep it; a solve that reaches
+`maxIterations` warns and returns an approximate estimate. The result does not
+depend on the mesh's position in space, and vertices that belong to no face
+are ignored (depth 0). Both functions need outward face winding, which FreeSurfer and GIFTI
 surfaces have.
 
 ## RGBA compositing contract

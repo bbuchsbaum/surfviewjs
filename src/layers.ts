@@ -2000,6 +2000,16 @@ export class BaseLayer extends Layer {
     this._notifyChange({ color: nextColor });
   }
 
+  /** The base colour as 0xRRGGBB. */
+  getColor(): number {
+    return this.color;
+  }
+
+  /** Restore the colour saved by {@link toStateJSON}, validated before it applies. */
+  fromStateJSON(state: Record<string, unknown>): void {
+    if (state.color !== undefined) this.setColor(rgbInteger(state.color, 'color'));
+  }
+
   getRGBAData(vertexCount: number): Float32Array {
     const rgbaData = new Float32Array(vertexCount * 4);
     

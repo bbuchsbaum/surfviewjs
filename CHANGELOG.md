@@ -23,8 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   FreeSurfer `sulc`-like depth (mm, positive deep, median-centred) measured
   below a smoothed envelope of a folded surface; r = 0.96 against FreeSurfer
   `lh.sulc` on fsaverage5. Smoothing is two implicit steps solved by
-  conjugate gradients, O(V^1.5) (≈35 ms fsaverage5, ≈175 ms fs_LR 32k, ≈1 s
-  at 164k vertices); a solve that reaches `maxIterations` warns. Use it,
+  conjugate gradients, O(V^1.5) (measured under vitest: ≈70 ms for
+  fsaverage5, ≈0.2 s at 41k vertices, ≈1.7 s at 164k, ≈13 s at 655k);
+  a solve that reaches `maxIterations` warns. It works in coordinates centred
+  on the mesh, so the result does not depend on where the mesh sits in space,
+  and it ignores vertices that belong to no face (depth 0). Use it,
   computed on the folded mesh, as the underlay of inflated and flat surfaces.
   `MeanCurvatureOptions` and `SulcalDepthOptions` are exported.
 - `CurvatureLayer` and `curvatureToGrayscale` option `invert`;
@@ -33,16 +36,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Viewer option `headlight` (default `true`) and `viewer.setHeadlight()`.
   Saved viewer state records `config.lighting.headlight`, and restores it
   through `setHeadlight()`; while the headlight is on, the key light's world
-  position is neither saved nor restored. Type-level change:
+  position is neither saved nor restored. States saved by 2.3.0 have no
+  `headlight` field but do carry `directionalPosition`; restoring one into a
+  viewer whose headlight is on (the default) leaves the headlight on and drops
+  that position, because it is ambiguous (2.3.0's report layout also saved
+  camera-tracked positions). Turn the headlight off first to restore a 2.3.0
+  world key position. `viewer.acquireHeadlight(enabled)` takes a nestable
+  temporary override and returns its release function; an explicit
+  `setHeadlight()` supersedes all live overrides. Type-level change:
   `ResolvedNeuroSurfaceViewerConfig` (`Required<NeuroSurfaceViewerConfig>`)
   gains a required `headlight: boolean`, so code that builds a complete
   resolved config object must add it.
-- `CurvatureLayer.fromStateJSON()`: viewer-state restore now applies saved
-  curvature `brightness`, `contrast`, `smoothness` and `invert` (previously
-  ignored for curvature layers).
-- `MultiLayerNeuroSurface.applyStyleBaseColor()`: a style preset's base colour
-  applies only to surfaces whose base colour the caller did not choose
-  (`baseColor` in the constructor or `updateConfig({ color })`).
+- `CurvatureLayer.fromStateJSON()` and `BaseLayer.fromStateJSON()` (with
+  `BaseLayer.getColor()`): viewer-state restore now applies saved curvature
+  `brightness`, `contrast`, `smoothness` and `invert` and the base-layer colour
+  (previously ignored). Both are validated with the rest of the state before
+  anything is applied, so an invalid value fails the restore without moving the
+  camera or applying earlier layers.
+- `MultiLayerNeuroSurface.applyStyleBaseColor()` and `resetBaseColor()`: the
+  surface records the base colour last applied by the default or a style
+  preset, and a preset recolours the base layer only while it still has that
+  colour. A colour chosen any other way — constructor `baseColor` or `color`,
+  `updateConfig({ color })`, `updateLayer('base', …)`, `updateLayers`,
+  `BaseLayer.setColor`, restored state — survives presets;
+  `resetBaseColor()` hands the base back to preset control. The constructor
+  now honours `color` as well as `baseColor` for the base layer.
 
 ### Changed
 - **Behaviour change (appearance): colour management.** Composited colours are
@@ -90,8 +108,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   camera-space directions (key `(0.35, 0.5, 2)`, fill `(-0.8, -0.3, 1.4)`)
   rather than placed at offsets from the camera position (previously
   `(0.4, 0.6, 0.8)` and `(-0.5, -0.3, 0.6)`), so report renders are lit
-  slightly more frontally. On dispose it hands back the viewer's previous
-  setting only if it changed it and nobody has changed it since.
+  slightly more frontally. It holds its setting as a nestable override
+  (`acquireHeadlight`) that it releases on dispose, so disposing one report
+  does not undo another live report's lighting, and a user's explicit
+  `setHeadlight()` outlives both.
 - **Behaviour change: curvature sign and estimator.** `CurvatureLayer` and
   `curvatureToGrayscale` take FreeSurfer-convention input (positive in sulci)
   and render gyri light, sulci dark (`gray = brightness − scaled · contrast`);

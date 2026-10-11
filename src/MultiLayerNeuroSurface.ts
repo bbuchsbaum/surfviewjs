@@ -47,6 +47,10 @@ import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
 
+
+/** Base colour of a MultiLayerNeuroSurface when none is given. */
+const DEFAULT_BASE_COLOR = 0xcccccc;
+
 export interface MultiLayerSurfaceConfig extends SurfaceConfig {
   baseColor?: THREE.ColorRepresentation;
   metalness?: number;
@@ -185,8 +189,13 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
   private useWideLines: boolean;
   private shadingUniforms!: SurfaceShadingUniforms;
   private thresholdEdges = true;
-  /** The caller chose the base colour (constructor or updateConfig); style presets keep it. */
-  private baseColorExplicit = false;
+  /**
+   * The base colour last applied by the library default or a style preset.
+   * A preset recolours the base only while it still has this colour, so a
+   * colour chosen any other way (constructor, updateConfig, updateLayer,
+   * BaseLayer.setColor, restored state) survives presets.
+   */
+  private styleBaseColor = DEFAULT_BASE_COLOR;
   private overlayBuffer: Float32Array | null = null;
   private edgeBuffer: Float32Array | null = null;
 
@@ -216,7 +225,6 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     this.clipPlanes = new ClipPlaneSet();
     this.shadingUniforms = createSurfaceShadingUniforms(config.shading);
     this.thresholdEdges = config.shading?.thresholdEdges ?? true;
-    this.baseColorExplicit = config.baseColor !== undefined;
     
     // Add curvature layer if provided (renders below base layer)
     if (config.curvature && config.showCurvature !== false) {
@@ -236,7 +244,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     // Add base layer
     // If curvature is shown, the base layer should be hidden (curvature acts as underlay)
     const hasCurvature = config.curvature && config.showCurvature !== false;
-    const baseColor = config.baseColor ?? 0xcccccc;
+    const baseColor = config.baseColor ?? config.color ?? DEFAULT_BASE_COLOR;
     const baseLayer = new BaseLayer(typeof baseColor === 'number' ? baseColor : new THREE.Color(baseColor).getHex(), {
       opacity: 1,
       visible: !hasCurvature  // Hide base layer when curvature is visible
@@ -732,13 +740,27 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
   }
 
   /**
-   * Apply a style preset's base colour unless the caller chose one (in the
-   * constructor's `baseColor` or with `updateConfig({ color })`). Returns
-   * whether the base colour changed.
+   * Apply a style preset's base colour. The base is recoloured only while it
+   * still shows the colour the default or the previous preset gave it; a
+   * colour chosen any other way is kept. (Choosing exactly that colour
+   * yourself is indistinguishable from not choosing one.) The preset colour is
+   * remembered either way, for {@link resetBaseColor}. Returns whether the
+   * base colour changed.
    */
   applyStyleBaseColor(color: THREE.ColorRepresentation): boolean {
-    if (this.baseColorExplicit) return false;
-    return this.setBaseLayerColor(color);
+    const base = this.layerStack.getLayer('base');
+    const next = new THREE.Color(color).getHex();
+    const following = base instanceof BaseLayer && base.getColor() === this.styleBaseColor;
+    this.styleBaseColor = next;
+    return following ? this.setBaseLayerColor(next) : false;
+  }
+
+  /**
+   * Return the base layer to the colour of the current style preset (or the
+   * library default), so later presets recolour it again.
+   */
+  resetBaseColor(): void {
+    this.setBaseLayerColor(this.styleBaseColor);
   }
 
   private setBaseLayerColor(color: THREE.ColorRepresentation): boolean {
@@ -1443,10 +1465,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     super.updateConfig(newConfig);
     // `color` is the colour of the bare surface: the base layer, which shows
     // wherever no curvature underlay or opaque layer covers it.
-    if (newConfig.color !== undefined) {
-      this.baseColorExplicit = true;
-      this.setBaseLayerColor(newConfig.color);
-    }
+    if (newConfig.color !== undefined) this.setBaseLayerColor(newConfig.color);
     const compositor = this.gpuCompositor;
     if (!this.useGPUCompositing || !compositor || !this.mesh ||
         this.mesh.material !== compositor.getMaterial()) {

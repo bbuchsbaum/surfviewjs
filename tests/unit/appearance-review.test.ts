@@ -311,8 +311,9 @@ describe('report headlight ownership', () => {
     second.viewer.setHeadlight(true);
     second.viewer.setHeadlight(false);
     report.dispose();
-    // Still what the report set, so the viewer's own setting comes back.
-    expect(second.viewer.config.headlight).toBe(true);
+    // An explicit setHeadlight() supersedes the report's override, even when it
+    // happens to equal it, so disposal leaves the user's choice in place.
+    expect(second.viewer.config.headlight).toBe(false);
   });
 });
 

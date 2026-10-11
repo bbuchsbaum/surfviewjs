@@ -196,6 +196,22 @@ export function assertValidViewerStateNumbers(state: ViewerState): void {
           finiteNumber(value, `${path}.${key}`, { minimum: 0, maximum: 1 });
         }
       }
+      // Anatomy layers restore through fromStateJSON; reject bad values here
+      // so a restore never stops halfway.
+      if (layer.type === 'base' && layer.color !== undefined) {
+        rgbInteger(layer.color, `${path}.color`);
+      }
+      if (layer.type === 'curvature') {
+        for (const key of ['brightness', 'contrast'] as const) {
+          if (layer[key] !== undefined) finiteNumber(layer[key], `${path}.${key}`, { minimum: 0, maximum: 1 });
+        }
+        if (layer.smoothness !== undefined) {
+          finiteNumber(layer.smoothness, `${path}.smoothness`, { minimum: 0, minimumExclusive: true });
+        }
+        if (layer.invert !== undefined && typeof layer.invert !== 'boolean') {
+          throw new TypeError(`${path}.invert must be a boolean`);
+        }
+      }
     }
     for (const [index, clip] of (surface.clipPlanes ?? []).entries()) {
       finiteTuple(clip.normal, `$.surfaces.${surfaceId}.clipPlanes[${index}].normal`, 3);

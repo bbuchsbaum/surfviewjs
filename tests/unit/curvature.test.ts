@@ -1,5 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { JSDOM } from 'jsdom';
 import * as THREE from 'three';
+import { parseGIfTISurface } from '../../src/loaders';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { computeMeanCurvature, computeSulcalDepth, normalizeCurvature, curvatureToGrayscale } from '../../src/utils/curvature';
 import { SurfaceGeometry } from '../../src/classes';
@@ -289,5 +292,55 @@ describe('curvatureToGrayscale (gyri light)', () => {
     const gray = curvatureToGrayscale(new Float32Array([-0.4, 0.4]), { brightness: 0.5, contrast: 0.5, invert: true });
     expect(gray[0]).toBeCloseTo(0.3, 5);
     expect(gray[1]).toBeCloseTo(0.7, 5);
+  });
+});
+
+describe('computeSulcalDepth invariance', () => {
+  function translated(geometry: SurfaceGeometry, offset: number): SurfaceGeometry {
+    const vertices = Float32Array.from(geometry.vertices, value => value + offset);
+    return new SurfaceGeometry(vertices, geometry.faces, 'unknown');
+  }
+
+  function maxDifference(a: Float32Array, b: Float32Array): number {
+    let max = 0;
+    for (let i = 0; i < a.length; i++) max = Math.max(max, Math.abs(a[i]! - b[i]!));
+    return max;
+  }
+
+  it('does not depend on where the mesh sits in space', () => {
+    const { geometry } = corrugatedSheet(0.25, 1, 4, 24, 6);
+    const reference = computeSulcalDepth(geometry);
+    for (const offset of [1000, 10000]) {
+      expect(maxDifference(computeSulcalDepth(translated(geometry, offset)), reference)).toBeLessThan(0.02);
+    }
+  });
+
+  it('gives fsaverage5 the same depth when it is translated far from the origin', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const parsed = parseGIfTISurface(
+      readFileSync(new URL('../data/fsaverage5-lh-pial.gii', import.meta.url), 'utf8'),
+      new JSDOM().window.DOMParser
+    );
+    warn.mockRestore();
+    const pial = new SurfaceGeometry(parsed.vertices, parsed.faces, 'left');
+    const reference = computeSulcalDepth(pial);
+    const far = computeSulcalDepth(translated(pial, 10000));
+    expect(correlation(far, reference)).toBeGreaterThan(0.999);
+    expect(maxDifference(far, reference)).toBeLessThan(0.05);
+  });
+
+  it('ignores vertices that belong to no face', () => {
+    const { geometry, z, interior } = corrugatedSheet(0.25, 1, 4, 24, 6);
+    const reference = computeSulcalDepth(geometry);
+    const count = z.length;
+    const vertices = new Float32Array((count + 1) * 3);
+    vertices.set(geometry.vertices);
+    vertices.set([200, 200, 200], count * 3);
+    const withStray = computeSulcalDepth(new SurfaceGeometry(vertices, geometry.faces, 'unknown'));
+    expect(withStray.length).toBe(count + 1);
+    const kept = withStray.subarray(0, count);
+    expect(correlation(kept, reference, interior)).toBeGreaterThan(0.999);
+    expect(maxDifference(kept, reference)).toBeLessThan(0.02);
+    expect(withStray[count]).toBe(0);
   });
 });
