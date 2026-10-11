@@ -103,3 +103,45 @@ test('volume layer modes report the sampling path they use', async ({ page }) =>
   await expect(page.locator('#volume-mode')).toBeHidden();
   expect(errors).toEqual([]);
 });
+
+/** The middle of the viewer, clear of the film corners that print the colormap name. */
+async function surfaceShot(page: Page) {
+  const box = (await page.locator('#viewer-slot canvas').boundingBox())!;
+  const clip = { x: box.x + box.width * 0.25, y: box.y + box.height * 0.1, width: box.width * 0.5, height: box.height * 0.8 };
+  const shot = () => page.screenshot({ clip });
+  // Wait for two identical frames so camera fitting or a pending redraw is not mistaken for a recolour.
+  let previous = await shot();
+  for (let attempt = 0; attempt < 20; attempt++) {
+    await page.waitForTimeout(150);
+    const next = await shot();
+    if (next.equals(previous)) return next;
+    previous = next;
+  }
+  throw new Error('viewer canvas did not settle');
+}
+
+test('volume chapter colormap select recolours every projection method and mode', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await openVolume(page);
+  const colormap = page.locator('#volume-colormap');
+
+  // Sample along normals: a DataLayer.
+  let before = await surfaceShot(page);
+  await colormap.selectOption('viridis');
+  expect((await surfaceShot(page)).equals(before)).toBe(false);
+  await colormap.selectOption('coolwarm');
+
+  // Volume layer: the GPU 3D-texture path (vertex mode with WebGL2) and the CPU paths.
+  await page.getByRole('radio', { name: 'Volume layer' }).check();
+  const path = page.locator('#volume-path');
+  for (const mode of ['vertex', 'fragment', 'ribbon'] as const) {
+    await page.locator('#volume-mode').selectOption(mode);
+    await expect(path).toContainText(mode === 'ribbon' ? 'CPU ribbon' : mode === 'vertex' ? /3D texture|CPU per vertex/ : 'CPU per vertex');
+    await colormap.selectOption('coolwarm');
+    before = await surfaceShot(page);
+    await colormap.selectOption('viridis');
+    expect((await surfaceShot(page)).equals(before), `${mode} mode recolours`).toBe(false);
+  }
+  expect(errors).toEqual([]);
+});

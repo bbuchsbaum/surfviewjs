@@ -220,6 +220,17 @@ test('Schaefer 400 reuses the renderer with both network tables and configurable
   await expect(label).toHaveText('8');
   await expect(label.locator('..').locator('title')).toHaveText('7Networks_LH_Vis_8');
   expect(await positions()).toEqual(original);
+  // Region names drop the atlas prefix so they fit beside parcels; the full
+  // source label stays in each label's tooltip.
+  const nameLabels = () => labels.evaluateAll(elements => elements.map(el =>
+    [el.textContent, el.parentElement!.querySelector('title')!.textContent]));
+  await page.getByLabel('Label text', { exact: true }).selectOption('names');
+  const sevenNames = await nameLabels();
+  expect(sevenNames.length).toBeGreaterThan(30);
+  for (const [text, title] of sevenNames) expect(text).toBe(title!.replace(/^7Networks_LH_/, '').replace(/_/g, ' '));
+  await expect(page.locator('[data-view="lateral"] .atlas-labels text', { hasText: /^Vis \d+$/ }).first()).toBeVisible();
+  await page.getByLabel('Label text', { exact: true }).selectOption('ids');
+  expect(await positions()).toEqual(original);
   await page.getByLabel('Parcellation', { exact: true }).selectOption('schaefer400-17');
   await expect(page.locator('#atlas-selected-name')).toHaveText('Explore a region');
   await expect(page.getByLabel('Find a region')).toHaveValue('');
@@ -227,9 +238,12 @@ test('Schaefer 400 reuses the renderer with both network tables and configurable
   await page.getByLabel('Find a region').selectOption({ value: '1' });
   await expect(page.locator('#atlas-selected-name')).toHaveText('17Networks_LH_VisCent_ExStr_1');
   await page.getByLabel('Label text', { exact: true }).selectOption('names');
-  const names = await labels.allTextContents();
-  expect(names.length).toBeGreaterThan(0);
-  expect(names.every(name => name.startsWith('17Networks_LH_'))).toBe(true);
+  const names = await nameLabels();
+  expect(names.length).toBeGreaterThan(10);
+  for (const [text, title] of names) {
+    expect(title).toMatch(/^17Networks_LH_/);
+    expect(text).toBe(title!.replace(/^17Networks_LH_/, '').replace(/_/g, ' '));
+  }
   await page.getByLabel('Label text', { exact: true }).selectOption('ids');
   const downloaded = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export medial SVG' }).click();

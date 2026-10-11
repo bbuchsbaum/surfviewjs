@@ -353,7 +353,7 @@ export const volume: Scenario = {
     select(display, {
       id: 'volume-colormap', label: 'Colormap', options: COLORMAPS, value: 'coolwarm',
       print: { film, corner: 'tr', key: 'colormap', label: 'Colormap' },
-      onChange: next => { state.colormap = next; updateDisplay({ colormap: next }); }
+      onChange: next => { state.colormap = next; updateDisplay({ colorMap: next }); }
     });
     slider(display, {
       id: 'volume-window', label: 'Colour window (±)', min: 1, max: 8, step: 0.5, value: state.window,

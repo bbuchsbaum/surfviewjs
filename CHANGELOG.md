@@ -46,6 +46,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in their active colour.
 
 ### Fixed
+- `VolumeProjectionLayer.update()` accepts `colorMap`, the field every other
+  scalar layer's `update()` takes, so one `updateLayer(..., { colorMap })`
+  call recolours data and volume layers alike. It previously threw "does not
+  support field: colorMap" (and `DataLayer` rejected `colormap`), which left
+  the volume demo's colormap select without effect. The older `colormap`
+  spelling still works; passing both with different values throws.
 - GPU picks near a triangle edge no longer miss: the ID buffer samples the
   pixel centre while the ray passes through the exact cursor, so the ray could
   just miss the visible face and return no vertex. Such picks now use the

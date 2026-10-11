@@ -125,10 +125,21 @@ test.describe('Anatomy & views chapter', () => {
     await expect(page.locator('#anatomy-mode').getByRole('radio', { name: 'Inflate', exact: true })).toBeChecked();
     const canvas = page.locator('#viewer-slot canvas');
     await expect(canvas).toBeVisible();
+    const inflation = page.locator('#anatomy-inflation');
+
+    // Entering the mode shows an inflated cortex at once, with the slider and film agreeing.
+    await expect(inflation).toHaveValue('1');
+    await expect(page.locator('.film-corner-tr')).toContainText('Inflated');
+    await expect(page.locator('.control-slider output[for="anatomy-inflation"]')).toHaveText('Inflated');
+    await page.waitForTimeout(150);
+    const opening = await canvas.screenshot();
+    await inflation.fill('0');
+    await expect(page.locator('.film-corner-tr')).toContainText('Folded');
     await page.waitForTimeout(150);
     const folded = await canvas.screenshot();
+    expect(folded.equals(opening)).toBe(false);
 
-    await page.locator('#anatomy-inflation').fill('1');
+    await inflation.fill('1');
     await expect(page.locator('.film-corner-tr')).toContainText('Inflated');
     await page.waitForTimeout(150);
     expect((await canvas.screenshot()).equals(folded)).toBe(false);
@@ -139,6 +150,27 @@ test.describe('Anatomy & views chapter', () => {
     await expect(page.locator('#anatomy-inflation')).toHaveValue('2');
     await page.getByRole('button', { name: 'Folded' }).click();
     await expect(page.locator('#status-text')).toContainText('Shape: folded', { timeout: 5000 });
+    await expect(inflation).toHaveValue('0');
+
+    // Taking the slider mid-transition stops the animation and frees the stage buttons.
+    await page.locator('#morph-duration').fill('2400');
+    await page.getByRole('button', { name: 'Very inflated' }).click();
+    await expect(page.getByRole('button', { name: 'Folded' })).toBeDisabled();
+    await inflation.fill('0.5');
+    await expect(page.locator('.film-corner-tr')).toContainText('0.50');
+    for (const name of ['Folded', 'Inflated', 'Very inflated']) {
+      await expect(page.getByRole('button', { name, exact: true })).toBeEnabled();
+    }
+    await page.waitForTimeout(2600);
+    await expect(inflation).toHaveValue('0.5');
+    await expect(page.locator('.film-corner-tr')).toContainText('0.50');
+    await expect(page.locator('#status-text')).not.toContainText('Shape: very inflated');
+
+    // Leaving and returning opens inflated again.
+    await openMode(page, 'Views');
+    await openMode(page, 'Inflate');
+    await expect(inflation).toHaveValue('1');
+    await expect(page.locator('.film-corner-tr')).toContainText('Inflated');
     expect(errors).toEqual([]);
   });
 

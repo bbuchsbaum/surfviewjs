@@ -13,12 +13,12 @@ export const networkNames: Readonly<Record<string, string>> = {
   SalVentAttn: 'Salience / ventral attention', Limbic: 'Limbic', Cont: 'Control', Default: 'Default'
 };
 
-/** Network key of a Schaefer label ("7Networks_LH_Vis_3" → "Vis"), or null for other atlases. */
+/** Network key of a Schaefer label ("7Networks_LH_Vis_3" → "Vis", either hemisphere), or null for other atlases. */
 export function networkOf(label: string): string | null {
-  return /^(?:7|17)Networks_LH_([^_]+)/.exec(label)?.[1] ?? null;
+  return /^(?:7|17)Networks_[LR]H_([^_]+)/.exec(label)?.[1] ?? null;
 }
 
 /** A Schaefer label without its atlas prefix ("7Networks_LH_Vis_3" → "Vis 3"). */
 export function shortParcelName(label: string): string {
-  return label.replace(/^(?:7|17)Networks_LH_/, '').replace(/_/g, ' ');
+  return label.replace(/^(?:7|17)Networks_[LR]H_/, '').replace(/_/g, ' ');
 }

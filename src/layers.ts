@@ -243,6 +243,9 @@ export interface DataLayerUpdateData extends LayerUpdateData {
 
 export interface VolumeProjectionLayerUpdateData extends LayerUpdateData {
   volumeData?: Float32Array | number[];
+  /** Colormap preset name; the same field DataLayer and TwoDataLayer update. */
+  colorMap?: string;
+  /** Legacy spelling of `colorMap`, kept for compatibility. */
   colormap?: string;
   range?: [number, number];
   threshold?: [number, number];
@@ -1455,7 +1458,7 @@ export class VolumeProjectionLayer extends Layer {
 
   update(updates: VolumeProjectionLayerUpdateData): void {
     assertLayerUpdateFields(updates, 'VolumeProjectionLayer', [
-      'volumeData', 'colormap', 'range', 'threshold', 'worldToIJK',
+      'volumeData', 'colorMap', 'colormap', 'range', 'threshold', 'worldToIJK',
       'affineMatrix', 'voxelSize', 'volumeOrigin', 'fillValue',
       'projectionMode', 'sampling', 'quality', 'ribbon'
     ]);
@@ -1463,11 +1466,26 @@ export class VolumeProjectionLayer extends Layer {
     if (updates.threshold !== undefined) finitePair(updates.threshold, 'threshold');
     if (updates.fillValue !== undefined) finiteNumber(updates.fillValue, 'fillValue');
     if (updates.opacity !== undefined) validateOpacity(updates.opacity);
+    // `colorMap` is the field every scalar layer's update accepts; `colormap`
+    // is this layer's older spelling. Either names a preset.
+    if (
+      updates.colorMap !== undefined &&
+      updates.colormap !== undefined &&
+      updates.colorMap !== updates.colormap
+    ) {
+      throw new TypeError(
+        'VolumeProjectionLayer.update received conflicting colorMap and colormap; pass colorMap only.'
+      );
+    }
+    const colorMap = updates.colorMap ?? updates.colormap;
+    if (colorMap !== undefined && typeof colorMap !== 'string') {
+      throw new TypeError('VolumeProjectionLayer.update colorMap must be a colormap preset name.');
+    }
     if (updates.volumeData !== undefined) {
       this.updateVolumeData(updates.volumeData);
     }
-    if (updates.colormap !== undefined) {
-      this.setColormap(updates.colormap);
+    if (colorMap !== undefined) {
+      this.setColormap(colorMap);
     }
     if (updates.range !== undefined) {
       this.setRange(updates.range);

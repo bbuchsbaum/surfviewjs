@@ -346,6 +346,8 @@ const EASINGS = [
 ] as const;
 
 const STAGES = ['Folded', 'Inflated', 'Very inflated'] as const;
+/** The mode opens inflated: folded would look exactly like Views until the slider moved. */
+const OPENING_STAGE = 1;
 const MORPH_GAP = 16;
 
 async function morphMode({ ctx, film, panel, isCurrent }: ModeContext): Promise<ModeCleanup | null> {
@@ -369,6 +371,7 @@ async function morphMode({ ctx, film, panel, isCurrent }: ModeContext): Promise<
       ]
     });
     surface.hemisphere = hemisphere;
+    surface.setMorphValue(OPENING_STAGE);
     viewer.addSurface(surface, id);
     surfaces[id] = surface;
   }
@@ -380,7 +383,8 @@ async function morphMode({ ctx, film, panel, isCurrent }: ModeContext): Promise<
   film.set('tl', 'surface', 'Surface', 'fsaverage5 pial, L + R');
   film.set('tl', 'curvature', 'Shading', 'folded curvature');
   film.set('bl', 'gap', 'Gap', `${MORPH_GAP} mm`);
-  const state = { duration: 900, easing: 'easeInOut' as (typeof EASINGS)[number]['value'], animating: false };
+  const state = { duration: 900, easing: 'easeInOut' as (typeof EASINGS)[number]['value'], transition: 0 };
+  let transitions = 0;
 
   const stageLabel = (value: number) => {
     const nearest = Math.round(value);
@@ -392,9 +396,11 @@ async function morphMode({ ctx, film, panel, isCurrent }: ModeContext): Promise<
   const amount = slider(shape, {
     id: 'anatomy-inflation',
     label: 'Inflation (folded → very inflated)',
-    min: 0, max: 2, step: 0.01, value: 0,
+    min: 0, max: 2, step: 0.01, value: OPENING_STAGE,
     format: stageLabel,
     onInput: value => {
+      // The slider takes over from a running transition; its promise never settles once cancelled.
+      endTransition();
       for (const surface of Object.values(surfaces)) {
         surface.cancelAnimation();
         surface.setMorphValue(value);
@@ -404,9 +410,14 @@ async function morphMode({ ctx, film, panel, isCurrent }: ModeContext): Promise<
   });
   const row = actions(shape);
   const buttons: HTMLButtonElement[] = [];
+  const endTransition = () => {
+    state.transition = 0;
+    for (const button of buttons) button.disabled = false;
+  };
   const morphTo = async (stage: 0 | 1 | 2) => {
-    if (state.animating) return;
-    state.animating = true;
+    if (state.transition !== 0) return;
+    const transition = ++transitions;
+    state.transition = transition;
     for (const button of buttons) button.disabled = true;
     const options = {
       duration: state.duration,
@@ -419,11 +430,10 @@ async function morphMode({ ctx, film, panel, isCurrent }: ModeContext): Promise<
     };
     const target = stage === 1 ? 'inflated' : 'very-inflated';
     await Promise.all(Object.values(surfaces).map(surface => (stage === 0 ? surface.morphToBase(options) : surface.morphTo(target, options))));
-    if (!isCurrent()) return;
+    if (!isCurrent() || state.transition !== transition) return;
     amount.set(stage);
     printMorph(stage);
-    state.animating = false;
-    for (const button of buttons) button.disabled = false;
+    endTransition();
     ctx.status(`Shape: ${STAGES[stage]!.toLowerCase()}`);
   };
   STAGES.forEach((label, stage) => {
@@ -458,7 +468,7 @@ async function morphMode({ ctx, film, panel, isCurrent }: ModeContext): Promise<
   const print = hoverPrinter(film, { lh: left, rh: right });
   viewer.on('vertex:hover', print);
   pairedView(viewer, 'lateral');
-  printMorph(0);
+  printMorph(OPENING_STAGE);
   return () => {
     viewer.off('vertex:hover', print);
     for (const surface of Object.values(surfaces)) surface.cancelAnimation();

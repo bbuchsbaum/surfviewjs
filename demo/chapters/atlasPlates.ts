@@ -6,7 +6,7 @@ import { action, actions, fmt, note, section, select, slider, toggle } from '../
 import { loadAtlas, loadMesh, type ATLAS_URLS, type AtlasFile } from '../kit/data';
 import type { Scenario } from '../types';
 import { mountAtlasComposer, type AtlasDemoComposer } from './atlasComposer';
-import { mutedNetworkColors, networkNames, networkOf } from './atlasPalettes';
+import { mutedNetworkColors, networkNames, networkOf, shortParcelName } from './atlasPalettes';
 
 const ATLASES: ReadonlyArray<{
   id: 'glasser' | 'schaefer400-7' | 'schaefer400-17';
@@ -116,7 +116,7 @@ export const atlasPlates: Scenario = {
       calloutGap: allLabels ? 12 : 20,
       detailScales: [2, 4, 8],
       parcelGroups: groups(),
-      labelText: parcel => labelMode === 'ids' ? String(parcel.id) : parcel.label,
+      labelText: parcel => labelMode === 'ids' ? String(parcel.id) : isGlasser() ? parcel.label : shortParcelName(parcel.label),
       measureText: (text, size) => {
         if (!metrics) return text.length * size * 0.72;
         metrics.font = `${size}px Arial`;
