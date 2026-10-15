@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-10-15
+
+### Added
+- Persistent binary anatomical references in portable v2 report scenes, with
+  independent visibility and opacity, categorical boundaries, and reset defaults.
+- Custom color arrays and `ColorMap` instances for `VolumeProjectionLayer`,
+  including CPU/GPU palette lookup, alpha, and saved mapping state.
+- `projectRibbonVolume()` for standalone white-to-pial sampling with voxel
+  masks and valid-sample counts, without WebGL.
+- `parseGIfTIScalars()` for per-vertex scalar GIFTI data, including compressed
+  payloads, multiple maps, and missing values.
+
+### Changed
+- The Volume demo offers a custom signed palette; scalar demo data now uses
+  the public GIFTI parser.
+
 ## [3.0.0] - 2026-10-10
 
 ### Upgrading from 2.x
