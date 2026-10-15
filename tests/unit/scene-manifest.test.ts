@@ -21,7 +21,7 @@ beforeAll(() => {
   }
 });
 
-async function fixtureManifest(inline = true): Promise<SurfViewSceneManifest> {
+export async function fixtureManifest(inline = true): Promise<SurfViewSceneManifest> {
   const leftVertices = await createSceneAsset(
     [0, 0, 0, -1, 0, 0, 0, 1, 0],
     { role: 'vertices', dtype: 'float32', shape: [3, 3], inline }
@@ -249,5 +249,66 @@ describe('surfview.scene.v1 validation', () => {
     asset.uri = 'duplicate.bin';
 
     expect(() => validateSceneManifest(manifest)).toThrow('exactly one of data or uri');
+  });
+});
+
+
+describe('reference scene validation', () => {
+  async function referenceManifest() {
+    const manifest = await fixtureManifest();
+    manifest.schemaVersion = 'surfview.scene.v2';
+    const mask = await createSceneAsset([0, 1, 1], { role: 'values', dtype: 'float32', shape: [3] });
+    manifest.assets[mask.descriptor.id] = mask.descriptor;
+    manifest.layers.reference = {
+      id: 'reference', role: 'reference', label: 'Synthetic anatomy', color: '#8844aa', boundary: 'midpoint',
+      values: { left: { values: mask.descriptor.id }, right: { values: mask.descriptor.id } },
+      visible: true, opacity: 0.25, provenance: { atlas: 'synthetic', region: 'PSL-like' }
+    };
+    return manifest;
+  }
+
+  it('round-trips the reference role, categorical display, membership and provenance', async () => {
+    const manifest = JSON.parse(JSON.stringify(await referenceManifest()));
+    validateSceneManifest(manifest);
+    expect(manifest.layers.reference).toMatchObject({ role: 'reference', color: '#8844aa', boundary: 'midpoint', provenance: { atlas: 'synthetic' } });
+    expect(Array.from(await loadSceneAsset(manifest.assets[manifest.layers.reference.values.left.values]))).toEqual([0, 1, 1]);
+  });
+
+  it('requires v2 so older runtimes cannot silently treat references as maps', async () => {
+    const manifest = await referenceManifest();
+    manifest.schemaVersion = 'surfview.scene.v1';
+    expect(() => validateSceneManifest(manifest)).toThrow('references require surfview.scene.v2');
+  });
+
+  it.each([
+    ['role', 'annotation', 'must be map or reference'],
+    ['color', 'red', 'must be #rrggbb'],
+    ['boundary', 'linear', 'must be midpoint'],
+    ['label', '', 'non-empty'],
+    ['visible', 1, 'boolean'],
+    ['opacity', 2, 'between 0 and 1'],
+    ['limits', [0, 1], 'not supported for references'],
+    ['threshold', [0, 0.5], 'not supported for references'],
+    ['colorMap', 'viridis', 'not supported for references'],
+    ['legend', {}, 'not supported for references']
+  ])('rejects invalid reference %s', async (field, value, message) => {
+    const manifest = await referenceManifest();
+    Object.assign(manifest.layers.reference!, { [field]: value });
+    expect(() => validateSceneManifest(manifest)).toThrow(message);
+  });
+
+  it('rejects reference selection, duplicate references, sparse membership and missing hemispheres', async () => {
+    const manifest = await referenceManifest();
+    manifest.selectedLayer = 'reference';
+    expect(() => validateSceneManifest(manifest)).toThrow('quantitative map');
+    manifest.selectedLayer = 'statistic';
+    manifest.layers.other = { ...manifest.layers.reference!, id: 'other' };
+    expect(() => validateSceneManifest(manifest)).toThrow('at most one reference');
+    delete manifest.layers.other;
+    manifest.layers.reference!.values.left!.indices = 'sparse';
+    expect(() => validateSceneManifest(manifest)).toThrow('dense');
+    delete manifest.layers.reference!.values.left!.indices;
+    delete manifest.layers.reference!.values.right;
+    expect(() => validateSceneManifest(manifest)).toThrow('every geometry');
   });
 });

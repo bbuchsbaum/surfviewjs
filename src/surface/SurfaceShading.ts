@@ -1,4 +1,4 @@
-import type * as THREE from 'three';
+import * as THREE from 'three';
 
 /**
  * Fragment-level surface shading shared by CPU-composited surfaces.
@@ -38,12 +38,15 @@ export interface SurfaceShadingOptions {
 }
 
 export interface SurfaceShadingUniforms {
+  surfviewReference: { value: THREE.Vector4 };
   surfviewEdgeEnabled: { value: number };
   surfviewOutlineWidth: { value: number };
   surfviewOutlineShade: { value: number };
   surfviewSilhouette: { value: number };
   surfviewEmission: { value: number };
 }
+
+export const SURFACE_REFERENCE_ATTRIBUTE = 'surfviewReferenceMembership';
 
 export const SURFACE_OVERLAY_ATTRIBUTE = 'surfviewOverlay';
 /**
@@ -104,6 +107,7 @@ function finiteIn(value: number | undefined, fallback: number, name: string, max
 
 export function createSurfaceShadingUniforms(options: SurfaceShadingOptions = {}): SurfaceShadingUniforms {
   const uniforms: SurfaceShadingUniforms = {
+    surfviewReference: { value: new THREE.Vector4(0, 0, 0, 0) },
     surfviewEdgeEnabled: { value: 0 },
     surfviewOutlineWidth: { value: 0 },
     surfviewOutlineShade: { value: 0.55 },
@@ -133,6 +137,8 @@ export function updateSurfaceShadingUniforms(
 }
 
 const VERTEX_DECLARATIONS = `
+attribute float ${SURFACE_REFERENCE_ATTRIBUTE};
+varying float vSurfviewReference;
 attribute vec4 ${SURFACE_OVERLAY_ATTRIBUTE};
 attribute float ${SURFACE_EDGE_ATTRIBUTE};
 varying vec4 vSurfviewOverlay;
@@ -149,9 +155,12 @@ vColor.rgb = surfviewSRGBToLinear( vColor.rgb );
 #endif
 vSurfviewOverlay = vec4( surfviewSRGBToLinear( ${SURFACE_OVERLAY_ATTRIBUTE}.rgb ), ${SURFACE_OVERLAY_ATTRIBUTE}.a );
 vSurfviewEdge = ${SURFACE_EDGE_ATTRIBUTE};
+vSurfviewReference = ${SURFACE_REFERENCE_ATTRIBUTE};
 `;
 
 const FRAGMENT_DECLARATIONS = `
+uniform vec4 surfviewReference;
+varying float vSurfviewReference;
 uniform float surfviewEdgeEnabled;
 uniform float surfviewOutlineWidth;
 uniform float surfviewOutlineShade;
@@ -170,6 +179,10 @@ vec3 surfviewGlow = vec3( 0.0 );
 #else
   vec4 surfviewBase = vec4( 1.0 );
 #endif
+// Categorical membership: fixed midpoint, zero colour outside the mask.
+// This is independent of map range, palette, threshold and opacity.
+float surfviewReferenceAlpha = step( 0.5, vSurfviewReference ) * surfviewReference.a;
+surfviewBase.rgb = mix( surfviewBase.rgb, surfviewReference.rgb, surfviewReferenceAlpha );
 if ( surfviewEdgeEnabled > 0.5 ) {
   float surfviewWidth = max( fwidth( vSurfviewEdge ), 1e-6 );
   // One-sided coverage: nothing on the hidden side of the contour, at least
@@ -236,6 +249,6 @@ export function installSurfaceShading(
   };
   const previousKey = material.customProgramCacheKey;
   material.customProgramCacheKey = () =>
-    `${previousKey ? previousKey.call(material) : ''}|surfview-shading-v3`;
+    `${previousKey ? previousKey.call(material) : ''}|surfview-shading-v4`;
   material.needsUpdate = true;
 }

@@ -73,6 +73,11 @@ export class ReportControls {
   private readonly subscription: SurfViewControlSubscription;
   private readonly select: HTMLSelectElement;
   private readonly legend: HTMLSpanElement;
+  private readonly referenceGroup: HTMLFieldSetElement;
+  private readonly referenceToggle: HTMLInputElement;
+  private readonly referenceOpacity: HTMLInputElement;
+  private readonly referenceName: HTMLSpanElement;
+  private readonly referenceSwatch: HTMLSpanElement;
   private readonly feedback: HTMLSpanElement;
   private readonly resetButton: HTMLButtonElement;
   private readonly exportButton: HTMLButtonElement;
@@ -111,6 +116,39 @@ export class ReportControls {
     }, { signal: this.events.signal });
     mapLabel.appendChild(this.select);
     this.element.appendChild(mapLabel);
+
+    this.referenceGroup = document.createElement('fieldset');
+    Object.assign(this.referenceGroup.style, { border: '0', margin: '0', padding: '0', display: 'flex', alignItems: 'center', gap: '6px' });
+    const referenceLegend = document.createElement('legend');
+    referenceLegend.textContent = 'Anatomical reference';
+    this.referenceGroup.appendChild(referenceLegend);
+    const referenceLabel = document.createElement('label');
+    this.referenceToggle = document.createElement('input');
+    this.referenceToggle.type = 'checkbox';
+    this.referenceName = document.createElement('span');
+    this.referenceSwatch = document.createElement('span');
+    this.referenceSwatch.setAttribute('aria-hidden', 'true');
+    Object.assign(this.referenceSwatch.style, { display: 'inline-block', width: '12px', height: '12px', border: '1px solid currentColor', marginInline: '4px' });
+    referenceLabel.append(this.referenceToggle, this.referenceSwatch, this.referenceName);
+    const opacityLabel = document.createElement('label');
+    opacityLabel.textContent = 'Reference opacity ';
+    this.referenceOpacity = document.createElement('input');
+    this.referenceOpacity.type = 'range';
+    this.referenceOpacity.min = '0';
+    this.referenceOpacity.max = '1';
+    this.referenceOpacity.step = '0.05';
+    this.referenceOpacity.style.width = '90px';
+    opacityLabel.appendChild(this.referenceOpacity);
+    this.referenceToggle.addEventListener('change', () => {
+      const reference = this.session.getSnapshot().canonical.capabilities.referenceLayers?.layers[0];
+      if (reference) this.reportResult(this.session.setLayerVisibility(reference.address, this.referenceToggle.checked));
+    }, { signal: this.events.signal });
+    this.referenceOpacity.addEventListener('input', () => {
+      const reference = this.session.getSnapshot().canonical.capabilities.referenceLayers?.layers[0];
+      if (reference) this.reportResult(this.session.setLayerOpacity(reference.address, Number(this.referenceOpacity.value)));
+    }, { signal: this.events.signal });
+    this.referenceGroup.append(referenceLabel, opacityLabel);
+
 
     const viewGroup = document.createElement('fieldset');
     Object.assign(viewGroup.style, {
@@ -152,6 +190,7 @@ export class ReportControls {
       this.viewInputs.set(view, input);
     }
     this.element.appendChild(viewGroup);
+    this.element.appendChild(this.referenceGroup);
 
     this.resetButton = document.createElement('button');
     this.resetButton.type = 'button';
@@ -229,6 +268,19 @@ export class ReportControls {
     }
     this.select.disabled = !exclusiveMap?.availability.enabled;
     this.select.value = exclusiveMap?.displayedLayerId ?? '';
+    const reference = canonical.capabilities.referenceLayers?.layers[0];
+    this.referenceGroup.hidden = !reference;
+    // A hidden fieldset must not retain its inline display:flex.
+    this.referenceGroup.style.display = reference ? 'flex' : 'none';
+    if (reference) {
+      this.referenceName.textContent = reference.label;
+      this.referenceSwatch.style.backgroundColor = reference.color;
+      this.referenceToggle.checked = reference.visible;
+      this.referenceOpacity.value = String(reference.opacity);
+      this.referenceToggle.disabled = !canonical.capabilities.referenceLayers?.availability.enabled;
+      this.referenceOpacity.disabled = this.referenceToggle.disabled;
+    }
+
 
     const viewAvailability = new Map(
       canonical.view.anatomicalViews.map(view => [view.id, view.availability])

@@ -48,6 +48,7 @@ afterEach(() => {
 describe('surface shading uniforms', () => {
   it('creates documented defaults and applies initial options', () => {
     expect(createSurfaceShadingUniforms()).toEqual({
+      surfviewReference: { value: new THREE.Vector4(0, 0, 0, 0) },
       surfviewEdgeEnabled: { value: 0 },
       surfviewOutlineWidth: { value: 0 },
       surfviewOutlineShade: { value: 0.55 },
@@ -115,7 +116,7 @@ describe('installSurfaceShading', () => {
     );
     expect(shader.vertexShader).toContain(`vSurfviewEdge = ${SURFACE_EDGE_ATTRIBUTE};`);
     for (const name of Object.keys(uniforms)) {
-      expect(shader.fragmentShader).toContain(`uniform float ${name};`);
+      expect(shader.fragmentShader).toContain(`uniform ${name === 'surfviewReference' ? 'vec4' : 'float'} ${name};`);
     }
     expect(shader.fragmentShader).not.toContain('#include <color_fragment>');
     expect(shader.fragmentShader).toContain('diffuseColor *= surfviewBase;');
@@ -143,7 +144,7 @@ describe('installSurfaceShading', () => {
       'float surfviewInside = vSurfviewEdge >= 0.0 ? max( 0.5, smoothstep( 0.0, surfviewWidth, vSurfviewEdge ) ) : 0.0;'
     );
     // A new cache key forces programs compiled with the old ramp to rebuild.
-    expect(material.customProgramCacheKey()).toContain('surfview-shading-v3');
+    expect(material.customProgramCacheKey()).toContain('surfview-shading-v4');
   });
 
   it('is idempotent', () => {
@@ -172,7 +173,7 @@ describe('installSurfaceShading', () => {
     expect(calls).toEqual(['previous']);
     expect(shader.fragmentShader).toContain('// previous-patch');
     expect(shader.fragmentShader).toContain('uniform float surfviewEdgeEnabled;');
-    expect(material.customProgramCacheKey()).toBe('previous-key|surfview-shading-v3');
+    expect(material.customProgramCacheKey()).toBe('previous-key|surfview-shading-v4');
   });
 });
 

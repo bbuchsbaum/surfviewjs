@@ -13,7 +13,7 @@ import {
 } from './utils/validation';
 
 export type BlendMode = 'normal' | 'additive' | 'multiply';
-export type LayerRole = 'anatomy' | 'data' | 'outline' | 'connectivity';
+export type LayerRole = 'anatomy' | 'reference' | 'data' | 'outline' | 'connectivity';
 export type LayerPinnedPosition = 'bottom' | 'top' | null;
 
 export interface LayerOrderConstraints {
@@ -2411,6 +2411,7 @@ export class LayerStack {
     const pin = constraints.pinned === 'bottom' ? 0 : constraints.pinned === 'top' ? 2 : 1;
     const role = {
       anatomy: 0,
+      reference: 0.5,
       data: 1,
       outline: 2,
       connectivity: 3

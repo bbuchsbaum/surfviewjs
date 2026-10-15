@@ -490,6 +490,7 @@ export class ReportSceneController {
 
   getAvailableLayerIds(): readonly string[] {
     return Object.freeze(Object.values(this.manifest.layers)
+      .filter(layer => layer.role !== 'reference')
       .filter(layer => this.getReportSurfaces().some(({ id }) =>
         this.viewer.getOrderedLayers(id).some(candidate => candidate.id === layer.id)
       ))
@@ -524,13 +525,17 @@ export class ReportSceneController {
     if (!this.manifest.layers[layerId]) {
       return failure('layer-not-found', `Report layer "${layerId}" was not found.`);
     }
+    if (this.manifest.layers[layerId]?.role === 'reference') {
+      return failure('invalid-value', 'A reference cannot be displayed as a quantitative map.');
+    }
     const reportSurfaces = this.getReportSurfaces();
     if (reportSurfaces.length === 0) {
       return failure('surface-not-found', 'No report surfaces are loaded.');
     }
     const layerInstances = reportSurfaces.flatMap(({ id }) =>
       this.viewer.getOrderedLayers(id).filter(layer =>
-        Object.prototype.hasOwnProperty.call(this.manifest.layers, layer.id)
+        Object.prototype.hasOwnProperty.call(this.manifest.layers, layer.id) &&
+        this.manifest.layers[layer.id]?.role !== 'reference'
       )
     );
     if (!layerInstances.some(layer => layer.id === layerId)) {
@@ -544,6 +549,32 @@ export class ReportSceneController {
         for (const layer of layerInstances) layer.setVisible(layer.id === layerId);
       } finally {
         this.changingLayers = false;
+      }
+      return SUCCESS;
+    });
+  }
+
+  /** Update the reference across all report geometries as one command. */
+  updateReference(layerId: string, update: { visible?: boolean; opacity?: number }): ControlCommandResult {
+    const unavailable = this.commandUnavailable();
+    if (unavailable) return unavailable;
+    const manifest = this.manifest.layers[layerId];
+    if (!manifest) return failure('layer-not-found', `Reference "${layerId}" was not found.`);
+    if (manifest.role !== 'reference') return failure('unsupported', 'Independent map visibility is not supported.');
+    if (!update || typeof update !== 'object') return failure('invalid-value', 'A reference update is required.');
+    if ((update.visible !== undefined && typeof update.visible !== 'boolean') ||
+        (update.opacity !== undefined && (!Number.isFinite(update.opacity) || update.opacity < 0 || update.opacity > 1))) {
+      return failure('invalid-value', 'Reference visibility must be boolean and opacity must be between 0 and 1.');
+    }
+    const surfaces = this.getReportSurfaces();
+    const layers = surfaces.map(({ surface }) => surface.getLayer(layerId));
+    if (!layers.length || layers.some(layer => !layer || layer.getOrderConstraints().role !== 'reference')) {
+      return failure('layer-not-found', `Reference "${layerId}" is not loaded on every report surface.`);
+    }
+    return this.withMutationBoundary(() => {
+      for (const layer of layers) {
+        if (update.visible !== undefined) layer!.setVisible(update.visible);
+        if (update.opacity !== undefined) layer!.setOpacity(update.opacity);
       }
       return SUCCESS;
     });
@@ -746,6 +777,32 @@ export class ReportSceneController {
   }
 
   resetView(): ControlCommandResult {
+    const unavailable = this.commandUnavailable();
+    if (unavailable) return unavailable;
+    // Check reference availability before moving the camera: failures must not
+    // leave a partially reset report.
+    const references = Object.values(this.manifest.layers).filter(layer => layer.role === 'reference');
+    for (const reference of references) {
+      const surfaces = this.getReportSurfaces();
+      if (!surfaces.length || surfaces.some(({ surface }) =>
+        surface.getLayer(reference.id)?.getOrderConstraints().role !== 'reference')) {
+        return failure('layer-not-found', `Reference "${reference.id}" is not loaded on every report surface.`);
+      }
+    }
+    return this.withMutationBoundary(() => {
+      const result = this.resetAnatomicalView();
+      if (!result.ok) return result;
+      for (const layer of Object.values(this.manifest.layers)) {
+        if (layer.role === 'reference') {
+          const restored = this.updateReference(layer.id, { visible: layer.visible ?? true, opacity: layer.opacity ?? 1 });
+          if (!restored.ok) return restored;
+        }
+      }
+      return SUCCESS;
+    });
+  }
+
+  private resetAnatomicalView(): ControlCommandResult {
     if (this.layout === 'anatomical') return this.setBrainView(this.initialBrainView, { fit: true });
     const target = this.getViewTarget();
     return target
@@ -850,7 +907,8 @@ export class ReportSceneController {
     const visible = new Set<string>();
     const surfaceLayers = this.getReportSurfaces().map(({ id }) =>
       this.viewer.getOrderedLayers(id).filter(layer =>
-        Object.prototype.hasOwnProperty.call(this.manifest.layers, layer.id)
+        Object.prototype.hasOwnProperty.call(this.manifest.layers, layer.id) &&
+        this.manifest.layers[layer.id]?.role !== 'reference'
       )
     );
     for (const layers of surfaceLayers) {

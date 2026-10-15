@@ -20,4 +20,7 @@ export async function showReport(container: HTMLElement, manifest: SurfViewScene
   });
   await report.ready;
   report.setBrainView('left-medial');
+  // A v2 manifest may include one binary role:'reference' with #rrggbb color.
+  report.controlTarget?.setLayerOpacity({ surfaceId: 'left', layerId: 'reference' }, 0.25);
+  report.selectLayer('contrast'); // preserves reference state
 }

@@ -94,7 +94,13 @@ test('figures chapter mounts an anatomical report scene and exports from it', as
   await expect(page.locator('#viewer-frame')).toContainText(/View\s*Left medial/);
   await expect.poll(async () => (await canvas.screenshot()).equals(oblique)).toBe(false);
 
+  await expect(page.getByLabel('Synthetic parietal reference')).toBeChecked();
+  await page.getByLabel('Synthetic parietal reference').uncheck();
+  await page.locator('#figures-reference-opacity').fill('0.6');
+  await page.locator('#figures-reference-opacity').dispatchEvent('input');
   await page.locator('#figures-report-map').selectOption('frontoparietal');
+  await expect(page.getByLabel('Synthetic parietal reference')).not.toBeChecked();
+  await expect(page.locator('#figures-reference-opacity')).toHaveValue('0.6');
   await expect(page.locator('#figures-key')).toContainText('Frontoparietal contrast (z)');
 
   await page.locator('#figures-size').selectOption('640x480');

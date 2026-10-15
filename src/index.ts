@@ -117,6 +117,7 @@ import { ParcelSurface } from './surfaces/ParcelSurface';
 import { createColormapTexture } from './textures/createColormapTexture';
 import {
   SURFVIEW_SCENE_SCHEMA,
+  SURFVIEW_SCENE_SCHEMA_V2,
   SceneManifestError,
   validateSceneManifest,
   createSceneAsset,
@@ -204,6 +205,7 @@ export {
   ParcelSurface,
   createColormapTexture,
   SURFVIEW_SCENE_SCHEMA,
+  SURFVIEW_SCENE_SCHEMA_V2,
   SceneManifestError,
   validateSceneManifest,
   createSceneAsset,
@@ -534,6 +536,8 @@ export type {
   SceneHemisphere,
   SceneLayerLegend,
   SurfViewSceneLayerManifest,
+  SceneMapLayerManifest,
+  SceneReferenceLayerManifest,
   SceneLayerValuesManifest,
   SurfViewSceneManifest,
   CreateSceneAssetOptions,
@@ -601,6 +605,7 @@ export type {
   FigurePresetControlDescriptor,
   FigureControlDescriptor,
   ExclusiveMapCapability,
+  ReferenceLayersCapability,
   SurfViewControlCapabilities,
   SurfViewControlSnapshot,
   ControlCommandFailureCode,

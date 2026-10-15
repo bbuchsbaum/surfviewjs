@@ -49,3 +49,20 @@ handle.controlTarget?.setDisplayedLayer('activation');
 
 // @ts-expect-error report targets do not expose their concrete viewer
 void concrete.viewer;
+
+import type { SceneReferenceLayerManifest, ReferenceLayersCapability } from '../../src';
+const referenceManifest: SceneReferenceLayerManifest = {
+  id: 'reference', role: 'reference', label: 'Region', color: '#8844aa', boundary: 'midpoint',
+  values: { lh: { values: 'mask-left' }, rh: { values: 'mask-right' } }
+};
+// @ts-expect-error references have categorical colors, never quantitative limits
+referenceManifest.limits = [0, 1];
+// @ts-expect-error continuous membership boundaries are not supported
+referenceManifest.boundary = 'linear';
+const references: ReferenceLayersCapability | undefined = target.getSnapshot().capabilities.referenceLayers;
+if (references?.availability.enabled && references.layers[0]) {
+  target.setLayerVisibility(references.layers[0].address, false);
+  target.setLayerOpacity(references.layers[0].address, 0.25);
+  // @ts-expect-error reference capability snapshots are immutable
+  references.layers[0].opacity = 0.5;
+}

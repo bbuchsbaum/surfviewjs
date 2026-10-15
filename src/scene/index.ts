@@ -1,5 +1,6 @@
 export {
   SURFVIEW_SCENE_SCHEMA,
+  SURFVIEW_SCENE_SCHEMA_V2,
   SceneManifestError,
   validateSceneManifest
 } from './SceneManifest';
@@ -12,6 +13,8 @@ export type {
   SceneHemisphere,
   SceneLayerLegend,
   SurfViewSceneLayerManifest,
+  SceneMapLayerManifest,
+  SceneReferenceLayerManifest,
   SceneLayerValuesManifest,
   SurfViewSceneManifest
 } from './SceneManifest';

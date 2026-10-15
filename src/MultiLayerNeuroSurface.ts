@@ -18,6 +18,7 @@ import {
   LayerOrderResult
 } from './layers';
 import ColorMap2D, { ColorMap2DPreset } from './ColorMap2D';
+import { ReferenceLayer } from './layers/ReferenceLayer';
 import { CurvatureLayer } from './layers/CurvatureLayer';
 import { ClipPlaneSet, ClipPlane, ClipAxis } from './utils/ClipPlane';
 import { debugLog, isDebugEnabled } from './debug';
@@ -28,6 +29,7 @@ import {
   createSurfaceShadingUniforms,
   installSurfaceShading,
   SURFACE_EDGE_ATTRIBUTE,
+  SURFACE_REFERENCE_ATTRIBUTE,
   SURFACE_OVERLAY_ATTRIBUTE,
   updateSurfaceShadingUniforms,
   writeThresholdEdgeSigns
@@ -1169,7 +1171,8 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     // As on the CPU path, the top thresholded data layer is drawn per fragment
     // (threshold edges) rather than composited per vertex.
     const edgeLayer = this.thresholdEdgeLayer(visibleLayers);
-    this.gpuCompositor.updateLayers(visibleLayers.filter(layer => layer !== edgeLayer));
+    this.applyReference();
+    this.gpuCompositor.updateLayers(visibleLayers.filter(layer => layer !== edgeLayer && !(layer instanceof ReferenceLayer)));
     this.applyThresholdEdges(edgeLayer);
     visibleLayers.forEach(layer => (layer.needsUpdate = false));
     
@@ -1205,10 +1208,11 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
 
     const collectDebugStats = isDebugEnabled();
     const edgeLayer = this.thresholdEdgeLayer(visibleLayers);
+    this.applyReference();
 
     // Composite each layer
     for (const layer of visibleLayers) {
-      if (layer === edgeLayer) continue;
+      if (layer === edgeLayer || layer instanceof ReferenceLayer) continue;
       try {
         debugLog('MultiLayerNeuroSurface: Processing layer', layer.id, '(type:', layer.constructor.name, ')');
         const layerRGBA = layer.getRGBAData(this.vertexCount);
@@ -1261,14 +1265,31 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
    * edges, since their values are not meant to be interpolated.
    */
   private thresholdEdgeLayer(visibleLayers: Layer[]): DataLayer | null {
-    if (!this.thresholdEdges || !this.mesh) return null;
+    if ((!this.thresholdEdges && !this.hasReference()) || !this.mesh) return null;
     const top = visibleLayers[visibleLayers.length - 1];
     if (!(top instanceof DataLayer) || Object.getPrototypeOf(top) !== DataLayer.prototype ||
         top.blendMode !== 'normal') {
       return null;
     }
     const [low, high] = top.getThreshold();
-    return high > low ? top : null;
+    return high > low || this.hasReference() ? top : null;
+  }
+
+  private hasReference(): boolean {
+    return this.layerStack.getAllLayers().some(layer => layer instanceof ReferenceLayer);
+  }
+
+  private applyReference(): void {
+    if (!this.mesh) return;
+    const attribute = this.mesh.geometry.getAttribute(SURFACE_REFERENCE_ATTRIBUTE) as THREE.BufferAttribute;
+    const layer = this.layerStack.getAllLayers().find(candidate => candidate instanceof ReferenceLayer);
+    this.shadingUniforms.surfviewReference.value.set(0, 0, 0, 0);
+    if (!(layer instanceof ReferenceLayer)) return;
+    layer.copyMembership(attribute.array as Float32Array);
+    attribute.needsUpdate = true;
+    const color = new THREE.Color(layer.color);
+    this.shadingUniforms.surfviewReference.value.set(color.r, color.g, color.b, layer.visible ? layer.opacity : 0);
+    layer.needsUpdate = false;
   }
 
   private applyThresholdEdges(layer: DataLayer | null): void {
@@ -1288,6 +1309,13 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
           overlay.array as Float32Array,
           edge.array as Float32Array
         );
+        if (!enabled && this.hasReference()) {
+          // Unmasked maps also stay above the categorical reference. Preserve
+          // their vertex colours and alpha; no map threshold is introduced.
+          overlay.array.set(layer.getRGBAData(this.vertexCount));
+          (edge.array as Float32Array).fill(1);
+          enabled = true;
+        }
         if (enabled) {
           // The shader draws the contour between shown and hidden vertices,
           // so it needs each vertex's visibility, not its distance.
@@ -1501,6 +1529,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     this.edgeBuffer = new Float32Array(this.vertexCount).fill(-1);
     geometry.setAttribute(SURFACE_OVERLAY_ATTRIBUTE, new THREE.BufferAttribute(this.overlayBuffer, 4));
     geometry.setAttribute(SURFACE_EDGE_ATTRIBUTE, new THREE.BufferAttribute(this.edgeBuffer, 1));
+    geometry.setAttribute(SURFACE_REFERENCE_ATTRIBUTE, new THREE.BufferAttribute(new Float32Array(this.vertexCount), 1));
 
     let material: THREE.Material;
 

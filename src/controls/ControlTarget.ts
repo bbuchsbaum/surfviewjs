@@ -194,7 +194,21 @@ export interface ExclusiveMapCapability {
   readonly availableLayerIds: readonly string[];
 }
 
+/** Report references have separate categorical controls, never map ranges. */
+export interface ReferenceLayersCapability {
+  readonly availability: CapabilityAvailability;
+  readonly layers: readonly {
+    readonly id: string;
+    readonly label: string;
+    readonly color: string;
+    readonly visible: boolean;
+    readonly opacity: number;
+    readonly address: LayerControlAddress;
+  }[];
+}
+
 export interface SurfViewControlCapabilities {
+  readonly referenceLayers?: ReferenceLayersCapability;
   readonly anatomicalViews: CapabilityAvailability;
   readonly surfaceVisibility: CapabilityAvailability;
   readonly layerVisibility: CapabilityAvailability;

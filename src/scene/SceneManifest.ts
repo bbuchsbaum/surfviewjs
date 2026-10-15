@@ -1,4 +1,6 @@
 export const SURFVIEW_SCENE_SCHEMA = 'surfview.scene.v1' as const;
+/** Required for persistent references; v1 runtimes reject this version. */
+export const SURFVIEW_SCENE_SCHEMA_V2 = 'surfview.scene.v2' as const;
 
 export type SceneHemisphere = 'left' | 'right';
 export type SceneAssetDType = 'float32' | 'uint32';
@@ -41,13 +43,10 @@ export interface SceneLayerLegend {
   metadata?: Record<string, unknown>;
 }
 
-export interface SurfViewSceneLayerManifest {
+interface SceneLayerCommon {
   id: string;
   label?: string;
   values: Record<string, SceneLayerValuesManifest>;
-  colorMap: string | string[];
-  limits: [number, number];
-  threshold?: [number, number];
   opacity?: number;
   visible?: boolean;
   units?: string;
@@ -56,8 +55,31 @@ export interface SurfViewSceneLayerManifest {
   provenance?: Record<string, unknown>;
 }
 
+export interface SceneMapLayerManifest extends SceneLayerCommon {
+  role?: 'map';
+  colorMap: string | string[];
+  limits: [number, number];
+  threshold?: [number, number];
+}
+
+export interface SceneReferenceLayerManifest extends SceneLayerCommon {
+  role: 'reference';
+  label: string;
+  /** Explicit display sRGB colour, #rrggbb. */
+  color: string;
+  /** Dense binary membership at each vertex. Boundary is the 0.5 contour. */
+  boundary: 'midpoint';
+  colorMap?: never;
+  limits?: never;
+  threshold?: never;
+  legend?: never;
+  units?: never;
+}
+
+export type SurfViewSceneLayerManifest = SceneMapLayerManifest | SceneReferenceLayerManifest;
+
 export interface SurfViewSceneManifest {
-  schemaVersion: typeof SURFVIEW_SCENE_SCHEMA;
+  schemaVersion: typeof SURFVIEW_SCENE_SCHEMA | typeof SURFVIEW_SCENE_SCHEMA_V2;
   id: string;
   assets: Record<string, SceneAssetDescriptor>;
   geometries: Record<string, SceneGeometryManifest>;
@@ -131,7 +153,8 @@ export function validateSceneManifest(manifest: SurfViewSceneManifest): SurfView
   if (!manifest || typeof manifest !== 'object') {
     throw new SceneManifestError('$', 'must be an object');
   }
-  if (manifest.schemaVersion !== SURFVIEW_SCENE_SCHEMA) {
+  if (manifest.schemaVersion !== SURFVIEW_SCENE_SCHEMA &&
+      manifest.schemaVersion !== SURFVIEW_SCENE_SCHEMA_V2) {
     throw new SceneManifestError(
       '$.schemaVersion',
       `unsupported schema ${String(manifest.schemaVersion)}`
@@ -245,12 +268,46 @@ export function validateSceneManifest(manifest: SurfViewSceneManifest): SurfView
   if (layerEntries.length === 0) {
     throw new SceneManifestError('$.layers', 'must contain at least one layer');
   }
+  if (!layerEntries.some(([, layer]) => layer.role !== 'reference')) {
+    throw new SceneManifestError('$.layers', 'must contain at least one quantitative map');
+  }
+  if (layerEntries.filter(([, layer]) => layer.role === 'reference').length > 1) {
+    throw new SceneManifestError('$.layers', 'supports at most one reference');
+  }
   for (const [layerId, layer] of layerEntries) {
+    if (layer.role !== undefined && layer.role !== 'map' && layer.role !== 'reference') {
+      throw new SceneManifestError(`$.layers.${layerId}.role`, 'must be map or reference');
+    }
+    if (layerId === 'base' || layerId === 'curvature') {
+      throw new SceneManifestError(`$.layers.${layerId}.id`, 'reserved anatomical layer ID');
+    }
+    if (layer.visible !== undefined && typeof layer.visible !== 'boolean') {
+      throw new SceneManifestError(`$.layers.${layerId}.visible`, 'must be a boolean');
+    }
     if (layer.id !== layerId) {
       throw new SceneManifestError(`$.layers.${layerId}.id`, 'must match its object key');
     }
-    requireFinitePair(layer.limits, `$.layers.${layerId}.limits`);
-    if (layer.threshold) requireFinitePair(layer.threshold, `$.layers.${layerId}.threshold`);
+    if (layer.role === 'reference') {
+      if (manifest.schemaVersion !== SURFVIEW_SCENE_SCHEMA_V2) {
+        throw new SceneManifestError(`$.layers.${layerId}`, 'references require surfview.scene.v2');
+      }
+      requireNonEmpty(layer.label, `$.layers.${layerId}.label`);
+      if (typeof layer.color !== 'string' || !/^#[a-fA-F0-9]{6}$/.test(layer.color)) {
+        throw new SceneManifestError(`$.layers.${layerId}.color`, 'must be #rrggbb');
+      }
+      if (layer.boundary !== 'midpoint') {
+        throw new SceneManifestError(`$.layers.${layerId}.boundary`, 'must be midpoint');
+      }
+      for (const field of ['colorMap', 'limits', 'threshold', 'legend', 'units']) {
+        if (field in layer) throw new SceneManifestError(`$.layers.${layerId}.${field}`, 'not supported for references');
+      }
+      if (Object.keys(layer.values ?? {}).length !== geometryEntries.length) {
+        throw new SceneManifestError(`$.layers.${layerId}.values`, 'reference requires every geometry');
+      }
+    } else {
+      requireFinitePair(layer.limits, `$.layers.${layerId}.limits`);
+      if (layer.threshold) requireFinitePair(layer.threshold, `$.layers.${layerId}.threshold`);
+    }
     if (layer.opacity !== undefined &&
         (!Number.isFinite(layer.opacity) || layer.opacity < 0 || layer.opacity > 1)) {
       throw new SceneManifestError(`$.layers.${layerId}.opacity`, 'must be between 0 and 1');
@@ -279,6 +336,10 @@ export function validateSceneManifest(manifest: SurfViewSceneManifest): SurfView
           'must be float32'
         );
       }
+      if (layer.role === 'reference' && (valueRef.indices !== undefined ||
+          values.shape.length !== 1 || values.shape[0] !== geometry.vertexCount)) {
+        throw new SceneManifestError(`$.layers.${layerId}.values.${geometryId}`, 'reference requires dense [vertexCount] membership without indices');
+      }
       if (valueRef.indices) {
         const indices = requireAsset(
           manifest,
@@ -302,6 +363,9 @@ export function validateSceneManifest(manifest: SurfViewSceneManifest): SurfView
   }
   if (manifest.selectedLayer && !manifest.layers[manifest.selectedLayer]) {
     throw new SceneManifestError('$.selectedLayer', 'references unknown layer');
+  }
+  if (manifest.selectedLayer && manifest.layers[manifest.selectedLayer]?.role === 'reference') {
+    throw new SceneManifestError('$.selectedLayer', 'must select a quantitative map');
   }
   return manifest;
 }

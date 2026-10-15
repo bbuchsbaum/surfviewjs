@@ -23,6 +23,7 @@ export type {
   FigurePresetControlDescriptor,
   FigureControlDescriptor,
   ExclusiveMapCapability,
+  ReferenceLayersCapability,
   SurfViewControlCapabilities,
   SurfViewControlSnapshot,
   ControlCommandFailureCode,

@@ -247,25 +247,42 @@ export class ReportSceneControlTarget implements SurfViewControlTarget {
   }
 
   setLayerVisibility(
-    _address: LayerControlAddress,
-    _visible: boolean
+    address: LayerControlAddress,
+    visible: boolean
   ): ControlCommandResult {
-    return this.commandUnavailable() ?? failure(
+    const unavailable = this.commandUnavailable();
+    if (unavailable) return unavailable;
+    if (!this.controller.manifest.layers[address?.layerId]) return failure('layer-not-found', 'Unknown report layer.');
+    if (this.controller.manifest.layers[address.layerId]?.role === 'reference') {
+      return this.referenceAddressFailure(address) ?? (typeof visible === 'boolean'
+        ? this.controller.updateReference(address.layerId, { visible })
+        : failure('invalid-value', 'Reference visibility must be boolean.'));
+    }
+    return failure(
       'unsupported',
       'Report scenes use setDisplayedLayer() to preserve their exclusive-map policy.'
     );
   }
 
   setLayerOpacity(address: LayerControlAddress, opacity: number): ControlCommandResult {
-    return this.commandUnavailable() ?? this.viewerTarget.setLayerOpacity(address, opacity);
+    const unavailable = this.commandUnavailable();
+    if (unavailable) return unavailable;
+    if (this.controller.manifest.layers[address?.layerId]?.role === 'reference') {
+      if (typeof opacity !== 'number' || !Number.isFinite(opacity) || opacity < 0 || opacity > 1) {
+        return failure('invalid-value', 'Reference opacity must be between 0 and 1.');
+      }
+      return this.referenceAddressFailure(address) ?? this.controller.updateReference(address.layerId, { opacity });
+    }
+    return this.viewerTarget.setLayerOpacity(address, opacity);
   }
 
   setLayerBlendMode(
     address: LayerControlAddress,
     blendMode: BlendMode
   ): ControlCommandResult {
-    return this.commandUnavailable() ??
-      this.viewerTarget.setLayerBlendMode(address, blendMode);
+    return this.commandUnavailable() ?? (this.controller.manifest.layers[address?.layerId]?.role === 'reference'
+      ? failure('unsupported', 'Reference blending is fixed to normal.')
+      : this.viewerTarget.setLayerBlendMode(address, blendMode));
   }
 
   setLayerOrder(
@@ -311,6 +328,14 @@ export class ReportSceneControlTarget implements SurfViewControlTarget {
     return this.commandUnavailable() ?? this.controller.setDisplayedLayer(layerId);
   }
 
+  private referenceAddressFailure(address: LayerControlAddress): ControlCommandFailure | null {
+    if (!this.controller.manifest.geometries[address.surfaceId] ||
+        !this.baseSnapshot.surfaces.some(surface => surface.id === address.surfaceId)) {
+      return failure('surface-not-found', `Report surface "${address.surfaceId}" was not found.`);
+    }
+    return null;
+  }
+
   private commandUnavailable(): ControlCommandFailure | null {
     return this.isDisposed()
       ? failure('disposed', 'The report-scene control target has been disposed.')
@@ -331,6 +356,17 @@ export class ReportSceneControlTarget implements SurfViewControlTarget {
     const exclusiveAvailability = availableLayerIds.length > 0
       ? ENABLED
       : disabled('No report maps are loaded.');
+    const references = Object.values(this.controller.manifest.layers).flatMap(manifest => {
+      if (manifest.role !== 'reference') return [];
+      const surface = base.surfaces.find(candidate => candidate.layers.some(layer => layer.id === manifest.id));
+      const layer = surface?.layers.find(candidate => candidate.id === manifest.id);
+      return surface && layer ? [{ id: manifest.id, label: manifest.label, color: manifest.color,
+        visible: layer.visible, opacity: layer.opacity, address: { surfaceId: surface.id, layerId: layer.id } }] : [];
+    });
+    const referencesAvailable = references.length > 0 && references.every(reference =>
+      Object.keys(this.controller.manifest.geometries).every(id =>
+        base.surfaces.find(surface => surface.id === id)?.layers.some(layer =>
+          layer.id === reference.id && layer.role === 'reference')));
     return deepFreeze({
       revision,
       view: this.buildView(base.view),
@@ -339,6 +375,7 @@ export class ReportSceneControlTarget implements SurfViewControlTarget {
       figure: base.figure,
       capabilities: {
         ...base.capabilities,
+        ...(references.length ? { referenceLayers: { availability: referencesAvailable ? ENABLED : disabled('Reference data are not loaded on every report surface.'), layers: references } } : {}),
         anatomicalViews: this.controller.getViewTarget()
           ? ENABLED
           : disabled('No coordinated report view target is available.'),
@@ -400,7 +437,7 @@ export class ReportSceneControlTarget implements SurfViewControlTarget {
       ...selection,
       inspection: {
         ...selection.inspection,
-        values: selection.inspection.values.map(value => {
+        values: selection.inspection.values.filter(value => this.controller.manifest.layers[value.layerId]?.role !== 'reference').map(value => {
           const manifest = this.controller.manifest.layers[value.layerId];
           if (!manifest) return value;
           return {
@@ -421,6 +458,10 @@ export class ReportSceneControlTarget implements SurfViewControlTarget {
     const metadata = this.layerMetadata(manifest);
     return deepFreeze({
       ...layer,
+      ...(manifest.role === 'reference' ? { colorPreview: { kind: 'categorical', label: manifest.label, css: manifest.color } } : {}),
+      moveUp: disabled('Report layer order is fixed.'),
+      moveDown: disabled('Report layer order is fixed.'),
+      reorderable: false,
       label: manifest.legend?.title ?? manifest.label ?? manifest.id,
       ...(manifest.legend?.units ?? manifest.units
         ? { units: manifest.legend?.units ?? manifest.units }

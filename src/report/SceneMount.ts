@@ -1,6 +1,7 @@
 import { NeuroSurfaceViewer } from '../NeuroSurfaceViewer';
 import { SurfaceGeometry } from '../classes';
 import { MultiLayerNeuroSurface } from '../MultiLayerNeuroSurface';
+import { ReferenceLayer } from '../layers/ReferenceLayer';
 import { DataLayer } from '../layers';
 import type { LayerPresentation } from '../layers';
 import type { FigureExportOptions, SurfViewStylePresetName } from '../StylePresets';
@@ -115,7 +116,7 @@ export interface SurfViewMountHandle {
   selectLayer(layerId: string): void;
   /** @deprecated Passing "reset" remains supported; prefer resetView(). */
   setView(view: SurfViewSceneView): void;
-  /** Restore the configured initial anatomical view. */
+  /** Restore the initial anatomical view and authored reference visibility/opacity. */
   resetView(): void;
   /** Pose the pair as one brain (anatomical layout only). */
   setBrainView(view: ReportBrainView): void;
@@ -166,6 +167,7 @@ export function createSceneDataLayer(
   indices: Uint32Array | null,
   visible: boolean
 ): DataLayer {
+  if (manifest.role === 'reference') throw new TypeError('A reference is not a quantitative map');
   const label = manifest.legend?.title ?? manifest.label;
   const units = manifest.legend?.units ?? manifest.units;
   const presentation: Partial<LayerPresentation> = {
@@ -238,8 +240,8 @@ class SceneMount implements SurfViewMountHandle {
         : { bilateralGroup: freezeBilateralSurfaceGroup(bilateralGroup) })
     };
     this.selectedLayer = manifest.selectedLayer ??
-      Object.values(manifest.layers).find(layer => layer.visible)?.id ??
-      Object.keys(manifest.layers)[0] ?? '';
+      Object.values(manifest.layers).find(layer => layer.role !== 'reference' && layer.visible)?.id ??
+      Object.values(manifest.layers).find(layer => layer.role !== 'reference')?.id ?? '';
     this.selectedView = this.options.initialView;
 
     this.ready = new Promise<void>((resolve, reject) => {
@@ -324,6 +326,7 @@ class SceneMount implements SurfViewMountHandle {
   selectLayer(layerId: string): void {
     const layer = this.manifest.layers[layerId];
     if (!layer) throw new Error(`Unknown scene layer: ${layerId}`);
+    if (layer.role === 'reference') throw new Error('A reference cannot be selected as a quantitative map');
     this.selectedLayer = layerId;
     if (!this.mounted || !this.reportTarget) return;
     const result = this.reportTarget.setDisplayedLayer(layerId);
@@ -359,7 +362,10 @@ class SceneMount implements SurfViewMountHandle {
       if (!result.ok) throw new Error(result.message);
       return;
     }
-    this.setView(this.options.initialView);
+    this.selectedView = this.options.initialView;
+    if (!this.mounted || !this.reportTarget) return;
+    const result = this.reportTarget.resetView();
+    if (!result.ok) throw new Error(result.message);
   }
 
   setBrainView(view: ReportBrainView): void {
@@ -514,6 +520,16 @@ class SceneMount implements SurfViewMountHandle {
       });
       loaded.set(descriptor.id, values);
     }));
+    // Reject malformed categorical bytes before allocating WebGL resources.
+    for (const layer of Object.values(this.manifest.layers)) {
+      if (layer.role !== 'reference') continue;
+      for (const ref of Object.values(layer.values)) {
+        const membership = this.requireFloat32(loaded, ref.values);
+        for (const value of membership) {
+          if (value !== 0 && value !== 1) throw new TypeError(`Reference ${layer.id} membership must be binary`);
+        }
+      }
+    }
     return loaded;
   }
 
@@ -576,6 +592,17 @@ class SceneMount implements SurfViewMountHandle {
               );
             }
           }
+        }
+        if (layerManifest.role === 'reference') {
+          surface.addLayer(new ReferenceLayer(layerManifest.id, values, layerManifest.color, {
+            visible: layerManifest.visible ?? true,
+            opacity: layerManifest.opacity ?? 1,
+            presentation: {
+              label: layerManifest.label,
+              ...(layerManifest.provenance ? { provenance: layerManifest.provenance } : {})
+            }
+          }));
+          continue;
         }
         surface.addLayer(createSceneDataLayer(
           layerManifest,

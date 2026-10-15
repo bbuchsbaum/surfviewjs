@@ -46,7 +46,8 @@ of duplicated source content to every package installation.
 
 `mountSurfView()` validates `manifest.schemaVersion` before it creates an
 observer, fetches an asset, requests an animation frame, or creates WebGL. The
-current schema is `surfview.scene.v1`. An unknown version throws a
+supported schemas are `surfview.scene.v1` (maps) and `surfview.scene.v2`
+(maps with an optional persistent reference). An unknown version throws a
 `SceneManifestError` synchronously.
 
 The returned handle provides these operations:
@@ -57,7 +58,7 @@ The returned handle provides these operations:
 | `controlTarget` | The report-aware `SurfViewControlTarget` after `ready`; `null` while lazy, unmounted, or disposed. |
 | `selectLayer(id)` | Changes the displayed map and legend without replacing geometry. |
 | `setView(view)` | Sets a lateral, medial, dorsal, ventral, anterior, or posterior view. |
-| `resetView()` | Restores the mount's configured `initialView`. Passing `reset` to `setView()` remains a deprecated compatibility form. |
+| `resetView()` | Restores the mount's configured initial view and authored reference visibility/opacity. Passing `reset` to `setView()` remains a deprecated compatibility form. |
 | `getAnatomicalViewCapabilities()` | Returns the shared view vocabulary, single-surface IDs, and registered bilateral groups. |
 | `resize(width?, height?)` | Resizes the renderer. A `ResizeObserver` also follows container width changes. |
 | `exportPNG(options?)` | Returns a PNG data URL using the viewer's figure-export options. |
@@ -123,6 +124,91 @@ left and right members, then independently oriented and separated by
 `hemisphereGap`. A one-surface report needs no group. This report mesh-layout
 mechanic deliberately differs from the ordinary viewer's camera-only paired
 view, while both use the same six orientation definitions.
+
+## Persistent anatomical reference
+
+A report may contain one binary anatomical reference in addition to its
+quantitative maps. Use `schemaVersion: 'surfview.scene.v2'` (exported as
+`SURFVIEW_SCENE_SCHEMA_V2`) so older runtimes reject the manifest before loading
+assets. Do not put references in a v1 manifest: older report controllers would
+apply map exclusivity to them. Existing v1 maps retain their behavior, and an
+omitted layer `role` means `map` in either supported version.
+
+Add a layer like this to `manifest.layers`, with content-addressed `Float32`
+assets holding exactly one `0` or `1` for every vertex of each geometry:
+
+```js
+manifest.schemaVersion = 'surfview.scene.v2';
+manifest.layers.psl = {
+  id: 'psl',
+  role: 'reference',
+  label: 'Glasser PSL',
+  color: '#8767ab',
+  boundary: 'midpoint',
+  values: {
+    left: { values: leftMaskAssetId },
+    right: { values: rightMaskAssetId }
+  },
+  visible: true,
+  opacity: 0.2,
+  provenance: { atlas: 'HCP-MMP1.0', region: 'PSL' }
+};
+```
+
+The mask must already match the geometry's vertex order and topology; the
+runtime does not register or project it. Membership is dense, finite and
+binary; sparse indices, missing geometries, fractional values and NaN are
+rejected. Asset hashes are verified before membership is checked. The label,
+explicit `#rrggbb` display color and `boundary: 'midpoint'` are required.
+References do not accept `colorMap`, `limits`, `threshold`, `units` or a
+quantitative `legend`. `base` and `curvature` are reserved layer IDs.
+
+The rendering order is anatomical shading, reference, selected map. At each
+fragment, interpolated binary membership is classified at **0.5**, with the
+inside including the contour. Mixed triangles therefore have a categorical
+midpoint boundary: color and opacity are constant inside, and zero membership
+is transparent. Membership is never interpreted as a measured quantity or
+normalized to a data range. An opaque quantitative map covers the reference;
+a masked map reveals it. This boundary convention does not claim a more
+precise anatomical border than the authored mesh.
+
+The compact report controls (`controls: true`) show a separate **Anatomical
+reference** group with a categorical label/swatch, native checkbox and opacity
+slider. They share the report target through a `ControlSession`. Custom controls
+can read `snapshot.capabilities.referenceLayers` and use the existing commands:
+
+```js
+await handle.ready;
+const target = handle.controlTarget;
+const address = { surfaceId: 'left', layerId: 'psl' };
+target.setLayerVisibility(address, false);
+target.setLayerOpacity(address, 0.35);
+handle.selectLayer('task-minus-rest');
+```
+
+Either hemisphere's valid reference address updates **both** report geometries
+as one command. The optional `referenceLayers` capability contains an immutable
+list of IDs, labels, colors, visibility, opacity and a valid command address.
+The global `layerVisibility` capability stays disabled for quantitative maps;
+independent map visibility, arbitrary ordering and reference blend-mode changes
+remain unsupported. A reference cannot be `selectedLayer` or passed to
+`setDisplayedLayer()` / `selectLayer()`. It never appears in the quantitative
+map selector, scalar inspector, color key or map-value inspection.
+
+Map switches, mapping changes, views and resize retain reference state.
+**Reset** (`handle.resetView()`, target/session `resetView()`, or the compact
+Reset button) restores authored reference defaults along with the initial
+view; it does not reset the selected map or its quantitative mapping. Omitted
+reference defaults are `visible: true` and `opacity: 1`. Disposal removes the
+controls and layers with the report. A remount reads authored defaults; a host
+can save the capability's state and restore it using the public commands above.
+The portable manifest retains reference provenance and works with inline or
+adjacent hashed assets, including the bundled offline embed. Arbitrary
+multi-reference ordering and volume-to-surface projection are outside this
+contract.
+
+The Figures chapter's report mode demonstrates a separately labelled synthetic
+parietal reference on both fsaverage5 hemispheres.
 
 ## Tweakpane migration
 

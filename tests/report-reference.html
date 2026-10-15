@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Synthetic bilateral reference fixture</title>
+  <style>
+    body { margin: 0; padding: 12px; background: #eef2f6; font: 14px system-ui; }
+    #viewer { width: min(900px, 100%); }
+  </style>
+  <script src="/dist/surfview.embed.iife.js"></script>
+</head>
+<body>
+  <p>Synthetic categorical reference and quantitative map fixture</p>
+  <main id="viewer" aria-label="Synthetic bilateral reference report"></main>
+  <script>
+    window.fixtureReady = false;
+    window.fixtureErrors = [];
+    async function start() {
+      const S = surfview;
+      const assets = {};
+      const bytes = new Map();
+      async function asset(values, role, dtype, shape) {
+        const result = await S.createSceneAsset(values, { role, dtype, shape });
+        assets[result.descriptor.id] = result.descriptor;
+        bytes.set(result.descriptor.id, result.bytes);
+        return result.descriptor.id;
+      }
+      // Four disjoint triangles per hemisphere. Their first three tiles are
+      // reference-only, reference+opaque effect, and neither; tile 4 has a
+      // mixed binary boundary. Planar YZ geometry faces the lateral camera.
+      const vertices = [];
+      for (let tile = 0; tile < 4; tile++) {
+        const y = tile % 2 * 2;
+        const z = Math.floor(tile / 2) * 2;
+        vertices.push(0, y, z, 0, y + 1.5, z, 0, y, z + 1.5);
+      }
+      const vertexId = await asset(vertices, 'vertices', 'float32', [12, 3]);
+      const facesId = await asset(Array.from({ length: 12 }, (_, i) => i), 'faces', 'uint32', [4, 3]);
+      const curvatureId = await asset(new Array(12).fill(0), 'curvature', 'float32', [12]);
+      const maskId = await asset([1,1,1, 1,1,1, 0,0,0, 1,0,0], 'values', 'float32', [12]);
+      const aId = await asset([0,0,0, 1,1,1, 0,0,0, 0,0,0], 'values', 'float32', [12]);
+      const bId = await asset([0,0,0, 2,2,2, 0,0,0, 0,0,0], 'values', 'float32', [12]);
+      const values = id => ({ left: { values: id }, right: { values: id } });
+      const manifest = {
+        schemaVersion: S.SURFVIEW_SCENE_SCHEMA_V2,
+        id: 'synthetic-reference', assets,
+        geometries: Object.fromEntries(['left', 'right'].map(id => [id, {
+          id, hemisphere: id, vertices: vertexId, faces: facesId, curvature: curvatureId,
+          vertexCount: 12, faceCount: 4
+        }])),
+        layers: {
+          // Reference deliberately authored first: selection must still use A.
+          reference: { id: 'reference', role: 'reference', label: 'Synthetic region',
+            color: '#ff0000', boundary: 'midpoint', values: values(maskId),
+            visible: true, opacity: 0.25, provenance: { atlas: 'synthetic', region: 'test' } },
+          a: { id: 'a', label: 'Effect A', values: values(aId),
+            colorMap: ['#00ff00', '#00ff00'], limits: [0, 2], threshold: [-0.1, 0.1],
+            legend: { title: 'Effect A', visible: true }, units: 'z' },
+          b: { id: 'b', label: 'Effect B', values: values(bId),
+            colorMap: ['#0000ff', '#0000ff'], limits: [0, 3], threshold: [-0.1, 0.1] }
+        },
+        provenance: { generator: 'synthetic browser fixture' }
+      };
+      window.fixtureManifest = JSON.parse(JSON.stringify(manifest));
+      window.mountFixture = async (adjacent = false) => {
+        const portable = JSON.parse(JSON.stringify(window.fixtureManifest));
+        let fetches = 0;
+        if (adjacent) for (const asset of Object.values(portable.assets)) {
+          delete asset.data; delete asset.encoding;
+          asset.uri = `./${asset.id}.bin`;
+        }
+        const handle = S.mountSurfView(document.getElementById('viewer'), portable, {
+          lazy: false, controls: true, width: 800, height: 450,
+          bilateralGroup: { id: 'cortex', leftSurfaceId: 'left', rightSurfaceId: 'right' },
+          fetcher: async input => {
+            fetches++;
+            const id = String(input).split('/').pop().replace(/\.bin$/, '');
+            return new Response(bytes.get(id));
+          }
+        });
+        await handle.ready;
+        window.fixtureHandle = handle;
+        window.fixtureFetches = fetches;
+        return handle;
+      };
+      await window.mountFixture();
+      // Pixel observations come from the actual WebGL canvas, immediately
+      // after a synchronous render. Coordinates are projected from geometry.
+      window.observeFixture = async () => {
+        const handle = window.fixtureHandle;
+        const viewer = handle.viewer;
+        viewer.render();
+        const canvas = viewer.renderer.domElement;
+        const image = new Image();
+        image.src = canvas.toDataURL();
+        await image.decode();
+        const readback = document.createElement('canvas');
+        readback.width = image.width; readback.height = image.height;
+        const ctx = readback.getContext('2d');
+        ctx.drawImage(image, 0, 0);
+        const surface = viewer.getSurface('left');
+        function pixel(tile, weights = [1/3, 1/3, 1/3]) {
+          const p = surface.mesh.position.clone().set(0, 0, 0);
+          for (let j = 0; j < 3; j++) {
+            const offset = (tile * 3 + j) * 3;
+            p.x += vertices[offset] * weights[j];
+            p.y += vertices[offset + 1] * weights[j];
+            p.z += vertices[offset + 2] * weights[j];
+          }
+          surface.mesh.localToWorld(p);
+          p.project(viewer.camera);
+          const x = Math.round((p.x + 1) / 2 * canvas.width);
+          const y = Math.round((1 - p.y) / 2 * canvas.height);
+          return Array.from(ctx.getImageData(x, y, 1, 1).data);
+        }
+        const target = handle.controlTarget;
+        target.setInspectionSelection({ kind: 'vertex', surfaceId: 'left', vertexIndex: 3 });
+        const snap = target.getSnapshot();
+        const map = snap.surfaces[0].layers.find(layer => layer.id === 'a');
+        return {
+          pixels: [pixel(0), pixel(1), pixel(2), pixel(3, [0.7, 0.15, 0.15]), pixel(3, [0.3, 0.35, 0.35])],
+          mapping: map.scalarMapping, inspection: snap.selection.inspection,
+          legend: viewer.getFigureColorbarSource(),
+          reference: snap.capabilities.referenceLayers.layers[0],
+          displayed: snap.capabilities.exclusiveMap.displayedLayerId,
+          order: viewer.getOrderedLayers('left').map(layer => layer.id)
+        };
+      };
+      window.fixtureReady = true;
+    }
+    start().catch(error => { window.fixtureErrors.push(String(error.stack || error)); throw error; });
+  </script>
+</body>
+</html>

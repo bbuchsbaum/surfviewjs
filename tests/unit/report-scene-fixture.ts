@@ -1,3 +1,4 @@
+import { ReferenceLayer } from '../../src/layers/ReferenceLayer';
 import { vi } from 'vitest';
 import * as THREE from 'three';
 import {
@@ -202,7 +203,7 @@ export function makeReportViewer(): NeuroSurfaceViewer {
   return viewer;
 }
 
-export function makeReportFixture(): ReportSceneFixture {
+export function makeReportFixture(withReference = false): ReportSceneFixture {
   const viewer = makeReportViewer();
   const manifest = reportManifestFixture();
   const left = new MultiLayerNeuroSurface(geometry('left'));
@@ -239,6 +240,17 @@ export function makeReportFixture(): ReportSceneFixture {
   ));
   viewer.addSurface(left, 'lh');
   viewer.addSurface(right, 'rh');
+  if (withReference) {
+    manifest.schemaVersion = 'surfview.scene.v2';
+    manifest.layers.reference = {
+      id: 'reference', role: 'reference', label: 'Synthetic region', color: '#ff0000', boundary: 'midpoint',
+      values: { lh: { values: 'mask' }, rh: { values: 'mask' } },
+      visible: true, opacity: 0.2, provenance: { atlas: 'synthetic' }
+    };
+    for (const surface of [left, right]) {
+      surface.addLayer(new ReferenceLayer('reference', [1, 0, 1, 0], '#ff0000', { opacity: 0.2 }));
+    }
+  }
   const group = {
     id: 'cortex',
     leftSurfaceId: 'lh',

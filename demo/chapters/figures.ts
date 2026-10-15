@@ -1,5 +1,5 @@
 import {
-  SURFVIEW_SCENE_SCHEMA,
+  SURFVIEW_SCENE_SCHEMA_V2,
   createSceneAsset,
   getStylePreset,
   listStylePresets,
@@ -18,7 +18,7 @@ import type {
   SurfViewStylePresetName
 } from '@src/index.js';
 import excerpt from '../excerpts/figures.ts?raw';
-import { action, actions, choice, fmt, note, readout, section, select, toggle } from '../kit/controls';
+import { action, actions, choice, fmt, note, readout, section, select, slider, toggle } from '../kit/controls';
 import { FOCI, addFields, blobField, curvatureOf, loadBilateral, mirror, smoothNoise } from '../kit/data';
 import { FILM_BASE, createFilmViewer } from '../kit/film';
 import { SYNTHETIC_CONTRAST_NOTE, addCortex, syntheticContrast } from '../kit/workflows-cortex';
@@ -65,7 +65,7 @@ function frontoparietal(vertices: Float32Array, side: Side): Float32Array {
   return addFields(signal, smoothNoise(vertices, side === 'left' ? 41 : 42, 0.8, 34));
 }
 
-/** Both fsaverage5 hemispheres and two synthetic maps as an inline `surfview.scene.v1` manifest. */
+/** Both fsaverage5 hemispheres and two synthetic maps and a binary reference as an inline `surfview.scene.v2` manifest. */
 async function buildReportManifest(): Promise<SurfViewSceneManifest> {
   const { left, right } = await loadBilateral();
   const assets: Record<string, SceneAssetDescriptor> = {};
@@ -76,6 +76,7 @@ async function buildReportManifest(): Promise<SurfViewSceneManifest> {
   };
   const geometries: SurfViewSceneManifest['geometries'] = {};
   const values: Record<ReportMap, Record<string, { values: string }>> = { contrast: {}, frontoparietal: {} };
+  const referenceValues: Record<string, { values: string }> = {};
   for (const [id, side, geometry, mesh] of [
     ['left', 'left', left, 'fsaverage5Left'],
     ['right', 'right', right, 'fsaverage5Right']
@@ -87,6 +88,11 @@ async function buildReportManifest(): Promise<SurfViewSceneManifest> {
       faces: await add(geometry.faces, 'faces', [faceCount, 3]),
       curvature: await add(curvatureOf(mesh, geometry), 'curvature', [vertexCount])
     };
+    const region = blobField(geometry.vertices, [{
+      center: side === 'left' ? FOCI.intraparietal : mirror(FOCI.intraparietal),
+      amplitude: 1, sigma: 18
+    }]);
+    referenceValues[id] = { values: await add(Float32Array.from(region, value => value > 0.4 ? 1 : 0), 'values', [vertexCount]) };
     values.contrast[id] = { values: await add(syntheticContrast(geometry.vertices, side), 'values', [vertexCount]) };
     values.frontoparietal[id] = { values: await add(frontoparietal(geometry.vertices, side), 'values', [vertexCount]) };
   }
@@ -96,14 +102,20 @@ async function buildReportManifest(): Promise<SurfViewSceneManifest> {
     provenance: { synthetic: true, generator: 'SurfView demo' }
   });
   return {
-    schemaVersion: SURFVIEW_SCENE_SCHEMA,
+    schemaVersion: SURFVIEW_SCENE_SCHEMA_V2,
     id: 'figures-report-scene',
     assets,
     geometries,
     layers: {
       // The colour key reads these labels; provenance records that both maps are synthetic.
       contrast: layer('contrast', REPORT_MAPS[0].label),
-      frontoparietal: layer('frontoparietal', REPORT_MAPS[1].label)
+      frontoparietal: layer('frontoparietal', REPORT_MAPS[1].label),
+      reference: {
+        id: 'reference', role: 'reference', label: 'Synthetic parietal region',
+        color: '#8c73b5', boundary: 'midpoint', values: referenceValues,
+        visible: true, opacity: 0.25,
+        provenance: { synthetic: true, generator: 'Binary spatial patch, not an atlas parcel' }
+      }
     },
     selectedLayer: 'contrast',
     provenance: { generator: 'SurfView demo, Figures chapter', meshes: 'fsaverage5 pial' }
@@ -166,7 +178,9 @@ export const figures: Scenario = {
       title: 'Synthetic contrast',
       brainView: 'oblique' as ReportBrainView,
       autoOblique: true,
-      reportMap: 'contrast' as ReportMap
+      reportMap: 'contrast' as ReportMap,
+      referenceVisible: true,
+      referenceOpacity: 0.25
     };
     let viewerCleanup: (() => void) | null = null;
     let viewer: NeuroSurfaceViewer | null = null;
@@ -235,6 +249,23 @@ export const figures: Scenario = {
         void showMode('report');
       }
     });
+
+    toggle(reportSection, {
+      id: 'figures-reference', label: 'Synthetic parietal reference', checked: state.referenceVisible,
+      onChange: visible => {
+        state.referenceVisible = visible;
+        report?.controlTarget?.setLayerVisibility({ surfaceId: 'left', layerId: 'reference' }, visible);
+      }
+    });
+    slider(reportSection, {
+      id: 'figures-reference-opacity', label: 'Reference opacity',
+      min: 0, max: 1, step: 0.05, value: state.referenceOpacity,
+      onInput: opacity => {
+        state.referenceOpacity = opacity;
+        report?.controlTarget?.setLayerOpacity({ surfaceId: 'left', layerId: 'reference' }, opacity);
+      }
+    });
+    note(reportSection, 'The purple binary patch is synthetic anatomy. It stays below either map and has its own visibility and opacity.');
 
     const exportSection = section(ctx.panel, 'Export');
     choice(exportSection, {
@@ -365,6 +396,8 @@ export const figures: Scenario = {
       });
       report.selectLayer(state.reportMap);
       await report.ready;
+      report.controlTarget?.setLayerVisibility({ surfaceId: 'left', layerId: 'reference' }, state.referenceVisible);
+      report.controlTarget?.setLayerOpacity({ surfaceId: 'left', layerId: 'reference' }, state.referenceOpacity);
       if (current !== revision) return;
       // Keep the live film base under the report preset; the export chooses its background.
       report.viewer?.setFigureBackground(FILM_BASE);
