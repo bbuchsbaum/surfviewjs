@@ -130,6 +130,8 @@ test('volume chapter colormap select recolours every projection method and mode'
   let before = await surfaceShot(page);
   await colormap.selectOption('viridis');
   expect((await surfaceShot(page)).equals(before)).toBe(false);
+  await colormap.selectOption('custom-signed');
+  expect((await surfaceShot(page)).equals(before)).toBe(false);
   await colormap.selectOption('coolwarm');
 
   // Volume layer: the GPU 3D-texture path (vertex mode with WebGL2) and the CPU paths.
@@ -142,6 +144,9 @@ test('volume chapter colormap select recolours every projection method and mode'
     before = await surfaceShot(page);
     await colormap.selectOption('viridis');
     expect((await surfaceShot(page)).equals(before), `${mode} mode recolours`).toBe(false);
+    before = await surfaceShot(page);
+    await colormap.selectOption('custom-signed');
+    expect((await surfaceShot(page)).equals(before), `${mode} mode accepts custom colors`).toBe(false);
   }
   expect(errors).toEqual([]);
 });

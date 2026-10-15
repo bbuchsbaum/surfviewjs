@@ -26,7 +26,11 @@ const VIEWS: ReadonlyArray<{ value: AnatomicalView; label: string }> = [
   { value: 'ventral', label: 'Ventral' }
 ];
 
+const CUSTOM_SIGNED = ['#163b9d', '#ffffff', '#b02125'];
+const palette = (name: string) => name === 'custom-signed' ? CUSTOM_SIGNED : name;
+
 const COLORMAPS = [
+  { value: 'custom-signed', label: 'Custom signed palette' },
   { value: 'coolwarm', label: 'Cool–warm (diverging)' },
   { value: 'seismic', label: 'Seismic (diverging)' },
   { value: 'RdBu', label: 'Red–blue' },
@@ -173,7 +177,7 @@ export const volume: Scenario = {
       const elapsed = performance.now() - start;
       if (projectedLayer) projectedLayer.setData(projected.values);
       else {
-        projectedLayer = new DataLayer('projected', projected.values, null, state.colormap, {
+        projectedLayer = new DataLayer('projected', projected.values, null, palette(state.colormap), {
           range: range(), threshold: threshold(),
           presentation: { label: 'Projected volume (synthetic)' }
         });
@@ -215,7 +219,7 @@ export const volume: Scenario = {
       if (volumeLayer) return volumeLayer;
       volumeLayer = new VolumeProjectionLayer('volume', vol.data, vol.dims, {
         affineMatrix: vol.voxelToWorld,
-        colormap: state.colormap,
+        colormap: palette(state.colormap),
         range: range(),
         threshold: threshold(),
         fillValue: -1e6, // no voxel holds this value, so nothing is masked as fill
@@ -352,7 +356,7 @@ export const volume: Scenario = {
     select(display, {
       id: 'volume-colormap', label: 'Colormap', options: COLORMAPS, value: 'coolwarm',
       print: { film, corner: 'tr', key: 'colormap', label: 'Colormap' },
-      onChange: next => { state.colormap = next; updateDisplay({ colorMap: next }); }
+      onChange: next => { state.colormap = next; updateDisplay({ colorMap: palette(next) }); }
     });
     slider(display, {
       id: 'volume-window', label: 'Colour window (±)', min: 1, max: 8, step: 0.5, value: state.window,

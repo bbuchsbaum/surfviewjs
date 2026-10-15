@@ -1,9 +1,13 @@
 import * as THREE from 'three';
-import ColorMap, { ColorArray } from '../ColorMap';
+import ColorMap, { ColorArray, Color } from '../ColorMap';
 
-export function createColormapTexture(name: string, size: number = 256): THREE.DataTexture {
+export function createColormapTexture(name: string | ColorMap | Color[], size: number = 256): THREE.DataTexture {
   let colors: ColorArray[];
-  try {
+  const custom = typeof name !== 'string';
+  if (custom) {
+    colors = (name instanceof ColorMap ? name : ColorMap.fromArray(name)).getColors();
+    size = colors.length;
+  } else try {
     colors = ColorMap.generatePreset(name, size);
   } catch (err) {
     const presets = ColorMap.getAvailableMaps();
@@ -29,8 +33,9 @@ export function createColormapTexture(name: string, size: number = 256): THREE.D
 
   const texture = new THREE.DataTexture(data, size, 1, THREE.RGBAFormat, THREE.UnsignedByteType);
   texture.needsUpdate = true;
-  texture.minFilter = THREE.LinearFilter;
-  texture.magFilter = THREE.LinearFilter;
+  texture.minFilter = custom ? THREE.NearestFilter : THREE.LinearFilter;
+  texture.magFilter = custom ? THREE.NearestFilter : THREE.LinearFilter;
+  texture.userData.surfviewDiscreteColors = custom ? size : 0;
   texture.wrapS = THREE.ClampToEdgeWrapping;
   texture.wrapT = THREE.ClampToEdgeWrapping;
   texture.generateMipmaps = false;

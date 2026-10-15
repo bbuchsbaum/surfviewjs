@@ -134,7 +134,7 @@
       threshold,
       fillValue
     }) {
-      const cmap = ColorMap.fromPreset(colormapName);
+      const cmap = colormapName instanceof ColorMap ? colormapName.clone() : Array.isArray(colormapName) ? ColorMap.fromArray(colormapName) : ColorMap.fromPreset(colormapName);
       cmap.setRange(range);
       cmap.setThreshold(threshold);
 
@@ -497,7 +497,8 @@
       projectionMode,
       ribbonSamples,
       ribbonReducer,
-      pixelTolerance
+      pixelTolerance,
+      colormap = 'viridis'
     }) {
       appendLog(`\n[case] ${name}`);
 
@@ -505,7 +506,6 @@
       const fillValue = -1;
       const range = [0, 500];
       const threshold = [0, 0];
-      const colormap = 'viridis';
       const meshTranslation = [0, 0, 0];
       const worldPositions = [];
       const pial = new Float32Array(width * height * 3);
@@ -718,6 +718,29 @@
           useHalfFloat: true,
           pixelTolerance: 0.06
         }
+      }));
+
+      for (const [name, colormap] of [
+        ['custom signed palette', ['#0000ff', '#ffffff', '#ff0000']],
+        ['long custom palette', Array.from({ length: 513 }, (_, i) => [i / 512, 0, 1 - i / 512])],
+        ['shared ColorMap', ColorMap.fromArray(['#0000ff', '#ffffff', '#ff0000'], { range: [-8, 8] })]
+      ]) {
+        results.cases.push(await runCase({
+          name, width: 4, height: 4, dims,
+          volumeToWorld: volumeToWorld3, meshTranslation: [0,0,0],
+          layerConfig: { ...common, colormap, threshold: [0,0], affineMatrix: volumeToWorld3,
+            range: [0,333], useHalfFloat: false, pixelTolerance: 0.015 }
+        }));
+      }
+      results.cases.push(await runShaderQualityCase({
+        name: 'custom fragment palette', renderer, width: 4, height: 4, dims,
+        projectionMode: 'fragment', ribbonSamples: 1, ribbonReducer: 'mean',
+        colormap: ['#0000ff', '#ffffff', '#ff0000'], pixelTolerance: 0.015
+      }));
+      results.cases.push(await runShaderQualityCase({
+        name: 'custom ribbon palette', renderer, width: 4, height: 4, dims: [4,4,5],
+        projectionMode: 'ribbon', ribbonSamples: 5, ribbonReducer: 'mean',
+        colormap: ['#0000ff', '#ffffff', '#ff0000'], pixelTolerance: 0.015
       }));
 
       results.cases.push(await runShaderQualityCase({

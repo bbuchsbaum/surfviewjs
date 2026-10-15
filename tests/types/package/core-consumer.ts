@@ -93,3 +93,13 @@ const normalProjection: ProjectVolumeResult = projectVolume(scalarVolume, {
   positions: new Float32Array([0, 0, 0]), normals: new Float32Array([1, 0, 0])
 }, { depthMm: [0, 1], steps: 5, interpolation: 'linear', reducer: 'max-abs' });
 void normalProjection;
+
+import { parseGIfTIScalars, projectRibbonVolume, VolumeProjectionLayer, ColorMap } from 'surfview';
+import type { RibbonProjectionSurface, ProjectRibbonVolumeOptions } from 'surfview';
+const anatomicalRibbon: RibbonProjectionSurface = { white:[0,0,0], pial:[0,0,2] };
+const ribbonOptions: ProjectRibbonVolumeOptions = { steps:7, interpolation:'nearest', reducer:'mean' };
+const ribbonProjection: ProjectVolumeResult = projectRibbonVolume(scalarVolume, anatomicalRibbon, ribbonOptions);
+const scalarGifti: Float32Array | Float32Array[] = parseGIfTIScalars('<GIFTI />', DOMParser);
+const customVolume = new VolumeProjectionLayer('custom-z', [1], [1,1,1], { colormap:['#0000ff','#ff0000'] });
+customVolume.update({ colorMap: ColorMap.fromArray([[0,0,1],[1,0,0]]) });
+void ribbonProjection; void scalarGifti;

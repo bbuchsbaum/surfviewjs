@@ -123,9 +123,9 @@ export interface TemporalLayerFactoryConfig extends BuiltInLayerConfigBase<'temp
 export interface VolumeLayerFactoryConfig extends BuiltInLayerConfigBase<'volume'> {
   volumeData: Float32Array | number[];
   dims: [number, number, number];
-  colormap?: string;
+  colormap?: ColorMap | string | Color[];
   /** @deprecated Use `colormap`. */
-  cmap?: string;
+  cmap?: ColorMap | string | Color[];
   range?: [number, number];
   threshold?: [number, number];
   worldToIJK?: THREE.Matrix4 | ArrayLike<number>;

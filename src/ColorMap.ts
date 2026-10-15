@@ -188,6 +188,18 @@ export class ColorMap extends EventEmitter<ColorMapEventMap> {
     return this.alpha;
   }
 
+  /** Independent copy, including range, threshold and global alpha. */
+  clone(): ColorMap {
+    return new ColorMap(this.colors, { range: this.getRange(), threshold: this.getThreshold(), alpha: this.alpha });
+  }
+
+  /** Copy the palette in display sRGB, including global alpha but no threshold mask. */
+  getColors(): ColorArray[] {
+    return this.colors.map(color => this._hasAlpha && color.length === 4
+      ? [color[0], color[1], color[2], color[3] * this.alpha]
+      : [...color]);
+  }
+
   // Generate colormap using the colormap library
   static generatePreset(name: string, nshades: number = 256): ColorArray[] {
     finiteNumber(nshades, 'nshades', { minimum: 2, maximum: 65_536, integer: true });

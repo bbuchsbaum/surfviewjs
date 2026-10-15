@@ -92,6 +92,7 @@ export class VolumeProjectionMaterial extends THREE.ShaderMaterial {
         uVolumeDims: { value: volumeTexture.dims.clone() },
         uFillValue: { value: normalizedFillValue },
         uColormapSampler: { value: colormapTexture },
+        uDiscreteColors: { value: Number(colormapTexture.userData.surfviewDiscreteColors ?? 0) },
         uIntensityRange: { value: new THREE.Vector2(...normalizedIntensityRange) },
         uThreshold: { value: new THREE.Vector2(...normalizedThreshold) },
         uOverlayOpacity: { value: normalizedOpacity },
@@ -130,6 +131,7 @@ export class VolumeProjectionMaterial extends THREE.ShaderMaterial {
 
   set colormap(texture: THREE.Texture) {
     requireUniform<THREE.Texture>(this.uniforms, 'uColormapSampler').value = texture;
+    requireUniform<number>(this.uniforms, 'uDiscreteColors').value = Number(texture.userData.surfviewDiscreteColors ?? 0);
   }
 
   setVolumeTexture(volumeTexture: VolumeTexture3D): void {

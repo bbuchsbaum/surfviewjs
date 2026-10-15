@@ -56,15 +56,8 @@ export function projectVolume(
   surface: ProjectionSurface,
   options: ProjectVolumeOptions
 ): ProjectVolumeResult {
+  validateVolumeDescriptor(volume);
   const { dims, data, mask } = volume;
-  if (dims.length !== 3 || !dims.every(n => Number.isSafeInteger(n) && n > 0)) {
-    throw new RangeError('dims must contain three positive safe integers');
-  }
-  const length = dims[0] * dims[1] * dims[2];
-  if (!Number.isSafeInteger(length) || data.length !== length) {
-    throw new RangeError('data length must equal dims[0] * dims[1] * dims[2]');
-  }
-  if (mask && mask.length !== length) throw new RangeError('mask length must match data length');
   const { positions, normals } = surface;
   if (!Number.isSafeInteger(positions.length) || positions.length % 3 !== 0 || normals.length !== positions.length) {
     throw new RangeError('positions and normals must contain matching packed xyz triplets');
@@ -124,4 +117,77 @@ export function projectVolume(
     if (result.count > 0 && !Number.isFinite(values[v])) throw new RangeError(`Vertex ${v}: projection exceeds finite Float32 range`);
   }
   return { values, validSamples };
+}
+
+/** Paired anatomical world positions, before inflation or viewer layout. */
+export interface RibbonProjectionSurface {
+  readonly white: ArrayLike<number>;
+  readonly pial: ArrayLike<number>;
+}
+
+export type ProjectRibbonVolumeOptions = Pick<ProjectVolumeOptions, 'steps' | 'interpolation' | 'reducer'>;
+
+/**
+ * Sample each vertex's own white→pial segment without Three.js or WebGL.
+ * Endpoints are included; one step samples the midpoint. Zero-length segments
+ * sample their shared endpoint. Mask, interpolation, reducers and missing-value
+ * semantics match projectVolume; segment directions are never normalized.
+ * Returns NaN/count=0 for an entirely invalid segment. Inputs are borrowed and
+ * not mutated. Complexity is O(vertices × steps), with one affine inverse.
+ */
+export function projectRibbonVolume(
+  volume: VolumeDescriptor,
+  surface: RibbonProjectionSurface,
+  options: ProjectRibbonVolumeOptions = {}
+): ProjectVolumeResult {
+  validateVolumeDescriptor(volume);
+  const { white, pial } = surface;
+  if (!Number.isSafeInteger(white.length) || white.length % 3 !== 0 || pial.length !== white.length) {
+    throw new RangeError('white and pial must contain matching packed xyz triplets');
+  }
+  const steps = options.steps ?? 5;
+  if (!Number.isInteger(steps) || steps < 1 || steps > 256) throw new RangeError('steps must be an integer from 1 to 256');
+  const interpolation = options.interpolation ?? 'linear';
+  if (interpolation !== 'linear' && interpolation !== 'nearest') throw new RangeError('Unknown interpolation');
+  const reducer = options.reducer ?? 'mean';
+  if (reducer !== 'mean' && reducer !== 'max-abs') throw new RangeError('Unknown ribbon projection reducer');
+  const affine = volume.voxelToWorld;
+  const m = invertVoxelToWorld('elements' in affine ? affine.elements : affine);
+  const parameters = Float64Array.from({ length: steps }, (_, s) => steps === 1 ? 0.5 : s / (steps - 1));
+  const project = createLineProjector(
+    createVoxelSampler(volume.data, volume.dims, interpolation, 'strict', volume.mask), parameters, reducer
+  );
+  const values = new Float32Array(white.length / 3);
+  const validSamples = new Uint32Array(values.length);
+  for (let v = 0; v < values.length; v++) {
+    const i = v * 3;
+    const x = white[i]!, y = white[i + 1]!, z = white[i + 2]!;
+    const px = pial[i]!, py = pial[i + 1]!, pz = pial[i + 2]!;
+    if (![x, y, z, px, py, pz].every(Number.isFinite)) throw new RangeError(`Vertex ${v}: white and pial must be finite`);
+    const ox = m[0]! * x + m[4]! * y + m[8]! * z + m[12]!;
+    const oy = m[1]! * x + m[5]! * y + m[9]! * z + m[13]!;
+    const oz = m[2]! * x + m[6]! * y + m[10]! * z + m[14]!;
+    const ex = m[0]! * px + m[4]! * py + m[8]! * pz + m[12]!;
+    const ey = m[1]! * px + m[5]! * py + m[9]! * pz + m[13]!;
+    const ez = m[2]! * px + m[6]! * py + m[10]! * pz + m[14]!;
+    const dx = ex - ox, dy = ey - oy, dz = ez - oz;
+    if (![ox, oy, oz, ex, ey, ez, dx, dy, dz].every(Number.isFinite)) throw new RangeError(`Vertex ${v}: transformed coordinates overflow`);
+    const result = project(ox, oy, oz, dx, dy, dz);
+    values[v] = result.value;
+    validSamples[v] = result.count;
+    if (result.count > 0 && !Number.isFinite(values[v])) throw new RangeError(`Vertex ${v}: projection exceeds finite Float32 range`);
+  }
+  return { values, validSamples };
+}
+
+function validateVolumeDescriptor(volume: VolumeDescriptor): void {
+  const { dims, data, mask } = volume;
+  if (dims.length !== 3 || !dims.every(n => Number.isSafeInteger(n) && n > 0)) {
+    throw new RangeError('dims must contain three positive safe integers');
+  }
+  const length = dims[0] * dims[1] * dims[2];
+  if (!Number.isSafeInteger(length) || data.length !== length) {
+    throw new RangeError('data length must equal dims[0] * dims[1] * dims[2]');
+  }
+  if (mask && mask.length !== length) throw new RangeError('mask length must match data length');
 }

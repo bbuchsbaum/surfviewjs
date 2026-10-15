@@ -22,7 +22,7 @@ import { ReferenceLayer } from './layers/ReferenceLayer';
 import { CurvatureLayer } from './layers/CurvatureLayer';
 import { ClipPlaneSet, ClipPlane, ClipAxis } from './utils/ClipPlane';
 import { debugLog, isDebugEnabled } from './debug';
-import ColorMap from './ColorMap';
+import ColorMap, { type Color } from './ColorMap';
 import { GPULayerCompositor } from './GPULayerCompositor';
 import { compositeStraightRGBABuffer, SURFACE_ALPHA_DISCARD_THRESHOLD } from './utils/rgbaCompositing';
 import {
@@ -120,8 +120,8 @@ export interface LayerUpdate {
   indices?: Uint32Array;
   range?: [number, number];
   threshold?: [number, number];
-  colormap?: ColorMap | string;
-  colorMap?: ColorMap | string; // Allow both spellings
+  colormap?: ColorMap | string | Color[];
+  colorMap?: ColorMap | string | Color[]; // Allow both spellings
   cmap?: string;
   color?: THREE.ColorRepresentation;
   opacity?: number;
@@ -982,9 +982,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
             break;
           case 'volume':
             if (props.volumeData && props.dims) {
-              const colormapName = typeof props.colormap === 'string'
-                ? props.colormap
-                : (props.cmap ?? 'viridis');
+              const colormapName = props.colormap ?? props.colorMap ?? props.cmap ?? 'viridis';
               layer = new VolumeProjectionLayer(
                 id,
                 props.volumeData,

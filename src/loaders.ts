@@ -295,35 +295,7 @@ export function parseFreeSurferSurface(buffer: ArrayBuffer): ParsedSurfaceData {
  */
 export function parseGIfTISurface(xmlString: string, domParser?: typeof DOMParser): ParsedSurfaceData {
   const format = 'gifti' as const;
-  if (!xmlString || xmlString.length < 20) {
-    throw loadError('truncated-data', 'parse', 'GIFTI XML is empty or too small', format);
-  }
-  if (xmlString.length > MAX_SURFACE_BYTES) {
-    throw loadError('too-large', 'parse', 'GIFTI XML exceeds the 500 MiB safety limit', format);
-  }
-
-  const DOMParserImpl = domParser || (typeof DOMParser !== 'undefined' ? DOMParser : null);
-  if (!DOMParserImpl) {
-    throw loadError(
-      'dom-parser-unavailable',
-      'parse',
-      'GIFTI parsing requires a DOMParser constructor in Node/SSR.',
-      format
-    );
-  }
-
-  let doc: Document;
-  try {
-    doc = new DOMParserImpl().parseFromString(xmlString, 'application/xml');
-  } catch (error) {
-    throw loadError('invalid-data', 'parse', 'GIFTI XML parsing failed', format, error);
-  }
-  if (doc.querySelector('parsererror')) {
-    throw loadError('invalid-data', 'parse', 'GIFTI XML contains a parse error', format);
-  }
-  if (doc.documentElement?.localName.toUpperCase() !== 'GIFTI') {
-    throw loadError('invalid-magic', 'parse', 'GIFTI XML root element must be GIFTI', format);
-  }
+  const doc = parseGIfTIDocument(xmlString, domParser);
 
   let vertices: Float32Array | null = null;
   let faces: Uint32Array | null = null;
@@ -367,7 +339,88 @@ export function parseGIfTISurface(xmlString: string, domParser?: typeof DOMParse
   };
 }
 
-type GIfTIArrayKind = 'vertices' | 'faces';
+type GIfTIArrayKind = 'vertices' | 'faces' | 'scalars';
+
+/**
+ * Parse per-vertex scalar GIFTI data. Returns one vector, or vectors in DataArray
+ * order (then column order for N×T arrays). Supports ASCII, Base64 and bounded
+ * gzip/zlib payloads, both endians and row/column-major scalar matrices.
+ * Geometry/vector/label intents are rejected; all maps must share vertex count.
+ * NaN denotes missing scalar data; infinities and Float32 overflow are rejected.
+ */
+export function parseGIfTIScalars(xmlString: string, domParser?: typeof DOMParser): Float32Array | Float32Array[] {
+  const doc = parseGIfTIDocument(xmlString, domParser);
+  const arrays = doc.getElementsByTagName('DataArray');
+  if (!arrays.length) throw loadError('invalid-data', 'validate', 'GIFTI contains no scalar arrays', 'gifti');
+  const declared = doc.documentElement.getAttribute('NumberOfDataArrays');
+  if (declared !== null && parseStrictIntegerAttribute(doc.documentElement, 'NumberOfDataArrays') !== arrays.length) {
+    throw loadError('invalid-count', 'validate', 'GIFTI NumberOfDataArrays does not match its arrays', 'gifti');
+  }
+  const maps: Float32Array[] = [];
+  let vertexCount: number | null = null;
+  let decodedBytes = 0;
+  for (const array of Array.from(arrays)) {
+    const intent = array.getAttribute('Intent') ?? '';
+    // Scalar statistical intents (2..24), NONE, ESTIMATE, TIME_SERIES and
+    // SHAPE. Do not silently interpret geometry, labels or vectors as scalars.
+    const scalarIntent = /^(?:NIFTI_INTENT_(?:NONE|SHAPE|TIME_SERIES|ESTIMATE|CORREL|TTEST|FTEST|ZSCORE|CHISQ|BETA|BINOM|GAMMA|POISSON|NORMAL|FTEST_NONC|CHISQ_NONC|LOGISTIC|LAPLACE|UNIFORM|TTEST_NONC|WEIBULL|CHI|INVGAUSS|EXTVAL|PVAL|LOGPVAL|LOG10PVAL)|0|1001|2001|2005)$/.test(intent) ||
+      /^(?:[2-9]|1[0-9]|2[0-4])$/.test(intent);
+    if (!scalarIntent) throw loadError('invalid-data', 'validate', `Unsupported scalar GIFTI Intent ${intent || '(missing)'}`, 'gifti');
+    const rows = parseStrictIntegerAttribute(array, 'Dim0');
+    const dims = parseStrictIntegerAttribute(array, 'Dimensionality');
+    const columns = dims === 1 ? 1 : parseStrictIntegerAttribute(array, 'Dim1');
+    // Bound aggregate retained data, not just each decompressed DataArray.
+    decodedBytes += checkedElementBytes(rows * columns, 4, 'gifti');
+    if (decodedBytes > MAX_SURFACE_BYTES) throw loadError('too-large', 'validate', 'GIFTI scalar arrays exceed the 500 MiB safety limit', 'gifti');
+    if (maps.length + columns > 65_536) throw loadError('too-large', 'validate', 'GIFTI exceeds the 65536 scalar-map safety limit', 'gifti');
+    const data = parseGIfTIDataArray(array, 'scalars');
+    if (vertexCount !== null && rows !== vertexCount) throw loadError('invalid-dimensions', 'validate', 'GIFTI scalar arrays must share a vertex count', 'gifti');
+    vertexCount = rows;
+    if (columns === 1) { maps.push(data); continue; }
+    const columnMajor = array.getAttribute('ArrayIndexingOrder') === 'ColumnMajorOrder';
+    for (let column = 0; column < columns; column++) {
+      const values = new Float32Array(rows);
+      for (let row = 0; row < rows; row++) values[row] = data[columnMajor ? column * rows + row : row * columns + column]!;
+      maps.push(values);
+    }
+  }
+  return maps.length === 1 ? maps[0]! : maps;
+}
+
+function parseGIfTIDocument(xmlString: string, domParser?: typeof DOMParser): Document {
+  const format = 'gifti' as const;
+  if (!xmlString || xmlString.length < 20) {
+    throw loadError('truncated-data', 'parse', 'GIFTI XML is empty or too small', format);
+  }
+  if (xmlString.length > MAX_SURFACE_BYTES) {
+    throw loadError('too-large', 'parse', 'GIFTI XML exceeds the 500 MiB safety limit', format);
+  }
+
+  const DOMParserImpl = domParser || (typeof DOMParser !== 'undefined' ? DOMParser : null);
+  if (!DOMParserImpl) {
+    throw loadError(
+      'dom-parser-unavailable',
+      'parse',
+      'GIFTI parsing requires a DOMParser constructor in Node/SSR.',
+      format
+    );
+  }
+
+  let doc: Document;
+  try {
+    doc = new DOMParserImpl().parseFromString(xmlString, 'application/xml');
+  } catch (error) {
+    throw loadError('invalid-data', 'parse', 'GIFTI XML parsing failed', format, error);
+  }
+  if (doc.querySelector('parsererror')) {
+    throw loadError('invalid-data', 'parse', 'GIFTI XML contains a parse error', format);
+  }
+  if (doc.documentElement?.localName.toUpperCase() !== 'GIFTI') {
+    throw loadError('invalid-magic', 'parse', 'GIFTI XML root element must be GIFTI', format);
+  }
+
+  return doc;
+}
 
 function parseGIfTIDataArray(
   dataArray: Element,
@@ -377,6 +430,7 @@ function parseGIfTIDataArray(
   dataArray: Element,
   kind: 'faces'
 ): Uint32Array;
+function parseGIfTIDataArray(dataArray: Element, kind: 'scalars'): Float32Array;
 function parseGIfTIDataArray(
   dataArray: Element,
   kind: GIfTIArrayKind
@@ -386,7 +440,7 @@ function parseGIfTIDataArray(
   const encoding = dataArray.getAttribute('Encoding') ?? '';
   const endian = dataArray.getAttribute('Endian') || 'LittleEndian';
   const order = dataArray.getAttribute('ArrayIndexingOrder') || 'RowMajorOrder';
-  if (order !== 'RowMajorOrder') {
+  if (order !== 'RowMajorOrder' && !(kind === 'scalars' && order === 'ColumnMajorOrder')) {
     throw loadError(
       'invalid-dimensions',
       'validate',
@@ -405,13 +459,16 @@ function parseGIfTIDataArray(
 
   const dimensionality = parseStrictIntegerAttribute(dataArray, 'Dimensionality');
   const rowCount = parseStrictIntegerAttribute(dataArray, 'Dim0');
-  const columnCount = parseStrictIntegerAttribute(dataArray, 'Dim1');
-  const maximumRows = kind === 'vertices' ? MAX_SURFACE_VERTICES : MAX_SURFACE_FACES;
-  if (dimensionality !== 2 || rowCount <= 0 || rowCount > maximumRows || columnCount !== 3) {
+  const columnCount = kind === 'scalars' && dimensionality === 1 ? 1 : parseStrictIntegerAttribute(dataArray, 'Dim1');
+  const maximumRows = kind === 'faces' ? MAX_SURFACE_FACES : MAX_SURFACE_VERTICES;
+  const validShape = kind === 'scalars'
+    ? (dimensionality === 1 || dimensionality === 2) && Number.isSafeInteger(columnCount) && columnCount > 0
+    : dimensionality === 2 && columnCount === 3;
+  if (!validShape || !Number.isSafeInteger(rowCount) || rowCount <= 0 || rowCount > maximumRows) {
     throw loadError(
       'invalid-dimensions',
       'validate',
-      `GIFTI ${kind} dimensions must be N x 3 with N in [1, ${maximumRows}] ` +
+      `GIFTI ${kind} dimensions must be ${kind === 'scalars' ? 'N or N x T' : 'N x 3'} with N in [1, ${maximumRows}] ` +
       `(received dimensionality=${dimensionality}, Dim0=${rowCount}, Dim1=${columnCount})`,
       format
     );
@@ -473,7 +530,7 @@ function giftiBytesPerElement(dataType: string, kind: GIfTIArrayKind): number {
     ['NIFTI_TYPE_INT32', 4],
     ['NIFTI_TYPE_UINT32', 4]
   ]);
-  const bytes = (kind === 'vertices' ? floatTypes : integerTypes).get(dataType);
+  const bytes = (kind === 'vertices' ? floatTypes : kind === 'scalars' ? new Map([...floatTypes, ...integerTypes]) : integerTypes).get(dataType);
   if (bytes === undefined) {
     throw loadError(
       'unsupported-data-type',
@@ -500,15 +557,15 @@ function parseGIfTIASCII(
       'gifti'
     );
   }
-  const output = kind === 'vertices'
+  const output = kind !== 'faces'
     ? new Float32Array(elementCount)
     : new Uint32Array(elementCount);
-  const numericPattern = kind === 'vertices'
+  const numericPattern = kind !== 'faces'
     ? /^[+-]?(?:(?:\d+(?:\.\d*)?)|(?:\.\d+))(?:[eE][+-]?\d+)?$/
     : /^[+-]?\d+$/;
   for (let index = 0; index < tokens.length; index += 1) {
     const token = tokens[index];
-    if (token === undefined || !numericPattern.test(token)) {
+    if (token === undefined || (!numericPattern.test(token) && !(kind === 'scalars' && /^(?:nan|[+-]?inf(?:inity)?)$/i.test(token)))) {
       throw loadError(
         'invalid-data',
         'validate',
@@ -516,10 +573,10 @@ function parseGIfTIASCII(
         'gifti'
       );
     }
-    const value = Number(token);
+    const value = kind === 'scalars' && /^nan$/i.test(token) ? NaN : Number(token);
     validateGIfTINumericValue(value, dataType, kind, index);
     output[index] = value;
-    if (!Number.isFinite(output[index])) {
+    if (!Number.isFinite(output[index]) && !(kind === 'scalars' && Number.isNaN(value))) {
       throw loadError(
         'invalid-data',
         'validate',
@@ -539,7 +596,7 @@ function decodeGIfTINumericArray(
   elementCount: number
 ): Float32Array | Uint32Array {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const output = kind === 'vertices'
+  const output = kind !== 'faces'
     ? new Float32Array(elementCount)
     : new Uint32Array(elementCount);
   const width = giftiBytesPerElement(dataType, kind);
@@ -560,7 +617,7 @@ function decodeGIfTINumericArray(
     }
     validateGIfTINumericValue(value, dataType, kind, index);
     output[index] = value;
-    if (!Number.isFinite(output[index])) {
+    if (!Number.isFinite(output[index]) && !(kind === 'scalars' && Number.isNaN(value))) {
       throw loadError(
         'invalid-data',
         'validate',
@@ -572,12 +629,19 @@ function decodeGIfTINumericArray(
   return output;
 }
 
+const GIFTI_INTEGER_BOUNDS: Record<string, readonly [number, number]> = {
+  NIFTI_TYPE_INT8: [-128, 127], NIFTI_TYPE_UINT8: [0, 255],
+  NIFTI_TYPE_INT16: [-32768, 32767], NIFTI_TYPE_UINT16: [0, 65535],
+  NIFTI_TYPE_INT32: [-2147483648, 2147483647], NIFTI_TYPE_UINT32: [0, 4294967295]
+};
+
 function validateGIfTINumericValue(
   value: number,
   dataType: string,
   kind: GIfTIArrayKind,
   index: number
 ): void {
+  if (kind === 'scalars' && Number.isNaN(value) && /^NIFTI_TYPE_FLOAT/.test(dataType)) return;
   if (!Number.isFinite(value)) {
     throw loadError(
       'invalid-data',
@@ -585,6 +649,12 @@ function validateGIfTINumericValue(
       `GIFTI ${kind} value at index ${index} must be finite`,
       'gifti'
     );
+  }
+  if (kind === 'scalars' && !dataType.startsWith('NIFTI_TYPE_FLOAT')) {
+    const bounds = GIFTI_INTEGER_BOUNDS[dataType];
+    if (!bounds || !Number.isInteger(value) || value < bounds[0] || value > bounds[1]) {
+      throw loadError('invalid-data', 'validate', `GIFTI scalar ${index} is outside ${dataType} range`, 'gifti');
+    }
   }
   if (kind === 'faces' && (!Number.isInteger(value) || value < 0 || value > 0xffffffff)) {
     throw loadError(

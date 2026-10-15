@@ -198,6 +198,8 @@ export class GPULayerCompositor {
       uniform sampler3D volume7;
 
       uniform sampler2DArray volumeColormaps;
+      uniform float volumeColormapWidth;
+      uniform float volumeDiscreteColors[8];
 
       uniform mat4 volumeWorldToIJK[8];
       uniform vec3 volumeDims[8];
@@ -232,7 +234,11 @@ export class GPULayerCompositor {
       }
 
       vec4 sampleVolumeColormap(int layerIndex, float t) {
-        return texture(volumeColormaps, vec3(t, 0.5, float(layerIndex)));
+        float count = volumeDiscreteColors[layerIndex];
+        float u = count > 0.0
+          ? (floor(t * (count - 1.0)) + 0.5) / volumeColormapWidth
+          : t * 256.0 / volumeColormapWidth;
+        return texture(volumeColormaps, vec3(u, 0.5, float(layerIndex)));
       }
 
       bool inBounds(vec3 uvw) {
@@ -359,6 +365,8 @@ export class GPULayerCompositor {
       volumeThreshold: { value: Array.from({ length: 8 }, () => new THREE.Vector2(0, 0)) },
       volumeFillValue: { value: new Float32Array(8).fill(0.0) },
       volumeColormaps: { value: this.volumeColormapsTexture },
+      volumeColormapWidth: { value: 256 },
+      volumeDiscreteColors: { value: new Float32Array(8) },
       // Clip plane uniforms
     };
 
@@ -390,6 +398,9 @@ export class GPULayerCompositor {
     // supplies its own settings through setMaterialResponse().
     this.setMaterialResponse({ color: 0xffffff, specular: 0x111111, shininess: 30 });
     this.material.onBeforeRender = (renderer: THREE.WebGLRenderer) => {
+      if (renderer.capabilities?.maxTextureSize && this.volumeColormapsTexture.image.width > renderer.capabilities.maxTextureSize) {
+        throw new RangeError('Volume colormap exceeds renderer maxTextureSize');
+      }
       for (const volume of this.volumeSlots) volume?.prepareForRenderer(renderer);
     };
   }
@@ -468,6 +479,20 @@ export class GPULayerCompositor {
 
     // Update layer count
     const uniforms = this.material.uniforms;
+    const requiredWidth = Math.max(256, ...visibleLayers.slice(0, layerCount).map(layer =>
+      layer instanceof VolumeProjectionLayer ? layer.getColormapTexture().image.width : 0));
+    const palettesResized = requiredWidth > this.volumeColormapsTexture.image.width;
+    if (palettesResized) {
+      const previous = this.volumeColormapsTexture;
+      this.volumeColormapsTexture = new THREE.DataArrayTexture(new Uint8Array(requiredWidth * 4 * this.maxLayers), requiredWidth, 1, this.maxLayers);
+      this.volumeColormapsTexture.minFilter = THREE.LinearFilter;
+      this.volumeColormapsTexture.magFilter = THREE.LinearFilter;
+      this.volumeColormapsTexture.generateMipmaps = false;
+      this.volumeColormapsTexture.needsUpdate = true;
+      requireUniform<THREE.DataArrayTexture>(uniforms, 'volumeColormaps').value = this.volumeColormapsTexture;
+      requireUniform<number>(uniforms, 'volumeColormapWidth').value = requiredWidth;
+      previous.dispose();
+    }
     requireUniform<number>(uniforms, 'layerCount').value = layerCount;
     const layerOpacity = requireUniform<Float32Array>(uniforms, 'layerOpacity').value;
     const layerBlendMode = requireUniform<Int32Array>(uniforms, 'layerBlendMode').value;
@@ -482,7 +507,7 @@ export class GPULayerCompositor {
       // `layerCount` is capped by both `visibleLayers.length` and `maxLayers`.
       const layer = visibleLayers[i]!;
       const previousLayer = this.layerSlots[i];
-      const contentChanged = previousLayer !== layer || layer.needsUpdate;
+      const contentChanged = previousLayer !== layer || layer.needsUpdate || palettesResized;
       
       // Update layer properties
       layerOpacity[i] = layer.opacity;
@@ -493,7 +518,7 @@ export class GPULayerCompositor {
         if (contentChanged) {
           this.updateVolumeLayerUniforms(i, layer);
           regeneratedLayerSlices += 1;
-          textureBytesMarkedForUpload += 256 * 4 * Uint8Array.BYTES_PER_ELEMENT;
+          textureBytesMarkedForUpload += this.volumeColormapsTexture.image.width * 4 * Uint8Array.BYTES_PER_ELEMENT;
         }
       } else {
         layerKind[i] = 0;
@@ -572,6 +597,8 @@ export class GPULayerCompositor {
     requireUniform<THREE.Data3DTexture | null>(uniforms, `volume${textureIndex}`).value = volume.texture;
     this.volumeSlots[textureIndex] = volume;
     this.updateVolumeColormapSlice(textureIndex, layer.getColormapTexture());
+    requireUniform<Float32Array>(uniforms, 'volumeDiscreteColors').value[textureIndex] =
+      Number(layer.getColormapTexture().userData.surfviewDiscreteColors ?? 0);
 
     const worldToIJK = requireUniform<THREE.Matrix4[]>(uniforms, 'volumeWorldToIJK').value;
     const volumeDims = requireUniform<THREE.Vector3[]>(uniforms, 'volumeDims').value;
@@ -612,15 +639,10 @@ export class GPULayerCompositor {
     const sliceSize = cmapImage.width * cmapImage.height * 4;
     const offset = textureIndex * sliceSize;
 
-    if (src.length === sliceSize) {
-      dst.set(src, offset);
-    } else {
-      // Best-effort copy for unexpected sizes.
-      const n = Math.min(src.length, sliceSize);
-      // The source and destination spans are bounded by `n` and `sliceSize`.
-      for (let i = 0; i < n; i++) dst[offset + i] = src[i]!;
-      for (let i = n; i < sliceSize; i++) dst[offset + i] = 0;
-    }
+    dst.set(src, offset);
+    // Extend the last texel through padding so named palettes retain their
+    // clamped right edge when a longer custom palette expands the array.
+    for (let i = src.length; i < sliceSize; i++) dst[offset + i] = src[src.length - 4 + i % 4]!;
 
     this.volumeColormapsTexture.addLayerUpdate(textureIndex);
     this.volumeColormapsTexture.needsUpdate = true;

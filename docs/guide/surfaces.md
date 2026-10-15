@@ -189,6 +189,45 @@ detected `format` when known. `loadSurface()` creates no viewer state, so a
 rejection cannot leave a half-registered surface; construct and add the surface
 only after successful resolution.
 
+### Per-vertex scalar GIFTI files
+
+`parseGIfTIScalars(xml, domParser?)` reads `.shape.gii` underlays and `.func.gii`
+scalar maps independently of geometry:
+
+```javascript
+import { parseGIfTIScalars, CurvatureLayer } from 'surfview';
+
+const xml = `<GIFTI Version="1.0" NumberOfDataArrays="1">
+  <DataArray Intent="NIFTI_INTENT_SHAPE" DataType="NIFTI_TYPE_FLOAT32"
+    ArrayIndexingOrder="RowMajorOrder" Dimensionality="1" Dim0="3"
+    Encoding="ASCII" Endian="LittleEndian"><Data>-1 0 1</Data></DataArray>
+</GIFTI>`;
+const parsed = parseGIfTIScalars(xml);
+const values = parsed instanceof Float32Array ? parsed : parsed[0];
+if (!values) throw new Error('The file contains no scalar maps');
+const underlay = new CurvatureLayer('sulc', values);
+// Attach only to geometry with the same vertex count and order.
+```
+
+One scalar map returns a `Float32Array`; multiple maps return a
+`Float32Array[]` in DataArray order. An `N × T` matrix is split into T
+per-vertex vectors, honoring row-major or column-major storage. All arrays must
+share vertex count. The parser accepts SHAPE, NONE, TIME_SERIES, ESTIMATE and
+scalar statistical intents, including their numeric forms; geometry, vector
+and categorical label intents fail explicitly. Use a separate geometry loader
+for the matching surface. File names alone do not establish vertex alignment.
+
+Supported encodings are ASCII, Base64Binary and GZipBase64Binary, including the
+existing zlib-framed compatibility fallback. Both endians, Float32/Float64 and
+8/16/32-bit integer scalar types are decoded to Float32. Floating-point `NaN`
+is preserved as missing data; infinity, Float32 overflow, out-of-range integer
+tokens, invalid dimensions, inconsistent lengths and corrupt compressed
+payloads produce `SurfaceLoadError`. Scalar XML, individual decoded payloads
+and aggregate retained Float32 data are bounded at 500 MiB; vertex count is
+bounded at 10,000,000 and map count at 65,536. ExternalFileBinary is unsupported.
+Node/SSR callers pass a DOMParser constructor as the second argument, just as
+with `parseGIfTISurface`. Fetching and cancellation remain caller-owned.
+
 ### From Custom Data
 
 ```javascript

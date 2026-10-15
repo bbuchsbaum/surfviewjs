@@ -133,8 +133,8 @@ export interface VolumeProjectionLayerConfig extends DataLayerConfig {
   voxelSize?: [number, number, number];
   /** Simple voxel-to-world fallback when no affine is provided. */
   volumeOrigin?: [number, number, number];
-  /** Colormap preset name (GPU path uses a 256x1 colormap texture). */
-  colormap?: string;
+  /** Preset name, independent ColorMap copy, or explicit RGB/RGBA/hex palette. */
+  colormap?: ColorMap | string | Color[];
   /** Use HalfFloatType on the GPU (saves memory, costs CPU conversion). */
   useHalfFloat?: boolean;
   /** Treat values equal to fillValue as transparent (alpha=0). */
@@ -243,10 +243,10 @@ export interface DataLayerUpdateData extends LayerUpdateData {
 
 export interface VolumeProjectionLayerUpdateData extends LayerUpdateData {
   volumeData?: Float32Array | number[];
-  /** Colormap preset name; the same field DataLayer and TwoDataLayer update. */
-  colorMap?: string;
+  /** Same colormap forms accepted by DataLayer. */
+  colorMap?: ColorMap | string | Color[];
   /** Legacy spelling of `colorMap`, kept for compatibility. */
-  colormap?: string;
+  colormap?: ColorMap | string | Color[];
   range?: [number, number];
   threshold?: [number, number];
   worldToIJK?: THREE.Matrix4 | ArrayLike<number>;
@@ -1152,21 +1152,10 @@ export class VolumeProjectionLayer extends Layer {
 
     this.worldToIJK = this.computeWorldToIJK(config);
 
-    this.colorMapName = config.colormap ?? 'viridis';
-    try {
-      this.colorMap = ColorMap.fromPreset(this.colorMapName);
-    } catch (err) {
-      const presets = ColorMap.getAvailableMaps();
-      const fallback = presets.includes('jet') ? 'jet' : (presets[0] || 'jet');
-      console.warn(`VolumeProjectionLayer ${this.id}: preset "${this.colorMapName}" unavailable, falling back to "${fallback}"`, err);
-      this.colorMapName = fallback;
-      this.colorMap = ColorMap.fromPreset(fallback);
-    }
-
-    this.colorMap.setRange(this.range);
-    this.colorMap.setThreshold(this.threshold);
-
-    this.colormapTexture = createColormapTexture(this.colorMapName);
+    const mapping = this.resolveColorMap(config.colormap ?? 'viridis');
+    this.colorMapName = mapping.name;
+    this.colorMap = mapping.map;
+    this.colormapTexture = mapping.texture;
   }
 
   /**
@@ -1318,25 +1307,30 @@ export class VolumeProjectionLayer extends Layer {
     this._notifyChange({ ribbon: this.getRibbonConfig() });
   }
 
-  setColormap(name: string): void {
-    this.colorMapName = name;
-    try {
-      this.colorMap = ColorMap.fromPreset(name);
-    } catch (err) {
-      const presets = ColorMap.getAvailableMaps();
-      const fallback = presets.includes('jet') ? 'jet' : (presets[0] || 'jet');
-      console.warn(`VolumeProjectionLayer ${this.id}: preset "${name}" unavailable, falling back to "${fallback}"`, err);
-      this.colorMapName = fallback;
-      this.colorMap = ColorMap.fromPreset(fallback);
-    }
+  private resolveColorMapValidation(input: ColorMap | string | Color[]): void {
+    if (input instanceof ColorMap || typeof input === 'string') return;
+    if (Array.isArray(input)) { ColorMap.fromArray(input); return; }
+    throw new TypeError('Volume colormap must be a preset, ColorMap or color array');
+  }
 
-    this.colorMap.setRange(this.range);
-    this.colorMap.setThreshold(this.threshold);
+  private resolveColorMap(input: ColorMap | string | Color[]): { name: string; map: ColorMap; texture: THREE.DataTexture } {
+    const custom = typeof input !== 'string';
+    const map = input instanceof ColorMap ? input.clone()
+      : Array.isArray(input) ? ColorMap.fromArray(input)
+        : typeof input === 'string' ? ColorMap.fromPreset(input)
+          : (() => { throw new TypeError('Volume colormap must be a preset, ColorMap or color array'); })();
+    map.setRange(this.range);
+    map.setThreshold(this.threshold);
+    return { name: custom ? 'custom' : input, map, texture: createColormapTexture(custom ? map : input) };
+  }
 
-    if (this.colormapTexture) {
-      this.colormapTexture.dispose();
-    }
-    this.colormapTexture = createColormapTexture(this.colorMapName);
+  setColormap(input: ColorMap | string | Color[]): void {
+    // Resolve everything before changing state or disposing the previous texture.
+    const next = this.resolveColorMap(input);
+    this.colormapTexture.dispose();
+    this.colorMapName = next.name;
+    this.colorMap = next.map;
+    this.colormapTexture = next.texture;
     this._notifyChange({ colormap: this.colorMapName });
   }
 
@@ -1478,9 +1472,7 @@ export class VolumeProjectionLayer extends Layer {
       );
     }
     const colorMap = updates.colorMap ?? updates.colormap;
-    if (colorMap !== undefined && typeof colorMap !== 'string') {
-      throw new TypeError('VolumeProjectionLayer.update colorMap must be a colormap preset name.');
-    }
+    if (colorMap !== undefined) this.resolveColorMapValidation(colorMap);
     if (updates.volumeData !== undefined) {
       this.updateVolumeData(updates.volumeData);
     }
@@ -1542,6 +1534,7 @@ export class VolumeProjectionLayer extends Layer {
       ...super.toStateJSON(),
       type: 'volume',
       colorMapName: this.colorMapName,
+      ...(this.colorMapName === 'custom' ? { colorMap: this.colorMap.getColors() } : {}),
       range: [...this.range],
       threshold: [...this.threshold],
       fillValue: this.fillValue,
@@ -1554,6 +1547,16 @@ export class VolumeProjectionLayer extends Layer {
         hasSurfaces: !!(this.ribbonPial && this.ribbonWhite)
       }
     };
+  }
+
+  /** Restore mapping state, including authored custom colors without a preset lookup. */
+  fromStateJSON(state: Record<string, unknown>): void {
+    const update: VolumeProjectionLayerUpdateData = {};
+    const colorMap = state.colorMap ?? state.colorMapName;
+    if (colorMap !== undefined) update.colorMap = colorMap as ColorMap | string | Color[];
+    if (state.range !== undefined) update.range = state.range as [number, number];
+    if (state.threshold !== undefined) update.threshold = state.threshold as [number, number];
+    this.update(update);
   }
 
   dispose(): void {

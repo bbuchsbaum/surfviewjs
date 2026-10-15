@@ -97,6 +97,39 @@ surface.updateLayer('volume', { volumeData: nextVolumeData });
 - For direct shader fragment/ribbon projection on one volume overlay, use `VolumeProjectedSurface`.
 - GPU compositing currently supports up to 8 total layers (including the base layer); volume layers count toward this limit.
 
+### Custom volume palettes
+
+`VolumeProjectionLayer` accepts a preset name, a `ColorMap` instance, or the
+same explicit hex/RGB/RGBA arrays as `DataLayer`:
+
+```javascript
+import { ColorMap, VolumeProjectionLayer } from 'surfview';
+
+const signedZ = ColorMap.fromArray(['#163b9d', '#ffffff', '#b02125'], {
+  range: [-4, 4]
+});
+const layer = new VolumeProjectionLayer('signed-z', volumeData, [nx, ny, nz], {
+  affineMatrix,
+  colormap: signedZ,
+  range: [-4, 4],
+  threshold: [-1.96, 1.96]
+});
+// Changing this layer does not mutate the shared slice-view ColorMap.
+layer.update({ colorMap: ['#0000ff', '#ffffff', '#ff0000'] });
+```
+
+The layer takes an independent copy of a supplied `ColorMap`, including its
+alpha, and applies the layer's own range and threshold. Explicit palettes use
+`ColorMap`'s discrete bin selection on CPU and GPU, including the GPU vertex
+compositor and direct fragment/ribbon material. Colors remain display sRGB;
+GPU texture components are quantized to 8 bits. Palettes are retained at their
+original length, so a palette longer than 256 colors is not truncated. Its
+width must fit the renderer's `maxTextureSize`. Named palettes retain their
+existing 256-texel, linearly filtered behavior. `setColormap()` and both
+`update({ colorMap })` and the legacy `update({ colormap })` accept these forms;
+replaced textures are disposed. Saved volume-layer mapping state retains custom
+colors. `sampleColorMap()` provides the unmasked color key.
+
 ### Numerical projection along normals
 
 `projectVolume(volume, surface, options)` returns scalar values and valid-sample
@@ -196,6 +229,46 @@ changed by numerical projection. Colormap thresholds remain separate display rul
 
 Try **Normal Volume Projection** in the demo gallery to vary depths, sample count,
 interpolation and reduction on a synthetic signed volume.
+
+### Numerical projection through a white–pial ribbon
+
+Use `projectRibbonVolume()` when thickness and direction differ at each vertex.
+It shares the `VolumeDescriptor` and result format of `projectVolume()`, but
+uses paired anatomical endpoints instead of normalized normals and global
+millimetre depths. It creates no layer, texture, DOM element or WebGL context.
+
+```javascript
+import { projectRibbonVolume } from 'surfview';
+
+const result = projectRibbonVolume({
+  data: new Float32Array([10, 0, 30]),
+  dims: [3, 1, 1],
+  voxelToWorld: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+  mask: new Uint8Array([1, 0, 1]) // e.g. precomputed BH membership
+}, {
+  white: new Float32Array([0, 0, 0]),
+  pial: new Float32Array([2, 0, 0])
+}, { steps: 3, interpolation: 'nearest', reducer: 'mean' });
+// result.values[0] === 20; result.validSamples[0] === 2
+```
+
+Endpoints are packed xyz triplets in the volume's anatomical world frame and
+must have matching vertex counts. Do not pass inflated or display-transformed
+coordinates. Samples include both endpoints; `steps: 1` samples the midpoint.
+A zero-length segment samples its shared endpoint. Defaults are five samples,
+linear interpolation and mean reduction; `max-abs` retains the sign and picks
+the earliest sample on ties. `steps` must be an integer from 1 through 256.
+
+The mask is an aligned **voxel** mask, not a per-vertex mask or a callback.
+Zero/non-finite mask entries invalidate samples; they are omitted from both sum
+and count. Genuine zero data values remain valid. A linear sample requires all
+nonzero-weight voxel contributors to be valid; weights are not renormalized
+around mask failures. For categorical BH membership, nearest interpolation
+avoids mixed contributor footprints. All-invalid/outside segments return
+`NaN` and count zero. Counts record accepted sample positions, including repeats
+in the same voxel. Inputs are borrowed without mutation; the affine is inverted
+once and work scales with vertices × steps. Render the returned values with a
+`DataLayer` and the same custom palette as your slice views.
 
 ### TemporalDataLayer
 

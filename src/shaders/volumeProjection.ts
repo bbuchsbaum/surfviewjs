@@ -58,6 +58,7 @@ uniform mat4 uWorldToIJK;
 uniform vec3 uVolumeDims;
 
 uniform sampler2D uColormapSampler;
+uniform float uDiscreteColors;
 uniform vec2 uIntensityRange;
 uniform vec2 uThreshold;
 uniform float uOverlayOpacity;
@@ -194,10 +195,12 @@ void main() {
 
   float t = normalizeValue(projectedValue, uIntensityRange.x, uIntensityRange.y);
   // Colormap texels are display (sRGB) values; shade in linear light.
-  vec3 overlayRgb = sRGBTransferEOTF( texture(uColormapSampler, vec2(t, 0.5)) ).rgb;
+  float colorU = uDiscreteColors > 0.0 ? (floor(t * (uDiscreteColors - 1.0)) + 0.5) / uDiscreteColors : t;
+  vec4 overlay = sRGBTransferEOTF( texture(uColormapSampler, vec2(colorU, 0.5)) );
+  vec3 overlayRgb = overlay.rgb;
   overlayRgb *= shade;
 
-  vec3 finalRgb = mix(baseRgb, overlayRgb, uOverlayOpacity);
+  vec3 finalRgb = mix(baseRgb, overlayRgb, uOverlayOpacity * overlay.a);
   // uBaseColor is linear (THREE.Color); encode once for the output target.
   outColor = linearToOutputTexel( vec4( finalRgb, 1.0 ) );
 }

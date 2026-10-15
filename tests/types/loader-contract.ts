@@ -32,3 +32,7 @@ if (error instanceof SurfaceGeometryError || error instanceof MeshAdjacencyError
   const code: string = error.code;
   void code;
 }
+
+import { parseGIfTIScalars } from '../../src';
+const scalars: Float32Array | Float32Array[] = parseGIfTIScalars('<GIFTI />', DOMParser);
+void scalars;

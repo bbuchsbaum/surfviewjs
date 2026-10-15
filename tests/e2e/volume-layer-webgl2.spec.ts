@@ -16,7 +16,12 @@ test('VolumeProjectionLayer renders via WebGL2 (CPU vs GPU match)', async ({ pag
   expect(result.cases.map((c: any) => c.name)).toEqual(
     expect.arrayContaining([
       'fragment shader projection parity',
-      'ribbon shader projection parity'
+      'ribbon shader projection parity',
+      'custom signed palette',
+      'long custom palette',
+      'shared ColorMap',
+      'custom fragment palette',
+      'custom ribbon palette'
     ])
   );
   expect(result.cases.every((c: any) => c.ok)).toBe(true);
