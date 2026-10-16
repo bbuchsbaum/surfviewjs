@@ -217,8 +217,9 @@ scalar statistical intents, including their numeric forms; geometry, vector
 and categorical label intents fail explicitly. Use a separate geometry loader
 for the matching surface. File names alone do not establish vertex alignment.
 
-Supported encodings are ASCII, Base64Binary and GZipBase64Binary, including the
-existing zlib-framed compatibility fallback. Both endians, Float32/Float64 and
+Supported encodings are ASCII, Base64Binary and GZipBase64Binary. Compressed
+payloads may use zlib framing (the usual encoding, written by nibabel,
+Connectome Workbench and FreeSurfer) or gzip framing; both decode silently. Both endians, Float32/Float64 and
 8/16/32-bit integer scalar types are decoded to Float32. Floating-point `NaN`
 is preserved as missing data; infinity, Float32 overflow, out-of-range integer
 tokens, invalid dimensions, inconsistent lengths and corrupt compressed

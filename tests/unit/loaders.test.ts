@@ -13,6 +13,7 @@ import {
   loadSurfaceFromFile,
   parseFreeSurferCurvature,
   parseFreeSurferSurface,
+  parseGIfTIScalars,
   parseGIfTISurface,
   parsePLY,
   SurfaceLoadError
@@ -200,16 +201,55 @@ describe('GIFTI surface parsing', () => {
     expect(Array.from(result.faces)).toEqual(TETRA_FACES);
   });
 
-  it('supports the zlib-framed compatibility route without changing geometry', () => {
+  it('decodes standard zlib-framed GZipBase64Binary geometry without warnings (#13)', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const result = parseGIfTISurface(readFixture('fsaverage5-lh-pial.gii'), DOMParserImpl);
 
     expect(result.vertices.length / 3).toBe(10_242);
     expect(result.faces.length / 3).toBe(20_480);
     expect(result.hemisphere).toBe('left');
-    expect(warn).toHaveBeenCalledWith(
-      'GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.'
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['fs_LR.32k.L.inflated.surf.gii', 'surface'],
+    ['fsaverage5-rh-pial.gii', 'surface'],
+    ['tetrahedron_gzip.gii', 'surface'],
+    ['fs_LR.32k.L.sulcal_depth.shape.gii', 'scalars'],
+    ['SensorimotorAssociation_Axis_LH.fslr32k.func.gii', 'scalars'],
+    ['gaussian_splat_demo.func.gii', 'scalars']
+  ] as const)('parses the valid compressed fixture %s silently (#13)', (name, kind) => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const xml = readFixture(name);
+    if (kind === 'surface') {
+      expect(parseGIfTISurface(xml, DOMParserImpl).vertices.length).toBeGreaterThan(0);
+    } else {
+      expect(parseGIfTIScalars(xml, DOMParserImpl)).toBeDefined();
+    }
+    expect(warn).not.toHaveBeenCalled();
+    expect(error).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['zlib', Buffer.from([0x78, 0x9c, 0xde, 0xad, 0xbe, 0xef, 0x01, 0x02, 0x03, 0x04])],
+    ['gzip', Buffer.from([0x1f, 0x8b, 0x08, 0x00, 0xde, 0xad, 0xbe, 0xef, 0x01, 0x02])]
+  ])('rejects a malformed %s-framed payload with a SurfaceLoadError (#13)', (_framing, bytes) => {
+    const fixture = readFixture('tetrahedron_gzip.gii');
+    const corrupted = fixture.replace(
+      /<Data>[^<]*<\/Data>/,
+      `<Data>${bytes.toString('base64')}</Data>`
     );
+    expect(corrupted).not.toBe(fixture);
+
+    let thrown: unknown;
+    try {
+      parseGIfTISurface(corrupted, DOMParserImpl);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(SurfaceLoadError);
+    expect(thrown).toMatchObject({ stage: 'decompress', format: 'gifti' });
   });
 
   it('retains reference laterality metadata independently of filenames', () => {

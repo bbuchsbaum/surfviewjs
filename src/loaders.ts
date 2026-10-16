@@ -687,11 +687,14 @@ function decompressGIfTIExactly(compressed: Uint8Array, expectedBytes: number): 
   };
 
   try {
+    // GZipBase64Binary payloads are zlib-framed (RFC 1950) in files written by
+    // nibabel, Connectome Workbench and FreeSurfer; gzip framing (RFC 1952) is
+    // also accepted. Both are valid, so neither logs anything; malformed data
+    // of either framing fails below with a SurfaceLoadError (#13).
     if (isGzip) {
       new Gunzip(onData).push(compressed, true);
     } else {
       new Unzlib(onData).push(compressed, true);
-      console.warn('GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.');
     }
   } catch (error) {
     if (error instanceof SurfaceLoadError) throw error;

@@ -19,13 +19,14 @@ describe('per-vertex GIFTI scalars', () => {
   it.each(['ASCII','Base64Binary','GZipBase64Binary'])('decodes %s with negative values and genuine zeros', encoding => {
     expect(Array.from(parseGIfTIScalars(xml(array({ encoding })), parser) as Float32Array)).toEqual([-2,0,3]);
   });
-  it('decodes big endian and zlib-framed compatibility payloads', () => {
+  it('decodes big endian and standard zlib-framed payloads silently', () => {
     expect(Array.from(parseGIfTIScalars(xml(array({ encoding:'Base64Binary', endian:'BigEndian' })), parser) as Float32Array)).toEqual([-2,0,3]);
     const warning = vi.spyOn(console,'warn').mockImplementation(()=>{});
     try {
       const bytes = new Uint8Array(new Float32Array([-2,0,3]).buffer);
       const data = parseGIfTIScalars(xml(array({ encoding:'GZipBase64Binary', payload:Buffer.from(zlibSync(bytes)).toString('base64') })), parser);
       expect(Array.from(data as Float32Array)).toEqual([-2,0,3]);
+      expect(warning).not.toHaveBeenCalled();
     } finally { warning.mockRestore(); }
   });
   it('preserves array order and splits row/column-major N×T matrices into vertex vectors', () => {

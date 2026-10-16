@@ -595,6 +595,11 @@ export function resolveFigureExportOptions(
   const fontScale = finitePositive(options.fontScale, figure.fontScale, 'fontScale');
   const { transparent, backgroundColor } = resolveFigureBackground(preset, options, context);
   const source = context.colorbar ?? null;
+  // A context that reports `colorbar: null` means the viewer has no layer for
+  // the key to describe; a preset default must not invent one (#12). Explicit
+  // requests (`colorbar: true`, a range or colours) still draw a key.
+  const noLayerToDescribe = 'colorbar' in context && context.colorbar === null &&
+    options.colorbarRange === undefined && options.colorbarColors === undefined;
   const colorbarRange = options.colorbarRange ??
     (source ? [source.range[0], source.range[1]] as [number, number] : undefined);
   const colorbarThreshold = options.colorbarThreshold === null
@@ -607,7 +612,7 @@ export function resolveFigureExportOptions(
     height,
     dpi,
     transparent,
-    colorbar: options.colorbar ?? figure.colorbar,
+    colorbar: options.colorbar ?? (noLayerToDescribe ? false : figure.colorbar),
     colorbarLabel: options.colorbarLabel ?? source?.label ?? 'Value',
     colorbarColors: options.colorbarColors ?? (source ? [...source.colors] : defaultColorbarColors(preset)),
     colorbarCaps: {

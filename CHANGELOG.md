@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- `exportPNG()` no longer draws a generic "Value" colour key when the viewer
+  has no scalar layer to describe; presets with `figure.colorbar` now omit the
+  key unless the caller passes `colorbar: true`, `colorbarRange` or
+  `colorbarColors` (#12).
+- The GIFTI loaders no longer warn "zlib framing; compatibility fallback" for
+  standard zlib-framed `GZipBase64Binary` arrays (the encoding written by
+  nibabel, Connectome Workbench and FreeSurfer). Malformed compressed payloads
+  still fail with a `SurfaceLoadError` at the `decompress` stage (#13).
+
 ## [3.1.0] - 2026-10-15
 
 ### Added

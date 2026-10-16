@@ -113,6 +113,28 @@ describe('figure export colour key', () => {
     expect(resolved.colorbarRange).toBeUndefined();
     expect(resolved.colorbarThreshold).toBeUndefined();
     expect(resolved.colorbarCaps).toEqual({ low: false, high: false });
+    expect(resolved.colorbar).toBe(false);
+  });
+
+  it.each(['report', 'paper-light', 'presentation', 'talk-dark'] as const)(
+    'omits the colour key for preset %s when the viewer has no layer to describe (#12)',
+    preset => {
+      const resolved = resolveFigureExportOptions(preset, {}, undefined, { colorbar: null });
+      expect(resolved.colorbar).toBe(false);
+    }
+  );
+
+  it('still draws a key without a layer when the caller asks for one (#12)', () => {
+    expect(resolveFigureExportOptions('report', { colorbar: true }, undefined, { colorbar: null }).colorbar)
+      .toBe(true);
+    expect(resolveFigureExportOptions('report', { colorbarRange: [0, 1] }, undefined, { colorbar: null }).colorbar)
+      .toBe(true);
+    expect(resolveFigureExportOptions('report', { colorbarColors: ['#000', '#fff'] }, undefined, { colorbar: null }).colorbar)
+      .toBe(true);
+  });
+
+  it('keeps the preset colour key when a layer is present (#12)', () => {
+    expect(resolveFigureExportOptions('report', {}, undefined, { colorbar: SOURCE }).colorbar).toBe(true);
   });
 
   it('lets explicit options override the layer', () => {
