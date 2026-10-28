@@ -1,0 +1,16 @@
+1: starting server using command "vite --host 127.0.0.1 --port 4192 --strictPort"
+and when url "[ 'http://127.0.0.1:4192/demo/' ]" is responding with HTTP status code 200
+running tests using command "playwright test tests/e2e/surface-geometry.spec.ts --grep "prepared worker" --workers=1"
+
+
+  VITE v8.2.2  ready in 150 ms
+
+  ➜  Local:   http://127.0.0.1:4192/
+
+Running 1 test using 1 worker
+
+(node:59613) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 [chromium] › tests/e2e/surface-geometry.spec.ts:190:1 › prepared worker batches retain dependencies, snapshot frames, cancel and release (704ms)
+
+  1 passed (1.4s)

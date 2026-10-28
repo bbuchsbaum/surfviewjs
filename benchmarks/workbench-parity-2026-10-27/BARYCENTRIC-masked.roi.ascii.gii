@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GIFTI xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:noNamespaceSchemaLocation="http://brainvis.wustl.edu/caret6/xml_schemas/GIFTI_Caret.xsd"
+       Version="1"
+       NumberOfDataArrays="1">
+   <MetaData>
+      <MD>
+         <Name><![CDATA[AnatomicalStructurePrimary]]></Name>
+         <Value><![CDATA[Invalid]]></Value>
+      </MD>
+      <MD>
+         <Name><![CDATA[ProgramProvenance]]></Name>
+         <Value><![CDATA[Connectome Workbench
+Type: Command Line Application
+Version: 2.2.1
+Qt Compiled Version: 6.11.1
+Qt Runtime Version: 6.11.1
+Commit: 01164ffa47f2778088bd6ff472ec9cd9a57f5b42
+Commit Date: 2026-07-13 18:19:49 -0500
+Compiler: c++ (/usr/bin)
+Compiler Version: 17.0.0.17000604
+Compiled Debug: NO
+Operating System: Apple OSX
+Compiled with OpenMP: YES
+]]></Value>
+      </MD>
+      <MD>
+         <Name><![CDATA[Provenance]]></Name>
+         <Value><![CDATA[/tmp/surfview-workbench-mount/ConnectomeWorkbench.app/Contents/usr/bin/../exe/exe_wb_command -metric-resample benchmarks/workbench-parity-2026-10-27/values.func.gii benchmarks/workbench-parity-2026-10-27/source.surf.gii benchmarks/workbench-parity-2026-10-27/target.surf.gii BARYCENTRIC benchmarks/workbench-parity-2026-10-27/BARYCENTRIC-masked.func.gii -current-roi benchmarks/workbench-parity-2026-10-27/roi.func.gii -valid-roi-out benchmarks/workbench-parity-2026-10-27/BARYCENTRIC-masked.roi.gii]]></Value>
+      </MD>
+      <MD>
+         <Name><![CDATA[WorkingDirectory]]></Name>
+         <Value><![CDATA[/Users/bbuchsbaum/code/jscode/surfviewjs]]></Value>
+      </MD>
+   </MetaData>
+   <LabelTable>
+      <Label Key="0" Red="0" Green="0" Blue="0" Alpha="0"><![CDATA[???]]></Label>
+   </LabelTable>
+<DataArray Intent="NIFTI_INTENT_NORMAL"
+           DataType="NIFTI_TYPE_FLOAT32"
+           ArrayIndexingOrder="RowMajorOrder"
+           Dimensionality="1"
+           Dim0="38"
+           Encoding="ASCII"
+           Endian="LittleEndian"
+           ExternalFileName=""
+           ExternalFileOffset="0">
+   <MetaData>
+      <MD>
+         <Name><![CDATA[Name]]></Name>
+         <Value><![CDATA[#1]]></Value>
+      </MD>
+   </MetaData>
+   <Data>
+      1 
+      1 
+      1 
+      1 
+      0 
+      1 
+      1 
+      1 
+      1 
+      1 
+      1 
+      1 
+      1 
+      1 
+      1 
+      1 
+      1 
+      1 
+      1 
+      1 
+      1 
+      1 
+      1 
+      1 
+      1 
+      1 
+      1 
+      1 
+      1 
+      1 
+      1 
+      1 
+      1 
+      0 
+      1 
+      1 
+      1 
+      1 
+   </Data>
+</DataArray>
+</GIFTI>

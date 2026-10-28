@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "started_utc": "2026-10-27T21:40:50.239657+00:00",
+  "finished_utc": "2026-10-27T21:40:58.412952+00:00",
+  "duration_seconds": 8.173081,
+  "command": [
+    "npm",
+    "test"
+  ],
+  "cwd": "/Users/bbuchsbaum/code/jscode/surfviewjs",
+  "log": "/tmp/surfview-complete-unit.log",
+  "exit_code": 0,
+  "child_returncode": 0,
+  "reason": "exited",
+  "detail": null,
+  "timeout_seconds": 180.0,
+  "log_bytes": 278
+}

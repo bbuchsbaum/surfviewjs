@@ -1,3 +1,4 @@
+import { addTemporalSmoothing } from '../kit/surface-geometry';
 import { MultiLayerNeuroSurface, SparklineOverlay, TemporalDataLayer, TimelineController } from '@src/index.js';
 import type { AnatomicalView, VertexHoverEvent } from '@src/index.js';
 import excerpt from '../excerpts/timeSeries.ts?raw';
@@ -159,9 +160,9 @@ export const timeSeries: Scenario = {
   title: 'Time series',
   short: 'Time series',
   group: 'surfaces',
-  tags: ['temporal', 'playback', 'timeline', 'sparkline', 'block design'],
+  tags: ['temporal', 'playback', 'timeline', 'sparkline', 'block design', 'area smoothing', 'worker'],
   summary:
-    'A 100-volume block-design run on both fsaverage5 hemispheres, played as a temporal data layer. Play, pause, stop, scrub to any time, set the playback rate and loop mode. The margin plots one vertex’s time course against the stimulus blocks, with the playhead marked; hover the cortex to plot another. Time, frame and the current block print in the lower corner.',
+    'Play or scrub a simulated 100-volume run on both fsaverage5 hemispheres. Turn on physical smoothing for the left hemisphere, choose its Gaussian width in millimetres, and compare the derived map with the original. Weights are built in a worker and reused during playback. Hover the cortex to plot a vertex time course.',
   synthetic:
     'The run is simulated: visual blocks drive both occipital poles, right-hand motor blocks drive the left hand knob (weakly the right), the posterior cingulate deactivates during either task, convolved with a canonical double-gamma response, plus seeded smooth noise. Not a recording.',
   excerpt,
@@ -300,11 +301,13 @@ export const timeSeries: Scenario = {
       film.set('br', 'value', 'Value', `${fmt(series[frame]!)} %`);
     };
 
+    const smoothing = addTemporalSmoothing(ctx, viewer, left, () => layers.get('lh')?.getData() ?? null);
     const onTime = (event: { time: number; frameA: number; frameB: number; alpha: number }) => {
       for (const [id, layer] of layers) {
         layer.setTime(event.frameA, event.frameB, event.alpha);
         surfaces.get(id)!.requestColorUpdate();
       }
+      smoothing.refresh();
       sparkline.updateTimeMarker(event.time);
       scrub.set(Math.round(event.time * 2) / 2);
       const frame = `${Math.min(FRAMES, Math.floor(event.time / TR) + 1)} / ${FRAMES}`;
@@ -344,6 +347,7 @@ export const timeSeries: Scenario = {
     ctx.perf(`${FRAMES} frames × ${vertexCount.toLocaleString('en-US')} vertices`);
     ctx.setBusy(false);
     return () => {
+      smoothing.dispose();
       viewer.off('vertex:hover', onHover);
       for (const off of unsubscribe) off();
       timeline.dispose();

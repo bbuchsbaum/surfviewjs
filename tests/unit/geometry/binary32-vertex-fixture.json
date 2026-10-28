@@ -1,0 +1,55 @@
+{
+  "description": "Exact normalized sharedvertex does not imply WB onehot;7982 fsaverage10k to164k",
+  "queryRaw": [
+    43.019290924072266,
+    -67.68888854980469,
+    -59.7290153503418
+  ],
+  "triangleRaw": {
+    "face": 2908,
+    "nodes": [
+      1776,
+      7982,
+      7981
+    ],
+    "vertices": [
+      [
+        41.80000305175781,
+        -70.52000427246094,
+        -57.27000427246094
+      ],
+      [
+        43.02000045776367,
+        -67.69000244140625,
+        -59.72999954223633
+      ],
+      [
+        44.85000228881836,
+        -68.91999816894531,
+        -56.910003662109375
+      ]
+    ]
+  },
+  "expectedWeightsBySourceVertex": {
+    "7981": 5.960464477539063e-08,
+    "7982": 0.9999999403953552
+  },
+  "sourceMask": {
+    "1776": 1.0,
+    "7982": 0.0,
+    "7981": 1.0
+  },
+  "expectedMaskedWeightsBySourceVertex": {
+    "7981": 1.0
+  },
+  "expectedMaskedValid": true,
+  "normalization": "binary32 radius100; normalize query andallvertices independently",
+  "normalizedQueryAndSource7982": [
+    43.019290924072266,
+    -67.68888854980469,
+    -59.7290153503418
+  ],
+  "expectedDistanceSquared": 0,
+  "roundedResidualSide": -3.660184120235499e-07,
+  "workbenchCommit": "01164ffa47f2778088bd6ff472ec9cd9a57f5b42"
+}

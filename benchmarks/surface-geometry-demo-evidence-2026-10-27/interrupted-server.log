@@ -1,0 +1,1370 @@
+
+Running 35 tests using 2 workers
+
+(node:44331) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44332) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘   1 [chromium] › tests/e2e/chapter-data.spec.ts:33:3 › Data in & out chapter › loads bundled samples and the local formats the copy names (6.5s)
+(node:44764) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘   3 [chromium] › tests/e2e/chapter-data.spec.ts:62:3 › Data in & out chapter › saves, restores and shares viewer state, and downloads a scene manifest (191ms)
+(node:44936) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘   4 [chromium] › tests/e2e/chapter-data.spec.ts:129:3 › Data in & out chapter › alignment QA renders all panels and exposes shifted-transform metrics (200ms)
+(node:45097) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘   5 [chromium] › tests/e2e/chapter-inspect.spec.ts:17:3 › Inspect & annotate chapter › picks time each hover, and the picker can be switched (202ms)
+(node:45105) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘   6 [chromium] › tests/e2e/chapter-inspect.spec.ts:41:3 › Inspect & annotate chapter › clicks place labelled marks that can be selected, removed and cleared (211ms)
+(node:45112) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘   7 [chromium] › tests/e2e/chapter-statistics.spec.ts:20:3 › Statistical maps chapter › corrections start at FDR and change what survives (197ms)
+(node:45132) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘   8 [chromium] › tests/e2e/chapter-statistics.spec.ts:62:3 › Statistical maps chapter › hover prints statistics into the film corner (203ms)
+(node:45147) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘   9 [chromium] › tests/e2e/chapter-statistics.spec.ts:78:3 › Statistical maps chapter › effect × confidence mode draws a TwoDataLayer with switchable 2D colormaps (210ms)
+(node:45154) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  10 [chromium] › tests/e2e/chapter-time-series.spec.ts:4:3 › Time series chapter › opens without errors, plays, pauses, scrubs and stops (209ms)
+(node:45161) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  11 [chromium] › tests/e2e/chapter-time-series.spec.ts:50:3 › Time series chapter › the margin plots a vertex time course with axes, and hovering changes the vertex (212ms)
+(node:45173) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  12 [chromium] › tests/e2e/normal-projection.spec.ts:14:1 › volume chapter projects along normals and recomputes ordinary vertex data (196ms)
+(node:45235) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  13 [chromium] › tests/e2e/normal-projection.spec.ts:51:1 › volume layer modes report the sampling path they use (196ms)
+(node:45400) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  14 [chromium] › tests/e2e/normal-projection.spec.ts:123:1 › volume chapter colormap select recolours every projection method and mode (196ms)
+(node:45551) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  15 [chromium] › tests/e2e/surface-geometry.spec.ts:6:1 › native morph triangles, precise picks, markers and midpoint borders agree (201ms)
+(node:45558) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  16 [chromium] › tests/e2e/surface-geometry.spec.ts:18:45 › esm consumer resolves standalone worker and matches synchronous results (211ms)
+(node:45565) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  17 [chromium] › tests/e2e/surface-geometry.spec.ts:18:45 › umd consumer resolves standalone worker and matches synchronous results (197ms)
+(node:45572) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  18 [chromium] › tests/e2e/surface-geometry.spec.ts:18:45 › embed consumer resolves standalone worker and matches synchronous results (211ms)
+(node:45579) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  19 [chromium] › tests/e2e/surface-geometry.spec.ts:24:1 › example ruler, live brush radius and both border styles produce visible results (202ms)
+(node:45586) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  20 [chromium] › tests/e2e/surface-geometry.spec.ts:49:1 › precise anchors move through inflation while anatomical distance and area stay fixed (187ms)
+(node:45616) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  21 [chromium] › tests/e2e/surface-geometry.spec.ts:66:1 › area cluster controls use physical extent and keep the threshold editable (191ms)
+(node:45624) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  22 [chromium] › tests/e2e/surface-geometry.spec.ts:79:1 › derived smoothing follows temporal frames and survives chapter disposal (185ms)
+(node:45688) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  23 [chromium] › tests/e2e/surface-geometry.spec.ts:109:1 › mapping demo supports scalar/label transfer, persisted identity, and invalid artifact recovery (214ms)
+(node:45862) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  24 [chromium] › tests/e2e/surface-geometry.spec.ts:145:1 › ribbon inspector reports a valid column on the cortical display (212ms)
+(node:46021) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  25 [chromium] › tests/e2e/surface-geometry.spec.ts:164:1 › surface tools are discoverable and keyboard operable on a narrow screen (248ms)
+(node:46093) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  26 [chromium] › tests/e2e/demo-gallery.spec.ts:36:1 › opens First look by default with a rendered cortex, live film overlays and a public-API excerpt (289ms)
+(node:46118) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  27 [chromium] › tests/e2e/demo-gallery.spec.ts:70:1 › old scenario ids open the chapter that absorbed them (280ms)
+(node:46167) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  28 [chromium] › tests/e2e/demo-gallery.spec.ts:78:1 › opens the Glasser puzzle and the full-width map lab, then cleans up on reset and navigation (284ms)
+(node:46261) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  29 [chromium] › tests/e2e/demo-gallery.spec.ts:126:1 › chapters stay keyboard accessible without horizontal page overflow on a small screen (190ms)
+  ✘   2 [chromium] › tests/e2e/chapter-anatomy.spec.ts:32:3 › Anatomy & views chapter › opens from the chapter strip and from the old scenario ids (31.0s)
+(node:46638) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  30 [chromium] › tests/e2e/chapter-anatomy.spec.ts:48:3 › Anatomy & views chapter › views: anatomical views, hemisphere choice and gap respond (192ms)
+(node:46645) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  31 [chromium] › tests/e2e/chapter-anatomy.spec.ts:80:3 › Anatomy & views chapter › views: camera responds to drag after a preset view (294ms)
+(node:46659) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  32 [chromium] › tests/e2e/chapter-anatomy.spec.ts:91:3 › Anatomy & views chapter › clip: planes cut the surface and presets apply (188ms)
+(node:46760) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  33 [chromium] › tests/e2e/chapter-anatomy.spec.ts:122:3 › Anatomy & views chapter › inflate: morph slider and stage buttons reshape the cortex (224ms)
+(node:46927) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  34 [chromium] › tests/e2e/chapter-anatomy.spec.ts:177:3 › Anatomy & views chapter › flat map: linked views, seeded ROI, exports and clear (193ms)
+(node:47080) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  35 [chromium] › tests/e2e/chapter-anatomy.spec.ts:214:3 › Anatomy & views chapter › flat map: a lasso drawn on the map creates an ROI (188ms)
+
+
+  1) [chromium] › tests/e2e/chapter-anatomy.spec.ts:32:3 › Anatomy & views chapter › opens from the chapter strip and from the old scenario ids 
+
+    Test timeout of 30000ms exceeded.
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: locator('#status-text')
+    Expected substring: "Running: Anatomy & views"
+    Received string:    "Chapter failed to start"
+    Timeout: 30000ms
+
+    Call log:
+      - Expect "toContainText" with timeout 30000ms
+      - waiting for locator('#status-text')
+        64 × locator resolved to <span role="status" id="status-text">Chapter failed to start</span>
+           - unexpected value "Chapter failed to start"
+
+
+      34 |     await page.goto('/demo/index.html');
+      35 |     await page.getByRole('button', { name: 'Anatomy & views', exact: true }).click();
+    > 36 |     await expect(page.locator('#status-text')).toContainText('Running: Anatomy & views', { timeout: 30000 });
+         |                                                ^
+      37 |     await expect(page.locator('#viewer-slot canvas')).toBeVisible();
+      38 |
+      39 |     for (const alias of ['hemispheres', 'clipping', 'morphing']) {
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/chapter-anatomy.spec.ts:36:48
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/chapter-anatomy-Anatomy-vi-8c1fe-d-from-the-old-scenario-ids-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/chapter-anatomy-Anatomy-vi-8c1fe-d-from-the-old-scenario-ids-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/chapter-anatomy-Anatomy-vi-8c1fe-d-from-the-old-scenario-ids-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/chapter-anatomy-Anatomy-vi-8c1fe-d-from-the-old-scenario-ids-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/chapter-anatomy-Anatomy-vi-8c1fe-d-from-the-old-scenario-ids-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) [chromium] › tests/e2e/chapter-anatomy.spec.ts:48:3 › Anatomy & views chapter › views: anatomical views, hemisphere choice and gap respond 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4190/demo/index.html?scenario=anatomy
+    Call log:
+      - navigating to "http://127.0.0.1:4190/demo/index.html?scenario=anatomy", waiting until "load"
+
+
+      10 |
+      11 | async function openAnatomy(page: Page, query = '') {
+    > 12 |   await page.goto(`/demo/index.html?scenario=anatomy${query}`);
+         |              ^
+      13 |   await expect(page.locator('#status-text')).toContainText('Running: Anatomy & views', { timeout: 30000 });
+      14 | }
+      15 |
+        at openAnatomy (/Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/chapter-anatomy.spec.ts:12:14)
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/chapter-anatomy.spec.ts:50:11
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/chapter-anatomy-Anatomy-vi-87e05-here-choice-and-gap-respond-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/chapter-anatomy-Anatomy-vi-87e05-here-choice-and-gap-respond-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/chapter-anatomy-Anatomy-vi-87e05-here-choice-and-gap-respond-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/chapter-anatomy-Anatomy-vi-87e05-here-choice-and-gap-respond-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/chapter-anatomy-Anatomy-vi-87e05-here-choice-and-gap-respond-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  3) [chromium] › tests/e2e/chapter-anatomy.spec.ts:80:3 › Anatomy & views chapter › views: camera responds to drag after a preset view 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4190/demo/index.html?scenario=anatomy
+    Call log:
+      - navigating to "http://127.0.0.1:4190/demo/index.html?scenario=anatomy", waiting until "load"
+
+
+      10 |
+      11 | async function openAnatomy(page: Page, query = '') {
+    > 12 |   await page.goto(`/demo/index.html?scenario=anatomy${query}`);
+         |              ^
+      13 |   await expect(page.locator('#status-text')).toContainText('Running: Anatomy & views', { timeout: 30000 });
+      14 | }
+      15 |
+        at openAnatomy (/Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/chapter-anatomy.spec.ts:12:14)
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/chapter-anatomy.spec.ts:81:11
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/chapter-anatomy-Anatomy-vi-abcf0-to-drag-after-a-preset-view-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/chapter-anatomy-Anatomy-vi-abcf0-to-drag-after-a-preset-view-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/chapter-anatomy-Anatomy-vi-abcf0-to-drag-after-a-preset-view-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/chapter-anatomy-Anatomy-vi-abcf0-to-drag-after-a-preset-view-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/chapter-anatomy-Anatomy-vi-abcf0-to-drag-after-a-preset-view-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  4) [chromium] › tests/e2e/chapter-anatomy.spec.ts:91:3 › Anatomy & views chapter › clip: planes cut the surface and presets apply 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4190/demo/index.html?scenario=anatomy
+    Call log:
+      - navigating to "http://127.0.0.1:4190/demo/index.html?scenario=anatomy", waiting until "load"
+
+
+      10 |
+      11 | async function openAnatomy(page: Page, query = '') {
+    > 12 |   await page.goto(`/demo/index.html?scenario=anatomy${query}`);
+         |              ^
+      13 |   await expect(page.locator('#status-text')).toContainText('Running: Anatomy & views', { timeout: 30000 });
+      14 | }
+      15 |
+        at openAnatomy (/Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/chapter-anatomy.spec.ts:12:14)
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/chapter-anatomy.spec.ts:93:11
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/chapter-anatomy-Anatomy-vi-2d67e-e-surface-and-presets-apply-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/chapter-anatomy-Anatomy-vi-2d67e-e-surface-and-presets-apply-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/chapter-anatomy-Anatomy-vi-2d67e-e-surface-and-presets-apply-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/chapter-anatomy-Anatomy-vi-2d67e-e-surface-and-presets-apply-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/chapter-anatomy-Anatomy-vi-2d67e-e-surface-and-presets-apply-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  5) [chromium] › tests/e2e/chapter-anatomy.spec.ts:122:3 › Anatomy & views chapter › inflate: morph slider and stage buttons reshape the cortex 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4190/demo/index.html?scenario=anatomy&mode=morph
+    Call log:
+      - navigating to "http://127.0.0.1:4190/demo/index.html?scenario=anatomy&mode=morph", waiting until "load"
+
+
+      10 |
+      11 | async function openAnatomy(page: Page, query = '') {
+    > 12 |   await page.goto(`/demo/index.html?scenario=anatomy${query}`);
+         |              ^
+      13 |   await expect(page.locator('#status-text')).toContainText('Running: Anatomy & views', { timeout: 30000 });
+      14 | }
+      15 |
+        at openAnatomy (/Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/chapter-anatomy.spec.ts:12:14)
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/chapter-anatomy.spec.ts:124:11
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/chapter-anatomy-Anatomy-vi-fcbf5--buttons-reshape-the-cortex-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/chapter-anatomy-Anatomy-vi-fcbf5--buttons-reshape-the-cortex-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/chapter-anatomy-Anatomy-vi-fcbf5--buttons-reshape-the-cortex-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/chapter-anatomy-Anatomy-vi-fcbf5--buttons-reshape-the-cortex-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/chapter-anatomy-Anatomy-vi-fcbf5--buttons-reshape-the-cortex-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  6) [chromium] › tests/e2e/chapter-anatomy.spec.ts:177:3 › Anatomy & views chapter › flat map: linked views, seeded ROI, exports and clear 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4190/demo/index.html?scenario=anatomy
+    Call log:
+      - navigating to "http://127.0.0.1:4190/demo/index.html?scenario=anatomy", waiting until "load"
+
+
+      10 |
+      11 | async function openAnatomy(page: Page, query = '') {
+    > 12 |   await page.goto(`/demo/index.html?scenario=anatomy${query}`);
+         |              ^
+      13 |   await expect(page.locator('#status-text')).toContainText('Running: Anatomy & views', { timeout: 30000 });
+      14 | }
+      15 |
+        at openAnatomy (/Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/chapter-anatomy.spec.ts:12:14)
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/chapter-anatomy.spec.ts:179:11
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/chapter-anatomy-Anatomy-vi-824e7-eeded-ROI-exports-and-clear-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/chapter-anatomy-Anatomy-vi-824e7-eeded-ROI-exports-and-clear-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/chapter-anatomy-Anatomy-vi-824e7-eeded-ROI-exports-and-clear-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/chapter-anatomy-Anatomy-vi-824e7-eeded-ROI-exports-and-clear-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/chapter-anatomy-Anatomy-vi-824e7-eeded-ROI-exports-and-clear-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  7) [chromium] › tests/e2e/chapter-anatomy.spec.ts:214:3 › Anatomy & views chapter › flat map: a lasso drawn on the map creates an ROI 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4190/demo/index.html?scenario=anatomy&mode=flatmap
+    Call log:
+      - navigating to "http://127.0.0.1:4190/demo/index.html?scenario=anatomy&mode=flatmap", waiting until "load"
+
+
+      10 |
+      11 | async function openAnatomy(page: Page, query = '') {
+    > 12 |   await page.goto(`/demo/index.html?scenario=anatomy${query}`);
+         |              ^
+      13 |   await expect(page.locator('#status-text')).toContainText('Running: Anatomy & views', { timeout: 30000 });
+      14 | }
+      15 |
+        at openAnatomy (/Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/chapter-anatomy.spec.ts:12:14)
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/chapter-anatomy.spec.ts:216:11
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/chapter-anatomy-Anatomy-vi-004a3-n-on-the-map-creates-an-ROI-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/chapter-anatomy-Anatomy-vi-004a3-n-on-the-map-creates-an-ROI-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/chapter-anatomy-Anatomy-vi-004a3-n-on-the-map-creates-an-ROI-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/chapter-anatomy-Anatomy-vi-004a3-n-on-the-map-creates-an-ROI-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/chapter-anatomy-Anatomy-vi-004a3-n-on-the-map-creates-an-ROI-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  8) [chromium] › tests/e2e/chapter-data.spec.ts:33:3 › Data in & out chapter › loads bundled samples and the local formats the copy names 
+
+    Error: expect(locator).toHaveText(expected) failed
+
+    Locator:  locator('#data-load-status')
+    Expected: "Tetrahedron: 4 vertices, 4 faces"
+    Received: "Tetrahedron could not be loaded: Surface loading failed"
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveText" with timeout 5000ms
+      - waiting for locator('#data-load-status')
+        14 × locator resolved to <output aria-live="polite" class="data-error" id="data-load-status">Tetrahedron could not be loaded: Surface loading …</output>
+           - unexpected value "Tetrahedron could not be loaded: Surface loading failed"
+
+
+      39 |
+      40 |     await page.getByRole('button', { name: 'Tetrahedron' }).click();
+    > 41 |     await expect(loaded).toHaveText('Tetrahedron: 4 vertices, 4 faces');
+         |                          ^
+      42 |     await page.getByRole('button', { name: 'ASCII GIFTI' }).click();
+      43 |     await expect(loaded).toContainText(/^ASCII GIFTI: [\d,]+ vertices, 10,240 faces$/);
+      44 |
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/chapter-data.spec.ts:41:26
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/chapter-data-Data-in-out-c-d68fb-ocal-formats-the-copy-names-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/chapter-data-Data-in-out-c-d68fb-ocal-formats-the-copy-names-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/chapter-data-Data-in-out-c-d68fb-ocal-formats-the-copy-names-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/chapter-data-Data-in-out-c-d68fb-ocal-formats-the-copy-names-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/chapter-data-Data-in-out-c-d68fb-ocal-formats-the-copy-names-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  9) [chromium] › tests/e2e/chapter-data.spec.ts:62:3 › Data in & out chapter › saves, restores and shares viewer state, and downloads a scene manifest 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4190/demo/index.html?scenario=data&mode=share
+    Call log:
+      - navigating to "http://127.0.0.1:4190/demo/index.html?scenario=data&mode=share", waiting until "load"
+
+
+      3 |
+      4 | async function openData(page: Page, query = ''): Promise<void> {
+    > 5 |   await page.goto(`/demo/index.html?scenario=data${query}`);
+        |              ^
+      6 |   await expect(page.locator('#status-text')).toHaveText('Running: Data in & out', { timeout: 20_000 });
+      7 | }
+      8 |
+        at openData (/Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/chapter-data.spec.ts:5:14)
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/chapter-data.spec.ts:68:11
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/chapter-data-Data-in-out-c-9b198--downloads-a-scene-manifest-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/chapter-data-Data-in-out-c-9b198--downloads-a-scene-manifest-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/chapter-data-Data-in-out-c-9b198--downloads-a-scene-manifest-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/chapter-data-Data-in-out-c-9b198--downloads-a-scene-manifest-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/chapter-data-Data-in-out-c-9b198--downloads-a-scene-manifest-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  10) [chromium] › tests/e2e/chapter-data.spec.ts:129:3 › Data in & out chapter › alignment QA renders all panels and exposes shifted-transform metrics 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4190/demo/index.html?scenario=data
+    Call log:
+      - navigating to "http://127.0.0.1:4190/demo/index.html?scenario=data", waiting until "load"
+
+
+      3 |
+      4 | async function openData(page: Page, query = ''): Promise<void> {
+    > 5 |   await page.goto(`/demo/index.html?scenario=data${query}`);
+        |              ^
+      6 |   await expect(page.locator('#status-text')).toHaveText('Running: Data in & out', { timeout: 20_000 });
+      7 | }
+      8 |
+        at openData (/Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/chapter-data.spec.ts:5:14)
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/chapter-data.spec.ts:131:11
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/chapter-data-Data-in-out-c-cc946-s-shifted-transform-metrics-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/chapter-data-Data-in-out-c-cc946-s-shifted-transform-metrics-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/chapter-data-Data-in-out-c-cc946-s-shifted-transform-metrics-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/chapter-data-Data-in-out-c-cc946-s-shifted-transform-metrics-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/chapter-data-Data-in-out-c-cc946-s-shifted-transform-metrics-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  11) [chromium] › tests/e2e/chapter-inspect.spec.ts:17:3 › Inspect & annotate chapter › picks time each hover, and the picker can be switched 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4190/demo/index.html?scenario=gpupicking
+    Call log:
+      - navigating to "http://127.0.0.1:4190/demo/index.html?scenario=gpupicking", waiting until "load"
+
+
+      18 |     const errors: string[] = [];
+      19 |     page.on('pageerror', error => errors.push(error.message));
+    > 20 |     await page.goto('/demo/index.html?scenario=gpupicking');
+         |                ^
+      21 |     await expect(page.locator('#status-text')).toContainText('Running: Inspect & annotate', { timeout: 30000 });
+      22 |
+      23 |     await hoverCortex(page);
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/chapter-inspect.spec.ts:20:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/chapter-inspect-Inspect-an-8f9d9--the-picker-can-be-switched-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/chapter-inspect-Inspect-an-8f9d9--the-picker-can-be-switched-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/chapter-inspect-Inspect-an-8f9d9--the-picker-can-be-switched-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/chapter-inspect-Inspect-an-8f9d9--the-picker-can-be-switched-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/chapter-inspect-Inspect-an-8f9d9--the-picker-can-be-switched-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  12) [chromium] › tests/e2e/chapter-inspect.spec.ts:41:3 › Inspect & annotate chapter › clicks place labelled marks that can be selected, removed and cleared 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4190/demo/index.html?scenario=inspect
+    Call log:
+      - navigating to "http://127.0.0.1:4190/demo/index.html?scenario=inspect", waiting until "load"
+
+
+      42 |     const errors: string[] = [];
+      43 |     page.on('pageerror', error => errors.push(error.message));
+    > 44 |     await page.goto('/demo/index.html?scenario=inspect');
+         |                ^
+      45 |     await expect(page.locator('#status-text')).toContainText('Running: Inspect & annotate', { timeout: 30000 });
+      46 |
+      47 |     const marks = page.locator('#inspect-marks li');
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/chapter-inspect.spec.ts:44:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/chapter-inspect-Inspect-an-2d4fb-elected-removed-and-cleared-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/chapter-inspect-Inspect-an-2d4fb-elected-removed-and-cleared-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/chapter-inspect-Inspect-an-2d4fb-elected-removed-and-cleared-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/chapter-inspect-Inspect-an-2d4fb-elected-removed-and-cleared-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/chapter-inspect-Inspect-an-2d4fb-elected-removed-and-cleared-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  13) [chromium] › tests/e2e/chapter-statistics.spec.ts:20:3 › Statistical maps chapter › corrections start at FDR and change what survives 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4190/demo/index.html?scenario=statisticalMap
+    Call log:
+      - navigating to "http://127.0.0.1:4190/demo/index.html?scenario=statisticalMap", waiting until "load"
+
+
+      2 |
+      3 | async function openStatistics(page: Page, id = 'statistics') {
+    > 4 |   await page.goto(`/demo/index.html?scenario=${id}`);
+        |              ^
+      5 |   await expect(page.locator('#status-text')).toContainText('Running: Statistical maps', { timeout: 20_000 });
+      6 |   await expect(page.locator('#viewer-slot canvas')).toBeVisible();
+      7 | }
+        at openStatistics (/Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/chapter-statistics.spec.ts:4:14)
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/chapter-statistics.spec.ts:23:11
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/chapter-statistics-Statist-76ee2-DR-and-change-what-survives-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/chapter-statistics-Statist-76ee2-DR-and-change-what-survives-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/chapter-statistics-Statist-76ee2-DR-and-change-what-survives-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/chapter-statistics-Statist-76ee2-DR-and-change-what-survives-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/chapter-statistics-Statist-76ee2-DR-and-change-what-survives-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  14) [chromium] › tests/e2e/chapter-statistics.spec.ts:62:3 › Statistical maps chapter › hover prints statistics into the film corner 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4190/demo/index.html?scenario=statistics
+    Call log:
+      - navigating to "http://127.0.0.1:4190/demo/index.html?scenario=statistics", waiting until "load"
+
+
+      2 |
+      3 | async function openStatistics(page: Page, id = 'statistics') {
+    > 4 |   await page.goto(`/demo/index.html?scenario=${id}`);
+        |              ^
+      5 |   await expect(page.locator('#status-text')).toContainText('Running: Statistical maps', { timeout: 20_000 });
+      6 |   await expect(page.locator('#viewer-slot canvas')).toBeVisible();
+      7 | }
+        at openStatistics (/Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/chapter-statistics.spec.ts:4:14)
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/chapter-statistics.spec.ts:63:11
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/chapter-statistics-Statist-29f45-istics-into-the-film-corner-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/chapter-statistics-Statist-29f45-istics-into-the-film-corner-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/chapter-statistics-Statist-29f45-istics-into-the-film-corner-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/chapter-statistics-Statist-29f45-istics-into-the-film-corner-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/chapter-statistics-Statist-29f45-istics-into-the-film-corner-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  15) [chromium] › tests/e2e/chapter-statistics.spec.ts:78:3 › Statistical maps chapter › effect × confidence mode draws a TwoDataLayer with switchable 2D colormaps 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4190/demo/index.html?scenario=colormap2d
+    Call log:
+      - navigating to "http://127.0.0.1:4190/demo/index.html?scenario=colormap2d", waiting until "load"
+
+
+      2 |
+      3 | async function openStatistics(page: Page, id = 'statistics') {
+    > 4 |   await page.goto(`/demo/index.html?scenario=${id}`);
+        |              ^
+      5 |   await expect(page.locator('#status-text')).toContainText('Running: Statistical maps', { timeout: 20_000 });
+      6 |   await expect(page.locator('#viewer-slot canvas')).toBeVisible();
+      7 | }
+        at openStatistics (/Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/chapter-statistics.spec.ts:4:14)
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/chapter-statistics.spec.ts:81:11
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/chapter-statistics-Statist-f5ef5-ith-switchable-2D-colormaps-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/chapter-statistics-Statist-f5ef5-ith-switchable-2D-colormaps-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/chapter-statistics-Statist-f5ef5-ith-switchable-2D-colormaps-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/chapter-statistics-Statist-f5ef5-ith-switchable-2D-colormaps-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/chapter-statistics-Statist-f5ef5-ith-switchable-2D-colormaps-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  16) [chromium] › tests/e2e/chapter-time-series.spec.ts:4:3 › Time series chapter › opens without errors, plays, pauses, scrubs and stops 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4190/demo/index.html?scenario=temporal-playback
+    Call log:
+      - navigating to "http://127.0.0.1:4190/demo/index.html?scenario=temporal-playback", waiting until "load"
+
+
+       6 |     page.on('pageerror', error => errors.push(error.message));
+       7 |
+    >  8 |     await page.goto('/demo/index.html?scenario=temporal-playback');
+         |                ^
+       9 |     await expect(page.locator('#status-text')).toContainText('Running: Time series', { timeout: 30000 });
+      10 |     const canvas = page.locator('#viewer-slot canvas').first();
+      11 |     await expect(canvas).toBeVisible();
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/chapter-time-series.spec.ts:8:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/chapter-time-series-Time-s-c8336-ays-pauses-scrubs-and-stops-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/chapter-time-series-Time-s-c8336-ays-pauses-scrubs-and-stops-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/chapter-time-series-Time-s-c8336-ays-pauses-scrubs-and-stops-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/chapter-time-series-Time-s-c8336-ays-pauses-scrubs-and-stops-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/chapter-time-series-Time-s-c8336-ays-pauses-scrubs-and-stops-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  17) [chromium] › tests/e2e/chapter-time-series.spec.ts:50:3 › Time series chapter › the margin plots a vertex time course with axes, and hovering changes the vertex 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4190/demo/index.html?scenario=time-series
+    Call log:
+      - navigating to "http://127.0.0.1:4190/demo/index.html?scenario=time-series", waiting until "load"
+
+
+      51 |     const errors: string[] = [];
+      52 |     page.on('pageerror', error => errors.push(error.message));
+    > 53 |     await page.goto('/demo/index.html?scenario=time-series');
+         |                ^
+      54 |     await expect(page.locator('#status-text')).toContainText('Running: Time series', { timeout: 30000 });
+      55 |     const canvas = page.locator('#viewer-slot canvas').first();
+      56 |     const box = await canvas.boundingBox();
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/chapter-time-series.spec.ts:53:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/chapter-time-series-Time-s-1ec62-hovering-changes-the-vertex-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/chapter-time-series-Time-s-1ec62-hovering-changes-the-vertex-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/chapter-time-series-Time-s-1ec62-hovering-changes-the-vertex-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/chapter-time-series-Time-s-1ec62-hovering-changes-the-vertex-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/chapter-time-series-Time-s-1ec62-hovering-changes-the-vertex-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  18) [chromium] › tests/e2e/demo-gallery.spec.ts:36:1 › opens First look by default with a rendered cortex, live film overlays and a public-API excerpt 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4190/demo/
+    Call log:
+      - navigating to "http://127.0.0.1:4190/demo/", waiting until "load"
+
+
+      38 |   const errors = collectErrors(page);
+      39 |   await page.setViewportSize({ width: 1440, height: 900 });
+    > 40 |   await page.goto('/demo/');
+         |              ^
+      41 |
+      42 |   await expect(page.locator('#active-title')).toHaveText('First look');
+      43 |   await expect(page.locator('#status-text')).toHaveText('Running: First look', { timeout: 30000 });
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/demo-gallery.spec.ts:40:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/demo-gallery-opens-First-l-713d6-ys-and-a-public-API-excerpt-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/demo-gallery-opens-First-l-713d6-ys-and-a-public-API-excerpt-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/demo-gallery-opens-First-l-713d6-ys-and-a-public-API-excerpt-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/demo-gallery-opens-First-l-713d6-ys-and-a-public-API-excerpt-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/demo-gallery-opens-First-l-713d6-ys-and-a-public-API-excerpt-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  19) [chromium] › tests/e2e/demo-gallery.spec.ts:70:1 › old scenario ids open the chapter that absorbed them 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4190/demo/?scenario=quickstart
+    Call log:
+      - navigating to "http://127.0.0.1:4190/demo/?scenario=quickstart", waiting until "load"
+
+
+      69 |
+      70 | test('old scenario ids open the chapter that absorbed them', async ({ page }) => {
+    > 71 |   await page.goto('/demo/?scenario=quickstart');
+         |              ^
+      72 |   await expect(page.locator('#active-title')).toHaveText('First look');
+      73 |   await expect(page).toHaveURL(/scenario=first-look/);
+      74 |   await page.goto('/demo/?scenario=no-such-chapter');
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/demo-gallery.spec.ts:71:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/demo-gallery-old-scenario--8cae3--chapter-that-absorbed-them-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/demo-gallery-old-scenario--8cae3--chapter-that-absorbed-them-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/demo-gallery-old-scenario--8cae3--chapter-that-absorbed-them-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/demo-gallery-old-scenario--8cae3--chapter-that-absorbed-them-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/demo-gallery-old-scenario--8cae3--chapter-that-absorbed-them-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  20) [chromium] › tests/e2e/demo-gallery.spec.ts:78:1 › opens the Glasser puzzle and the full-width map lab, then cleans up on reset and navigation 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4190/demo/?scenario=parcel-puzzle&atlas=glasser
+    Call log:
+      - navigating to "http://127.0.0.1:4190/demo/?scenario=parcel-puzzle&atlas=glasser", waiting until "load"
+
+
+      80 |   const errors = collectErrors(page);
+      81 |   await page.setViewportSize({ width: 1500, height: 940 });
+    > 82 |   await page.goto('/demo/?scenario=parcel-puzzle&atlas=glasser');
+         |              ^
+      83 |
+      84 |   await expect(page.locator('.sv-parcel-puzzle[data-ready="true"]')).toBeVisible({ timeout: 30000 });
+      85 |   await expect(chapter(page, 'Parcel puzzle')).toHaveAttribute('aria-current', 'page');
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/demo-gallery.spec.ts:82:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/demo-gallery-opens-the-Gla-42a26--up-on-reset-and-navigation-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/demo-gallery-opens-the-Gla-42a26--up-on-reset-and-navigation-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/demo-gallery-opens-the-Gla-42a26--up-on-reset-and-navigation-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/demo-gallery-opens-the-Gla-42a26--up-on-reset-and-navigation-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/demo-gallery-opens-the-Gla-42a26--up-on-reset-and-navigation-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  21) [chromium] › tests/e2e/demo-gallery.spec.ts:126:1 › chapters stay keyboard accessible without horizontal page overflow on a small screen 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4190/demo/?scenario=parcel-puzzle&atlas=glasser
+    Call log:
+      - navigating to "http://127.0.0.1:4190/demo/?scenario=parcel-puzzle&atlas=glasser", waiting until "load"
+
+
+      128 |   const errors = collectErrors(page);
+      129 |   await page.setViewportSize({ width: 390, height: 844 });
+    > 130 |   await page.goto('/demo/?scenario=parcel-puzzle&atlas=glasser');
+          |              ^
+      131 |   await expect(page.locator('.sv-parcel-puzzle[data-ready="true"]')).toBeVisible({ timeout: 30000 });
+      132 |   await expect(page.locator('.nav')).toBeVisible();
+      133 |
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/demo-gallery.spec.ts:130:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/demo-gallery-chapters-stay-5e93d--overflow-on-a-small-screen-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/demo-gallery-chapters-stay-5e93d--overflow-on-a-small-screen-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/demo-gallery-chapters-stay-5e93d--overflow-on-a-small-screen-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/demo-gallery-chapters-stay-5e93d--overflow-on-a-small-screen-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/demo-gallery-chapters-stay-5e93d--overflow-on-a-small-screen-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  22) [chromium] › tests/e2e/normal-projection.spec.ts:14:1 › volume chapter projects along normals and recomputes ordinary vertex data 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4190/demo/index.html?scenario=normal-projection
+    Call log:
+      - navigating to "http://127.0.0.1:4190/demo/index.html?scenario=normal-projection", waiting until "load"
+
+
+      2 |
+      3 | async function openVolume(page: Page, id = 'volume') {
+    > 4 |   await page.goto(`/demo/index.html?scenario=${id}`);
+        |              ^
+      5 |   await expect(page.locator('#status-text')).toContainText('Running: Volume to surface', { timeout: 20_000 });
+      6 |   await expect(page.locator('#viewer-slot canvas')).toBeVisible();
+      7 | }
+        at openVolume (/Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/normal-projection.spec.ts:4:14)
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/normal-projection.spec.ts:17:9
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/normal-projection-volume-c-3ab1c-mputes-ordinary-vertex-data-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/normal-projection-volume-c-3ab1c-mputes-ordinary-vertex-data-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/normal-projection-volume-c-3ab1c-mputes-ordinary-vertex-data-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/normal-projection-volume-c-3ab1c-mputes-ordinary-vertex-data-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/normal-projection-volume-c-3ab1c-mputes-ordinary-vertex-data-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  23) [chromium] › tests/e2e/normal-projection.spec.ts:51:1 › volume layer modes report the sampling path they use 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4190/demo/index.html?scenario=volume-projection
+    Call log:
+      - navigating to "http://127.0.0.1:4190/demo/index.html?scenario=volume-projection", waiting until "load"
+
+
+      2 |
+      3 | async function openVolume(page: Page, id = 'volume') {
+    > 4 |   await page.goto(`/demo/index.html?scenario=${id}`);
+        |              ^
+      5 |   await expect(page.locator('#status-text')).toContainText('Running: Volume to surface', { timeout: 20_000 });
+      6 |   await expect(page.locator('#viewer-slot canvas')).toBeVisible();
+      7 | }
+        at openVolume (/Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/normal-projection.spec.ts:4:14)
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/normal-projection.spec.ts:54:9
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/normal-projection-volume-l-81659--the-sampling-path-they-use-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/normal-projection-volume-l-81659--the-sampling-path-they-use-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/normal-projection-volume-l-81659--the-sampling-path-they-use-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/normal-projection-volume-l-81659--the-sampling-path-they-use-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/normal-projection-volume-l-81659--the-sampling-path-they-use-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  24) [chromium] › tests/e2e/normal-projection.spec.ts:123:1 › volume chapter colormap select recolours every projection method and mode 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4190/demo/index.html?scenario=volume
+    Call log:
+      - navigating to "http://127.0.0.1:4190/demo/index.html?scenario=volume", waiting until "load"
+
+
+      2 |
+      3 | async function openVolume(page: Page, id = 'volume') {
+    > 4 |   await page.goto(`/demo/index.html?scenario=${id}`);
+        |              ^
+      5 |   await expect(page.locator('#status-text')).toContainText('Running: Volume to surface', { timeout: 20_000 });
+      6 |   await expect(page.locator('#viewer-slot canvas')).toBeVisible();
+      7 | }
+        at openVolume (/Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/normal-projection.spec.ts:4:14)
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/normal-projection.spec.ts:126:9
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/normal-projection-volume-c-38691--projection-method-and-mode-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/normal-projection-volume-c-38691--projection-method-and-mode-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/normal-projection-volume-c-38691--projection-method-and-mode-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/normal-projection-volume-c-38691--projection-method-and-mode-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/normal-projection-volume-c-38691--projection-method-and-mode-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  25) [chromium] › tests/e2e/surface-geometry.spec.ts:6:1 › native morph triangles, precise picks, markers and midpoint borders agree 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4190/tests/geometry-fixture.html
+    Call log:
+      - navigating to "http://127.0.0.1:4190/tests/geometry-fixture.html", waiting until "load"
+
+
+       6 | test('native morph triangles, precise picks, markers and midpoint borders agree', async ({ page }) => {
+       7 |   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+    >  8 |   await page.goto('/tests/geometry-fixture.html'); await page.waitForFunction(() => (window as any).geometryReady);
+         |              ^
+       9 |   const samples = await page.evaluate(() => (window as any).checkAttachments());
+      10 |   for (const sample of samples) {
+      11 |     expect(sample.kind).toBe('triangle'); expect(sample.markerZ).toBeCloseTo(sample.expectedZ, 6); expect(sample.hitZ).toBeCloseTo(sample.expectedZ, 6);
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/surface-geometry.spec.ts:8:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/surface-geometry-native-mo-ac7de--and-midpoint-borders-agree-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/surface-geometry-native-mo-ac7de--and-midpoint-borders-agree-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/surface-geometry-native-mo-ac7de--and-midpoint-borders-agree-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/surface-geometry-native-mo-ac7de--and-midpoint-borders-agree-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/surface-geometry-native-mo-ac7de--and-midpoint-borders-agree-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  26) [chromium] › tests/e2e/surface-geometry.spec.ts:18:45 › esm consumer resolves standalone worker and matches synchronous results 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4190/tests/geometry-fixture.html
+    Call log:
+      - navigating to "http://127.0.0.1:4190/tests/geometry-fixture.html", waiting until "load"
+
+
+      17 |
+      18 | for (const kind of ['esm', 'umd', 'embed']) test(`${kind} consumer resolves standalone worker and matches synchronous results`, async ({ page }) => {
+    > 19 |   await page.goto('/tests/geometry-fixture.html'); await page.waitForFunction(() => (window as any).geometryReady);
+         |              ^
+      20 |   const result = await page.evaluate(k => (window as any).checkWorker(k), kind);
+      21 |   expect(result.values).toEqual(result.expected);
+      22 | });
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/surface-geometry.spec.ts:19:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/surface-geometry-esm-consu-8e3ee-matches-synchronous-results-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/surface-geometry-esm-consu-8e3ee-matches-synchronous-results-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/surface-geometry-esm-consu-8e3ee-matches-synchronous-results-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/surface-geometry-esm-consu-8e3ee-matches-synchronous-results-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/surface-geometry-esm-consu-8e3ee-matches-synchronous-results-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  27) [chromium] › tests/e2e/surface-geometry.spec.ts:18:45 › umd consumer resolves standalone worker and matches synchronous results 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4190/tests/geometry-fixture.html
+    Call log:
+      - navigating to "http://127.0.0.1:4190/tests/geometry-fixture.html", waiting until "load"
+
+
+      17 |
+      18 | for (const kind of ['esm', 'umd', 'embed']) test(`${kind} consumer resolves standalone worker and matches synchronous results`, async ({ page }) => {
+    > 19 |   await page.goto('/tests/geometry-fixture.html'); await page.waitForFunction(() => (window as any).geometryReady);
+         |              ^
+      20 |   const result = await page.evaluate(k => (window as any).checkWorker(k), kind);
+      21 |   expect(result.values).toEqual(result.expected);
+      22 | });
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/surface-geometry.spec.ts:19:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/surface-geometry-umd-consu-89c46-matches-synchronous-results-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/surface-geometry-umd-consu-89c46-matches-synchronous-results-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/surface-geometry-umd-consu-89c46-matches-synchronous-results-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/surface-geometry-umd-consu-89c46-matches-synchronous-results-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/surface-geometry-umd-consu-89c46-matches-synchronous-results-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  28) [chromium] › tests/e2e/surface-geometry.spec.ts:18:45 › embed consumer resolves standalone worker and matches synchronous results 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4190/tests/geometry-fixture.html
+    Call log:
+      - navigating to "http://127.0.0.1:4190/tests/geometry-fixture.html", waiting until "load"
+
+
+      17 |
+      18 | for (const kind of ['esm', 'umd', 'embed']) test(`${kind} consumer resolves standalone worker and matches synchronous results`, async ({ page }) => {
+    > 19 |   await page.goto('/tests/geometry-fixture.html'); await page.waitForFunction(() => (window as any).geometryReady);
+         |              ^
+      20 |   const result = await page.evaluate(k => (window as any).checkWorker(k), kind);
+      21 |   expect(result.values).toEqual(result.expected);
+      22 | });
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/surface-geometry.spec.ts:19:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/surface-geometry-embed-con-fcede-matches-synchronous-results-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/surface-geometry-embed-con-fcede-matches-synchronous-results-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/surface-geometry-embed-con-fcede-matches-synchronous-results-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/surface-geometry-embed-con-fcede-matches-synchronous-results-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/surface-geometry-embed-con-fcede-matches-synchronous-results-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  29) [chromium] › tests/e2e/surface-geometry.spec.ts:24:1 › example ruler, live brush radius and both border styles produce visible results 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4190/demo/?scenario=inspect
+    Call log:
+      - navigating to "http://127.0.0.1:4190/demo/?scenario=inspect", waiting until "load"
+
+
+      24 | test('example ruler, live brush radius and both border styles produce visible results', async ({ page }) => {
+      25 |   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+    > 26 |   await page.goto(`${demoRoot}?scenario=inspect`); await expect(page.locator('#status-text')).toContainText('Running: Inspect', { timeout: 30000 });
+         |              ^
+      27 |   await page.locator('#surface-measure-example').click();
+      28 |   const distance = page.locator('#surface-measurement'), area = page.locator('#surface-brush-area');
+      29 |   await expect(distance).toContainText('mm along surface');
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/surface-geometry.spec.ts:26:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/surface-geometry-example-r-e5707-les-produce-visible-results-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/surface-geometry-example-r-e5707-les-produce-visible-results-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/surface-geometry-example-r-e5707-les-produce-visible-results-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/surface-geometry-example-r-e5707-les-produce-visible-results-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/surface-geometry-example-r-e5707-les-produce-visible-results-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  30) [chromium] › tests/e2e/surface-geometry.spec.ts:49:1 › precise anchors move through inflation while anatomical distance and area stay fixed 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4190/demo/?scenario=anatomy&mode=morph&task=measure
+    Call log:
+      - navigating to "http://127.0.0.1:4190/demo/?scenario=anatomy&mode=morph&task=measure", waiting until "load"
+
+
+      49 | test('precise anchors move through inflation while anatomical distance and area stay fixed', async ({ page }) => {
+      50 |   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+    > 51 |   await page.goto(`${demoRoot}?scenario=anatomy&mode=morph&task=measure`);
+         |              ^
+      52 |   await expect(page.locator('#surface-measurement')).toContainText('mm along surface', { timeout: 30000 });
+      53 |   await page.locator('#anatomy-inflation').fill('0');
+      54 |   const point = await page.locator('#surface-anchor-position').textContent();
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/surface-geometry.spec.ts:51:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/surface-geometry-precise-a-11a62-istance-and-area-stay-fixed-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/surface-geometry-precise-a-11a62-istance-and-area-stay-fixed-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/surface-geometry-precise-a-11a62-istance-and-area-stay-fixed-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/surface-geometry-precise-a-11a62-istance-and-area-stay-fixed-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/surface-geometry-precise-a-11a62-istance-and-area-stay-fixed-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  31) [chromium] › tests/e2e/surface-geometry.spec.ts:66:1 › area cluster controls use physical extent and keep the threshold editable 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4190/demo/?scenario=statistics&task=area
+    Call log:
+      - navigating to "http://127.0.0.1:4190/demo/?scenario=statistics&task=area", waiting until "load"
+
+
+      66 | test('area cluster controls use physical extent and keep the threshold editable', async ({ page }) => {
+      67 |   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+    > 68 |   await page.goto(`${demoRoot}?scenario=statistics&task=area`);
+         |              ^
+      69 |   await expect(page.locator('#status-text')).toContainText('Running: Statistical maps', { timeout: 30000 });
+      70 |   await expect(page.getByRole('radio', { name: 'Cluster area (descriptive)', exact: true })).toBeChecked();
+      71 |   await expect(page.locator('#stats-cluster-t')).toBeEnabled();
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/surface-geometry.spec.ts:68:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/surface-geometry-area-clus-4054a-keep-the-threshold-editable-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/surface-geometry-area-clus-4054a-keep-the-threshold-editable-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/surface-geometry-area-clus-4054a-keep-the-threshold-editable-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/surface-geometry-area-clus-4054a-keep-the-threshold-editable-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/surface-geometry-area-clus-4054a-keep-the-threshold-editable-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  32) [chromium] › tests/e2e/surface-geometry.spec.ts:79:1 › derived smoothing follows temporal frames and survives chapter disposal 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4190/demo/?scenario=time-series&task=smoothing
+    Call log:
+      - navigating to "http://127.0.0.1:4190/demo/?scenario=time-series&task=smoothing", waiting until "load"
+
+
+      80 |   test.setTimeout(60000);
+      81 |   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+    > 82 |   await page.goto(`${demoRoot}?scenario=time-series&task=smoothing`);
+         |              ^
+      83 |   await expect(page.locator('#status-text')).toContainText('Running: Time series', { timeout: 30000 });
+      84 |   await page.locator('#surface-smoothing').check();
+      85 |   const kernel = page.locator('#surface-smoothing-status'), difference = page.locator('#surface-smoothing-difference');
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/surface-geometry.spec.ts:82:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/surface-geometry-derived-s-2c052-d-survives-chapter-disposal-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/surface-geometry-derived-s-2c052-d-survives-chapter-disposal-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/surface-geometry-derived-s-2c052-d-survives-chapter-disposal-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/surface-geometry-derived-s-2c052-d-survives-chapter-disposal-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/surface-geometry-derived-s-2c052-d-survives-chapter-disposal-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  33) [chromium] › tests/e2e/surface-geometry.spec.ts:109:1 › mapping demo supports scalar/label transfer, persisted identity, and invalid artifact recovery 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4190/demo/?scenario=data&task=mapping
+    Call log:
+      - navigating to "http://127.0.0.1:4190/demo/?scenario=data&task=mapping", waiting until "load"
+
+
+      110 |   test.setTimeout(60000);
+      111 |   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+    > 112 |   await page.goto(`${demoRoot}?scenario=data&task=mapping`);
+          |              ^
+      113 |   await expect(page.locator('#status-text')).toContainText('Running: Data in & out', { timeout: 30000 });
+      114 |   await page.getByRole('button', { name: 'Tetrahedron', exact: true }).click();
+      115 |   await expect(page.locator('#data-load-status')).toHaveText('Tetrahedron: 4 vertices, 4 faces');
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/surface-geometry.spec.ts:112:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/surface-geometry-mapping-d-c3ab0-d-invalid-artifact-recovery-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/surface-geometry-mapping-d-c3ab0-d-invalid-artifact-recovery-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/surface-geometry-mapping-d-c3ab0-d-invalid-artifact-recovery-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/surface-geometry-mapping-d-c3ab0-d-invalid-artifact-recovery-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/surface-geometry-mapping-d-c3ab0-d-invalid-artifact-recovery-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  34) [chromium] › tests/e2e/surface-geometry.spec.ts:145:1 › ribbon inspector reports a valid column on the cortical display 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4190/demo/?scenario=volume&task=column
+    Call log:
+      - navigating to "http://127.0.0.1:4190/demo/?scenario=volume&task=column", waiting until "load"
+
+
+      145 | test('ribbon inspector reports a valid column on the cortical display', async ({ page }) => {
+      146 |   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+    > 147 |   await page.goto(`${demoRoot}?scenario=volume&task=column`);
+          |              ^
+      148 |   await expect(page.locator('#status-text')).toContainText('Running: Volume to surface', { timeout: 30000 });
+      149 |   await page.locator('#ribbon-column-example').click();
+      150 |   const status = page.locator('#ribbon-column-status');
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/surface-geometry.spec.ts:147:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/surface-geometry-ribbon-in-d2023-umn-on-the-cortical-display-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/surface-geometry-ribbon-in-d2023-umn-on-the-cortical-display-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/surface-geometry-ribbon-in-d2023-umn-on-the-cortical-display-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/surface-geometry-ribbon-in-d2023-umn-on-the-cortical-display-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/surface-geometry-ribbon-in-d2023-umn-on-the-cortical-display-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  35) [chromium] › tests/e2e/surface-geometry.spec.ts:164:1 › surface tools are discoverable and keyboard operable on a narrow screen 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4190/demo/
+    Call log:
+      - navigating to "http://127.0.0.1:4190/demo/", waiting until "load"
+
+
+      164 | test('surface tools are discoverable and keyboard operable on a narrow screen', async ({ page }) => {
+      165 |   await page.setViewportSize({ width: 390, height: 844 });
+    > 166 |   await page.goto(demoRoot);
+          |              ^
+      167 |   const tools = page.locator('#surface-tools');
+      168 |   await expect(tools.getByRole('link')).toHaveCount(6);
+      169 |   const ruler = tools.getByRole('link', { name: 'Ruler & borders', exact: true });
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/surface-geometry.spec.ts:166:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/surface-geometry-surface-t-5963a-operable-on-a-narrow-screen-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/surface-geometry-surface-t-5963a-operable-on-a-narrow-screen-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/surface-geometry-surface-t-5963a-operable-on-a-narrow-screen-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/surface-geometry-surface-t-5963a-operable-on-a-narrow-screen-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/surface-geometry-surface-t-5963a-operable-on-a-narrow-screen-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  35 failed
+    [chromium] › tests/e2e/chapter-anatomy.spec.ts:32:3 › Anatomy & views chapter › opens from the chapter strip and from the old scenario ids 
+    [chromium] › tests/e2e/chapter-anatomy.spec.ts:48:3 › Anatomy & views chapter › views: anatomical views, hemisphere choice and gap respond 
+    [chromium] › tests/e2e/chapter-anatomy.spec.ts:80:3 › Anatomy & views chapter › views: camera responds to drag after a preset view 
+    [chromium] › tests/e2e/chapter-anatomy.spec.ts:91:3 › Anatomy & views chapter › clip: planes cut the surface and presets apply 
+    [chromium] › tests/e2e/chapter-anatomy.spec.ts:122:3 › Anatomy & views chapter › inflate: morph slider and stage buttons reshape the cortex 
+    [chromium] › tests/e2e/chapter-anatomy.spec.ts:177:3 › Anatomy & views chapter › flat map: linked views, seeded ROI, exports and clear 
+    [chromium] › tests/e2e/chapter-anatomy.spec.ts:214:3 › Anatomy & views chapter › flat map: a lasso drawn on the map creates an ROI 
+    [chromium] › tests/e2e/chapter-data.spec.ts:33:3 › Data in & out chapter › loads bundled samples and the local formats the copy names 
+    [chromium] › tests/e2e/chapter-data.spec.ts:62:3 › Data in & out chapter › saves, restores and shares viewer state, and downloads a scene manifest 
+    [chromium] › tests/e2e/chapter-data.spec.ts:129:3 › Data in & out chapter › alignment QA renders all panels and exposes shifted-transform metrics 
+    [chromium] › tests/e2e/chapter-inspect.spec.ts:17:3 › Inspect & annotate chapter › picks time each hover, and the picker can be switched 
+    [chromium] › tests/e2e/chapter-inspect.spec.ts:41:3 › Inspect & annotate chapter › clicks place labelled marks that can be selected, removed and cleared 
+    [chromium] › tests/e2e/chapter-statistics.spec.ts:20:3 › Statistical maps chapter › corrections start at FDR and change what survives 
+    [chromium] › tests/e2e/chapter-statistics.spec.ts:62:3 › Statistical maps chapter › hover prints statistics into the film corner 
+    [chromium] › tests/e2e/chapter-statistics.spec.ts:78:3 › Statistical maps chapter › effect × confidence mode draws a TwoDataLayer with switchable 2D colormaps 
+    [chromium] › tests/e2e/chapter-time-series.spec.ts:4:3 › Time series chapter › opens without errors, plays, pauses, scrubs and stops 
+    [chromium] › tests/e2e/chapter-time-series.spec.ts:50:3 › Time series chapter › the margin plots a vertex time course with axes, and hovering changes the vertex 
+    [chromium] › tests/e2e/demo-gallery.spec.ts:36:1 › opens First look by default with a rendered cortex, live film overlays and a public-API excerpt 
+    [chromium] › tests/e2e/demo-gallery.spec.ts:70:1 › old scenario ids open the chapter that absorbed them 
+    [chromium] › tests/e2e/demo-gallery.spec.ts:78:1 › opens the Glasser puzzle and the full-width map lab, then cleans up on reset and navigation 
+    [chromium] › tests/e2e/demo-gallery.spec.ts:126:1 › chapters stay keyboard accessible without horizontal page overflow on a small screen 
+    [chromium] › tests/e2e/normal-projection.spec.ts:14:1 › volume chapter projects along normals and recomputes ordinary vertex data 
+    [chromium] › tests/e2e/normal-projection.spec.ts:51:1 › volume layer modes report the sampling path they use 
+    [chromium] › tests/e2e/normal-projection.spec.ts:123:1 › volume chapter colormap select recolours every projection method and mode 
+    [chromium] › tests/e2e/surface-geometry.spec.ts:6:1 › native morph triangles, precise picks, markers and midpoint borders agree 
+    [chromium] › tests/e2e/surface-geometry.spec.ts:18:45 › esm consumer resolves standalone worker and matches synchronous results 
+    [chromium] › tests/e2e/surface-geometry.spec.ts:18:45 › umd consumer resolves standalone worker and matches synchronous results 
+    [chromium] › tests/e2e/surface-geometry.spec.ts:18:45 › embed consumer resolves standalone worker and matches synchronous results 
+    [chromium] › tests/e2e/surface-geometry.spec.ts:24:1 › example ruler, live brush radius and both border styles produce visible results 
+    [chromium] › tests/e2e/surface-geometry.spec.ts:49:1 › precise anchors move through inflation while anatomical distance and area stay fixed 
+    [chromium] › tests/e2e/surface-geometry.spec.ts:66:1 › area cluster controls use physical extent and keep the threshold editable 
+    [chromium] › tests/e2e/surface-geometry.spec.ts:79:1 › derived smoothing follows temporal frames and survives chapter disposal 
+    [chromium] › tests/e2e/surface-geometry.spec.ts:109:1 › mapping demo supports scalar/label transfer, persisted identity, and invalid artifact recovery 
+    [chromium] › tests/e2e/surface-geometry.spec.ts:145:1 › ribbon inspector reports a valid column on the cortical display 
+    [chromium] › tests/e2e/surface-geometry.spec.ts:164:1 › surface tools are discoverable and keyboard operable on a narrow screen 

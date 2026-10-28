@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "started_utc": "2026-10-27T21:02:40.151699+00:00",
+  "finished_utc": "2026-10-27T21:02:48.550430+00:00",
+  "duration_seconds": 8.398417,
+  "command": [
+    "npx",
+    "playwright",
+    "test",
+    "tests/e2e/surface-geometry.spec.ts",
+    "--grep",
+    "derived smoothing|mapping demo|ribbon inspector",
+    "--workers=1",
+    "--output=/tmp/surfview-demo-production-results"
+  ],
+  "cwd": "/Users/bbuchsbaum/code/jscode/surfviewjs",
+  "log": "/tmp/surfview-demo-geometry-production-20261027.log",
+  "exit_code": 0,
+  "child_returncode": 0,
+  "reason": "exited",
+  "detail": null,
+  "timeout_seconds": 600.0,
+  "log_bytes": 674
+}

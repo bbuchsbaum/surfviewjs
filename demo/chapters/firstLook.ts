@@ -89,6 +89,20 @@ export const firstLook: Scenario = {
       for (const id of ['lh', 'rh']) viewer.updateLayer(id, 'map', changes);
     };
 
+    const tools = section(ctx.panel, 'Explore surface tools');
+    tools.id = 'surface-tools';
+    const links = actions(tools);
+    for (const [label, query] of [
+      ['Ruler & borders', 'scenario=inspect&task=measure'],
+      ['Anchors through inflation', 'scenario=anatomy&mode=morph&task=measure'],
+      ['Area clusters', 'scenario=statistics&task=area'],
+      ['Physical smoothing', 'scenario=time-series&task=smoothing'],
+      ['Surface mapping', 'scenario=data&task=mapping'],
+      ['Ribbon columns', 'scenario=volume&task=column']
+    ]) {
+      const link = document.createElement('a'); link.className = 'action'; link.href = `?${query}`; link.textContent = label!; links.append(link);
+    }
+
     const view = section(ctx.panel, 'View');
     choice(view, {
       id: 'first-look-view',

@@ -1,0 +1,268 @@
+{
+  "route": "10k-164k",
+  "source": {
+    "file": "/tmp/surfview-hcp-fixtures/fsaverage5_std_sphere.L.10k_fsavg_L.surf.gii",
+    "sha256": "38b13855694098fde897ef3984f0420bd6bce4eac1562ce0c285bcaf565d56b8",
+    "vertices": 10242,
+    "areaFile": "/tmp/surfview-anatomical/fsaverage10k-midthickness.surf.gii",
+    "areaSha256": "995bc3ec334db893f4e23cdc15308a9e79d33c71a4b5f3ced11cfb7bf8af9bdf"
+  },
+  "target": {
+    "file": "/tmp/surfview-hcp-fixtures/fsaverage_std_sphere.L.164k_fsavg_L.surf.gii",
+    "sha256": "9bf5b673cc1c4738b1137ac53ff724ff0ef45e12f5550448efa2da50bb521c32",
+    "vertices": 163842,
+    "areaFile": "/tmp/surfview-anatomical/fsaverage164k-midthickness.surf.gii",
+    "areaSha256": "6420425e7760b4bedd6855cfa88f57af8e0fc01455ef9ff14009d9133722d4fc"
+  },
+  "cases": [
+    {
+      "method": "barycentric-closest",
+      "masked": false,
+      "referenceCache": "/tmp/surfview-anatomical-qualified-20261027/10k-164k",
+      "projectionProfile": "binary32-chart-fma-v1",
+      "sphereNormalization": "radius",
+      "buildMs": 2873.7676249999995,
+      "scalar": {
+        "maxAbsoluteError": 6.001727411164559e-7,
+        "rms": 2.6542526410239764e-7,
+        "count": 163842,
+        "maskMismatches": 0,
+        "supportMismatchVertexIds": [],
+        "nonfinite": 0,
+        "nonfiniteVertexIds": [],
+        "mismatchCount": 0,
+        "exactTies": 0,
+        "worstVertexIds": [],
+        "passed": true,
+        "command": [
+          "-metric-resample",
+          "/tmp/surfview-anatomical-complete-20261027/10k-164k/scalar.func.gii",
+          "/tmp/surfview-hcp-fixtures/fsaverage5_std_sphere.L.10k_fsavg_L.surf.gii",
+          "/tmp/surfview-hcp-fixtures/fsaverage_std_sphere.L.164k_fsavg_L.surf.gii",
+          "BARYCENTRIC",
+          "/tmp/surfview-anatomical-complete-20261027/10k-164k/barycentric-closest-false-scalar.func.gii",
+          "-valid-roi-out",
+          "/tmp/surfview-anatomical-complete-20261027/10k-164k/barycentric-closest-false-scalar.roi.func.gii"
+        ]
+      },
+      "labels": {
+        "maxAbsoluteError": 202,
+        "rms": 0.7057546478269964,
+        "count": 163842,
+        "maskMismatches": 0,
+        "supportMismatchVertexIds": [],
+        "nonfinite": 0,
+        "nonfiniteVertexIds": [],
+        "mismatchCount": 5,
+        "exactTies": 5,
+        "worstVertexIds": [
+          11031,
+          13431,
+          32205,
+          34563,
+          36483
+        ],
+        "passed": true,
+        "command": [
+          "-label-resample",
+          "/tmp/surfview-anatomical-complete-20261027/10k-164k/labels.label.gii",
+          "/tmp/surfview-hcp-fixtures/fsaverage5_std_sphere.L.10k_fsavg_L.surf.gii",
+          "/tmp/surfview-hcp-fixtures/fsaverage_std_sphere.L.164k_fsavg_L.surf.gii",
+          "BARYCENTRIC",
+          "/tmp/surfview-anatomical-complete-20261027/10k-164k/barycentric-closest-false-labels.label.gii",
+          "-valid-roi-out",
+          "/tmp/surfview-anatomical-complete-20261027/10k-164k/barycentric-closest-false-labels.roi.func.gii"
+        ]
+      }
+    },
+    {
+      "method": "adaptive-barycentric-area",
+      "masked": false,
+      "referenceCache": "/tmp/surfview-anatomical-qualified-20261027/10k-164k",
+      "projectionProfile": "binary32-chart-fma-v1",
+      "sphereNormalization": "radius",
+      "buildMs": 5003.649208,
+      "scalar": {
+        "maxAbsoluteError": 6.960363133079461e-7,
+        "rms": 2.669650824510517e-7,
+        "count": 163842,
+        "maskMismatches": 0,
+        "supportMismatchVertexIds": [],
+        "nonfinite": 0,
+        "nonfiniteVertexIds": [],
+        "mismatchCount": 0,
+        "exactTies": 0,
+        "worstVertexIds": [],
+        "passed": true,
+        "command": [
+          "-metric-resample",
+          "/tmp/surfview-anatomical-complete-20261027/10k-164k/scalar.func.gii",
+          "/tmp/surfview-hcp-fixtures/fsaverage5_std_sphere.L.10k_fsavg_L.surf.gii",
+          "/tmp/surfview-hcp-fixtures/fsaverage_std_sphere.L.164k_fsavg_L.surf.gii",
+          "ADAP_BARY_AREA",
+          "/tmp/surfview-anatomical-complete-20261027/10k-164k/adaptive-barycentric-area-false-scalar.func.gii",
+          "-area-surfs",
+          "/tmp/surfview-anatomical/fsaverage10k-midthickness.surf.gii",
+          "/tmp/surfview-anatomical/fsaverage164k-midthickness.surf.gii",
+          "-valid-roi-out",
+          "/tmp/surfview-anatomical-complete-20261027/10k-164k/adaptive-barycentric-area-false-scalar.roi.func.gii"
+        ]
+      },
+      "labels": {
+        "maxAbsoluteError": 0,
+        "rms": 0,
+        "count": 163842,
+        "maskMismatches": 0,
+        "supportMismatchVertexIds": [],
+        "nonfinite": 0,
+        "nonfiniteVertexIds": [],
+        "mismatchCount": 0,
+        "exactTies": 0,
+        "worstVertexIds": [],
+        "passed": true,
+        "command": [
+          "-label-resample",
+          "/tmp/surfview-anatomical-complete-20261027/10k-164k/labels.label.gii",
+          "/tmp/surfview-hcp-fixtures/fsaverage5_std_sphere.L.10k_fsavg_L.surf.gii",
+          "/tmp/surfview-hcp-fixtures/fsaverage_std_sphere.L.164k_fsavg_L.surf.gii",
+          "ADAP_BARY_AREA",
+          "/tmp/surfview-anatomical-complete-20261027/10k-164k/adaptive-barycentric-area-false-labels.label.gii",
+          "-area-surfs",
+          "/tmp/surfview-anatomical/fsaverage10k-midthickness.surf.gii",
+          "/tmp/surfview-anatomical/fsaverage164k-midthickness.surf.gii",
+          "-valid-roi-out",
+          "/tmp/surfview-anatomical-complete-20261027/10k-164k/adaptive-barycentric-area-false-labels.roi.func.gii"
+        ]
+      }
+    },
+    {
+      "method": "barycentric-closest",
+      "masked": true,
+      "referenceCache": "/tmp/surfview-anatomical-qualified-20261027/10k-164k",
+      "projectionProfile": "binary32-chart-fma-v1",
+      "sphereNormalization": "radius",
+      "buildMs": 3008.9948330000007,
+      "scalar": {
+        "maxAbsoluteError": 6.230506699456129e-7,
+        "rms": 2.666379307175171e-7,
+        "count": 163426,
+        "maskMismatches": 0,
+        "supportMismatchVertexIds": [],
+        "nonfinite": 0,
+        "nonfiniteVertexIds": [],
+        "mismatchCount": 0,
+        "exactTies": 0,
+        "worstVertexIds": [],
+        "passed": true,
+        "command": [
+          "-metric-resample",
+          "/tmp/surfview-anatomical-complete-20261027/10k-164k/scalar.func.gii",
+          "/tmp/surfview-hcp-fixtures/fsaverage5_std_sphere.L.10k_fsavg_L.surf.gii",
+          "/tmp/surfview-hcp-fixtures/fsaverage_std_sphere.L.164k_fsavg_L.surf.gii",
+          "BARYCENTRIC",
+          "/tmp/surfview-anatomical-complete-20261027/10k-164k/barycentric-closest-true-scalar.func.gii",
+          "-current-roi",
+          "/tmp/surfview-anatomical-complete-20261027/10k-164k/roi.func.gii",
+          "-valid-roi-out",
+          "/tmp/surfview-anatomical-complete-20261027/10k-164k/barycentric-closest-true-scalar.roi.func.gii"
+        ]
+      },
+      "labels": {
+        "maxAbsoluteError": 202,
+        "rms": 0.7066523242538496,
+        "count": 163426,
+        "maskMismatches": 0,
+        "supportMismatchVertexIds": [],
+        "nonfinite": 0,
+        "nonfiniteVertexIds": [],
+        "mismatchCount": 5,
+        "exactTies": 5,
+        "worstVertexIds": [
+          11031,
+          13431,
+          32205,
+          34563,
+          36483
+        ],
+        "passed": true,
+        "command": [
+          "-label-resample",
+          "/tmp/surfview-anatomical-complete-20261027/10k-164k/labels.label.gii",
+          "/tmp/surfview-hcp-fixtures/fsaverage5_std_sphere.L.10k_fsavg_L.surf.gii",
+          "/tmp/surfview-hcp-fixtures/fsaverage_std_sphere.L.164k_fsavg_L.surf.gii",
+          "BARYCENTRIC",
+          "/tmp/surfview-anatomical-complete-20261027/10k-164k/barycentric-closest-true-labels.label.gii",
+          "-current-roi",
+          "/tmp/surfview-anatomical-complete-20261027/10k-164k/roi.func.gii",
+          "-valid-roi-out",
+          "/tmp/surfview-anatomical-complete-20261027/10k-164k/barycentric-closest-true-labels.roi.func.gii"
+        ]
+      }
+    },
+    {
+      "method": "adaptive-barycentric-area",
+      "masked": true,
+      "referenceCache": "/tmp/surfview-anatomical-qualified-20261027/10k-164k",
+      "projectionProfile": "binary32-chart-fma-v1",
+      "sphereNormalization": "radius",
+      "buildMs": 4225.833417,
+      "scalar": {
+        "maxAbsoluteError": 6.960363133079461e-7,
+        "rms": 2.679752821751067e-7,
+        "count": 163426,
+        "maskMismatches": 0,
+        "supportMismatchVertexIds": [],
+        "nonfinite": 0,
+        "nonfiniteVertexIds": [],
+        "mismatchCount": 0,
+        "exactTies": 0,
+        "worstVertexIds": [],
+        "passed": true,
+        "command": [
+          "-metric-resample",
+          "/tmp/surfview-anatomical-complete-20261027/10k-164k/scalar.func.gii",
+          "/tmp/surfview-hcp-fixtures/fsaverage5_std_sphere.L.10k_fsavg_L.surf.gii",
+          "/tmp/surfview-hcp-fixtures/fsaverage_std_sphere.L.164k_fsavg_L.surf.gii",
+          "ADAP_BARY_AREA",
+          "/tmp/surfview-anatomical-complete-20261027/10k-164k/adaptive-barycentric-area-true-scalar.func.gii",
+          "-area-surfs",
+          "/tmp/surfview-anatomical/fsaverage10k-midthickness.surf.gii",
+          "/tmp/surfview-anatomical/fsaverage164k-midthickness.surf.gii",
+          "-current-roi",
+          "/tmp/surfview-anatomical-complete-20261027/10k-164k/roi.func.gii",
+          "-valid-roi-out",
+          "/tmp/surfview-anatomical-complete-20261027/10k-164k/adaptive-barycentric-area-true-scalar.roi.func.gii"
+        ]
+      },
+      "labels": {
+        "maxAbsoluteError": 0,
+        "rms": 0,
+        "count": 163426,
+        "maskMismatches": 0,
+        "supportMismatchVertexIds": [],
+        "nonfinite": 0,
+        "nonfiniteVertexIds": [],
+        "mismatchCount": 0,
+        "exactTies": 0,
+        "worstVertexIds": [],
+        "passed": true,
+        "command": [
+          "-label-resample",
+          "/tmp/surfview-anatomical-complete-20261027/10k-164k/labels.label.gii",
+          "/tmp/surfview-hcp-fixtures/fsaverage5_std_sphere.L.10k_fsavg_L.surf.gii",
+          "/tmp/surfview-hcp-fixtures/fsaverage_std_sphere.L.164k_fsavg_L.surf.gii",
+          "ADAP_BARY_AREA",
+          "/tmp/surfview-anatomical-complete-20261027/10k-164k/adaptive-barycentric-area-true-labels.label.gii",
+          "-area-surfs",
+          "/tmp/surfview-anatomical/fsaverage10k-midthickness.surf.gii",
+          "/tmp/surfview-anatomical/fsaverage164k-midthickness.surf.gii",
+          "-current-roi",
+          "/tmp/surfview-anatomical-complete-20261027/10k-164k/roi.func.gii",
+          "-valid-roi-out",
+          "/tmp/surfview-anatomical-complete-20261027/10k-164k/adaptive-barycentric-area-true-labels.roi.func.gii"
+        ]
+      }
+    }
+  ],
+  "isolatedProcessMaxRssBytes": 597049344
+}

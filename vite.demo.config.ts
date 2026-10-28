@@ -17,7 +17,7 @@ export default defineConfig({
   assetsInclude: ['**/*.gii'],
   server: {
     fs: {
-      allow: [demoRoot, resolve(__dirname, 'tests/data')]
+      allow: [demoRoot, resolve(__dirname, 'src'), resolve(__dirname, 'tests/data'), resolve(__dirname, 'node_modules/@fontsource-variable')]
     }
   },
   build: {

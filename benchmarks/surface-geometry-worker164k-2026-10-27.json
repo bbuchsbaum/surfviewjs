@@ -1,0 +1,31 @@
+{
+  "vertices": 163842,
+  "fwhmMm": 2,
+  "inputSha256": "6420425e7760b4bedd6855cfa88f57af8e0fc01455ef9ff14009d9133722d4fc",
+  "bundleSha256": "38947e1a65bb83926f1e8dbc1ea9d9c3f7604ed4896928940204839a25174d29",
+  "note": "Node worker_threads with Web Worker transport adapter; round trips include client copies and structured cloning. Not browser GPU upload timing.",
+  "runtime": "v26.7.0",
+  "registrationBuildPrepareMs": 12877.824916,
+  "maxOrdinaryDifference": 0,
+  "constantError": 1.2434497875801753e-14,
+  "batch16RoundTripMs": {
+    "p50": 1047.7247500000012,
+    "p95": 1095.7696250000008,
+    "samplesMs": [
+      977.512541,
+      1017.4441250000018,
+      1047.1647919999996,
+      1047.7247500000012,
+      1050.9555,
+      1064.489625000002,
+      1095.7696250000008
+    ],
+    "warmup": 1
+  },
+  "cancellation": {
+    "cancelled": true
+  },
+  "clientCancellationMs": 0.6025410000002012,
+  "workerReleaseAfterAbortMs": 3.862291000001278,
+  "processMaxRssBytes": 1343520768
+}

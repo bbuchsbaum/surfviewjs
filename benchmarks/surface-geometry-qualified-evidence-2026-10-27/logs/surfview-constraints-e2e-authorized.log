@@ -1,0 +1,70 @@
+1: starting server using command "vite --host 127.0.0.1 --port 4192 --strictPort"
+and when url "[ 'http://127.0.0.1:4192/tests/geometry-fixture.html' ]" is responding with HTTP status code 200
+running tests using command "playwright test tests/e2e/surface-geometry.spec.ts --workers=1"
+
+
+  VITE v8.2.2  ready in 88 ms
+
+  ➜  Local:   http://127.0.0.1:4192/
+
+Running 14 tests using 1 worker
+
+(node:63548) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 [chromium] › tests/e2e/surface-geometry.spec.ts:6:1 › native morph triangles, precise picks, markers and midpoint borders agree (992ms)
+  ✓   2 [chromium] › tests/e2e/surface-geometry.spec.ts:18:45 › esm consumer resolves standalone worker and matches synchronous results (389ms)
+  ✓   3 [chromium] › tests/e2e/surface-geometry.spec.ts:18:45 › umd consumer resolves standalone worker and matches synchronous results (562ms)
+7:53:20 PM [vite] (client) [console.warn] THREE.WARNING: Multiple instances of Three.js being imported.
+  ✓   4 [chromium] › tests/e2e/surface-geometry.spec.ts:18:45 › embed consumer resolves standalone worker and matches synchronous results (459ms)
+7:53:20 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+7:53:20 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+7:53:20 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+7:53:20 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+7:53:20 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓   5 [chromium] › tests/e2e/surface-geometry.spec.ts:24:1 › example ruler, live brush radius and both border styles produce visible results (4.0s)
+7:53:24 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+7:53:24 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+7:53:24 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+7:53:24 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+7:53:24 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓   6 [chromium] › tests/e2e/surface-geometry.spec.ts:49:1 › precise anchors move through inflation while anatomical distance and area stay fixed (2.1s)
+7:53:26 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+7:53:26 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+7:53:26 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+7:53:26 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+7:53:26 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓   7 [chromium] › tests/e2e/surface-geometry.spec.ts:66:1 › area cluster controls use physical extent and keep the threshold editable (1.1s)
+7:53:27 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+7:53:27 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+7:53:27 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+7:53:28 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+7:53:28 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓   8 [chromium] › tests/e2e/surface-geometry.spec.ts:79:1 › derived smoothing follows temporal frames and survives chapter disposal (2.7s)
+7:53:30 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+7:53:30 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+7:53:30 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+7:53:31 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+7:53:31 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓   9 [chromium] › tests/e2e/surface-geometry.spec.ts:109:1 › mapping demo supports scalar/label transfer, persisted identity, and invalid artifact recovery (1.6s)
+7:53:32 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+7:53:32 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+7:53:32 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+7:53:33 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+7:53:33 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓  10 [chromium] › tests/e2e/surface-geometry.spec.ts:145:1 › ribbon inspector reports a valid column on the cortical display (1.6s)
+7:53:33 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+7:53:33 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+7:53:33 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+7:53:33 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+7:53:33 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+7:53:34 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+7:53:34 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+7:53:34 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+7:53:34 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+7:53:34 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓  11 [chromium] › tests/e2e/surface-geometry.spec.ts:164:1 › surface tools are discoverable and keyboard operable on a narrow screen (1.8s)
+  ✓  12 [chromium] › tests/e2e/surface-geometry.spec.ts:180:1 › folded strokes remain visible at two zoom levels and preserve cortical occlusion (599ms)
+  ✓  13 [chromium] › tests/e2e/surface-geometry.spec.ts:190:1 › prepared worker batches retain dependencies, snapshot frames, cancel and release (385ms)
+  ✓  14 [chromium] › tests/e2e/surface-geometry.spec.ts:199:1 › streamed worker batches snapshot distinct masks and reject stale delivery (393ms)
+
+  14 passed (19.1s)

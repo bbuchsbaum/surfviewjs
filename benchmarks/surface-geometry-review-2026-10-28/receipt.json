@@ -1,0 +1,159 @@
+{
+  "recordedAt": "2026-10-28T15:37:09.708785+00:00",
+  "baseCommit": "e3501fd1a4cc476b2a1f77315b600e833c8c5173",
+  "upstreamIntegration": "Fast-forwarded origin/main e3501fd1a4cc476b2a1f77315b600e833c8c5173 before final validation; no conflicts.",
+  "fixes": [
+    "Namespaced shared worker requests, replies and cancellation",
+    "Terminal worker failure and ownership-aware cleanup",
+    "Compacted annotation GPU position/color upload ranges",
+    "Annotation revisions cover morph identities, relative mode and interleaved buffers",
+    "Shared annotation geometry disposal and instanced material color setup",
+    "Ill-conditioned double projection uses exact dyadic region and edge selection"
+  ],
+  "checks": {
+    "unit": {
+      "files": 109,
+      "tests": 1255,
+      "exitCode": 0
+    },
+    "types": {
+      "exitCode": 0
+    },
+    "build": {
+      "exitCode": 0
+    },
+    "browser": {
+      "tests": 16,
+      "exitCode": 0
+    },
+    "consumers": {
+      "exitCode": 0
+    }
+  },
+  "sourceSha256": {
+    "demo/chapters/anatomy.ts": "c2351b81364c21e7387e17865b9699b6a39aec49a10fb429286b98b3d4894e79",
+    "demo/chapters/dataInOut.ts": "18a744b5c28a320ee01f193d6e9b8dcd69deee3c46102b0c9a6bf38dec1338a6",
+    "demo/chapters/firstLook.ts": "86b944308f25567a5a81ca681f721007794a0e5c44b8d5d14951e2b79edb5c76",
+    "demo/chapters/inspect.ts": "829e1769fc4b9a617081ecc6a92ffa8fb6d1d9f25f9caa81ae2558d9958e5599",
+    "demo/chapters/statistics.ts": "b8e80081e004c301bf1f9aa9a33755f904ae36079edd4e85f0cbdc973a65c716",
+    "demo/chapters/timeSeries.ts": "f6eab7f8c221753a50d26c00eae8f1662e61b5542d6cc3bcb995cf6b07dcb82e",
+    "demo/chapters/volume.ts": "ce2f03ba191c102ca26748cc71a43b47e3254fe2687ec5395d26a9ab8faa786e",
+    "demo/excerpts/anatomy.ts": "4bdf90770bebc7ad9f1c10dadde467df94a6b05d365fdcc54e1d332846e251db",
+    "demo/excerpts/dataInOut.ts": "0f01fed0d263175ee5d77c074627c86010ec33d4fd16d1d7316f4809bebc2c4b",
+    "demo/excerpts/inspect.ts": "24af560553508d4465e5bcf94ed1330b790e11fd87b554b71a9719d7683548cb",
+    "demo/excerpts/statistics.ts": "885dc25f4485957f7f6870ef44358fed4ab9e17549047d4eebcab24f9844f324",
+    "demo/excerpts/timeSeries.ts": "b9f786cc2face687542c18bdf38ff04e33fc48eab81790c2aa5b31d55c620939",
+    "demo/excerpts/volume.ts": "975f7cc2b5bf3420a5afb1530b06b07fce3847b9ac634fd887bae2dc2919ef21",
+    "demo/kit/ribbon-columns.ts": "dd04f116b73769827bbb42838a579f0e5b13e7dc354b20dcb6e8b45b78fa4f7e",
+    "demo/kit/surface-geometry.ts": "c221f74e74ac5309a5a0ba389004507aa3d8f21864dd9c2cadbf59f56c0d58ac",
+    "demo/kit/surface-mapping.ts": "4e5ea8b19b55796440ff3fd10a6c40f820edad3d96b6b9de28dadd8f2499ca35",
+    "demo/kit/surface-measurements.ts": "a55c8bb7b453cb5b65c89f5e0d81d94c82a5d01aa30aa62dff4721f285f1589d",
+    "demo/kit/surface-smoothing.ts": "400e3343aa5b24335aff111af120d167066c764cdc551af3d8dd6606d8278d22",
+    "docs/.vitepress/config.ts": "13d0d102fe6b33539ad9b807a380a875dbf32c7ef44ed4b3728d0a0e7b819b56",
+    "docs/architecture/surface-geometry-implementation.md": "83e4ade29de4ff020a60dcbb24882c4dc02b0c06bb4e4603ea0542e52f62a4b7",
+    "docs/architecture/surface-geometry-plan.md": "9a637250dfe3215b428b93d18222c70e5fbbd1b22eed8e26fd110fff13bc9d95",
+    "docs/guide/surface-geometry.md": "a4644bf7418aabe5413366c39f4c286c85417a00f238b411731208428baa572a",
+    "examples/surface-geometry.ts": "076df9015fdaa6fccd6498f058182cab20ec9424dba4e7acc8f4fa4e7ef89526",
+    "package.json": "8f03bb99d1855cdf71adeea35eb3d9a5770d67dcc3766dd3514cc46404008c03",
+    "scripts/benchmark-browser-geometry.mjs": "ec5c7044f26e6aaaeaaef43756ac5f9c86d1b9dee92fcfcef3f12b98367d2a2d",
+    "scripts/benchmark-cortical-geometry.mjs": "21362e646bf391c46bafcb73ae36ef853b5bc1f812b250328053c886fa9ca0b8",
+    "scripts/benchmark-streamed-batches.mjs": "2a730dd46a2ad2adc88f22f3888e1ae5b143eafa0414155500fed8949a210ab1",
+    "scripts/benchmark-surface-geometry.mjs": "a84ceb98a927c3ed0056d9a3739a5a5b662d291792dbb33741c3ada85acfde79",
+    "scripts/benchmark-worker-batches.mjs": "d163b4a48ae1911d6d32f616bc46e6273c46f1b762e141e45bf66d4dd22fa3f0",
+    "scripts/check-documentation-examples.mjs": "adecd02840c2e536900c7457296a6389f210cba604a9610f879009897930c108",
+    "scripts/check-package-consumers.mjs": "48a04eb85257d7df5af145ca972e6b3e33f418b4d408c508f0f05907e7c1c7f2",
+    "scripts/qualify-anatomical-ribbon.mjs": "7bbdddc443a0cfb1cd1938b7e8d871cc19e75a3922759a836eb209beac824888",
+    "scripts/qualify-ribbon-independent.py": "5b15210b646070d5ce839e8976365c4b71b8e8956221a7fbac676d4a6ea86da7",
+    "scripts/qualify-surface-geometry.mjs": "ee7981762603a9fd929aa5a246b891c0d6e55c0f5ac09100780afe509a6ee678",
+    "scripts/qualify-template-resampling.mjs": "3774d1fbd70994e963e67c66d23cbcc5514773a0b8b7aeab752cd5f49718d69d",
+    "src/LayerRegistry.ts": "c6ef61f9054ce5c64e81fb0b8abf8b9a166b4029eb25ed39f674cc43be0a8b1e",
+    "src/MultiLayerNeuroSurface.ts": "b5d880a279ad32fa90026dca17f58156c7a40360a9600f6e7c19fdba0e2cbc14",
+    "src/NeuroSurfaceViewer.ts": "e6124118978864cf8fdd1f54cebf486ff9ddf07c3a1f5856516978f4be4fe534",
+    "src/OutlineLayer.ts": "0c5fa64e1a0ea4d0107f6f09b31338ababc1850fef02b6b06022bae2aa6b0390",
+    "src/annotations.ts": "e2decb38e81203444bad960545394ca0f20ed110a16f35992dbbafc594a5e128",
+    "src/geometry/Binary32Chart.ts": "8aae75222bab8c8366efb741f53a1b043f36ba078ba01fac010891f994921d7a",
+    "src/geometry/DisplayGeometryBinding.ts": "e01c6d5d9c95a4ce5e665b74724a7abe97f57d6362268eb23d79bde607aaee5e",
+    "src/geometry/ExactTriangleProjection.ts": "d096ae0e5835ad61b67b7b6d851430d97407bf48cd643d6d7a8a697159ba4dc8",
+    "src/geometry/GeodesicIndex.ts": "3f43424781e832d513a303ea5e60e19bacf73538768e73c896c21b6527256e7b",
+    "src/geometry/GeometryError.ts": "5c036bb0c2de0dfb82f1d896bcc5b223731ad310b2c7911edc8fe91f84b98901",
+    "src/geometry/GeometryExecutor.ts": "52f9a5936879eba3d81f9a209bff7eb5264862b202a7d71ec25c7adde1ceb30e",
+    "src/geometry/GeometryWorkerClient.ts": "4129272a5aa9757e394c4902499f76cdef0e102d89c4f80adcba6243d6d284d7",
+    "src/geometry/PreparedSmoothing.ts": "fa5a29d0e6aafc60840ef57c7be8dbed5de32d1c4706fd37bb1c040ed908294c",
+    "src/geometry/RibbonIntegration.ts": "6a90df664b16176f21580420bc5279508dd746decc24224ba5209a11c2cd9caf",
+    "src/geometry/SparsePlan.ts": "5a0e6b2dd6b9d1f6bc83de5b3c53977fe48ea3bf3e1ae9d4777d854226edc817",
+    "src/geometry/SurfaceArea.ts": "da10c1425449febe8d01bbb1f1c59aceec6dab80c21515e4fdd3773f1f2a406a",
+    "src/geometry/SurfaceBoundaries.ts": "0dd68379077de189a4bf14b699709fe0158ec70baa1ae54c8f2ed79cd6825cdb",
+    "src/geometry/SurfaceCurves.ts": "392567a81a9d7be0a49477ed323f758fbbde8e3171a8ef0c769c5732f96a2ced",
+    "src/geometry/SurfaceDomain.ts": "d7a09834d4fc6d1d5e8394bbd2ce29d8e1f20a6b96e4e8f59b0ca45db003673b",
+    "src/geometry/SurfaceLocation.ts": "c3f5e7ad000854744ca182b56b3bee05d2df29e92dfd2e4df60a711c0e17311a",
+    "src/geometry/SurfacePolyline.ts": "2830ed9b5c957ba3104913399b3958d98cf3c643c790c1738c5d1d74ff5be3a8",
+    "src/geometry/SurfaceResampling.ts": "ddd97bf0fe313067c5297578ac4ef722310b0ad91c637539e8663775848c1e0a",
+    "src/geometry/SurfaceSmoothing.ts": "28ac5c4143b0c7ab3175ce610d90e428041fa9eac517aeff46f55ee1141594fb",
+    "src/geometry/SurfaceTopology.ts": "a2baaa96c43d6688288cefdf8dad51233555bc0e048e493267d46afd8a90be2a",
+    "src/geometry/SurfaceTriangleIndex.ts": "48ab9d082bfc9facc7e34ae405a685f648a3258d6c909fa91bea21ab1cd5c5ec",
+    "src/geometry/geometryWorker.ts": "b63de075368d853b2ac1f852e18f9b1b4a6c7bca6d6a6ff88ae1f2937d21ea04",
+    "src/geometry/geometryWorkerProtocol.ts": "62e506cf5006af82841a0f04873bbd42ea3ce90d9d265afd4bfe22f894dc2769",
+    "src/geometry/index.ts": "34d861c46ce2adc0820898d66bdb6f8b2c2fe3a07b6c47392b3c5d6c10ac1dd3",
+    "src/geometry/labelPartition.ts": "ac6870e4d67628a09f9d620b5a9d099f2aea4b871efa609142979144e87f072a",
+    "src/index.ts": "a611abfc8483f81cb11bf5c412a988b4da588960c1b129abe49d763758795a6c",
+    "src/layers/StatisticalMapLayer.ts": "a5a23997ddbcb7f58559f1d4e820af46ce508aab615a6274e80bd0222ae094e6",
+    "src/puzzle/parcelPatches.ts": "3178652bee3ed87953a094d20dd2d6ba925b1b4f5eac938a33b5d6cb7566c0b9",
+    "src/viewer/ViewerPickingController.ts": "52273a22af8e70a459cba25f5122c9a3f48d28429abbd81573ea22f971e44888",
+    "tests/e2e/surface-geometry.spec.ts": "7b949911f7425ca3e26125920167c3d9bc12736cf892ecaef1059b8c3554aac2",
+    "tests/geometry-fixture.html": "0af6e808d74ba61e72e3940c9ac80f709ae2d8de03a7959f6b2e14bb4591150a",
+    "tests/geometry-performance.html": "12e6ed311632ea73c64de86d4faec079bfa6982056f5b3dc93ecffa07e9e6afc",
+    "tests/types/surface-geometry-contract.ts": "eacde2d78cd8cdb51ae2f7fcc418ce15f86776c4e7e6e328c65ed786e59dacb4",
+    "tests/unit/geometry/annotation-regressions.test.ts": "51fb9ad137590cfde5a3e44f5af911f6b456c11b7457f1e39fd0c4589bf38dc7",
+    "tests/unit/geometry/binary32-fixture.json": "45312004fd22f5c02e868a87aadd5642dc623ce4be25b5432b1d57f1a8366192",
+    "tests/unit/geometry/binary32-halfspace-fixture.json": "a7bb4deac01400970191036798e2e8702b9fc617267b19650ac0c82df95444ae",
+    "tests/unit/geometry/binary32-projection.test.ts": "7e8d8d22155b32128228efec7b276ea0c861c1c70d6015b0fd0f619a47922a55",
+    "tests/unit/geometry/binary32-vertex-fixture.json": "02857b1f45495a25ccdc2f54a7eed955e27879671d6834c48f922c37e0f6324a",
+    "tests/unit/geometry/closest-triangle-projection.test.ts": "018e13d27f20c9c50f8d6a4254b45f56061eb14facffe4229f9ec9d88a24d051",
+    "tests/unit/geometry/dense-smoothing.test.ts": "6a72214ea7baad45f33f4972e5f44c865c71818d5bef75f118629ad38bdb8285",
+    "tests/unit/geometry/prepared-smoothing.test.ts": "dbdf87bb173d6989f59610f73144f4d8c2727c2d31643cc3949db041dded7dd2",
+    "tests/unit/geometry/sphere-normalization.test.ts": "7f3d64e08178ebf5fb0c72358c689bba36f449f2b1f37f8ebeeee93f60f3b33e",
+    "tests/unit/geometry/streamed-batch.test.ts": "d9755251cf56ad643a306922834791798f07cbedc92bf0844dfea0cedd5c2c76",
+    "tests/unit/geometry/surface-computation.test.ts": "29ba2af72d23c735be9587b14ba518678790ce81d0adad92617493085ef1d233",
+    "tests/unit/geometry/surface-domain.test.ts": "ffc98556f9cf6a93c63303c235f8e8d8726eb588e2724558c17a2be49e1e97d8",
+    "tests/unit/geometry/surface-geometry.test.ts": "d022c54ae673cf16e80e11e2b5b4b80adf0bd3ea9de72fdab007a8191d65df06",
+    "tests/unit/geometry/surface-integration.test.ts": "761bfd831d1eb37691d9a55a0327038accd7cd0e300aae71f11b4366ed068f01",
+    "tests/unit/geometry/surface-strokes.test.ts": "400ba079bdfc3473e6fcb438f11767d10621380711bb8c09786582dfac66a683",
+    "tests/unit/report-scene-fixture.ts": "5979e53701fefef3fb3452993a30b7140e11a17a8b459fac07719f37f7487184",
+    "tests/unit/viewer-control-target.test.ts": "9deb549d7669f209c48bb1e9210c384d40e0be7ad71fdf27f7fcbfc844e2648a",
+    "vite.config.geometry-worker.js": "09a772241c970e5313336a744a0f3cf23f893a7213c72c31334ed880f2f69f14",
+    "vite.config.js": "1e6d101629f5b3dbd7e4f18f3166446baecb2bd1d0d9f45b2e912af513987920",
+    "vite.demo.config.ts": "75e67a969f43e93452ed16f53abca54c08bf24149fcbdd4294dcce2e8daa0af0"
+  },
+  "runtimeSha256": {
+    "dist/surfview.es.js": "5928132ed0e560462f980706b4518fa35dde9d99db66c4488fc883c9366d80ae",
+    "dist/surfview.umd.js": "4940d9513c1124820fff80635ee9010e1c5e8d0678d5ad29083b9c7a75696a2f",
+    "dist/surfview.embed.iife.js": "d519210ebcbcfe0effed7e190c49c2e94988de5b9e0a7c1cfb0fda60a8c0e398",
+    "dist/surfview.geometry.worker.js": "219e7ed7272bc73b6411c75e23e7f3316c209292a12cbc9bbe1c7d40e874d2a3"
+  },
+  "limits": [
+    "Prior Workbench, ribbon integration and performance receipts describe their recorded source snapshots; those qualification runs were not repeated for this review repair.",
+    "The exact projection fallback determines regions and within-triangle candidates exactly, then returns binary64 weights; cross-triangle distance ranking remains floating point."
+  ],
+  "logs": {
+    "unit": {
+      "path": "unit.log",
+      "sha256": "4783a3830f8996cf974d70a502db2978f4aeed2be4cbbc576437f373fc6bc931"
+    },
+    "types": {
+      "path": "types.log",
+      "sha256": "2557b810aa9b4ec3a81e247a0a63bb14dd9628bd434c226923c1edcc2cc0a99f"
+    },
+    "build": {
+      "path": "build.log",
+      "sha256": "ad50ea0674b6964a76ea17c82d6f15e643c2fad8d11d707a06568fc5d7ca72ef"
+    },
+    "browser": {
+      "path": "browser.log",
+      "sha256": "a096854114b229b0361e3eb25e3450e023ee5e4e1e71b7cf90288caa66e22578"
+    },
+    "consumers": {
+      "path": "consumers.log",
+      "sha256": "14462ee66184c72d83f3abb16163d2ef6dc5be191c2642556f4213d759f3bc0b"
+    }
+  }
+}

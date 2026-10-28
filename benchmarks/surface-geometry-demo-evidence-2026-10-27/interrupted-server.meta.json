@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "started_utc": "2026-10-27T21:01:34.026105+00:00",
+  "finished_utc": "2026-10-27T21:02:10.645216+00:00",
+  "duration_seconds": 36.618603,
+  "command": [
+    "npx",
+    "playwright",
+    "test",
+    "tests/e2e/surface-geometry.spec.ts",
+    "tests/e2e/chapter-inspect.spec.ts",
+    "tests/e2e/chapter-anatomy.spec.ts",
+    "tests/e2e/chapter-statistics.spec.ts",
+    "tests/e2e/chapter-time-series.spec.ts",
+    "tests/e2e/chapter-data.spec.ts",
+    "tests/e2e/normal-projection.spec.ts",
+    "tests/e2e/demo-gallery.spec.ts",
+    "--workers=2"
+  ],
+  "cwd": "/Users/bbuchsbaum/code/jscode/surfviewjs",
+  "log": "/tmp/surfview-demo-geometry-owning-20261027.log",
+  "exit_code": 1,
+  "child_returncode": 1,
+  "reason": "exited",
+  "detail": null,
+  "timeout_seconds": 600.0,
+  "log_bytes": 123689
+}

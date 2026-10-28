@@ -1,0 +1,60 @@
+
+Running 14 tests using 1 worker
+
+(node:82973) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 [chromium] › tests/e2e/chapter-inspect.spec.ts:17:3 › Inspect & annotate chapter › picks time each hover, and the picker can be switched (2.0s)
+  ✓   2 [chromium] › tests/e2e/chapter-inspect.spec.ts:41:3 › Inspect & annotate chapter › clicks place labelled marks that can be selected, removed and cleared (4.0s)
+  ✓   3 [chromium] › tests/e2e/surface-geometry.spec.ts:6:1 › native morph triangles, precise picks, markers and midpoint borders agree (926ms)
+  ✓   4 [chromium] › tests/e2e/surface-geometry.spec.ts:18:45 › esm consumer resolves standalone worker and matches synchronous results (536ms)
+  ✓   5 [chromium] › tests/e2e/surface-geometry.spec.ts:18:45 › umd consumer resolves standalone worker and matches synchronous results (815ms)
+  ✓   6 [chromium] › tests/e2e/surface-geometry.spec.ts:18:45 › embed consumer resolves standalone worker and matches synchronous results (676ms)
+  ✓   7 [chromium] › tests/e2e/surface-geometry.spec.ts:24:1 › example ruler, live brush radius and both border styles produce visible results (4.2s)
+  ✓   8 [chromium] › tests/e2e/surface-geometry.spec.ts:49:1 › precise anchors move through inflation while anatomical distance and area stay fixed (2.8s)
+  ✓   9 [chromium] › tests/e2e/surface-geometry.spec.ts:66:1 › area cluster controls use physical extent and keep the threshold editable (1.2s)
+  ✓  10 [chromium] › tests/e2e/surface-geometry.spec.ts:79:1 › derived smoothing follows temporal frames and survives chapter disposal (2.9s)
+  ✘  11 [chromium] › tests/e2e/surface-geometry.spec.ts:109:1 › mapping demo supports scalar/label transfer, persisted identity, and invalid artifact recovery (2.0m)
+(node:94128) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  12 [chromium] › tests/e2e/surface-geometry.spec.ts:145:1 › ribbon inspector reports a valid column on the cortical display (2.3s)
+  ✓  13 [chromium] › tests/e2e/surface-geometry.spec.ts:164:1 › surface tools are discoverable and keyboard operable on a narrow screen (2.9s)
+  ✓  14 [chromium] › tests/e2e/surface-geometry.spec.ts:180:2 › folded strokes remain visible from the adjacent face at two zoom levels (848ms)
+
+
+  1) [chromium] › tests/e2e/surface-geometry.spec.ts:109:1 › mapping demo supports scalar/label transfer, persisted identity, and invalid artifact recovery 
+
+    Test timeout of 60000ms exceeded.
+
+    Test timeout of 60000ms exceeded.
+
+    Error: locator.screenshot: Test ended.
+    Call log:
+      - taking element screenshot
+      - waiting for fonts to load...
+      - fonts loaded
+      - attempting scroll into view action
+        - waiting for element to be stable
+
+
+      121 |   expect(artifact.checksum).toMatch(/^[a-f0-9]{64}$/);
+      122 |   await expect(page.locator('#surface-mapping-status')).toHaveText('4 supported rows; checksum verified');
+    > 123 |   const canvas = page.locator('#viewer-slot canvas'), scalar = await canvas.screenshot();
+          |                                                                             ^
+      124 |   await page.getByRole('radio', { name: 'Categorical labels', exact: true }).check();
+      125 |   await expect(page.locator('#surface-mapping-coverage')).toContainText('weighted label votes');
+      126 |   await expect.poll(async () => (await canvas.screenshot()).equals(scalar)).toBe(false);
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/surface-geometry.spec.ts:123:77
+
+    Error Context: test-results/surface-geometry-mapping-d-c3ab0-d-invalid-artifact-recovery-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/surface-geometry-mapping-d-c3ab0-d-invalid-artifact-recovery-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/surface-geometry-mapping-d-c3ab0-d-invalid-artifact-recovery-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    [chromium] › tests/e2e/surface-geometry.spec.ts:109:1 › mapping demo supports scalar/label transfer, persisted identity, and invalid artifact recovery 
+  13 passed (2.5m)

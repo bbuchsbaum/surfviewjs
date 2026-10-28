@@ -1,0 +1,35 @@
+{
+  "hcpCommit": "a0937443c13092c60909e54e990c354b64f9af28",
+  "inputs": [
+    {
+      "name": "fs_LR-deformed_to-fsaverage.L.sphere.32k_fs_LR.surf.gii",
+      "url": "https://raw.githubusercontent.com/Washington-University/HCPpipelines/a0937443c13092c60909e54e990c354b64f9af28/global/templates/standard_mesh_atlases/resample_fsaverage/fs_LR-deformed_to-fsaverage.L.sphere.32k_fs_LR.surf.gii",
+      "sha256": "31987d139b6cdf1040188d1795bf23c213c57f8e84fb45f2c04823d996b0defc",
+      "bytes": 720487
+    },
+    {
+      "name": "fsaverage5_std_sphere.L.10k_fsavg_L.surf.gii",
+      "url": "https://raw.githubusercontent.com/Washington-University/HCPpipelines/a0937443c13092c60909e54e990c354b64f9af28/global/templates/standard_mesh_atlases/resample_fsaverage/fsaverage5_std_sphere.L.10k_fsavg_L.surf.gii",
+      "sha256": "38b13855694098fde897ef3984f0420bd6bce4eac1562ce0c285bcaf565d56b8",
+      "bytes": 204479
+    },
+    {
+      "name": "fsaverage_std_sphere.L.164k_fsavg_L.surf.gii",
+      "url": "https://raw.githubusercontent.com/Washington-University/HCPpipelines/a0937443c13092c60909e54e990c354b64f9af28/global/templates/standard_mesh_atlases/resample_fsaverage/fsaverage_std_sphere.L.164k_fsavg_L.surf.gii",
+      "sha256": "9bf5b673cc1c4738b1137ac53ff724ff0ef45e12f5550448efa2da50bb521c32",
+      "bytes": 4093613
+    },
+    {
+      "name": "fsLR-32k-midthickness.surf.gii",
+      "url": "https://templateflow.s3.amazonaws.com/tpl-fsLR/tpl-fsLR_den-32k_hemi-L_midthickness.surf.gii",
+      "sha256": "036a8b6c84fa4b581b7ad7b36d99190b57ad6755c9d7ef7adc3e9ffc6448f1af",
+      "bytes": 726059
+    },
+    {
+      "name": "fsaverage-164k-midthickness.surf.gii",
+      "url": "https://templateflow.s3.amazonaws.com/tpl-fsaverage/tpl-fsaverage_hemi-L_den-164k_midthickness.surf.gii",
+      "sha256": "6420425e7760b4bedd6855cfa88f57af8e0fc01455ef9ff14009d9133722d4fc",
+      "bytes": 4322550
+    }
+  ]
+}

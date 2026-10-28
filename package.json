@@ -38,6 +38,10 @@
       "types": "./dist/types/controls-ui/react.d.ts",
       "import": "./dist/surfview.controls.react.es.js",
       "default": "./dist/surfview.controls.react.es.js"
+    },
+    "./geometry-worker": {
+      "types": "./dist/types/geometry/geometryWorker.d.ts",
+      "default": "./dist/surfview.geometry.worker.js"
     }
   },
   "files": [
@@ -47,7 +51,7 @@
   "scripts": {
     "dev": "vite",
     "demo": "vite --config vite.demo.config.ts --open",
-    "build": "npm run clean && vite build && vite build --config vite.config.embed.js && vite build --config vite.config.react.js && vite build --config vite.config.report.js && vite build --config vite.config.controls.js && vite build --config vite.config.controls-react.js && npm run build:types && npm run test:package-types && npm run check:controls-artifacts",
+    "build": "npm run clean && vite build && vite build --config vite.config.embed.js && vite build --config vite.config.react.js && vite build --config vite.config.report.js && vite build --config vite.config.controls.js && vite build --config vite.config.controls-react.js && vite build --config vite.config.geometry-worker.js && npm run build:types && npm run test:package-types && npm run check:controls-artifacts",
     "demo:build": "vite build --config vite.demo.config.ts",
     "build:types": "tsc --emitDeclarationOnly",
     "clean": "rm -rf dist",
@@ -66,6 +70,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "benchmark:volume": "npm run build && node scripts/benchmark-volume-projection.mjs",
+    "benchmark:geometry": "npm run build && node --expose-gc scripts/benchmark-surface-geometry.mjs",
     "benchmark:performance": "npm run build && node --expose-gc scripts/performance-benchmark.mjs",
     "benchmark:check": "node --expose-gc scripts/performance-benchmark.mjs --check",
     "benchmark:browser": "start-server-and-test dev:ci http://localhost:4173 \"playwright test tests/e2e/performance-benchmark.spec.ts\"",

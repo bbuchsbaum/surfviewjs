@@ -1,0 +1,22 @@
+[
+  {
+    "subdiv": 32,
+    "value": -0.769267,
+    "volumeMm3": 34.6793049796,
+    "command": [
+      "/tmp/surfview-workbench-mount/ConnectomeWorkbench.app/Contents/usr/bin/wb_command",
+      "-volume-to-surface-mapping",
+      "/tmp/surfview-anatomical-ribbon-20261027/v0/values.nii.gz",
+      "/tmp/surfview-anatomical-ribbon-20261027/v0/mid.surf.gii",
+      "/tmp/surfview-anatomical-ribbon-20261027/v0/wb-32.func.gii",
+      "-ribbon-constrained",
+      "/tmp/surfview-anatomical-ribbon-20261027/v0/white.surf.gii",
+      "/tmp/surfview-anatomical-ribbon-20261027/v0/pial.surf.gii",
+      "-thin-columns",
+      "-voxel-subdiv",
+      "32",
+      "-output-weights-text",
+      "/tmp/surfview-anatomical-ribbon-20261027/v0/wb-32-weights.txt"
+    ]
+  }
+]

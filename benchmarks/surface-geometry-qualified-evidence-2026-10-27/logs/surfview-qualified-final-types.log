@@ -1,0 +1,4 @@
+
+> surfview@3.1.0 test:types
+> tsc -p tsconfig.contracts.json
+

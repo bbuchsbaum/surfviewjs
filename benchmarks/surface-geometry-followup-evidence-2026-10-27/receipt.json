@@ -1,0 +1,65 @@
+{
+  "date": "2026-10-27",
+  "base": "7b44e4491c52f7cea4f0eaae6472d906de041010",
+  "state": "Local uncommitted work. User demo server remains at http://127.0.0.1:4190/ by request. Test server closed, browser audit empty, task-owned read-only Workbench mount detached.",
+  "delivered": [
+    "Shared-edge/vertex bounded-miter drawing offsets; anatomical measurements unchanged",
+    "Depth-tested pixel-width ruler; crosshair suppressed during measurement; label-crossing edges named as diagnostic",
+    "Owned fixed-validity denominator/coverage cache and synchronous 1-16 frame smoothing batches with 128-row tiles",
+    "External versioned full/masked nonconstant scalar Workbench fixtures",
+    "Isolated cortical stress processes at 10242/40962/163842 vertices and FWHM 2/4/8",
+    "Indexed legacy source-map aliases retain canonical embedded-source maps, preserving archive size ceilings"
+  ],
+  "checks": {
+    "native_browser": "14 passed; final fold witness rerun after adding an occlusion case: 1 passed",
+    "unit": "Final full suite: 103 files, 1201 tests passed; final targeted stroke/prepared tests: 5 passed.",
+    "types": "type-check, type-check:demo, test:types passed",
+    "build": "library, demo, docs builds passed",
+    "consumers": "Packed ESM/CommonJS/worker/examples passed; archive 2760469 bytes, unpacked 10824554 bytes",
+    "size": "Core Brotli 172.23 kB against 180 kB; existing other limits pass",
+    "visual": "One desktop/zoom/mobile batch inspected; no corrections needed. Impeccable detector returned []."
+  },
+  "external_parity": {
+    "receipt": "../workbench-parity-2026-10-27/receipt.json",
+    "source": "https://www.humanconnectome.org/software/get-connectome-workbench",
+    "download_sha256": "a5a1372b581aa64b4667be854d884dbadb06ed44c4ecb7220a9ab4ad84c183bc",
+    "result": "4/4 analytic full/masked scalar cases pass fixed max 5e-5, RMS 1e-5 gates and supported-row mask equality; max observed error < 6.6e-7. Not cortical or categorical admission."
+  },
+  "benchmarks": {
+    "first_layout": "../surface-geometry-cortical-2026-10-27.json",
+    "tiled_layout": "../surface-geometry-cortical-tiled-2026-10-27.json",
+    "result": "Five completed cases show 14-23 percent median improvement for 16-frame batches and exactly zero difference from ordinary apply. Four other cases retain budget-exceeded failures at 512 MiB. Seven timed samples, one warmup; p95 is maximum, not a stable tail estimate. No transfer/upload performance claim. Midpoint subdivisions add density without anatomical detail."
+  },
+  "resolved_failures": [
+    "Fold witness first camera viewed through an intervening face; corrected to a both-faces-visible view and added explicit hidden-view test. Depth testing remains enabled.",
+    "An overloaded earlier browser run timed out stabilizing a mapping screenshot; source-stable rerun passed all 14. Raw adverse log retained.",
+    "Initial packed archive exceeded the 15 MiB ceiling; legacy source-map indirection removes duplicate sources while complete canonical maps remain published.",
+    "Typedoc rejected an internal constructor type warning; constructor marked internal, consistent with existing plan constructors. Final docs build passes."
+  ],
+  "remaining": [
+    "Full-template Workbench up/downsampling, near-edge and categorical fixtures; ribbon external qualification",
+    "Independent 32k/164k cortical datasets, transfer/upload/cancellation and broader memory matrix",
+    "Reduce retained-kernel construction storage or use the existing explicit streaming path for failed dense cases",
+    "Prepared batching worker protocol/integration; current API is synchronous"
+  ],
+  "source_sha256": {
+    "src/geometry/SurfaceLocation.ts": "c3f5e7ad000854744ca182b56b3bee05d2df29e92dfd2e4df60a711c0e17311a",
+    "src/geometry/SurfacePolyline.ts": "2830ed9b5c957ba3104913399b3958d98cf3c643c790c1738c5d1d74ff5be3a8",
+    "src/geometry/PreparedSmoothing.ts": "a36518258ffd58a0f697d5a06bbd942b1ec8586db72f0ff45df85a833a4d5f95",
+    "src/geometry/SurfaceSmoothing.ts": "30a4e9feb9d35b7484cb113444284879763e24c7f7deeb23459747ea36df0080",
+    "src/geometry/SurfaceResampling.ts": "52e19c496fb7e3e2bb1d3980e46f6f97726b7e58f1a152004b9761030ba5519e",
+    "src/geometry/index.ts": "379466f3f624ebd9c648c8a681c609c0683f27b64969fc6a514993ea357dab04",
+    "src/MultiLayerNeuroSurface.ts": "b5d880a279ad32fa90026dca17f58156c7a40360a9600f6e7c19fdba0e2cbc14",
+    "demo/kit/surface-measurements.ts": "a55c8bb7b453cb5b65c89f5e0d81d94c82a5d01aa30aa62dff4721f285f1589d",
+    "tests/unit/geometry/prepared-smoothing.test.ts": "dbdf87bb173d6989f59610f73144f4d8c2727c2d31643cc3949db041dded7dd2",
+    "tests/unit/geometry/surface-strokes.test.ts": "400ba079bdfc3473e6fcb438f11767d10621380711bb8c09786582dfac66a683",
+    "tests/e2e/surface-geometry.spec.ts": "a193992e629397f51858fd722fe68e0a9b3976b65ebdeada529876b3694993d4",
+    "tests/geometry-fixture.html": "910c67bc46903541f48a89b85d76fc674a1f9221dc9820c1066478ed08f681f3",
+    "scripts/qualify-surface-geometry.mjs": "ee7981762603a9fd929aa5a246b891c0d6e55c0f5ac09100780afe509a6ee678",
+    "scripts/benchmark-cortical-geometry.mjs": "12065efa19c55763f4237c9dc48dd71960fba14a2d64dd49a71b88dc5588ae8e",
+    "scripts/check-package-consumers.mjs": "59767e857ae1b55cbe5de7dea20f4b89f9e4033c68ae37a3fcfa2efe021d7a72",
+    "vite.config.js": "1e6d101629f5b3dbd7e4f18f3166446baecb2bd1d0d9f45b2e912af513987920",
+    "docs/guide/surface-geometry.md": "913270bfebaca4f11db9f4435139cbdb46838cc2c2095045cdb1dc56f92a7bea"
+  },
+  "bundle_sha256": "54b619ac41f01daf08f9330227ec2fb0822e18701528bb9a04c7f4c3a6e206b1"
+}

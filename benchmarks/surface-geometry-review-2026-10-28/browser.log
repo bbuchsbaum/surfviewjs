@@ -1,0 +1,23 @@
+
+Running 16 tests using 1 worker
+
+(node:89670) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 [chromium] › tests/e2e/surface-geometry.spec.ts:6:1 › native morph triangles, precise picks, markers and midpoint borders agree (1.5s)
+  ✓   2 [chromium] › tests/e2e/surface-geometry.spec.ts:18:45 › esm consumer resolves standalone worker and matches synchronous results (525ms)
+  ✓   3 [chromium] › tests/e2e/surface-geometry.spec.ts:18:45 › umd consumer resolves standalone worker and matches synchronous results (781ms)
+  ✓   4 [chromium] › tests/e2e/surface-geometry.spec.ts:18:45 › embed consumer resolves standalone worker and matches synchronous results (639ms)
+  ✓   5 [chromium] › tests/e2e/surface-geometry.spec.ts:24:1 › example ruler, live brush radius and both border styles produce visible results (5.0s)
+  ✓   6 [chromium] › tests/e2e/surface-geometry.spec.ts:49:1 › precise anchors move through inflation while anatomical distance and area stay fixed (3.2s)
+  ✓   7 [chromium] › tests/e2e/surface-geometry.spec.ts:66:1 › area cluster controls use physical extent and keep the threshold editable (1.2s)
+  ✓   8 [chromium] › tests/e2e/surface-geometry.spec.ts:79:1 › derived smoothing follows temporal frames and survives chapter disposal (3.0s)
+  ✓   9 [chromium] › tests/e2e/surface-geometry.spec.ts:109:1 › mapping demo supports scalar/label transfer, persisted identity, and invalid artifact recovery (2.1s)
+  ✓  10 [chromium] › tests/e2e/surface-geometry.spec.ts:145:1 › ribbon inspector reports a valid column on the cortical display (2.1s)
+  ✓  11 [chromium] › tests/e2e/surface-geometry.spec.ts:164:1 › surface tools are discoverable and keyboard operable on a narrow screen (2.6s)
+  ✓  12 [chromium] › tests/e2e/surface-geometry.spec.ts:185:1 › folded strokes remain visible at two zoom levels and preserve cortical occlusion (848ms)
+  ✓  13 [chromium] › tests/e2e/surface-geometry.spec.ts:195:1 › prepared worker batches retain dependencies, snapshot frames, cancel and release (547ms)
+  ✓  14 [chromium] › tests/e2e/surface-geometry.spec.ts:204:1 › streamed worker batches snapshot distinct masks and reject stale delivery (536ms)
+  ✓  15 [chromium] › tests/e2e/surface-geometry.spec.ts:213:1 › compacted annotation slots upload their positions and colors (636ms)
+  ✓  16 [chromium] › tests/e2e/surface-geometry.spec.ts:223:1 › independent clients share a real worker without resource or cancellation collisions (793ms)
+
+  16 passed (26.7s)

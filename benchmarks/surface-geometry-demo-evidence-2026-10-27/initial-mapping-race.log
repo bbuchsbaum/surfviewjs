@@ -1,0 +1,66 @@
+
+Running 11 tests using 1 worker
+
+(node:19900) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 [chromium] › tests/e2e/surface-geometry.spec.ts:4:1 › native morph triangles, precise picks, markers and midpoint borders agree (1.5s)
+  ✓   2 [chromium] › tests/e2e/surface-geometry.spec.ts:16:45 › esm consumer resolves standalone worker and matches synchronous results (625ms)
+  ✓   3 [chromium] › tests/e2e/surface-geometry.spec.ts:16:45 › umd consumer resolves standalone worker and matches synchronous results (886ms)
+  ✓   4 [chromium] › tests/e2e/surface-geometry.spec.ts:16:45 › embed consumer resolves standalone worker and matches synchronous results (834ms)
+  ✓   5 [chromium] › tests/e2e/surface-geometry.spec.ts:22:1 › example ruler, live brush radius and both border styles produce visible results (4.4s)
+  ✓   6 [chromium] › tests/e2e/surface-geometry.spec.ts:47:1 › precise anchors move through inflation while anatomical distance and area stay fixed (2.4s)
+  ✓   7 [chromium] › tests/e2e/surface-geometry.spec.ts:64:1 › area cluster controls use physical extent and keep the threshold editable (1.2s)
+  ✓   8 [chromium] › tests/e2e/surface-geometry.spec.ts:77:1 › derived smoothing follows temporal frames and survives chapter disposal (3.1s)
+  ✘   9 [chromium] › tests/e2e/surface-geometry.spec.ts:107:1 › mapping demo supports scalar/label transfer, persisted identity, and invalid artifact recovery (7.2s)
+(node:21452) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  10 [chromium] › tests/e2e/surface-geometry.spec.ts:141:1 › ribbon inspector reports a valid column on the cortical display (2.2s)
+  ✓  11 [chromium] › tests/e2e/surface-geometry.spec.ts:160:1 › surface tools are discoverable and keyboard operable on a narrow screen (2.2s)
+
+
+  1) [chromium] › tests/e2e/surface-geometry.spec.ts:107:1 › mapping demo supports scalar/label transfer, persisted identity, and invalid artifact recovery 
+
+    Error: expect(locator).toHaveText(expected) failed
+
+    Locator:  locator('#surface-mapping-status')
+    Expected: "4 supported rows; checksum verified"
+    Received: "Mesh changed; apply an example or load matching weights"
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveText" with timeout 5000ms
+      - waiting for locator('#surface-mapping-status')
+        14 × locator resolved to <output class="" aria-live="polite" id="surface-mapping-status">Mesh changed; apply an example or load matching w…</output>
+           - unexpected value "Mesh changed; apply an example or load matching weights"
+
+
+      134 |   await page.getByRole('button', { name: 'Tetrahedron', exact: true }).click();
+      135 |   await input.setInputFiles({ name: 'saved.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(artifact)) });
+    > 136 |   await expect(page.locator('#surface-mapping-status')).toHaveText('4 supported rows; checksum verified');
+          |                                                         ^
+      137 |   await expect(page.locator('#surface-mapping-status')).not.toHaveAttribute('data-error');
+      138 |   expect(errors).toEqual([]);
+      139 | });
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/surface-geometry.spec.ts:136:57
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/surface-geometry-mapping-d-c3ab0-d-invalid-artifact-recovery-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/surface-geometry-mapping-d-c3ab0-d-invalid-artifact-recovery-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/surface-geometry-mapping-d-c3ab0-d-invalid-artifact-recovery-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/surface-geometry-mapping-d-c3ab0-d-invalid-artifact-recovery-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/surface-geometry-mapping-d-c3ab0-d-invalid-artifact-recovery-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    [chromium] › tests/e2e/surface-geometry.spec.ts:107:1 › mapping demo supports scalar/label transfer, persisted identity, and invalid artifact recovery 
+  10 passed (28.2s)

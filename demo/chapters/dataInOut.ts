@@ -1,3 +1,4 @@
+import { addMappingInterchange } from '../kit/surface-geometry';
 import {
   AlignmentQAWorkspace,
   DataLayer,
@@ -164,7 +165,9 @@ async function runLoad(ctx: ScenarioRunContext, panel: HTMLElement): Promise<() 
   input.addEventListener('change', onFile);
 
   await loadSample(SAMPLES[0]);
+  const removeMapping = addMappingInterchange({ ...ctx, panel }, viewer);
   return () => {
+    removeMapping();
     input.removeEventListener('change', onFile);
     cleanup();
   };
@@ -405,11 +408,11 @@ export const dataInOut: Scenario = {
   title: 'Data in & out',
   short: 'Data in & out',
   group: 'workflows',
-  tags: ['GIFTI', 'PLY', 'FreeSurfer', 'file loading', 'state', 'share link', 'scene export', 'alignment QA'],
+  tags: ['GIFTI', 'PLY', 'FreeSurfer', 'file loading', 'state', 'share link', 'scene export', 'alignment QA', 'resampling', 'mapping interchange'],
   summary:
-    'Surfaces in, views out. Load reads a bundled GIFTI sample or a surface file of your own. Save & share stores and restores the viewer state, packs it into a share link, and exports a scene manifest or HTML shell. Alignment QA draws the fsaverage5 pial surface on slices of a reference volume under a chosen transform and reports the fit.',
+    'Load a surface, apply scalar or categorical mapping weights, and save or reload a checksummed mapping artifact. Compare identity with a local neighbour blend on the same mesh. Save & share stores viewer state and exports scenes; Alignment QA compares a surface with a reference volume under a chosen transform.',
   synthetic:
-    'Save & share shows a constructed contrast (Gaussian effects at anatomical foci plus smooth noise). The Alignment QA volume is built from the pial mesh (blurred vertex density) with dropout placed at the orbitofrontal cortex and temporal pole; it is not an image.',
+    'Mapping uses generated x-coordinate fields and three geometric labels, not anatomical parcels. Save & share shows a constructed contrast (Gaussian effects at anatomical foci plus smooth noise). The Alignment QA volume is built from the pial mesh (blurred vertex density) with dropout placed at the orbitofrontal cortex and temporal pole; it is not an image.',
   excerpt,
   run: async ctx => {
     let mode: Mode = MODES.some(entry => entry.value === ctx.params.get('mode')) ? (ctx.params.get('mode') as Mode) : 'load';

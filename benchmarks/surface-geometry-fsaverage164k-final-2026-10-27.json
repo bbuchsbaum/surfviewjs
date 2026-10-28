@@ -1,0 +1,87 @@
+{
+  "runtime": "v26.7.0",
+  "hardware": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M3 Max",
+    "totalMemoryBytes": 38654705664
+  },
+  "fixture": "/tmp/surfview-cortical-templates/fsaverage-164k-midthickness.surf.gii",
+  "coldBuildSamples": 1,
+  "cases": [
+    {
+      "frame": "fsaverage-template-RAS",
+      "level": 0,
+      "vertices": 163842,
+      "faces": 327680,
+      "fwhmMm": 2,
+      "inputSha256": "6420425e7760b4bedd6855cfa88f57af8e0fc01455ef9ff14009d9133722d4fc",
+      "bundleSha256": "adb87edd4821eda0e390a18c4f84e7352f1279ee69f055bbd68e82592ffd48a9",
+      "budgetBytes": 536870912,
+      "buildMs": 9810.643957999999,
+      "retainedBytes": 176574436,
+      "ordinary16Ms": {
+        "p50": 710.9380000000001,
+        "p95": 713.1757080000007,
+        "samples": 7,
+        "warmup": 1,
+        "samplesMs": [
+          707.9777499999982,
+          708.7187089999989,
+          709.9547079999993,
+          710.9380000000001,
+          712.2313749999994,
+          713.020625000001,
+          713.1757080000007
+        ]
+      },
+      "prepared16Ms": {
+        "p50": 720.5235839999987,
+        "p95": 748.0070419999975,
+        "samples": 7,
+        "warmup": 1,
+        "samplesMs": [
+          701.0103339999987,
+          719.2460829999982,
+          720.0253750000011,
+          720.5235839999987,
+          724.2752089999994,
+          734.5903749999998,
+          748.0070419999975
+        ]
+      },
+      "maxBatchDifference": 0,
+      "isolatedProcessMaxRssBytes": 914964480
+    },
+    {
+      "frame": "fsaverage-template-RAS",
+      "level": 0,
+      "vertices": 163842,
+      "faces": 327680,
+      "fwhmMm": 4,
+      "inputSha256": "6420425e7760b4bedd6855cfa88f57af8e0fc01455ef9ff14009d9133722d4fc",
+      "bundleSha256": "adb87edd4821eda0e390a18c4f84e7352f1279ee69f055bbd68e82592ffd48a9",
+      "budgetBytes": 536870912,
+      "error": {
+        "code": "budget-exceeded",
+        "message": "Computation requires 536873552 bytes; budget is 536870912"
+      },
+      "isolatedProcessMaxRssBytes": 458129408
+    },
+    {
+      "frame": "fsaverage-template-RAS",
+      "level": 0,
+      "vertices": 163842,
+      "faces": 327680,
+      "fwhmMm": 8,
+      "inputSha256": "6420425e7760b4bedd6855cfa88f57af8e0fc01455ef9ff14009d9133722d4fc",
+      "bundleSha256": "adb87edd4821eda0e390a18c4f84e7352f1279ee69f055bbd68e82592ffd48a9",
+      "budgetBytes": 536870912,
+      "error": {
+        "code": "budget-exceeded",
+        "message": "Computation requires 536876504 bytes; budget is 536870912"
+      },
+      "isolatedProcessMaxRssBytes": 461242368
+    }
+  ]
+}

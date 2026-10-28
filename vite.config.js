@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'node:path';
-import { copyFileSync, existsSync, readFileSync } from 'node:fs';
+import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 
 function legacyBundleAliases() {
   return {
@@ -17,7 +17,13 @@ function legacyBundleAliases() {
       ]) {
         const sourcePath = resolve(import.meta.dirname, 'dist', source);
         if (existsSync(sourcePath)) {
-          copyFileSync(sourcePath, resolve(import.meta.dirname, 'dist', target));
+          const targetPath = resolve(import.meta.dirname, 'dist', target);
+          if (target.endsWith('.map')) {
+            // Legacy bundles already reference the canonical map. Preserve the
+            // old map URL too, using standard indexed-map indirection rather
+            // than republishing megabytes of identical sourcesContent.
+            writeFileSync(targetPath, JSON.stringify({ version: 3, file: target.slice(0, -4), sections: [{ offset: { line: 0, column: 0 }, url: source }] }));
+          } else copyFileSync(sourcePath, targetPath);
         }
       }
     }

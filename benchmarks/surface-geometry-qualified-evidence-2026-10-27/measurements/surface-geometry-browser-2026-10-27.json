@@ -1,0 +1,82 @@
+{
+  "vertices": 10242,
+  "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+  "frameHashes": [
+    2727290174,
+    2938241648
+  ],
+  "timerExtension": false,
+  "timingNote": "CPU wall clock: submit includes copies; worker round trip includes execution and transport. drawAndFinish includes DataLayer update, viewer render, uploads/draw and gl.finish; it is not isolated GPU upload time. Two warmups, seven samples.",
+  "samples": [
+    {
+      "gpuUploadDrawMs": null,
+      "submitCopyMs": 0,
+      "workerRoundTripMs": 1.800000011920929,
+      "displayBufferMs": 0.09999999403953552,
+      "drawAndFinishMs": 0.9000000059604645,
+      "totalMs": 2.800000011920929
+    },
+    {
+      "gpuUploadDrawMs": null,
+      "submitCopyMs": 0,
+      "workerRoundTripMs": 19.80000001192093,
+      "displayBufferMs": 0,
+      "drawAndFinishMs": 0.699999988079071,
+      "totalMs": 20.5
+    },
+    {
+      "gpuUploadDrawMs": null,
+      "submitCopyMs": 0,
+      "workerRoundTripMs": 0.7000000178813934,
+      "displayBufferMs": 0,
+      "drawAndFinishMs": 0.5999999940395355,
+      "totalMs": 1.300000011920929
+    },
+    {
+      "gpuUploadDrawMs": null,
+      "submitCopyMs": 0,
+      "workerRoundTripMs": 0.699999988079071,
+      "displayBufferMs": 0,
+      "drawAndFinishMs": 0.5999999940395355,
+      "totalMs": 1.2999999821186066
+    },
+    {
+      "gpuUploadDrawMs": null,
+      "submitCopyMs": 0,
+      "workerRoundTripMs": 27.69999998807907,
+      "displayBufferMs": 0,
+      "drawAndFinishMs": 0.7000000178813934,
+      "totalMs": 28.400000005960464
+    },
+    {
+      "gpuUploadDrawMs": null,
+      "submitCopyMs": 0,
+      "workerRoundTripMs": 0.5999999940395355,
+      "displayBufferMs": 0,
+      "drawAndFinishMs": 0.5999999940395355,
+      "totalMs": 1.199999988079071
+    },
+    {
+      "gpuUploadDrawMs": null,
+      "submitCopyMs": 0,
+      "workerRoundTripMs": 0.4000000059604645,
+      "displayBufferMs": 0,
+      "drawAndFinishMs": 0.5,
+      "totalMs": 0.9000000059604645
+    }
+  ],
+  "maxDynamicMaskDifference": 0,
+  "cancellation": {
+    "cancelled": true
+  },
+  "clientCancelMs": 0.20000001788139343,
+  "releaseAfterAbortMs": 4.5,
+  "nonblackPixels": 96444,
+  "heap": {
+    "used": 50400000,
+    "total": 56800000
+  },
+  "browserVersion": "151.0.7922.34",
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36",
+  "fixtureSha256": "6ce8360b18af243421d9422927accec8c870894ededda3da66631a360dbabf45"
+}

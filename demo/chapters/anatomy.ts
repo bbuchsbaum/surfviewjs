@@ -1,3 +1,4 @@
+import { addSurfaceMeasurements } from '../kit/surface-geometry';
 import {
   DataLayer,
   Easing,
@@ -477,7 +478,9 @@ async function morphMode({ ctx, film, panel, isCurrent }: ModeContext): Promise<
   viewer.on('vertex:hover', print);
   pairedView(viewer, 'lateral');
   printMorph(OPENING_STAGE);
+  const measurements = addSurfaceMeasurements({ ...ctx, panel }, viewer, { lh: left, rh: right });
   return () => {
+    measurements.dispose();
     viewer.off('vertex:hover', print);
     for (const surface of Object.values(surfaces)) surface.cancelAnimation();
     cleanup();

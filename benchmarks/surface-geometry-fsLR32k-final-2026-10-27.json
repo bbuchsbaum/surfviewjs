@@ -1,0 +1,142 @@
+{
+  "runtime": "v26.7.0",
+  "hardware": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M3 Max",
+    "totalMemoryBytes": 38654705664
+  },
+  "fixture": "/tmp/surfview-cortical-templates/fsLR-32k-midthickness.surf.gii",
+  "coldBuildSamples": 1,
+  "cases": [
+    {
+      "level": 0,
+      "vertices": 32492,
+      "faces": 64980,
+      "fwhmMm": 2,
+      "inputSha256": "036a8b6c84fa4b581b7ad7b36d99190b57ad6755c9d7ef7adc3e9ffc6448f1af",
+      "bundleSha256": "adb87edd4821eda0e390a18c4f84e7352f1279ee69f055bbd68e82592ffd48a9",
+      "budgetBytes": 536870912,
+      "buildMs": 396.9312909999999,
+      "retainedBytes": 7563436,
+      "ordinary16Ms": {
+        "p50": 34.77154099999984,
+        "p95": 36.96229100000005,
+        "samples": 7,
+        "warmup": 1,
+        "samplesMs": [
+          34.49133400000005,
+          34.519583999999895,
+          34.55862500000012,
+          34.77154099999984,
+          35.22683299999994,
+          35.52929199999994,
+          36.96229100000005
+        ]
+      },
+      "prepared16Ms": {
+        "p50": 28.546375000000126,
+        "p95": 32.706084000000146,
+        "samples": 7,
+        "warmup": 1,
+        "samplesMs": [
+          27.85245800000007,
+          27.89608300000009,
+          28.248874999999998,
+          28.546375000000126,
+          30.328042000000096,
+          30.913208000000168,
+          32.706084000000146
+        ]
+      },
+      "maxBatchDifference": 0,
+      "isolatedProcessMaxRssBytes": 366673920
+    },
+    {
+      "level": 0,
+      "vertices": 32492,
+      "faces": 64980,
+      "fwhmMm": 4,
+      "inputSha256": "036a8b6c84fa4b581b7ad7b36d99190b57ad6755c9d7ef7adc3e9ffc6448f1af",
+      "bundleSha256": "adb87edd4821eda0e390a18c4f84e7352f1279ee69f055bbd68e82592ffd48a9",
+      "budgetBytes": 536870912,
+      "buildMs": 1382.662333,
+      "retainedBytes": 28542220,
+      "ordinary16Ms": {
+        "p50": 120.56254200000012,
+        "p95": 187.83804199999986,
+        "samples": 7,
+        "warmup": 1,
+        "samplesMs": [
+          111.8902079999998,
+          112.21566699999994,
+          116.18079099999977,
+          120.56254200000012,
+          149.85037499999999,
+          151.02720799999997,
+          187.83804199999986
+        ]
+      },
+      "prepared16Ms": {
+        "p50": 93.03699999999981,
+        "p95": 96.0670839999998,
+        "samples": 7,
+        "warmup": 1,
+        "samplesMs": [
+          92.31495899999982,
+          92.81320899999992,
+          92.92333300000018,
+          93.03699999999981,
+          95.97112500000003,
+          96.06179199999997,
+          96.0670839999998
+        ]
+      },
+      "maxBatchDifference": 0,
+      "isolatedProcessMaxRssBytes": 406372352
+    },
+    {
+      "level": 0,
+      "vertices": 32492,
+      "faces": 64980,
+      "fwhmMm": 8,
+      "inputSha256": "036a8b6c84fa4b581b7ad7b36d99190b57ad6755c9d7ef7adc3e9ffc6448f1af",
+      "bundleSha256": "adb87edd4821eda0e390a18c4f84e7352f1279ee69f055bbd68e82592ffd48a9",
+      "budgetBytes": 536870912,
+      "buildMs": 5630.933542,
+      "retainedBytes": 111880180,
+      "ordinary16Ms": {
+        "p50": 424.5330839999997,
+        "p95": 426.966625,
+        "samples": 7,
+        "warmup": 1,
+        "samplesMs": [
+          422.8527500000009,
+          423.01545799999985,
+          424.41854199999943,
+          424.5330839999997,
+          424.6421250000003,
+          425.2224580000002,
+          426.966625
+        ]
+      },
+      "prepared16Ms": {
+        "p50": 334.5849159999998,
+        "p95": 338.23662499999955,
+        "samples": 7,
+        "warmup": 1,
+        "samplesMs": [
+          333.7574169999989,
+          334.2049590000006,
+          334.53962499999943,
+          334.5849159999998,
+          337.1754579999997,
+          337.91949999999997,
+          338.23662499999955
+        ]
+      },
+      "maxBatchDifference": 0,
+      "isolatedProcessMaxRssBytes": 481689600
+    }
+  ]
+}

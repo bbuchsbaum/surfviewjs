@@ -1,0 +1,39 @@
+Detected locale "C" with character encoding "US-ASCII", which is not UTF-8.
+Qt depends on a UTF-8 locale, and has switched to "UTF-8" instead.
+If this causes problems, reconfigure your locale. See the locale(1) manual
+for more information.
+{
+  "probeNodes": [
+    18022,
+    18023,
+    18039,
+    18040,
+    18041,
+    18055,
+    18056,
+    18057
+  ],
+  "workbenchWeights": {
+    "18039": 0.3579576015472412,
+    "18040": 0.6420423984527588
+  },
+  "workbenchRowSum": 1.0,
+  "outsideProbeMass": 0.0,
+  "constantOutput": 1.0,
+  "reconstructedScalar": -0.5664540144270802,
+  "floatGeometryEdgeComparison": {
+    "nodes": [
+      18039,
+      18040
+    ],
+    "exactEdgeWeights": [
+      0.35795678921855123,
+      0.6420432107814488
+    ],
+    "edgeDistanceSquared": 3.403268422464889e-05,
+    "faceDistanceSquared": 3.399032447118791e-05,
+    "edgeMinusFaceDistanceSquared": 4.23597534609797e-08,
+    "recoveredPointDistanceSquared": 3.40326875676311e-05
+  }
+}
+/Users/bbuchsbaum/code/jscode/surfviewjs/benchmarks/surface-geometry-dense-evidence-2026-10-27/onehot/receipt.json

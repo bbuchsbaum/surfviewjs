@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { partitionLabelTriangle } from '../geometry/labelPartition';
 import { validateSurfaceGeometryData } from '../classes';
 import { validateParcelData, type ParcelRecord } from '../parcellation';
 import { finiteNumber } from '../utils/validation';
@@ -70,25 +71,16 @@ export function buildParcelPatches(input: ParcelPuzzleInput, background = 0): Ma
   };
   for (let f = 0; f < input.faces.length; f += 3) {
     const ids = [input.faces[f]!, input.faces[f + 1]!, input.faces[f + 2]!];
-    const faceLabels = ids.map(id => labels[id]!);
-    const unique = new Set(faceLabels);
-    if (unique.size === 1) {
-      add(faceLabels[0]!, ids.map(id => points[id]!));
-    } else if (unique.size === 2) {
-      const single = faceLabels.findIndex(label => faceLabels.filter(other => label === other).length === 1);
-      const a = ids[single]!, b = ids[(single + 1) % 3]!, c = ids[(single + 2) % 3]!;
-      const mAB = midpoint(a, b), mCA = midpoint(c, a);
-      add(labels[a]!, [points[a]!, mAB, mCA]);
-      add(labels[b]!, [points[b]!, points[c]!, mCA, mAB]);
-    } else {
+    const partition = partitionLabelTriangle(ids.map(id => labels[id]!) as [number, number, number]);
+    for (const piece of partition.pieces) add(piece.label, piece.polygon.map(weights => {
+      const corner = weights.indexOf(1);
+      if (corner >= 0) return points[ids[corner]!]!;
+      const zero = weights.indexOf(0);
+      if (zero >= 0) return midpoint(ids[(zero + 1) % 3]!, ids[(zero + 2) % 3]!);
       const center: ParcelPatchPoint = { key: `f${f / 3}`, position: new THREE.Vector3(), normal: new THREE.Vector3() };
-      ids.forEach(id => { center.position.add(points[id]!.position); center.normal.add(points[id]!.normal); });
-      center.position.divideScalar(3); center.normal.normalize();
-      for (let i = 0; i < 3; i++) {
-        const a = ids[i]!, b = ids[(i + 1) % 3]!, c = ids[(i + 2) % 3]!;
-        add(labels[a]!, [points[a]!, midpoint(a, b), center, midpoint(c, a)]);
-      }
-    }
+      ids.forEach((id, j) => { center.position.addScaledVector(points[id]!.position, weights[j]!); center.normal.addScaledVector(points[id]!.normal, weights[j]!); });
+      center.normal.normalize(); return center;
+    }));
   }
   return patches;
 }

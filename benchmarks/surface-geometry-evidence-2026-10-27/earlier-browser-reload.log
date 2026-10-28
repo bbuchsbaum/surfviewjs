@@ -1,0 +1,122 @@
+1: starting server using command "vite --host 127.0.0.1 --port 4189 --strictPort"
+and when url "[ 'http://127.0.0.1:4189/tests/geometry-fixture.html' ]" is responding with HTTP status code 200
+running tests using command "playwright test tests/e2e/surface-geometry.spec.ts tests/e2e/chapter-inspect.spec.ts tests/e2e/normal-projection.spec.ts --workers=1"
+
+
+  VITE v8.2.2  ready in 207 ms
+
+  ➜  Local:   http://127.0.0.1:4189/
+
+Running 10 tests using 1 worker
+
+(node:88016) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+3:54:41 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+3:54:42 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+3:54:42 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+3:54:42 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+3:54:42 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓   1 [chromium] › tests/e2e/chapter-inspect.spec.ts:17:3 › Inspect & annotate chapter › picks time each hover, and the picker can be switched (3.6s)
+3:54:44 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+3:54:44 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+3:54:44 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+3:54:44 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+3:54:44 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓   2 [chromium] › tests/e2e/chapter-inspect.spec.ts:41:3 › Inspect & annotate chapter › clicks place labelled marks that can be selected, removed and cleared (4.5s)
+3:54:48 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+3:54:48 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+3:54:48 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+3:54:50 PM [vite] (client) page reload src/geometry/SurfaceTopology.ts
+3:54:50 PM [vite] (client) page reload src/geometry/SurfaceBoundaries.ts
+3:54:50 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+3:54:50 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+3:54:50 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✘   3 [chromium] › tests/e2e/normal-projection.spec.ts:14:1 › volume chapter projects along normals and recomputes ordinary vertex data (7.3s)
+(node:88858) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+3:54:57 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+3:54:57 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+3:54:57 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓   4 [chromium] › tests/e2e/normal-projection.spec.ts:51:1 › volume layer modes report the sampling path they use (3.8s)
+3:55:00 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+3:55:00 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+3:55:00 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓   5 [chromium] › tests/e2e/normal-projection.spec.ts:123:1 › volume chapter colormap select recolours every projection method and mode (8.4s)
+  ✓   6 [chromium] › tests/e2e/surface-geometry.spec.ts:3:1 › native morph triangles, precise picks, markers and midpoint borders agree (986ms)
+  ✓   7 [chromium] › tests/e2e/surface-geometry.spec.ts:15:45 › esm consumer resolves standalone worker and matches synchronous results (521ms)
+  ✓   8 [chromium] › tests/e2e/surface-geometry.spec.ts:15:45 › umd consumer resolves standalone worker and matches synchronous results (779ms)
+3:55:11 PM [vite] (client) [console.warn] THREE.WARNING: Multiple instances of Three.js being imported.
+  ✓   9 [chromium] › tests/e2e/surface-geometry.spec.ts:15:45 › embed consumer resolves standalone worker and matches synchronous results (643ms)
+3:55:12 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+3:55:12 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+3:55:12 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+3:55:12 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+3:55:12 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓  10 [chromium] › tests/e2e/surface-geometry.spec.ts:21:1 › inspect chapter measures an anatomical brush with a midpoint border (1.5s)
+
+
+  1) [chromium] › tests/e2e/normal-projection.spec.ts:14:1 › volume chapter projects along normals and recomputes ordinary vertex data 
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: locator('#normal-result')
+    Expected substring: "1 samples;"
+    Received string:    "10,242 / 10,242 vertices; depths [-4, 4] mm; 5 samples; mean; 6.9 ms"
+    Timeout: 5000ms
+
+    Call log:
+      - Expect "toContainText" with timeout 5000ms
+      - waiting for locator('#normal-result')
+        - waiting for "http://127.0.0.1:4189/demo/index.html?scenario=volume" navigation to finish...
+        - navigated to "http://127.0.0.1:4189/demo/index.html?scenario=volume"
+        12 × locator resolved to <output role="status" id="normal-result" aria-live="polite">10,242 / 10,242 vertices; depths [-4, 4] mm; 5 sa…</output>
+           - unexpected value "10,242 / 10,242 vertices; depths [-4, 4] mm; 5 samples; mean; 6.9 ms"
+
+
+      31 |
+      32 |   await page.locator('#normal-steps').fill('1');
+    > 33 |   await expect(result).toContainText('1 samples;');
+         |                        ^
+      34 |   const oneSampleImage = await settledShot(page);
+      35 |   expect(oneSampleImage.equals(maxAbsImage)).toBe(false);
+      36 |
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/normal-projection.spec.ts:33:24
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/normal-projection-volume-c-3ab1c-mputes-ordinary-vertex-data-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/normal-projection-volume-c-3ab1c-mputes-ordinary-vertex-data-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/normal-projection-volume-c-3ab1c-mputes-ordinary-vertex-data-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/normal-projection-volume-c-3ab1c-mputes-ordinary-vertex-data-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/normal-projection-volume-c-3ab1c-mputes-ordinary-vertex-data-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    [chromium] › tests/e2e/normal-projection.spec.ts:14:1 › volume chapter projects along normals and recomputes ordinary vertex data 
+  9 passed (33.9s)
+Error: Command failed with exit code 1: playwright test tests/e2e/surface-geometry.spec.ts tests/e2e/chapter-inspect.spec.ts tests/e2e/normal-projection.spec.ts --workers=1
+    at makeError (/Users/bbuchsbaum/code/jscode/surfviewjs/node_modules/execa/lib/error.js:60:11)
+    at handlePromise (/Users/bbuchsbaum/code/jscode/surfviewjs/node_modules/execa/index.js:118:26)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  shortMessage: 'Command failed with exit code 1: playwright test tests/e2e/surface-geometry.spec.ts tests/e2e/chapter-inspect.spec.ts tests/e2e/normal-projection.spec.ts --workers=1',
+  command: 'playwright test tests/e2e/surface-geometry.spec.ts tests/e2e/chapter-inspect.spec.ts tests/e2e/normal-projection.spec.ts --workers=1',
+  escapedCommand: '"playwright test tests/e2e/surface-geometry.spec.ts tests/e2e/chapter-inspect.spec.ts tests/e2e/normal-projection.spec.ts --workers=1"',
+  exitCode: 1,
+  signal: undefined,
+  signalDescription: undefined,
+  stdout: undefined,
+  stderr: undefined,
+  failed: true,
+  timedOut: false,
+  isCanceled: false,
+  killed: false
+}

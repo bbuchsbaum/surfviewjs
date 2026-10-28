@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GIFTI xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:noNamespaceSchemaLocation="http://brainvis.wustl.edu/caret6/xml_schemas/GIFTI_Caret.xsd"
+       Version="1"
+       NumberOfDataArrays="1">
+   <MetaData>
+      <MD>
+         <Name><![CDATA[AnatomicalStructurePrimary]]></Name>
+         <Value><![CDATA[Invalid]]></Value>
+      </MD>
+      <MD>
+         <Name><![CDATA[ProgramProvenance]]></Name>
+         <Value><![CDATA[Connectome Workbench
+Type: Command Line Application
+Version: 2.2.1
+Qt Compiled Version: 6.11.1
+Qt Runtime Version: 6.11.1
+Commit: 01164ffa47f2778088bd6ff472ec9cd9a57f5b42
+Commit Date: 2026-07-13 18:19:49 -0500
+Compiler: c++ (/usr/bin)
+Compiler Version: 17.0.0.17000604
+Compiled Debug: NO
+Operating System: Apple OSX
+Compiled with OpenMP: YES
+]]></Value>
+      </MD>
+      <MD>
+         <Name><![CDATA[Provenance]]></Name>
+         <Value><![CDATA[/tmp/surfview-workbench-mount/ConnectomeWorkbench.app/Contents/usr/bin/../exe/exe_wb_command -volume-to-surface-mapping /tmp/surfview-anatomical-ribbon-20261027/v0/values.nii.gz /tmp/surfview-anatomical-ribbon-20261027/v0/mid.surf.gii /tmp/surfview-anatomical-ribbon-20261027/v0/wb-16.func.gii -ribbon-constrained /tmp/surfview-anatomical-ribbon-20261027/v0/white.surf.gii /tmp/surfview-anatomical-ribbon-20261027/v0/pial.surf.gii -thin-columns -voxel-subdiv 16 -output-weights-text /tmp/surfview-anatomical-ribbon-20261027/v0/wb-weights.txt]]></Value>
+      </MD>
+      <MD>
+         <Name><![CDATA[WorkingDirectory]]></Name>
+         <Value><![CDATA[/Users/bbuchsbaum/code/jscode/surfviewjs]]></Value>
+      </MD>
+   </MetaData>
+   <LabelTable>
+      <Label Key="0" Red="0" Green="0" Blue="0" Alpha="0"><![CDATA[???]]></Label>
+   </LabelTable>
+<DataArray Intent="NIFTI_INTENT_NORMAL"
+           DataType="NIFTI_TYPE_FLOAT32"
+           ArrayIndexingOrder="RowMajorOrder"
+           Dimensionality="1"
+           Dim0="6"
+           Encoding="ASCII"
+           Endian="LittleEndian"
+           ExternalFileName=""
+           ExternalFileOffset="0">
+   <MetaData>
+      <MD>
+         <Name><![CDATA[Name]]></Name>
+         <Value><![CDATA[ ribbon constrained]]></Value>
+      </MD>
+   </MetaData>
+   <Data>
+      -0.769212 
+      -0.848053 
+      -0.554627 
+      -0.515316 
+      0.360564 
+      -0.51137 
+   </Data>
+</DataArray>
+</GIFTI>

@@ -1,0 +1,40 @@
+10k-32k [
+  [ 'barycentric-closest', false, false, false ],
+  [ 'adaptive-barycentric-area', false, false, true ],
+  [ 'barycentric-closest', true, false, false ],
+  [ 'adaptive-barycentric-area', true, false, true ]
+]
+Detected locale "C" with character encoding "US-ASCII", which is not UTF-8.
+Qt depends on a UTF-8 locale, and has switched to "UTF-8" instead.
+If this causes problems, reconfigure your locale. See the locale(1) manual
+for more information.
+32k-10k [
+  [ 'barycentric-closest', false, true, true ],
+  [ 'adaptive-barycentric-area', false, true, false ],
+  [ 'barycentric-closest', true, false, true ],
+  [ 'adaptive-barycentric-area', true, true, false ]
+]
+Detected locale "C" with character encoding "US-ASCII", which is not UTF-8.
+Qt depends on a UTF-8 locale, and has switched to "UTF-8" instead.
+If this causes problems, reconfigure your locale. See the locale(1) manual
+for more information.
+32k-164k [
+  [ 'barycentric-closest', false, false, true ],
+  [ 'adaptive-barycentric-area', false, false, true ],
+  [ 'barycentric-closest', true, false, true ],
+  [ 'adaptive-barycentric-area', true, false, true ]
+]
+Detected locale "C" with character encoding "US-ASCII", which is not UTF-8.
+Qt depends on a UTF-8 locale, and has switched to "UTF-8" instead.
+If this causes problems, reconfigure your locale. See the locale(1) manual
+for more information.
+164k-32k [
+  [ 'barycentric-closest', false, true, true ],
+  [ 'adaptive-barycentric-area', false, true, true ],
+  [ 'barycentric-closest', true, false, true ],
+  [ 'adaptive-barycentric-area', true, true, true ]
+]
+Detected locale "C" with character encoding "US-ASCII", which is not UTF-8.
+Qt depends on a UTF-8 locale, and has switched to "UTF-8" instead.
+If this causes problems, reconfigure your locale. See the locale(1) manual
+for more information.

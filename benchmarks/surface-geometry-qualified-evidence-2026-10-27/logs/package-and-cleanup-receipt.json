@@ -1,0 +1,21 @@
+{
+  "package": {
+    "passed": true,
+    "archiveBytes": 2800509,
+    "unpackedBytes": 10978285,
+    "entries": 165,
+    "note": "Packed import/require/type/example/worker checks; original size limits unchanged"
+  },
+  "size": {
+    "coreBrotliBytes": 174909,
+    "coreCeilingBytes": 180000,
+    "otherCeilings": "passed unchanged"
+  },
+  "cleanup": {
+    "browserAudit": "No automated top-level browser processes found",
+    "nativeCommands": "No wb_command process remains; task-owned read-only disk5 image ejected",
+    "testServer": "port4192 closed",
+    "userDemo": "http://127.0.0.1:4191/ retained at user request; owner session8856, listener PID97177, repository Vite server; old port4190 closed"
+  },
+  "verification": "Observed successful tool exit statuses; package and size output returned directly by session59453; standalone demo final checks and audit completed."
+}

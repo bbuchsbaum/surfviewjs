@@ -1,0 +1,405 @@
+{
+  "source": "TemplateFlow fsaverage10k corresponding white/pial anatomy; complete incident-face patches retain each selected central column.",
+  "whiteSha256": "ee707e6eaee1a4c9ce7abbb9a3a22bb1d47d4452259bf2c5c9cd269c325a3f8f",
+  "pialSha256": "2201cd917aae312477747c06c6a7a4a7cc8debe28b053190afbe1622ae0ee699",
+  "version": "Connectome Workbench\nType: Command Line Application\nVersion: 2.2.1\nQt Compiled Version: 6.11.1\nQt Runtime Version: 6.11.1\nCommit: 01164ffa47f2778088bd6ff472ec9cd9a57f5b42\nCommit Date: 2026-07-13 18:19:49 -0500\nCompiler: c++ (/usr/bin)\nCompiler Version: 17.0.0.17000604\nCompiled Debug: NO\nOperating System: Apple OSX\nCompiled with OpenMP: YES\n",
+  "cases": [
+    {
+      "vertex": 0,
+      "patchVertices": 6,
+      "patchFaces": 5,
+      "dims": [
+        16,
+        19,
+        18
+      ],
+      "origin": [
+        -46,
+        -28,
+        55
+      ],
+      "exact": {
+        "constant": 7.000000000000004,
+        "mean": -0.7678827646569195,
+        "volumeMm3": 34.68361966760371,
+        "coverage": 0.9999999999999997
+      },
+      "missing": {
+        "value": -0.7737199008471334,
+        "coverage": 0.8493174468182332,
+        "strictValid": 0
+      },
+      "workbench": [
+        {
+          "subdiv": 2,
+          "value": -0.7777209877967834,
+          "absoluteDifference": 0.009838223139863933,
+          "command": [
+            "-volume-to-surface-mapping",
+            "/tmp/surfview-anatomical-ribbon-20261027/v0/values.nii.gz",
+            "/tmp/surfview-anatomical-ribbon-20261027/v0/mid.surf.gii",
+            "/tmp/surfview-anatomical-ribbon-20261027/v0/wb-2.func.gii",
+            "-ribbon-constrained",
+            "/tmp/surfview-anatomical-ribbon-20261027/v0/white.surf.gii",
+            "/tmp/surfview-anatomical-ribbon-20261027/v0/pial.surf.gii",
+            "-thin-columns",
+            "-voxel-subdiv",
+            "2"
+          ]
+        },
+        {
+          "subdiv": 4,
+          "value": -0.7690550088882446,
+          "absoluteDifference": 0.0011722442313251147,
+          "command": [
+            "-volume-to-surface-mapping",
+            "/tmp/surfview-anatomical-ribbon-20261027/v0/values.nii.gz",
+            "/tmp/surfview-anatomical-ribbon-20261027/v0/mid.surf.gii",
+            "/tmp/surfview-anatomical-ribbon-20261027/v0/wb-4.func.gii",
+            "-ribbon-constrained",
+            "/tmp/surfview-anatomical-ribbon-20261027/v0/white.surf.gii",
+            "/tmp/surfview-anatomical-ribbon-20261027/v0/pial.surf.gii",
+            "-thin-columns",
+            "-voxel-subdiv",
+            "4"
+          ]
+        },
+        {
+          "subdiv": 8,
+          "value": -0.7692930102348328,
+          "absoluteDifference": 0.0014102455779132494,
+          "command": [
+            "-volume-to-surface-mapping",
+            "/tmp/surfview-anatomical-ribbon-20261027/v0/values.nii.gz",
+            "/tmp/surfview-anatomical-ribbon-20261027/v0/mid.surf.gii",
+            "/tmp/surfview-anatomical-ribbon-20261027/v0/wb-8.func.gii",
+            "-ribbon-constrained",
+            "/tmp/surfview-anatomical-ribbon-20261027/v0/white.surf.gii",
+            "/tmp/surfview-anatomical-ribbon-20261027/v0/pial.surf.gii",
+            "-thin-columns",
+            "-voxel-subdiv",
+            "8"
+          ]
+        },
+        {
+          "subdiv": 16,
+          "value": -0.769212007522583,
+          "absoluteDifference": 0.0013292428656634936,
+          "command": [
+            "-volume-to-surface-mapping",
+            "/tmp/surfview-anatomical-ribbon-20261027/v0/values.nii.gz",
+            "/tmp/surfview-anatomical-ribbon-20261027/v0/mid.surf.gii",
+            "/tmp/surfview-anatomical-ribbon-20261027/v0/wb-16.func.gii",
+            "-ribbon-constrained",
+            "/tmp/surfview-anatomical-ribbon-20261027/v0/white.surf.gii",
+            "/tmp/surfview-anatomical-ribbon-20261027/v0/pial.surf.gii",
+            "-thin-columns",
+            "-voxel-subdiv",
+            "16",
+            "-output-weights-text",
+            "/tmp/surfview-anatomical-ribbon-20261027/v0/wb-weights.txt"
+          ]
+        }
+      ],
+      "workbenchConstant": 7
+    },
+    {
+      "vertex": 100,
+      "patchVertices": 7,
+      "patchFaces": 6,
+      "dims": [
+        18,
+        15,
+        17
+      ],
+      "origin": [
+        -64,
+        -18,
+        24
+      ],
+      "exact": {
+        "constant": 6.999999999999999,
+        "mean": -0.23269589716516123,
+        "volumeMm3": 14.196774091910424,
+        "coverage": 1
+      },
+      "missing": {
+        "value": -0.20493710539592946,
+        "coverage": 0.9401965936568972,
+        "strictValid": 0
+      },
+      "workbench": [
+        {
+          "subdiv": 2,
+          "value": -0.22800900042057037,
+          "absoluteDifference": 0.004686896744590857,
+          "command": [
+            "-volume-to-surface-mapping",
+            "/tmp/surfview-anatomical-ribbon-20261027/v100/values.nii.gz",
+            "/tmp/surfview-anatomical-ribbon-20261027/v100/mid.surf.gii",
+            "/tmp/surfview-anatomical-ribbon-20261027/v100/wb-2.func.gii",
+            "-ribbon-constrained",
+            "/tmp/surfview-anatomical-ribbon-20261027/v100/white.surf.gii",
+            "/tmp/surfview-anatomical-ribbon-20261027/v100/pial.surf.gii",
+            "-thin-columns",
+            "-voxel-subdiv",
+            "2"
+          ]
+        },
+        {
+          "subdiv": 4,
+          "value": -0.22564199566841125,
+          "absoluteDifference": 0.007053901496749976,
+          "command": [
+            "-volume-to-surface-mapping",
+            "/tmp/surfview-anatomical-ribbon-20261027/v100/values.nii.gz",
+            "/tmp/surfview-anatomical-ribbon-20261027/v100/mid.surf.gii",
+            "/tmp/surfview-anatomical-ribbon-20261027/v100/wb-4.func.gii",
+            "-ribbon-constrained",
+            "/tmp/surfview-anatomical-ribbon-20261027/v100/white.surf.gii",
+            "/tmp/surfview-anatomical-ribbon-20261027/v100/pial.surf.gii",
+            "-thin-columns",
+            "-voxel-subdiv",
+            "4"
+          ]
+        },
+        {
+          "subdiv": 8,
+          "value": -0.23157000541687012,
+          "absoluteDifference": 0.0011258917482911135,
+          "command": [
+            "-volume-to-surface-mapping",
+            "/tmp/surfview-anatomical-ribbon-20261027/v100/values.nii.gz",
+            "/tmp/surfview-anatomical-ribbon-20261027/v100/mid.surf.gii",
+            "/tmp/surfview-anatomical-ribbon-20261027/v100/wb-8.func.gii",
+            "-ribbon-constrained",
+            "/tmp/surfview-anatomical-ribbon-20261027/v100/white.surf.gii",
+            "/tmp/surfview-anatomical-ribbon-20261027/v100/pial.surf.gii",
+            "-thin-columns",
+            "-voxel-subdiv",
+            "8"
+          ]
+        },
+        {
+          "subdiv": 16,
+          "value": -0.23213399946689606,
+          "absoluteDifference": 0.0005618976982651736,
+          "command": [
+            "-volume-to-surface-mapping",
+            "/tmp/surfview-anatomical-ribbon-20261027/v100/values.nii.gz",
+            "/tmp/surfview-anatomical-ribbon-20261027/v100/mid.surf.gii",
+            "/tmp/surfview-anatomical-ribbon-20261027/v100/wb-16.func.gii",
+            "-ribbon-constrained",
+            "/tmp/surfview-anatomical-ribbon-20261027/v100/white.surf.gii",
+            "/tmp/surfview-anatomical-ribbon-20261027/v100/pial.surf.gii",
+            "-thin-columns",
+            "-voxel-subdiv",
+            "16",
+            "-output-weights-text",
+            "/tmp/surfview-anatomical-ribbon-20261027/v100/wb-weights.txt"
+          ]
+        }
+      ],
+      "workbenchConstant": 7
+    },
+    {
+      "vertex": 1000,
+      "patchVertices": 7,
+      "patchFaces": 6,
+      "dims": [
+        19,
+        14,
+        16
+      ],
+      "origin": [
+        -54,
+        -3,
+        38
+      ],
+      "exact": {
+        "constant": 6.999999999999999,
+        "mean": 0.13949829256667834,
+        "volumeMm3": 17.728181123814977,
+        "coverage": 0.9999999999999998
+      },
+      "missing": {
+        "value": 0.2350714608590267,
+        "coverage": 0.8508216457260767,
+        "strictValid": 0
+      },
+      "workbench": [
+        {
+          "subdiv": 2,
+          "value": 0.15064699947834015,
+          "absoluteDifference": 0.01114870691166181,
+          "command": [
+            "-volume-to-surface-mapping",
+            "/tmp/surfview-anatomical-ribbon-20261027/v1000/values.nii.gz",
+            "/tmp/surfview-anatomical-ribbon-20261027/v1000/mid.surf.gii",
+            "/tmp/surfview-anatomical-ribbon-20261027/v1000/wb-2.func.gii",
+            "-ribbon-constrained",
+            "/tmp/surfview-anatomical-ribbon-20261027/v1000/white.surf.gii",
+            "/tmp/surfview-anatomical-ribbon-20261027/v1000/pial.surf.gii",
+            "-thin-columns",
+            "-voxel-subdiv",
+            "2"
+          ]
+        },
+        {
+          "subdiv": 4,
+          "value": 0.1337299942970276,
+          "absoluteDifference": 0.005768298269650751,
+          "command": [
+            "-volume-to-surface-mapping",
+            "/tmp/surfview-anatomical-ribbon-20261027/v1000/values.nii.gz",
+            "/tmp/surfview-anatomical-ribbon-20261027/v1000/mid.surf.gii",
+            "/tmp/surfview-anatomical-ribbon-20261027/v1000/wb-4.func.gii",
+            "-ribbon-constrained",
+            "/tmp/surfview-anatomical-ribbon-20261027/v1000/white.surf.gii",
+            "/tmp/surfview-anatomical-ribbon-20261027/v1000/pial.surf.gii",
+            "-thin-columns",
+            "-voxel-subdiv",
+            "4"
+          ]
+        },
+        {
+          "subdiv": 8,
+          "value": 0.14026600122451782,
+          "absoluteDifference": 0.0007677086578394832,
+          "command": [
+            "-volume-to-surface-mapping",
+            "/tmp/surfview-anatomical-ribbon-20261027/v1000/values.nii.gz",
+            "/tmp/surfview-anatomical-ribbon-20261027/v1000/mid.surf.gii",
+            "/tmp/surfview-anatomical-ribbon-20261027/v1000/wb-8.func.gii",
+            "-ribbon-constrained",
+            "/tmp/surfview-anatomical-ribbon-20261027/v1000/white.surf.gii",
+            "/tmp/surfview-anatomical-ribbon-20261027/v1000/pial.surf.gii",
+            "-thin-columns",
+            "-voxel-subdiv",
+            "8"
+          ]
+        },
+        {
+          "subdiv": 16,
+          "value": 0.1397079974412918,
+          "absoluteDifference": 0.00020970487461346998,
+          "command": [
+            "-volume-to-surface-mapping",
+            "/tmp/surfview-anatomical-ribbon-20261027/v1000/values.nii.gz",
+            "/tmp/surfview-anatomical-ribbon-20261027/v1000/mid.surf.gii",
+            "/tmp/surfview-anatomical-ribbon-20261027/v1000/wb-16.func.gii",
+            "-ribbon-constrained",
+            "/tmp/surfview-anatomical-ribbon-20261027/v1000/white.surf.gii",
+            "/tmp/surfview-anatomical-ribbon-20261027/v1000/pial.surf.gii",
+            "-thin-columns",
+            "-voxel-subdiv",
+            "16",
+            "-output-weights-text",
+            "/tmp/surfview-anatomical-ribbon-20261027/v1000/wb-weights.txt"
+          ]
+        }
+      ],
+      "workbenchConstant": 7
+    },
+    {
+      "vertex": 5000,
+      "patchVertices": 7,
+      "patchFaces": 6,
+      "dims": [
+        16,
+        17,
+        18
+      ],
+      "origin": [
+        -46,
+        -15,
+        -14
+      ],
+      "exact": {
+        "constant": 7.000000000000002,
+        "mean": -0.4506055627979522,
+        "volumeMm3": 27.50718058184468,
+        "coverage": 0.9999999999999999
+      },
+      "missing": {
+        "value": -0.40408764851954243,
+        "coverage": 0.8216814351304985,
+        "strictValid": 0
+      },
+      "workbench": [
+        {
+          "subdiv": 2,
+          "value": -0.45744600892066956,
+          "absoluteDifference": 0.006840446122717336,
+          "command": [
+            "-volume-to-surface-mapping",
+            "/tmp/surfview-anatomical-ribbon-20261027/v5000/values.nii.gz",
+            "/tmp/surfview-anatomical-ribbon-20261027/v5000/mid.surf.gii",
+            "/tmp/surfview-anatomical-ribbon-20261027/v5000/wb-2.func.gii",
+            "-ribbon-constrained",
+            "/tmp/surfview-anatomical-ribbon-20261027/v5000/white.surf.gii",
+            "/tmp/surfview-anatomical-ribbon-20261027/v5000/pial.surf.gii",
+            "-thin-columns",
+            "-voxel-subdiv",
+            "2"
+          ]
+        },
+        {
+          "subdiv": 4,
+          "value": -0.45374199748039246,
+          "absoluteDifference": 0.0031364346824402367,
+          "command": [
+            "-volume-to-surface-mapping",
+            "/tmp/surfview-anatomical-ribbon-20261027/v5000/values.nii.gz",
+            "/tmp/surfview-anatomical-ribbon-20261027/v5000/mid.surf.gii",
+            "/tmp/surfview-anatomical-ribbon-20261027/v5000/wb-4.func.gii",
+            "-ribbon-constrained",
+            "/tmp/surfview-anatomical-ribbon-20261027/v5000/white.surf.gii",
+            "/tmp/surfview-anatomical-ribbon-20261027/v5000/pial.surf.gii",
+            "-thin-columns",
+            "-voxel-subdiv",
+            "4"
+          ]
+        },
+        {
+          "subdiv": 8,
+          "value": -0.45175600051879883,
+          "absoluteDifference": 0.0011504377208466088,
+          "command": [
+            "-volume-to-surface-mapping",
+            "/tmp/surfview-anatomical-ribbon-20261027/v5000/values.nii.gz",
+            "/tmp/surfview-anatomical-ribbon-20261027/v5000/mid.surf.gii",
+            "/tmp/surfview-anatomical-ribbon-20261027/v5000/wb-8.func.gii",
+            "-ribbon-constrained",
+            "/tmp/surfview-anatomical-ribbon-20261027/v5000/white.surf.gii",
+            "/tmp/surfview-anatomical-ribbon-20261027/v5000/pial.surf.gii",
+            "-thin-columns",
+            "-voxel-subdiv",
+            "8"
+          ]
+        },
+        {
+          "subdiv": 16,
+          "value": -0.4515259861946106,
+          "absoluteDifference": 0.0009204233966583764,
+          "command": [
+            "-volume-to-surface-mapping",
+            "/tmp/surfview-anatomical-ribbon-20261027/v5000/values.nii.gz",
+            "/tmp/surfview-anatomical-ribbon-20261027/v5000/mid.surf.gii",
+            "/tmp/surfview-anatomical-ribbon-20261027/v5000/wb-16.func.gii",
+            "-ribbon-constrained",
+            "/tmp/surfview-anatomical-ribbon-20261027/v5000/white.surf.gii",
+            "/tmp/surfview-anatomical-ribbon-20261027/v5000/pial.surf.gii",
+            "-thin-columns",
+            "-voxel-subdiv",
+            "16",
+            "-output-weights-text",
+            "/tmp/surfview-anatomical-ribbon-20261027/v5000/wb-weights.txt"
+          ]
+        }
+      ],
+      "workbenchConstant": 7
+    }
+  ],
+  "note": "Exact tetrahedral column integration compared with Workbench thin-column subvoxel mapping. These estimators may differ on warped faces; differences are reported, not tolerance-admitted."
+}

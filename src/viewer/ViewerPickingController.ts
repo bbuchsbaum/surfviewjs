@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { GPUPicker } from '../utils/GPUPicker';
 import { isObjectDrawn } from '../utils/Picking';
+import { getDisplayGeometryBinding } from '../geometry/DisplayGeometryBinding';
+import type { SurfaceLocation } from '../geometry/SurfaceLocation';
 
 export interface ViewerPickResult {
   surfaceId: string | null;
@@ -32,6 +34,7 @@ export class ViewerPickingController {
   raycaster = new THREE.Raycaster();
   mouse = new THREE.Vector2();
   intersectionPoint = new THREE.Vector3();
+  private lastCPUHit: THREE.Intersection | undefined;
 
   constructor(private readonly host: ViewerPickingHost) {}
 
@@ -43,6 +46,7 @@ export class ViewerPickingController {
   }
 
   pick(options: ViewerPickOptions = {}): ViewerPickResult {
+    this.lastCPUHit = undefined;
     if (options.x !== undefined && options.y !== undefined) {
       this.updateScreenPosition(options.x, options.y);
     }
@@ -75,8 +79,15 @@ export class ViewerPickingController {
         ? material.every(item => item.opacity < opacityThreshold)
         : material.opacity < opacityThreshold;
       if (isTransparent) return;
+      surface.mesh.updateWorldMatrix(true, false);
 
       for (const intersection of this.raycaster.intersectObject(surface.mesh, false)) {
+        const hitMaterial = Array.isArray(material) ? material[intersection.face?.materialIndex ?? 0] : material;
+        const planes = hitMaterial?.clippingPlanes;
+        if (planes?.length) {
+          const clipped = planes.map(plane => plane.distanceToPoint(intersection.point) < 0);
+          if (hitMaterial?.clipIntersection ? clipped.every(Boolean) : clipped.some(Boolean)) continue;
+        }
         intersections.push(Object.assign(intersection, { surfaceId: id }));
       }
     });
@@ -85,6 +96,7 @@ export class ViewerPickingController {
     // across all surfaces, not the first surface's (which may lie behind).
     intersections.sort((left, right) => left.distance - right.distance);
     const hit = intersections[0];
+    this.lastCPUHit = hit;
     if (!hit) return { surfaceId: null, vertexIndex: null, point: null };
 
     const face = hit.face;
@@ -103,11 +115,7 @@ export class ViewerPickingController {
     let closestDistance = Infinity;
     const worldPosition = new THREE.Vector3();
     for (const index of [face.a, face.b, face.c]) {
-      worldPosition.set(
-        position.getX(index),
-        position.getY(index),
-        position.getZ(index)
-      ).applyMatrix4(mesh.matrixWorld);
+      mesh.getVertexPosition(index, worldPosition).applyMatrix4(mesh.matrixWorld);
       const distance = worldPosition.distanceToSquared(hit.point);
       if (distance < closestDistance) {
         closestDistance = distance;
@@ -120,6 +128,13 @@ export class ViewerPickingController {
       vertexIndex: closestIndex,
       point: hit.point.clone()
     };
+  }
+
+  /** Precise CPU triangle attachment; GPU vertex IDs cannot establish barycentrics. */
+  pickSurfaceLocation(options: ViewerPickOptions = {}): ViewerPickResult & { location: SurfaceLocation | null } {
+    const result = this.pick({ ...options, useGPU: false }), hit = this.lastCPUHit;
+    if (!hit || hit.faceIndex === undefined || hit.faceIndex === null) return { ...result, location: null };
+    return { ...result, location: getDisplayGeometryBinding(hit.object as THREE.Mesh).locationAt(hit.faceIndex, hit.point) };
   }
 
   initializeGPU(renderer: THREE.WebGLRenderer, enabled: boolean): boolean {

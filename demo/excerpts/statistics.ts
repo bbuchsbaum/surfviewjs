@@ -1,4 +1,4 @@
-import { MultiLayerNeuroSurface, NeuroSurfaceViewer, StatisticalMapLayer, SurfaceGeometry } from '@src/index.js';
+import { MultiLayerNeuroSurface, NeuroSurfaceViewer, StatisticalMapLayer, SurfaceGeometry, SurfaceMetric, getDisplayGeometryBinding } from '@src/index.js';
 
 export function statMap(viewer: NeuroSurfaceViewer, geometry: SurfaceGeometry, t: Float32Array, p: Float32Array) {
   viewer.addSurface(new MultiLayerNeuroSurface(geometry), 'lh');
@@ -10,6 +10,10 @@ export function statMap(viewer: NeuroSurfaceViewer, geometry: SurfaceGeometry, t
 
   stat.applyFDR(0.05); // or applyBonferroni(0.05), clearCorrection()
   stat.applyClusterThreshold(3, { minClusterSize: 20 });
+  const domain = getDisplayGeometryBinding(viewer.getSurface('lh')!.mesh!).domain;
+  const metric = new SurfaceMetric(domain, { positions: geometry.vertices, frame: 'fsaverage5-RAS', units: 'mm' });
+  stat.applyClusterAreaThreshold(3, { metric, minAreaMm2: 100, signMode: 'separate' });
+  // This replaces the correction mask with a descriptive area filter, not a cluster p-value.
   stat.setDualThreshold({ positiveColorMap: 'hot', negativeColorMap: 'cool', positiveRange: [2, 7], negativeRange: [-7, -2] });
   viewer.on('vertex:hover', ({ vertexIndex }) => {
     const info = vertexIndex === null ? null : stat.getVertexStatInfo(vertexIndex);

@@ -1,0 +1,14 @@
+{
+  "level": 0,
+  "vertices": 163842,
+  "faces": 327680,
+  "fwhmMm": 8,
+  "inputSha256": "6420425e7760b4bedd6855cfa88f57af8e0fc01455ef9ff14009d9133722d4fc",
+  "bundleSha256": "adb87edd4821eda0e390a18c4f84e7352f1279ee69f055bbd68e82592ffd48a9",
+  "budgetBytes": 536870912,
+  "error": {
+    "code": "budget-exceeded",
+    "message": "Computation requires 536876504 bytes; budget is 536870912"
+  },
+  "isolatedProcessMaxRssBytes": 448495616
+}

@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GIFTI xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:noNamespaceSchemaLocation="http://brainvis.wustl.edu/caret6/xml_schemas/GIFTI_Caret.xsd"
+       Version="1"
+       NumberOfDataArrays="1">
+   <MetaData>
+      <MD>
+         <Name><![CDATA[AnatomicalStructurePrimary]]></Name>
+         <Value><![CDATA[Invalid]]></Value>
+      </MD>
+      <MD>
+         <Name><![CDATA[ProgramProvenance]]></Name>
+         <Value><![CDATA[Connectome Workbench
+Type: Command Line Application
+Version: 2.2.1
+Qt Compiled Version: 6.11.1
+Qt Runtime Version: 6.11.1
+Commit: 01164ffa47f2778088bd6ff472ec9cd9a57f5b42
+Commit Date: 2026-07-13 18:19:49 -0500
+Compiler: c++ (/usr/bin)
+Compiler Version: 17.0.0.17000604
+Compiled Debug: NO
+Operating System: Apple OSX
+Compiled with OpenMP: YES
+]]></Value>
+      </MD>
+      <MD>
+         <Name><![CDATA[Provenance]]></Name>
+         <Value><![CDATA[/tmp/surfview-workbench-mount/ConnectomeWorkbench.app/Contents/usr/bin/../exe/exe_wb_command -metric-resample benchmarks/workbench-parity-2026-10-27/values.func.gii benchmarks/workbench-parity-2026-10-27/source.surf.gii benchmarks/workbench-parity-2026-10-27/target.surf.gii ADAP_BARY_AREA benchmarks/workbench-parity-2026-10-27/ADAP_BARY_AREA-masked.func.gii -area-surfs benchmarks/workbench-parity-2026-10-27/source.surf.gii benchmarks/workbench-parity-2026-10-27/target.surf.gii -current-roi benchmarks/workbench-parity-2026-10-27/roi.func.gii -valid-roi-out benchmarks/workbench-parity-2026-10-27/ADAP_BARY_AREA-masked.roi.gii]]></Value>
+      </MD>
+      <MD>
+         <Name><![CDATA[WorkingDirectory]]></Name>
+         <Value><![CDATA[/Users/bbuchsbaum/code/jscode/surfviewjs]]></Value>
+      </MD>
+   </MetaData>
+   <LabelTable>
+      <Label Key="0" Red="0" Green="0" Blue="0" Alpha="0"><![CDATA[???]]></Label>
+   </LabelTable>
+<DataArray Intent="NIFTI_INTENT_NORMAL"
+           DataType="NIFTI_TYPE_FLOAT32"
+           ArrayIndexingOrder="RowMajorOrder"
+           Dimensionality="1"
+           Dim0="38"
+           Encoding="ASCII"
+           Endian="LittleEndian"
+           ExternalFileName=""
+           ExternalFileOffset="0">
+   <MetaData>
+      <MD>
+         <Name><![CDATA[Name]]></Name>
+         <Value><![CDATA[#1]]></Value>
+      </MD>
+      <MD>
+         <Name><![CDATA[PaletteColorMapping]]></Name>
+         <Value><![CDATA[<PaletteColorMapping Version="1">
+   <ScaleMode>MODE_AUTO_SCALE_ABSOLUTE_PERCENTAGE</ScaleMode>
+   <AutoScalePercentageValues>98.000000 2.000000 2.000000 98.000000</AutoScalePercentageValues>
+   <AutoScaleAbsolutePercentageValues>2.000000 98.000000</AutoScaleAbsolutePercentageValues>
+   <UserScaleValues>-100.000000 0.000000 0.000000 100.000000</UserScaleValues>
+   <PaletteName>ROY-BIG-BL</PaletteName>
+   <InterpolatePalette>true</InterpolatePalette>
+   <InvertPalette>OFF</InvertPalette>
+   <DisplayPositiveData>true</DisplayPositiveData>
+   <DisplayZeroData>false</DisplayZeroData>
+   <DisplayNegativeData>true</DisplayNegativeData>
+   <ThresholdTest>THRESHOLD_TEST_SHOW_INSIDE</ThresholdTest>
+   <ThresholdType>THRESHOLD_TYPE_OFF</ThresholdType>
+   <ThresholdFailureInGreen>false</ThresholdFailureInGreen>
+   <ThresholdNormalValues>-0.899847 0.977544</ThresholdNormalValues>
+   <ThresholdMappedValues>-1.000000 1.000000</ThresholdMappedValues>
+   <ThresholdMappedAvgAreaValues>-1.000000 1.000000</ThresholdMappedAvgAreaValues>
+   <ThresholdDataName></ThresholdDataName>
+   <ThresholdRangeMode>PALETTE_THRESHOLD_RANGE_MODE_MAP</ThresholdRangeMode>
+   <ThresholdLowHighLinked>false</ThresholdLowHighLinked>
+   <ThresholdOutlineDrawingMode>OFF</ThresholdOutlineDrawingMode>
+   <ThresholdOutlineDrawingColor>WHITE</ThresholdOutlineDrawingColor>
+   <HistogramRangeMode>PALETTE_HISTOGRAM_RANGE_ALL</HistogramRangeMode>
+   <HistogramBarsVisible>true</HistogramBarsVisible>
+   <HistogramEnvelopeVisible>false</HistogramEnvelopeVisible>
+   <HistogramBarsColor>CUSTOM</HistogramBarsColor>
+   <HistogramEnvelopeColor>RED</HistogramEnvelopeColor>
+   <HistogramEnvelopeLineWidthPercentage>0.5</HistogramEnvelopeLineWidthPercentage>
+   <HistogramNumberOfBuckets>100</HistogramNumberOfBuckets>
+   <NumericFormatMode>AUTO</NumericFormatMode>
+   <PrecisionDigits>2</PrecisionDigits>
+   <NumericSubivisions>0</NumericSubivisions>
+   <ColorBarValuesMode>DATA</ColorBarValuesMode>
+   <ShowTickMarksSelected>false</ShowTickMarksSelected>
+</PaletteColorMapping>
+]]></Value>
+      </MD>
+   </MetaData>
+   <Data>
+      -0.0650915 
+      0.715703 
+      -0.0650915 
+      -0.10482 
+      0 
+      -0.57011 
+      0.00679406 
+      0.793537 
+      -0.330581 
+      0.55556 
+      -0.390451 
+      0.0718639 
+      -0.284135 
+      -0.707379 
+      -0.686503 
+      -0.707379 
+      0.0870273 
+      -0.3653 
+      -0.871882 
+      0.0505543 
+      -0.664977 
+      -0.180666 
+      0.138041 
+      -0.244805 
+      0.00679406 
+      0.239936 
+      -0.345675 
+      0.479281 
+      -0.372632 
+      0.00679406 
+      -0.518856 
+      0.479281 
+      -0.804846 
+      0 
+      -0.100275 
+      -0.550024 
+      -0.0889515 
+      -0.292825 
+   </Data>
+</DataArray>
+</GIFTI>

@@ -1,0 +1,43 @@
+{
+  "version": "Connectome Workbench\nType: Command Line Application\nVersion: 2.2.1\nQt Compiled Version: 6.11.1\nQt Runtime Version: 6.11.1\nCommit: 01164ffa47f2778088bd6ff472ec9cd9a57f5b42\nCommit Date: 2026-07-13 18:19:49 -0500\nCompiler: c++ (/usr/bin)\nCompiler Version: 17.0.0.17000604\nCompiled Debug: NO\nOperating System: Apple OSX\nCompiled with OpenMP: YES\n",
+  "sourceProvenance": {
+    "commit": "a0937443c13092c60909e54e990c354b64f9af28",
+    "inputs": [
+      {
+        "file": "/tmp/surfview-hcp-fixtures/fs_LR-deformed_to-fsaverage.L.sphere.32k_fs_LR.surf.gii",
+        "url": "https://raw.githubusercontent.com/Washington-University/HCPpipelines/a0937443c13092c60909e54e990c354b64f9af28/global/templates/standard_mesh_atlases/resample_fsaverage/fs_LR-deformed_to-fsaverage.L.sphere.32k_fs_LR.surf.gii",
+        "gitBlob": "d2306564d4c3f012bff9c6960b25396c9942af74"
+      },
+      {
+        "file": "/tmp/surfview-hcp-fixtures/fsaverage5_std_sphere.L.10k_fsavg_L.surf.gii",
+        "url": "https://raw.githubusercontent.com/Washington-University/HCPpipelines/a0937443c13092c60909e54e990c354b64f9af28/global/templates/standard_mesh_atlases/resample_fsaverage/fsaverage5_std_sphere.L.10k_fsavg_L.surf.gii",
+        "gitBlob": "95fc11607aeb5ddc6e2f49840e8c280ca1cef1b4"
+      },
+      {
+        "file": "/tmp/surfview-hcp-fixtures/fsaverage_std_sphere.L.164k_fsavg_L.surf.gii",
+        "url": "https://raw.githubusercontent.com/Washington-University/HCPpipelines/a0937443c13092c60909e54e990c354b64f9af28/global/templates/standard_mesh_atlases/resample_fsaverage/fsaverage_std_sphere.L.164k_fsavg_L.surf.gii",
+        "gitBlob": "14c6b92a083ef9d446c7bc370f7f73eabfa23622"
+      }
+    ]
+  },
+  "fixtureNote": "Full left fsaverage template spheres with independently fetched corresponding pial area metrics; generated scalars and labels. Canonical per-vertex face incidence validated. No population inference.",
+  "gates": {
+    "maxAbsoluteError": 0.00005,
+    "rms": 0.00001,
+    "support": "identical",
+    "labels": "identical except exact-weight ties"
+  },
+  "bundleSha256": "7b8d0dbbf5acbe0ced4ff26f9808eb408be478380a5b6f32cb4d2dcd36fcc45f",
+  "results": [
+    {
+      "route": "10k-164k",
+      "error": "GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.\nGZipBase64Binary payload used zlib framing; compatibility fallback succeeded.\nGZipBase64Binary payload used zlib framing; compatibility fallback succeeded.\nGZipBase64Binary payload used zlib framing; compatibility fallback succeeded.\nGZipBase64Binary payload used zlib framing; compatibility fallback succeeded.\nGZipBase64Binary payload used zlib framing; compatibility fallback succeeded.\nGZipBase64Binary payload used zlib framing; compatibility fallback succeeded.\nGZipBase64Binary payload used zlib framing; compatibility fallback succeeded.\n{\n  \"code\": \"degenerate-geometry\",\n  \"message\": \"Degenerate, underflowing or overflowing face 3\",\n  \"stack\": [\n    \"    at new br (file:///Users/bbuchsbaum/code/jscode/surfviewjs/dist/surfview.es.js:1:206446)\",\n    \"    at file:///Users/bbuchsbaum/code/jscode/surfviewjs/scripts/qualify-template-resampling.mjs:31:66\"\n  ]\n}\n",
+      "status": 1
+    },
+    {
+      "route": "164k-10k",
+      "error": "GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.\nGZipBase64Binary payload used zlib framing; compatibility fallback succeeded.\nGZipBase64Binary payload used zlib framing; compatibility fallback succeeded.\nGZipBase64Binary payload used zlib framing; compatibility fallback succeeded.\nGZipBase64Binary payload used zlib framing; compatibility fallback succeeded.\nGZipBase64Binary payload used zlib framing; compatibility fallback succeeded.\n{\n  \"code\": \"degenerate-geometry\",\n  \"message\": \"Degenerate, underflowing or overflowing face 3\",\n  \"stack\": [\n    \"    at new br (file:///Users/bbuchsbaum/code/jscode/surfviewjs/dist/surfview.es.js:1:206446)\",\n    \"    at file:///Users/bbuchsbaum/code/jscode/surfviewjs/scripts/qualify-template-resampling.mjs:31:66\"\n  ]\n}\n",
+      "status": 1
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+
+> surfview@3.1.0 test
+> vitest run
+
+
+ RUN  v4.1.11 /Users/bbuchsbaum/code/jscode/surfviewjs
+
+
+ Test Files  107 passed (107)
+      Tests  1219 passed (1219)
+   Start at  19:47:53
+   Duration  6.75s (transform 14.33s, setup 0ms, import 27.07s, tests 16.58s, environment 12.79s)
+

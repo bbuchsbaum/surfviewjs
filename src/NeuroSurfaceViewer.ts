@@ -2385,6 +2385,11 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     return this.ensurePickingController().pick(options);
   }
 
+  /** Pick a barycentric attachment on the currently displayed (possibly morphed) mesh. */
+  pickSurfaceLocation(options: { x?: number; y?: number; opacityThreshold?: number } = {}) {
+    return this.ensurePickingController().pickSurfaceLocation(options);
+  }
+
   // Lightweight option bag for embed environments (e.g. R HTML widgets)
   setOption(key: string, value: any): void {
     this.options.set(key, value);
@@ -2674,8 +2679,10 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
     for (const surface of this.surfaces.values()) {
       if (surface instanceof MultiLayerNeuroSurface) {
         surface.flushPendingColorUpdate();
+        surface.updateSurfaceAttachments();
       }
     }
+    this.annotations?.updatePositions();
     if (this.config.headlight) this.updateHeadlight();
     // Emit before render event
     this.emit('render:before');

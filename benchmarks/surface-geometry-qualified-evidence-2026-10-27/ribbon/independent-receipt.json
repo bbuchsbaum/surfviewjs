@@ -1,0 +1,134 @@
+{
+  "method": "Independent NumPy determinant plus IID Dirichlet tetrahedron volume sampling, three fixed seeds; six-SE checks are Monte Carlo diagnostics, not formal universal coverage guarantees. Column decomposition follows the published geometric model; clipping/CSR implementation is not called.",
+  "scriptSha256": "5b15210b646070d5ce839e8976365c4b71b8e8956221a7fbac676d4a6ea86da7",
+  "results": [
+    {
+      "vertex": 5000,
+      "volume": 27.507180581844676,
+      "exactVolume": 27.50718058184468,
+      "relativeVolumeError": 1.2915586416535062e-16,
+      "samples": [
+        {
+          "seed": 20261027,
+          "count": 200000,
+          "mean": -0.450170887813475,
+          "standardError": 0.0012936194961913807,
+          "absoluteError": 0.00043467498447724573,
+          "withinSixSE": true
+        },
+        {
+          "seed": 1729,
+          "count": 200000,
+          "mean": -0.4503644389642123,
+          "standardError": 0.0012932076500336434,
+          "absoluteError": 0.0002411238337399202,
+          "withinSixSE": true
+        },
+        {
+          "seed": 91,
+          "count": 200000,
+          "mean": -0.45141118800546975,
+          "standardError": 0.001291128460291155,
+          "absoluteError": 0.0008056252075175352,
+          "withinSixSE": true
+        }
+      ]
+    },
+    {
+      "vertex": 0,
+      "volume": 34.6836196676037,
+      "exactVolume": 34.68361966760371,
+      "relativeVolumeError": 2.0486406625655164e-16,
+      "samples": [
+        {
+          "seed": 20261027,
+          "count": 200000,
+          "mean": -0.7685262373064272,
+          "standardError": 0.0009429142024567344,
+          "absoluteError": 0.0006434726495077037,
+          "withinSixSE": true
+        },
+        {
+          "seed": 1729,
+          "count": 200000,
+          "mean": -0.7664626900382061,
+          "standardError": 0.0009441831336909927,
+          "absoluteError": 0.0014200746187134072,
+          "withinSixSE": true
+        },
+        {
+          "seed": 91,
+          "count": 200000,
+          "mean": -0.7685706915847864,
+          "standardError": 0.0009416438104836686,
+          "absoluteError": 0.0006879269278668998,
+          "withinSixSE": true
+        }
+      ]
+    },
+    {
+      "vertex": 1000,
+      "volume": 17.728181123814974,
+      "exactVolume": 17.728181123814977,
+      "relativeVolumeError": 2.0039922053977658e-16,
+      "samples": [
+        {
+          "seed": 20261027,
+          "count": 200000,
+          "mean": 0.1405864785385132,
+          "standardError": 0.0013908469412850751,
+          "absoluteError": 0.001088185971834854,
+          "withinSixSE": true
+        },
+        {
+          "seed": 1729,
+          "count": 200000,
+          "mean": 0.1390418649473693,
+          "standardError": 0.0013889735467883856,
+          "absoluteError": 0.00045642761930903,
+          "withinSixSE": true
+        },
+        {
+          "seed": 91,
+          "count": 200000,
+          "mean": 0.13871629870097152,
+          "standardError": 0.001390968840682496,
+          "absoluteError": 0.0007819938657068204,
+          "withinSixSE": true
+        }
+      ]
+    },
+    {
+      "vertex": 100,
+      "volume": 14.196774091910424,
+      "exactVolume": 14.196774091910424,
+      "relativeVolumeError": 0.0,
+      "samples": [
+        {
+          "seed": 20261027,
+          "count": 200000,
+          "mean": -0.23320342935244553,
+          "standardError": 0.001313596761345745,
+          "absoluteError": 0.0005075321872843042,
+          "withinSixSE": true
+        },
+        {
+          "seed": 1729,
+          "count": 200000,
+          "mean": -0.23307610455119052,
+          "standardError": 0.001312367638344454,
+          "absoluteError": 0.0003802073860292854,
+          "withinSixSE": true
+        },
+        {
+          "seed": 91,
+          "count": 200000,
+          "mean": -0.23061028360321187,
+          "standardError": 0.0013160068417931903,
+          "absoluteError": 0.002085613561949362,
+          "withinSixSE": true
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+32492 vertices: cutoff 0.32 ms, smoothing apply 2.42 ms, cancel 0.92 ms
+163842 vertices: cutoff 0.04 ms, smoothing apply 5.49 ms, cancel 1.40 ms
+324002 vertices: cutoff 0.03 ms, smoothing apply 10.89 ms, cancel 1.57 ms
+Report: /tmp/surfview-geometry-benchmark-20261027.json

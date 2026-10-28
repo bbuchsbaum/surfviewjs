@@ -1,0 +1,22 @@
+1: starting server using command "vite --host 127.0.0.1 --port 4192 --strictPort"
+and when url "[ 'http://127.0.0.1:4192/demo/' ]" is responding with HTTP status code 200
+running tests using command "playwright test tests/e2e/surface-geometry.spec.ts --grep "prepared worker|derived smoothing" --workers=1"
+
+
+  VITE v8.2.2  ready in 122 ms
+
+  ➜  Local:   http://127.0.0.1:4192/
+
+Running 2 tests using 1 worker
+
+(node:70601) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+6:21:18 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+6:21:18 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+6:21:18 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+6:21:18 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+6:21:18 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓  1 [chromium] › tests/e2e/surface-geometry.spec.ts:79:1 › derived smoothing follows temporal frames and survives chapter disposal (3.4s)
+  ✓  2 [chromium] › tests/e2e/surface-geometry.spec.ts:190:1 › prepared worker batches retain dependencies, snapshot frames, cancel and release (514ms)
+
+  2 passed (4.5s)

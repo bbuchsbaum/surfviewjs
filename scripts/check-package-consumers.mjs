@@ -13,7 +13,7 @@ const packageJson = JSON.parse(await readFile(
 ));
 assert.deepEqual(
   Object.keys(packageJson.exports).sort(),
-  ['.', './controls', './controls/react', './react', './report'],
+  ['.', './controls', './controls/react', './geometry-worker', './react', './report'],
   'Every advertised package export must have an explicit packed-consumer case'
 );
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
@@ -76,6 +76,8 @@ try {
     'dist/surfview.controls.es.js',
     'dist/surfview.controls.react.es.js',
     'dist/surfview.report.es.js',
+    'dist/surfview.geometry.worker.js',
+    'dist/types/geometry/geometryWorker.d.ts',
     'dist/types/index.d.ts'
   ]) {
     assert.ok(packedPaths.has(requiredPath), `Packed archive is missing ${requiredPath}`);
@@ -92,6 +94,12 @@ try {
       false,
       `Packed archive unexpectedly includes ${unpublishedMap}`
     );
+  }
+  for (const [alias, canonical] of [['neurosurface.es.js.map', 'surfview.es.js.map'], ['neurosurface.umd.js.map', 'surfview.umd.js.map']]) {
+    const map = JSON.parse(await readFile(resolve(projectRoot, 'dist', alias), 'utf8'));
+    assert.deepEqual(map.sections, [{ offset: { line: 0, column: 0 }, url: canonical }]);
+    const full = JSON.parse(await readFile(resolve(projectRoot, 'dist', canonical), 'utf8'));
+    assert.ok(full.sourcesContent.length > 0, 'Canonical maps must retain embedded source content');
   }
   assert.ok(packResult.size <= 5 * 1024 * 1024, 'Packed archive exceeds the 5 MiB ceiling');
   assert.ok(
@@ -127,8 +135,11 @@ try {
   );
   assert.deepEqual(legacyEsmArtifact, esmArtifact, 'Legacy ESM alias drifted from core ESM');
   assert.deepEqual(legacyUmdArtifact, umdArtifact, 'Legacy UMD alias drifted from browser UMD');
-  assert.deepEqual(legacyEsmSourceMap, esmSourceMap, 'Legacy ESM source-map alias drifted');
-  assert.deepEqual(legacyUmdSourceMap, umdSourceMap, 'Legacy UMD source-map alias drifted');
+  for (const [aliasBytes, canonicalBytes, name] of [[legacyEsmSourceMap, esmSourceMap, 'surfview.es.js.map'], [legacyUmdSourceMap, umdSourceMap, 'surfview.umd.js.map']]) {
+    const alias = JSON.parse(aliasBytes.toString('utf8'));
+    assert.deepEqual(alias.sections, [{ offset: { line: 0, column: 0 }, url: name }]);
+    assert.deepEqual(await readFile(join(projectRoot, 'dist', alias.sections[0].url)), canonicalBytes, 'Indexed legacy map must resolve to the complete canonical map');
+  }
   for (const [name, sourceMapBytes] of [
     ['ESM', esmSourceMap],
     ['UMD', umdSourceMap]
@@ -177,6 +188,40 @@ assert.equal(typeof NeuroSurfaceViewer, 'function');
 `);
   run(process.execPath, ['core-only.cjs'], { cwd: coreOnlyRoot });
   run(process.execPath, ['core-only.mjs'], { cwd: coreOnlyRoot });
+
+  // The worker subpath is an artifact URL, not a module to execute on the UI/main thread.
+  await writeFile(join(coreOnlyRoot, 'geometry-worker.mjs'), `
+import assert from 'node:assert/strict';
+import { Worker } from 'node:worker_threads';
+import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
+import { SurfaceDomain, SurfaceMetric, buildSurfaceSmoothingPlan } from 'surfview';
+const require = createRequire(import.meta.url);
+const url = pathToFileURL(require.resolve('surfview/geometry-worker')).href;
+assert.equal(import.meta.resolve('surfview/geometry-worker'), url);
+const bootstrap = "import { parentPort } from 'node:worker_threads'; globalThis.addEventListener = (_, fn) => parentPort.on('message', data => fn({data})); globalThis.postMessage = value => parentPort.postMessage(value); await import(" + JSON.stringify(url) + "); parentPort.postMessage({ready:true});";
+const worker = new Worker(new URL('data:text/javascript,' + encodeURIComponent(bootstrap)), { type: 'module' });
+try {
+  await new Promise((resolve, reject) => { worker.once('message', resolve); worker.once('error', reject); });
+  let id = 0;
+  const clientId = 'packed-consumer';
+  const request = command => new Promise((resolve, reject) => {
+    const current = ++id;
+    const timer = setTimeout(() => { worker.off('message', receive); reject(new Error('Packed worker request timed out: ' + command.type)); }, 10000);
+    const receive = message => { if (message.clientId !== clientId || message.id !== current) return; clearTimeout(timer); worker.off('message', receive); if (message.error) reject(new Error(message.error.message)); else resolve(message.value); };
+    worker.on('message', receive); worker.postMessage({protocol:1,clientId,id:current,command});
+  });
+  const options = {id:'packed-triangle',structure:'synthetic',vertexCount:3,faces:new Uint32Array([0,1,2])};
+  const domain = new SurfaceDomain(options), metricOptions = {positions:new Float64Array([0,0,0,1,0,0,0,1,0]),frame:'mm',units:'mm'};
+  const d = await request({type:'domain',options}), m = await request({type:'metric',domain:d,options:metricOptions});
+  const p = await request({type:'smoothing',metric:m,options:{fwhmMm:2}});
+  const result = await request({type:'apply',plan:p,values:new Float64Array([0,2,4])});
+  assert.deepEqual(result, buildSurfaceSmoothingPlan(new SurfaceMetric(domain,metricOptions),{fwhmMm:2}).apply([0,2,4]));
+  for (const handle of [d,m,p]) await request({type:'release',handle});
+} finally { await worker.terminate(); }
+process.stdout.write('Packed worker URL resolution and numerical execution passed\\n');
+`);
+  run(process.execPath, ['geometry-worker.mjs'], { cwd: coreOnlyRoot });
 
   const consumerRoot = join(fixtureRoot, 'consumer');
   await mkdir(consumerRoot);
@@ -236,15 +281,18 @@ process.stdout.write('ESM and optional-subpath consumers passed\\n');
 `);
   run(process.execPath, ['consumer.mjs'], { cwd: consumerRoot });
 
-  const [quickstartExample, statisticsExample] = await Promise.all([
+  const [quickstartExample, statisticsExample, geometryExample] = await Promise.all([
     readFile(join(projectRoot, 'examples/quickstart.ts'), 'utf8'),
-    readFile(join(projectRoot, 'examples/statistical-equivalence.js'), 'utf8')
+    readFile(join(projectRoot, 'examples/statistical-equivalence.js'), 'utf8'),
+    readFile(join(projectRoot, 'examples/surface-geometry.ts'), 'utf8')
   ]);
   await Promise.all([
     writeFile(join(consumerRoot, 'quickstart.ts'), quickstartExample),
-    writeFile(join(consumerRoot, 'statistical-equivalence.js'), statisticsExample)
+    writeFile(join(consumerRoot, 'statistical-equivalence.js'), statisticsExample),
+    writeFile(join(consumerRoot, 'surface-geometry.ts'), geometryExample)
   ]);
   run(process.execPath, ['statistical-equivalence.js'], { cwd: consumerRoot });
+  run(process.execPath, ['surface-geometry.ts'], { cwd: consumerRoot });
 
   await writeFile(join(consumerRoot, 'consumer.tsx'), `
 import React, { createRef } from 'react';
@@ -287,7 +335,7 @@ tToZ('2', 10);
       skipLibCheck: false,
       lib: ['ES2020', 'DOM', 'DOM.Iterable']
     },
-    include: ['consumer.tsx', 'quickstart.ts']
+    include: ['consumer.tsx', 'quickstart.ts', 'surface-geometry.ts']
   }, null, 2));
   run(process.execPath, [
     join(projectRoot, 'node_modules/typescript/bin/tsc'),
@@ -300,7 +348,7 @@ tToZ('2', 10);
     `${packResult.unpackedSize} B unpacked; ` +
     'surfview.umd.js and surfview.umd.cjs are the one intentional 2.x ' +
     'browser/CommonJS compatibility duplicate; legacy neurosurface aliases ' +
-    'and core source maps match byte-for-byte; canonical documentation ' +
+    'match byte-for-byte and legacy source maps resolve to complete canonical maps; canonical documentation ' +
     'examples compiled/executed against the archive\n'
   );
 } finally {

@@ -1,0 +1,19 @@
+{'subdiv': 32, 'value': -0.769267, 'volumeMm3': 34.6793049796, 'command': ['/tmp/surfview-workbench-mount/ConnectomeWorkbench.app/Contents/usr/bin/wb_command', '-volume-to-surface-mapping', '/tmp/surfview-anatomical-ribbon-20261027/v0/values.nii.gz', '/tmp/surfview-anatomical-ribbon-20261027/v0/mid.surf.gii', '/tmp/surfview-anatomical-ribbon-20261027/v0/wb-32.func.gii', '-ribbon-constrained', '/tmp/surfview-anatomical-ribbon-20261027/v0/white.surf.gii', '/tmp/surfview-anatomical-ribbon-20261027/v0/pial.surf.gii', '-thin-columns', '-voxel-subdiv', '32', '-output-weights-text', '/tmp/surfview-anatomical-ribbon-20261027/v0/wb-32-weights.txt']}
+Traceback (most recent call last):
+  File "/tmp/surfview-refine-ribbon.py", line 7, in <module>
+    subprocess.run(args,check=True,timeout=240,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py", line 557, in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+                     ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py", line 1221, in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+                     ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py", line 2154, in _communicate
+    self._check_timeout(endtime, orig_timeout, stdout, stderr)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py", line 1268, in _check_timeout
+    raise TimeoutExpired(
+    ...<2 lines>...
+            stderr=b''.join(stderr_seq) if stderr_seq else None)
+subprocess.TimeoutExpired: Command '['/tmp/surfview-workbench-mount/ConnectomeWorkbench.app/Contents/usr/bin/wb_command', '-volume-to-surface-mapping', '/tmp/surfview-anatomical-ribbon-20261027/v0/values.nii.gz', '/tmp/surfview-anatomical-ribbon-20261027/v0/mid.surf.gii', '/tmp/surfview-anatomical-ribbon-20261027/v0/wb-64.func.gii', '-ribbon-constrained', '/tmp/surfview-anatomical-ribbon-20261027/v0/white.surf.gii', '/tmp/surfview-anatomical-ribbon-20261027/v0/pial.surf.gii', '-thin-columns', '-voxel-subdiv', '64', '-output-weights-text', '/tmp/surfview-anatomical-ribbon-20261027/v0/wb-64-weights.txt']' timed out after 240 seconds

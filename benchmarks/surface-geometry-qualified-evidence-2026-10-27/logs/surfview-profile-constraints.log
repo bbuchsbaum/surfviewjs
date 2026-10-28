@@ -1,0 +1,76 @@
+10k-32k GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+{
+  "code": "ENOENT",
+  "message": "ENOENT: no such file or directory, open '/tmp/surfview-profile-qualified-20261027/10k-32k/barycentric-closest-false-scalar.func.gii.ascii.gii'",
+  "stack": [
+    "    at async open (node:internal/fs/promises:1360:25)",
+    "    at async readFile (node:internal/fs/promises:2149:14)",
+    "    at async readArray (file:///Users/bbuchsbaum/code/jscode/surfviewjs/scripts/qualify-template-resampling.mjs:54:138)",
+    "    at async file:///Users/bbuchsbaum/code/jscode/surfviewjs/scripts/qualify-template-resampling.mjs:77:46"
+  ]
+}
+
+Detected locale "C" with character encoding "US-ASCII", which is not UTF-8.
+Qt depends on a UTF-8 locale, and has switched to "UTF-8" instead.
+If this causes problems, reconfigure your locale. See the locale(1) manual
+for more information.
+32k-10k GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+{
+  "code": "ENOENT",
+  "message": "ENOENT: no such file or directory, open '/tmp/surfview-profile-qualified-20261027/32k-10k/barycentric-closest-false-scalar.func.gii.ascii.gii'",
+  "stack": [
+    "    at async open (node:internal/fs/promises:1360:25)",
+    "    at async readFile (node:internal/fs/promises:2149:14)",
+    "    at async readArray (file:///Users/bbuchsbaum/code/jscode/surfviewjs/scripts/qualify-template-resampling.mjs:54:138)",
+    "    at async file:///Users/bbuchsbaum/code/jscode/surfviewjs/scripts/qualify-template-resampling.mjs:77:46"
+  ]
+}
+
+Detected locale "C" with character encoding "US-ASCII", which is not UTF-8.
+Qt depends on a UTF-8 locale, and has switched to "UTF-8" instead.
+If this causes problems, reconfigure your locale. See the locale(1) manual
+for more information.
+32k-164k GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+{
+  "code": "ENOENT",
+  "message": "ENOENT: no such file or directory, open '/tmp/surfview-profile-qualified-20261027/32k-164k/barycentric-closest-false-scalar.func.gii.ascii.gii'",
+  "stack": [
+    "    at async open (node:internal/fs/promises:1360:25)",
+    "    at async readFile (node:internal/fs/promises:2149:14)",
+    "    at async readArray (file:///Users/bbuchsbaum/code/jscode/surfviewjs/scripts/qualify-template-resampling.mjs:54:138)",
+    "    at async file:///Users/bbuchsbaum/code/jscode/surfviewjs/scripts/qualify-template-resampling.mjs:77:46"
+  ]
+}
+
+Detected locale "C" with character encoding "US-ASCII", which is not UTF-8.
+Qt depends on a UTF-8 locale, and has switched to "UTF-8" instead.
+If this causes problems, reconfigure your locale. See the locale(1) manual
+for more information.
+164k-32k GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+{
+  "code": "ENOENT",
+  "message": "ENOENT: no such file or directory, open '/tmp/surfview-profile-qualified-20261027/164k-32k/barycentric-closest-false-scalar.func.gii.ascii.gii'",
+  "stack": [
+    "    at async open (node:internal/fs/promises:1360:25)",
+    "    at async readFile (node:internal/fs/promises:2149:14)",
+    "    at async readArray (file:///Users/bbuchsbaum/code/jscode/surfviewjs/scripts/qualify-template-resampling.mjs:54:138)",
+    "    at async file:///Users/bbuchsbaum/code/jscode/surfviewjs/scripts/qualify-template-resampling.mjs:77:46"
+  ]
+}
+
+Detected locale "C" with character encoding "US-ASCII", which is not UTF-8.
+Qt depends on a UTF-8 locale, and has switched to "UTF-8" instead.
+If this causes problems, reconfigure your locale. See the locale(1) manual
+for more information.

@@ -1,0 +1,161 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Surface geometry qualification</title></head>
+<body><div id="viewer" style="width:400px;height:400px"></div><script type="module">
+import * as api from '/src/index.ts';
+window.geometryAPI = api;
+window.checkAttachments = () => {
+  const { THREE, NeuroSurfaceViewer, SurfaceGeometry, MorphableSurface, OutlineLayer, getDisplayGeometryBinding, triangleLocation } = api;
+  const viewer = new NeuroSurfaceViewer(document.querySelector('#viewer'), 400, 400, { backgroundColor: 0x000000 });
+  try {
+    viewer.stopRenderLoop();
+    const surface = new MorphableSurface(new SurfaceGeometry(new Float32Array([-2,-2,0, 2,-2,0, 0,2,0]), new Uint32Array([0,1,2]), 'left'), { useWideLines: false, morphTargets: [{ name:'lift', positions:new Float32Array([-2,-2,1, 2,-2,2, 0,2,3]) }] });
+    viewer.addSurface(surface, 'lh'); surface.mesh.position.set(0.5,0,0);
+    const binding = getDisplayGeometryBinding(surface.mesh), location = triangleLocation(binding.domain,0,[0.25,0.25,0.5]);
+    const annotation = viewer.annotations.addAnchor('lh',{location},undefined,{radius:0.12,colorOff:0x00ff00});
+    const outline = new OutlineLayer('border',{roiLabels:[1,2,2],boundaryMode:'midpoint',color:0xff0000,width:2}); surface.addLayer(outline);
+    viewer.camera.position.set(0.5,0,10); viewer.camera.lookAt(0.5,0,0); viewer.camera.updateMatrixWorld();
+    const samples = [];
+    for (const weight of [0,0.25,0.75,1,0.4]) {
+      surface.setMorphWeight('lift',weight); viewer.render();
+      const marker = viewer.annotations.get(annotation), expectedZ = weight * 2.25;
+      const world = marker.position.clone().applyMatrix4(surface.mesh.matrixWorld), screen = world.clone().project(viewer.camera), rect = viewer.renderer.domElement.getBoundingClientRect();
+      const hit = viewer.pickSurfaceLocation({x:rect.left+(screen.x+1)*rect.width/2,y:rect.top+(1-screen.y)*rect.height/2});
+      const gl = viewer.renderer.getContext(), pixel = new Uint8Array(4);
+      gl.readPixels(Math.floor((screen.x+1)*gl.drawingBufferWidth/2),Math.floor((screen.y+1)*gl.drawingBufferHeight/2),1,1,gl.RGBA,gl.UNSIGNED_BYTE,pixel);
+      samples.push({weight,markerZ:marker.position.z,expectedZ,hitZ:hit.point?.z,kind:hit.location?.kind,pixel:[...pixel],border:[...outline.lineObject.geometry.getAttribute('position').array]});
+    }
+    return samples;
+  } finally { viewer.dispose(); }
+};
+window.checkFoldedStroke = () => {
+  const { THREE, NeuroSurfaceViewer, SurfaceGeometry, MultiLayerNeuroSurface, OutlineLayer, getDisplayGeometryBinding, SurfacePolyline, triangleLocation } = api;
+  const viewer = new NeuroSurfaceViewer(document.querySelector('#viewer'),400,400,{backgroundColor:0x000000});
+  try {
+    viewer.stopRenderLoop();
+    const surface = new MultiLayerNeuroSurface(new SurfaceGeometry(new Float32Array([0,0,0, 4,0,0, 0,4,0, 0,4,4]),new Uint32Array([0,1,2,1,0,3]),'left'),{useWideLines:true});
+    viewer.addSurface(surface,'lh');
+    const binding=getDisplayGeometryBinding(surface.mesh);
+    const locations=[triangleLocation(binding.domain,0,[0.5,0.5,0]),triangleLocation(binding.domain,1,[0.5,0,0.5])];
+    const line=new SurfacePolyline(locations,0.2,0xffff00,3); line.updateBinding(binding); surface.mesh.add(line);
+    const point=new THREE.Vector3(2,0.482842712474619,0.2);
+    const samples=[];
+    for(const [zoom, direction] of [[7,0.4],[12,0.4],[7,-1]]) {
+      surface.mesh.updateMatrixWorld(true); const target = point.clone().applyMatrix4(surface.mesh.matrixWorld); viewer.camera.position.copy(target).add(new THREE.Vector3(0,zoom,zoom * direction)); viewer.camera.lookAt(target); viewer.camera.updateMatrixWorld(); viewer.render();
+      const screen=point.clone().applyMatrix4(surface.mesh.matrixWorld).project(viewer.camera),gl=viewer.renderer.getContext();
+      const x=Math.round((screen.x+1)*gl.drawingBufferWidth/2),y=Math.round((screen.y+1)*gl.drawingBufferHeight/2),pixels=new Uint8Array(7*7*4);
+      gl.readPixels(x-3,y-3,7,7,gl.RGBA,gl.UNSIGNED_BYTE,pixels);
+      let yellow=0; for(let i=0;i<pixels.length;i+=4) if(pixels[i]>150 && pixels[i+1]>150 && pixels[i+2]<80) yellow++;
+      samples.push({zoom,yellow,expectedVisible:direction>0});
+    }
+    line.dispose(); return samples;
+  } finally { viewer.dispose(); }
+};
+window.checkWorker = async (apiKind) => {
+  let library = api;
+  if (apiKind === 'umd') {
+    window.THREE = api.THREE;
+    await new Promise((resolve,reject) => { const script=document.createElement('script'); script.src='/dist/surfview.umd.js'; script.onload=resolve; script.onerror=reject; document.head.append(script); });
+    library = window.surfview;
+  } else if (apiKind === 'embed') {
+    await new Promise((resolve,reject) => { const script=document.createElement('script'); script.src='/dist/surfview.embed.iife.js'; script.onload=resolve; script.onerror=reject; document.head.append(script); });
+    library = window.surfview;
+  }
+  if (!library?.GeometryWorkerClient) throw new Error('Missing worker client in '+apiKind);
+  const client = new library.GeometryWorkerClient({workerFactory:() => new Worker('/dist/surfview.geometry.worker.js',{type:'module'})});
+  try {
+    const domain = new library.SurfaceDomain({id:'browser',structure:'synthetic',vertexCount:3,faces:[0,1,2]});
+    const metric = new library.SurfaceMetric(domain,{positions:[0,0,0,1,0,0,0,1,0],frame:'mm',units:'mm'});
+    const d=await client.registerDomain(domain),m=await client.registerMetric(d,metric),p=await client.buildSmoothing(m,{fwhmMm:2});
+    const result=await client.apply(p,[0,2,4]); const expected=library.buildSurfaceSmoothingPlan(metric,{fwhmMm:2}).apply([0,2,4]);
+    const index=await client.buildGeodesic(m);
+    await client.release(d); await client.release(m);
+    let releasedRejected=false;
+    try { await client.buildSmoothing(m,{fwhmMm:2}); } catch (error) { releasedRejected=error.code==='invalid-domain'; }
+    if (!releasedRejected) throw new Error('Released metric handle remained callable');
+    const neighbors=await client.withinRadius(index,new Uint32Array([0]),1.1);
+    if (neighbors.vertices.length!==3) throw new Error('Retained index lost its metric dependency');
+    const afterRelease=await client.apply(p,[0,2,4]);
+    await client.release(p); await client.release(index);
+    return {values:[...afterRelease.values],expected:[...expected.values]};
+  } finally { client.dispose(); }
+};
+window.checkPreparedWorker = async () => {
+ const {GeometryWorkerClient,SurfaceDomain,SurfaceMetric,buildSurfaceSmoothingPlan}=api;
+ const client=new GeometryWorkerClient({workerFactory:()=>new Worker('/dist/surfview.geometry.worker.js',{type:'module'}),limits:{budgetBytes:8*1024*1024,planBudgetBytes:4*1024*1024}});
+ try {
+  const domain=new SurfaceDomain({id:'batch',structure:'test',vertexCount:3,faces:[0,1,2]});
+  const metric=new SurfaceMetric(domain,{positions:[0,0,0,1,0,0,0,1,0],frame:'mm',units:'mm'});
+  const d=await client.registerDomain(domain),m=await client.registerMetric(d,metric),s=await client.buildSmoothing(m,{fwhmMm:2});
+  const prepared=await client.prepareSmoothing(s,{validity:new Uint8Array([1,0,1])});
+  let configurationLocked=false;try{await client.request({type:'configure',budgetBytes:8*1024*1024,planBudgetBytes:4*1024*1024});}catch(e){configurationLocked=e.code==='invalid-domain';}
+  await client.release(s); await client.release(m); await client.release(d);
+  const frames=[new Float64Array([0,NaN,4]),new Float64Array([7,99,3])];
+  const pending=client.applyBatch(prepared,frames); frames[0][0]=999;
+  const results=await pending,reference=buildSurfaceSmoothingPlan(metric,{fwhmMm:2}).prepare({validity:new Uint8Array([1,0,1])}).applyBatch([[0,NaN,4],[7,99,3]]);
+  let rejected=false;try{await client.applyBatch(prepared,[[NaN,0,4]]);}catch(e){rejected=e.code==='invalid-shape';}
+  const abort=new AbortController(),cancelled=client.applyBatch(prepared,[[0,0,4]],{signal:abort.signal});abort.abort();
+  let cancellation=false;try{await cancelled;}catch(e){cancellation=e.code==='cancelled';}
+  await client.release(prepared);let released=false;try{await client.applyBatch(prepared,[[0,0,4]]);}catch(e){released=e.code==='invalid-domain';}
+  let lockedAfterRelease=false;try{await client.request({type:'configure',budgetBytes:8*1024*1024,planBudgetBytes:4*1024*1024});}catch(e){lockedAfterRelease=e.code==='invalid-domain';}
+  return {actual:results.map(r=>[...r.values]),expected:reference.map(r=>[...r.values]),rejected,cancellation,released,configurationLocked,lockedAfterRelease};
+ } finally {client.dispose();}
+};
+window.checkStreamedWorker = async () => {
+ const {GeometryWorkerClient,SurfaceDomain,SurfaceMetric,buildSurfaceSmoothingPlan}=api;
+ const client=new GeometryWorkerClient({workerFactory:()=>new Worker('/dist/surfview.geometry.worker.js',{type:'module'})});
+ try {
+  const domain=new SurfaceDomain({id:'streamed',structure:'test',vertexCount:3,faces:[0,1,2]}),metric=new SurfaceMetric(domain,{positions:[0,0,0,1,0,0,0,1,0],frame:'mm',units:'mm'});
+  const d=await client.registerDomain(domain),m=await client.registerMetric(d,metric),frames=[new Float64Array([0,2,4]),new Float64Array([7,NaN,3])],masks=[new Uint8Array([1,1,0]),new Uint8Array([1,0,1])];
+  const pending=client.smoothBatch(m,frames,{fwhmMm:2},{frameValidity:masks});frames[0].fill(99);masks[0].fill(0);
+  const actual=await pending,plan=buildSurfaceSmoothingPlan(metric,{fwhmMm:2}),expected=[plan.apply([0,2,4],{validity:new Uint8Array([1,1,0])}),plan.apply([7,NaN,3],{validity:new Uint8Array([1,0,1])})];
+  let current=true;const stale=client.smoothBatch(m,[[0,2,4]],{fwhmMm:2},{},{isCurrent:()=>current});current=false;let staleRejected=false;try{await stale;}catch(e){staleRejected=e.code==='stale-input';}
+  await client.release(m);await client.release(d);return {actual:actual.map(r=>({values:[...r.values],coverage:[...r.coverage],valid:[...r.valid]})),expected:expected.map(r=>({values:[...r.values],coverage:[...r.coverage],valid:[...r.valid]})),staleRejected};
+ }finally{client.dispose();}
+};
+window.checkInstanceCompaction = () => {
+  const { THREE, AnnotationManager } = api;
+  const renderer = new THREE.WebGLRenderer();
+  renderer.setSize(128, 128);
+  const target = new THREE.WebGLRenderTarget(128, 128);
+  const scene = new THREE.Scene();
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute([-1,0,0, 0,0,0, 1,0,0], 3));
+  const material = new THREE.MeshBasicMaterial({ visible: false });
+  const mesh = new THREE.Mesh(geometry, material); scene.add(mesh);
+  const camera = new THREE.OrthographicCamera(-2,2,2,-2,0.1,10); camera.position.z = 5;
+  const manager = new AnnotationManager({ scene, getSurface: () => ({mesh}), requestRender() {}, emit() {} });
+  manager.instancedThreshold = 1;
+  try {
+    const ids = [0,1,2].map((v,i) => manager.add('s',v,undefined,{radius:0.25,colorOff:[0xff0000,0x00ff00,0x0000ff][i]}));
+    renderer.setRenderTarget(target); renderer.render(scene,camera);
+    manager.move(ids[1],0); manager.remove(ids[0]);
+    renderer.render(scene,camera);
+    const pixel = x => { const value = new Uint8Array(4); renderer.readRenderTargetPixels(target,x,64,1,1,value); return [...value]; };
+    return { left: pixel(32), right: pixel(96) };
+  } finally { manager.dispose(); geometry.dispose(); material.dispose(); target.dispose(); renderer.dispose(); renderer.forceContextLoss(); }
+};
+window.checkSharedWorker = async () => {
+  // Separate source and built clients also exercise independent module copies.
+  const built = await import('/dist/surfview.es.js');
+  const native = new Worker('/dist/surfview.geometry.worker.js', {type:'module'});
+  const a = new api.GeometryWorkerClient({workerFactory: () => native, ownsWorker:false});
+  const b = new built.GeometryWorkerClient({workerFactory: () => native, ownsWorker:false});
+  try {
+    const da = new api.SurfaceDomain({id:'a',structure:'test',vertexCount:3,faces:[0,1,2]});
+    const db = new api.SurfaceDomain({id:'b',structure:'test',vertexCount:4,faces:[0,1,2,0,2,3]});
+    const ma = new api.SurfaceMetric(da,{positions:[0,0,0,1,0,0,0,1,0],frame:'mm',units:'mm'});
+    const mb = new api.SurfaceMetric(db,{positions:[0,0,0,1,0,0,1,1,0,0,1,0],frame:'mm',units:'mm'});
+    const [ha,hb] = await Promise.all([a.registerDomain(da),b.registerDomain(db)]);
+    const controller = new AbortController();
+    const cancelled = a.registerMetric(ha,ma,{signal:controller.signal}).then(() => false, error => error.code === 'cancelled');
+    const metric = b.registerMetric(hb,mb); controller.abort();
+    const cancelledA = await cancelled, metricB = await metric;
+    a.dispose();
+    const plan = await b.buildSmoothing(metricB,{fwhmMm:0});
+    const result = await b.apply(plan,[1,2,3,4]);
+    await b.release(plan); await b.release(metricB); await b.release(hb);
+    return {distinct:ha !== hb,cancelledA,values:[...result.values]};
+  } finally {a.dispose();b.dispose();native.terminate();}
+};
+window.geometryReady=true;
+</script></body></html>

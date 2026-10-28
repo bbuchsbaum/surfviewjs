@@ -1,0 +1,38 @@
+1: starting server using command "vite --host 127.0.0.1 --port 4192 --strictPort"
+and when url "[ 'http://127.0.0.1:4192/tests/geometry-performance.html' ]" is responding with HTTP status code 200
+running tests using command "node scripts/benchmark-browser-geometry.mjs benchmarks/surface-geometry-browser-metal-2026-10-27.json"
+
+
+  VITE v8.2.2  ready in 86 ms
+
+  ➜  Local:   http://127.0.0.1:4192/
+7:46:29 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+7:46:29 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+page.evaluate: GeometryError: Geometry worker failed
+    at GeometryWorkerClient.failure (http://127.0.0.1:4192/src/geometry/GeometryWorkerClient.ts:36:19)
+    at /Users/bbuchsbaum/code/jscode/surfviewjs/scripts/benchmark-browser-geometry.mjs:11:26 {
+  log: []
+}
+
+Node.js v26.7.0
+Error: Command failed with exit code 1: node scripts/benchmark-browser-geometry.mjs benchmarks/surface-geometry-browser-metal-2026-10-27.json
+    at makeError (/Users/bbuchsbaum/code/jscode/surfviewjs/node_modules/execa/lib/error.js:60:11)
+    at handlePromise (/Users/bbuchsbaum/code/jscode/surfviewjs/node_modules/execa/index.js:118:26)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  shortMessage: 'Command failed with exit code 1: node scripts/benchmark-browser-geometry.mjs benchmarks/surface-geometry-browser-metal-2026-10-27.json',
+  command: 'node scripts/benchmark-browser-geometry.mjs benchmarks/surface-geometry-browser-metal-2026-10-27.json',
+  escapedCommand: '"node scripts/benchmark-browser-geometry.mjs benchmarks/surface-geometry-browser-metal-2026-10-27.json"',
+  exitCode: 1,
+  signal: undefined,
+  signalDescription: undefined,
+  stdout: undefined,
+  stderr: undefined,
+  failed: true,
+  timedOut: false,
+  isCanceled: false,
+  killed: false
+}

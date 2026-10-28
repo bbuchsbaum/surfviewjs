@@ -1,5 +1,5 @@
 import { SparklineOverlay, TemporalDataLayer, TimelineController } from '@src/index.js';
-import type { MultiLayerNeuroSurface, NeuroSurfaceViewer } from '@src/index.js';
+import type { MultiLayerNeuroSurface, NeuroSurfaceViewer, GeometryWorkerClient, SurfaceMetric } from '@src/index.js';
 
 // frames: one Float32Array of vertex values per time point; times in seconds.
 export function playSeries(viewer: NeuroSurfaceViewer, surface: MultiLayerNeuroSurface, frames: Float32Array[], times: number[]) {
@@ -23,4 +23,17 @@ export function playSeries(viewer: NeuroSurfaceViewer, surface: MultiLayerNeuroS
   });
   timeline.play();
   return timeline;
+}
+
+// The host creates GeometryWorkerClient with its served module-worker URL.
+export async function smoothingForPlayback(worker: GeometryWorkerClient, metric: SurfaceMetric) {
+  const domain = await worker.registerDomain(metric.domain);
+  const anatomy = await worker.registerMetric(domain, metric);
+  const plan = await worker.buildSmoothing(anatomy, { fwhmMm: 3 });
+  const prepared = await worker.prepareSmoothing(plan);
+  await worker.release(plan); await worker.release(domain); await worker.release(anatomy); // dependencies retained by preparation
+  return {
+    applyFrame: async (frame: Float32Array) => Float32Array.from((await worker.applyBatch(prepared, [frame]))[0]!.values),
+    dispose: () => worker.release(prepared)
+  }; // a separate DataLayer owns each derived frame; dispose the worker with its host
 }

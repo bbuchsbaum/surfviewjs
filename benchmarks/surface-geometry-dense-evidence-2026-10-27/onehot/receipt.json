@@ -1,0 +1,505 @@
+{
+  "targetVertex": 119351,
+  "method": "BARYCENTRIC",
+  "fullSourceVertices": 32492,
+  "fullTargetVertices": 163842,
+  "sourceSha256": "31987d139b6cdf1040188d1795bf23c213c57f8e84fb45f2c04823d996b0defc",
+  "targetSha256": "9bf5b673cc1c4738b1137ac53ff724ff0ef45e12f5550448efa2da50bb521c32",
+  "scriptSha256": "e5b687186b26b87a2ccd8a6f9e7a6c709f1e40e10fbf87b0096d1a278fede1a0",
+  "inputSha256": "6025eeb314abe9240782c2db9af1e32c44169e4bcbd92a2d5575b2ef6879c0e7",
+  "outputSha256": "acf6710b81187468ff3ab1e9be9f43099c466c433fb4157b53fda9b8ec35feaa",
+  "workbenchVersion": "Connectome Workbench\nType: Command Line Application\nVersion: 2.2.1\nQt Compiled Version: 6.11.1\nQt Runtime Version: 6.11.1\nCommit: 01164ffa47f2778088bd6ff472ec9cd9a57f5b42\nCommit Date: 2026-07-13 18:19:49 -0500\nCompiler: c++ (/usr/bin)\nCompiler Version: 17.0.0.17000604\nCompiled Debug: NO\nOperating System: Apple OSX\nCompiled with OpenMP: YES\n",
+  "command": [
+    "/tmp/surfview-workbench-mount/ConnectomeWorkbench.app/Contents/usr/bin/wb_command",
+    "-metric-resample",
+    "/Users/bbuchsbaum/code/jscode/surfviewjs/benchmarks/surface-geometry-dense-evidence-2026-10-27/onehot/impulses.func.gii",
+    "/tmp/surfview-hcp-fixtures/fs_LR-deformed_to-fsaverage.L.sphere.32k_fs_LR.surf.gii",
+    "/tmp/surfview-hcp-fixtures/fsaverage_std_sphere.L.164k_fsavg_L.surf.gii",
+    "BARYCENTRIC",
+    "/Users/bbuchsbaum/code/jscode/surfviewjs/benchmarks/surface-geometry-dense-evidence-2026-10-27/onehot/output.func.gii"
+  ],
+  "exitCode": 0,
+  "stderr": "Detected locale \"C\" with character encoding \"US-ASCII\", which is not UTF-8.\nQt depends on a UTF-8 locale, and has switched to \"UTF-8\" instead.\nIf this causes problems, reconfigure your locale. See the locale(1) manual\nfor more information.\n",
+  "probeNodes": [
+    18022,
+    18023,
+    18039,
+    18040,
+    18041,
+    18055,
+    18056,
+    18057
+  ],
+  "workbenchWeights": {
+    "18039": 0.3579576015472412,
+    "18040": 0.6420423984527588
+  },
+  "workbenchRowSum": 1.0,
+  "outsideProbeMass": 0.0,
+  "constantOutput": 1.0,
+  "reconstructedScalar": -0.5664540144270802,
+  "independentGeometry": {
+    "raw": {
+      "query": [
+        -61.29957580566406,
+        20.98985481262207,
+        76.16946411132812
+      ],
+      "candidates": [
+        {
+          "face": 35433,
+          "nodes": [
+            18056,
+            18040,
+            18039
+          ],
+          "weights": [
+            0.00011404808237536201,
+            0.6419799562749331,
+            0.3579059956426915
+          ],
+          "kind": "face",
+          "distanceSquared": 3.386355154300796e-05,
+          "unconstrainedWeights": [
+            0.00011404808237536201,
+            0.6419799562749331,
+            0.3579059956426915
+          ]
+        },
+        {
+          "face": 35397,
+          "nodes": [
+            18040,
+            18022,
+            18039
+          ],
+          "weights": [
+            0.64204321331996,
+            0.0,
+            0.35795678668004005
+          ],
+          "kind": "edge",
+          "distanceSquared": 3.3906452742866746e-05,
+          "unconstrainedWeights": [
+            0.6421143040278764,
+            -0.00015454363849217573,
+            0.35804023961061576
+          ]
+        },
+        {
+          "face": 35398,
+          "nodes": [
+            18040,
+            18023,
+            18022
+          ],
+          "weights": [
+            0.7836204569235514,
+            0.0,
+            0.21637954307644858
+          ],
+          "kind": "edge",
+          "distanceSquared": 0.4373771126617064,
+          "unconstrainedWeights": [
+            0.9952507593875103,
+            -0.35942677974360293,
+            0.36417602035609264
+          ]
+        },
+        {
+          "face": 35434,
+          "nodes": [
+            18057,
+            18040,
+            18056
+          ],
+          "weights": [
+            0.0,
+            0.812232247974318,
+            0.18776775202568197
+          ],
+          "kind": "edge",
+          "distanceSquared": 0.4974507037449915,
+          "unconstrainedWeights": [
+            -0.33225191990431324,
+            0.9690940941014733,
+            0.36315782580284
+          ]
+        },
+        {
+          "face": 35399,
+          "nodes": [
+            18041,
+            18023,
+            18040
+          ],
+          "weights": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "kind": "edge",
+          "distanceSquared": 0.649163926806068,
+          "unconstrainedWeights": [
+            -0.34181282712808403,
+            -0.02358963916536609,
+            1.36540246629345
+          ]
+        },
+        {
+          "face": 35435,
+          "nodes": [
+            18057,
+            18041,
+            18040
+          ],
+          "weights": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "kind": "edge",
+          "distanceSquared": 0.649163926806068,
+          "unconstrainedWeights": [
+            0.022548266206217304,
+            -0.3653484089715447,
+            1.3428001427653273
+          ]
+        },
+        {
+          "face": 35432,
+          "nodes": [
+            18056,
+            18039,
+            18055
+          ],
+          "weights": [
+            0.37152836282623525,
+            0.6284716371737648,
+            0.0
+          ],
+          "kind": "edge",
+          "distanceSquared": 1.4179569011265276,
+          "unconstrainedWeights": [
+            0.6273414625622713,
+            1.014666827588463,
+            -0.6420082901507342
+          ]
+        }
+      ]
+    },
+    "double": {
+      "query": [
+        -61.299578067568845,
+        20.98985558713074,
+        76.16946692191976
+      ],
+      "candidates": [
+        {
+          "face": 35433,
+          "nodes": [
+            18056,
+            18040,
+            18039
+          ],
+          "weights": [
+            0.00011403177754121252,
+            0.6419799665861226,
+            0.3579060016363363
+          ],
+          "kind": "face",
+          "distanceSquared": 3.390691669901186e-05,
+          "unconstrainedWeights": [
+            0.00011403177754121252,
+            0.6419799665861226,
+            0.3579060016363363
+          ]
+        },
+        {
+          "face": 35397,
+          "nodes": [
+            18040,
+            18022,
+            18039
+          ],
+          "weights": [
+            0.6420432145856736,
+            0.0,
+            0.3579567854143264
+          ],
+          "kind": "edge",
+          "distanceSquared": 3.394980563134825e-05,
+          "unconstrainedWeights": [
+            0.6421143041484993,
+            -0.00015454115512800542,
+            0.35804023700662874
+          ]
+        },
+        {
+          "face": 35398,
+          "nodes": [
+            18040,
+            18023,
+            18022
+          ],
+          "weights": [
+            0.7836204676194481,
+            0.0,
+            0.21637953238055185
+          ],
+          "kind": "edge",
+          "distanceSquared": 0.43737714942268,
+          "unconstrainedWeights": [
+            0.9952507854264082,
+            -0.3594267925525438,
+            0.36417600712613557
+          ]
+        },
+        {
+          "face": 35434,
+          "nodes": [
+            18057,
+            18040,
+            18056
+          ],
+          "weights": [
+            0.0,
+            0.8122322524799584,
+            0.18776774752004152
+          ],
+          "kind": "edge",
+          "distanceSquared": 0.49745074563934266,
+          "unconstrainedWeights": [
+            -0.3322519495545295,
+            0.9690941035907299,
+            0.3631578459637996
+          ]
+        },
+        {
+          "face": 35399,
+          "nodes": [
+            18041,
+            18023,
+            18040
+          ],
+          "weights": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "kind": "edge",
+          "distanceSquared": 0.649163958661951,
+          "unconstrainedWeights": [
+            -0.34181285195926425,
+            -0.02358963763845219,
+            1.3654024895977164
+          ]
+        },
+        {
+          "face": 35435,
+          "nodes": [
+            18057,
+            18041,
+            18040
+          ],
+          "weights": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "kind": "edge",
+          "distanceSquared": 0.649163958661951,
+          "unconstrainedWeights": [
+            0.022548275851205224,
+            -0.3653484381906082,
+            1.342800162339403
+          ]
+        },
+        {
+          "face": 35432,
+          "nodes": [
+            18056,
+            18039,
+            18055
+          ],
+          "weights": [
+            0.37152835677489615,
+            0.6284716432251038,
+            0.0
+          ],
+          "kind": "edge",
+          "distanceSquared": 1.417956987981035,
+          "unconstrainedWeights": [
+            0.6273414827907703,
+            1.0146668679203636,
+            -0.6420083507111339
+          ]
+        }
+      ]
+    },
+    "float": {
+      "query": [
+        -61.299583435058594,
+        20.989856719970703,
+        76.16947174072266
+      ],
+      "candidates": [
+        {
+          "face": 35433,
+          "nodes": [
+            18056,
+            18040,
+            18039
+          ],
+          "weights": [
+            0.00011332621693838085,
+            0.6419803541018168,
+            0.3579063196812448
+          ],
+          "kind": "face",
+          "distanceSquared": 3.399032447118791e-05,
+          "unconstrainedWeights": [
+            0.00011332621693838085,
+            0.6419803541018168,
+            0.3579063196812448
+          ]
+        },
+        {
+          "face": 35397,
+          "nodes": [
+            18040,
+            18022,
+            18039
+          ],
+          "weights": [
+            0.6420432107814488,
+            0.0,
+            0.35795678921855123
+          ],
+          "kind": "edge",
+          "distanceSquared": 3.403268422469999e-05,
+          "unconstrainedWeights": [
+            0.6421139843938299,
+            -0.00015385430737129973,
+            0.3580398699135413
+          ]
+        },
+        {
+          "face": 35398,
+          "nodes": [
+            18040,
+            18023,
+            18022
+          ],
+          "weights": [
+            0.7836201857555711,
+            0.0,
+            0.21637981424442887
+          ],
+          "kind": "edge",
+          "distanceSquared": 0.43737652596519117,
+          "unconstrainedWeights": [
+            0.9952503693284845,
+            -0.35942659491681933,
+            0.3641762255883348
+          ]
+        },
+        {
+          "face": 35434,
+          "nodes": [
+            18057,
+            18040,
+            18056
+          ],
+          "weights": [
+            0.0,
+            0.8122325649953535,
+            0.18776743500464654
+          ],
+          "kind": "edge",
+          "distanceSquared": 0.4974515985936643,
+          "unconstrainedWeights": [
+            -0.33225223394679637,
+            0.9690944773079713,
+            0.36315775663882505
+          ]
+        },
+        {
+          "face": 35399,
+          "nodes": [
+            18041,
+            18023,
+            18040
+          ],
+          "weights": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "kind": "edge",
+          "distanceSquared": 0.6491640622443811,
+          "unconstrainedWeights": [
+            -0.34181338570676156,
+            -0.02358877290846877,
+            1.3654021586152303
+          ]
+        },
+        {
+          "face": 35435,
+          "nodes": [
+            18057,
+            18041,
+            18040
+          ],
+          "weights": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "kind": "edge",
+          "distanceSquared": 0.6491640622443811,
+          "unconstrainedWeights": [
+            0.022547372284007494,
+            -0.3653480641973972,
+            1.3428006919133897
+          ]
+        },
+        {
+          "face": 35432,
+          "nodes": [
+            18056,
+            18039,
+            18055
+          ],
+          "weights": [
+            0.3715283894682557,
+            0.6284716105317443,
+            0.0
+          ],
+          "kind": "edge",
+          "distanceSquared": 1.4179576474806195,
+          "unconstrainedWeights": [
+            0.6273413672966212,
+            1.0146669930555998,
+            -0.642008360352221
+          ]
+        }
+      ]
+    }
+  },
+  "floatGeometryEdgeComparison": {
+    "nodes": [
+      18039,
+      18040
+    ],
+    "exactEdgeWeights": [
+      0.35795678921855123,
+      0.6420432107814488
+    ],
+    "edgeDistanceSquared": 3.403268422464889e-05,
+    "faceDistanceSquared": 3.399032447118791e-05,
+    "edgeMinusFaceDistanceSquared": 4.23597534609797e-08,
+    "recoveredPointDistanceSquared": 3.40326875676311e-05
+  },
+  "qualification": "Bounded single-target ordinary barycentric probe; no adaptive or anatomical qualification. Float normalization uses explicit float32 multiply/add/sqrt/divide; compiler contraction may differ."
+}

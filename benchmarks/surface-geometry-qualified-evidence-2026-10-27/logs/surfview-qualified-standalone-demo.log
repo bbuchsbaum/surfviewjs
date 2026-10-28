@@ -1,0 +1,60 @@
+
+Running 7 tests using 1 worker
+
+(node:94119) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 [chromium] › tests/e2e/surface-geometry.spec.ts:24:1 › example ruler, live brush radius and both border styles produce visible results (3.6s)
+  ✓  2 [chromium] › tests/e2e/surface-geometry.spec.ts:49:1 › precise anchors move through inflation while anatomical distance and area stay fixed (1.9s)
+  ✓  3 [chromium] › tests/e2e/surface-geometry.spec.ts:66:1 › area cluster controls use physical extent and keep the threshold editable (903ms)
+  ✘  4 [chromium] › tests/e2e/surface-geometry.spec.ts:79:1 › derived smoothing follows temporal frames and survives chapter disposal (13.1s)
+
+
+  1) [chromium] › tests/e2e/surface-geometry.spec.ts:79:1 › derived smoothing follows temporal frames and survives chapter disposal 
+
+    Test was interrupted.
+
+    Error: expect(locator).toHaveText(expected) failed
+
+    Locator:  locator('#surface-smoothing-status')
+    Expected: "3 mm FWHM; weights ready in worker"
+    Received: "Could not build smoothing: GeometryError: Geometry worker failed. Reduce the width and retry."
+
+    Call log:
+      - Expect "toHaveText" with timeout 30000ms
+      - waiting for locator('#surface-smoothing-status')
+        28 × locator resolved to <output aria-live="polite" id="surface-smoothing-status">Could not build smoothing: GeometryError: Geometr…</output>
+           - unexpected value "Could not build smoothing: GeometryError: Geometry worker failed. Reduce the width and retry."
+      - Test ended.
+
+
+      84 |   await page.locator('#surface-smoothing').check();
+      85 |   const kernel = page.locator('#surface-smoothing-status'), difference = page.locator('#surface-smoothing-difference');
+    > 86 |   await expect(kernel).toHaveText('3 mm FWHM; weights ready in worker', { timeout: 30000 });
+         |                        ^
+      87 |   await expect.poll(() => page.workers().length).toBe(1);
+      88 |   await page.locator('#surface-smoothing-fwhm').fill('0');
+      89 |   await expect(kernel).toContainText('0 mm FWHM; weights ready');
+        at /Users/bbuchsbaum/code/jscode/surfviewjs/tests/e2e/surface-geometry.spec.ts:86:24
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/surface-geometry-derived-s-2c052-d-survives-chapter-disposal-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/surface-geometry-derived-s-2c052-d-survives-chapter-disposal-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/surface-geometry-derived-s-2c052-d-survives-chapter-disposal-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/surface-geometry-derived-s-2c052-d-survives-chapter-disposal-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/surface-geometry-derived-s-2c052-d-survives-chapter-disposal-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 interrupted
+    [chromium] › tests/e2e/surface-geometry.spec.ts:79:1 › derived smoothing follows temporal frames and survives chapter disposal 
+  3 did not run
+  3 passed (20.2s)

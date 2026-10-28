@@ -1,4 +1,5 @@
-import type { NeuroSurfaceViewer } from '@src/index.js';
+import { GeodesicIndex, OutlineLayer, SurfaceMetric, getDisplayGeometryBinding, summarizeSurfaceRegion } from '@src/index.js';
+import type { NeuroSurfaceViewer, SurfaceGeometry, SurfaceLocation } from '@src/index.js';
 
 export function inspect(viewer: NeuroSurfaceViewer, readout: HTMLOutputElement, marks: HTMLOListElement) {
   viewer.enableGPUPicking(); // false when unsupported; pick() then raycasts on the CPU
@@ -20,8 +21,22 @@ export function inspect(viewer: NeuroSurfaceViewer, readout: HTMLOutputElement, 
   // A click pins a selection crosshair; drop a labelled mark there too.
   viewer.on('surface:click', ({ surfaceId, vertexIndex }) => {
     if (!surfaceId || vertexIndex === null) return;
-    const id = viewer.addAnnotation(surfaceId, vertexIndex, { label: `M${marks.children.length + 1}` });
+    const hit = viewer.pickSurfaceLocation(); // CPU triangle hit includes GPU morph positions
+    if (!hit.location) return;
+    const id = viewer.annotations.addAnchor(surfaceId, { location: hit.location }, { label: `M${marks.children.length + 1}` });
     if (id) marks.append(Object.assign(document.createElement('li'), { textContent: id }));
   });
   return () => { canvas.removeEventListener('pointermove', onMove); viewer.clearAnnotations(); };
+}
+
+export function measureSurface(viewer: NeuroSurfaceViewer, pial: SurfaceGeometry, start: SurfaceLocation, end: SurfaceLocation, seed: number) {
+  const domain = getDisplayGeometryBinding(viewer.getSurface('lh')!.mesh!).domain;
+  const metric = new SurfaceMetric(domain, { positions: pial.vertices, frame: 'fsaverage5-RAS', units: 'mm' });
+  const index = new GeodesicIndex(metric); // reuse it for subsequent queries
+  const path = index.shortestPathLocations(start, end); // virtual endpoints, no vertex snapping
+  const roi = new Uint8Array(domain.vertexCount);
+  index.withinRadius([seed], 10).vertices.forEach(v => { roi[v] = 1; });
+  viewer.addLayer('lh', new OutlineLayer('brush', { roiLabels: Uint32Array.from(roi), boundaryMode: 'midpoint', color: 0xf2c230, width: 2 }));
+  const area = summarizeSurfaceRegion(metric, roi, { mode: 'vertex-membership', roi }).totalAreaMm2;
+  return { path, area }; // path length is mm; area is mm²; display morphs leave both unchanged
 }

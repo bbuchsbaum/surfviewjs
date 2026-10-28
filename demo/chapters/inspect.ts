@@ -1,3 +1,4 @@
+import { addSurfaceMeasurements } from '../kit/surface-geometry';
 import { DataLayer, MultiLayerNeuroSurface } from '@src/index.js';
 import type { SurfacePickEvent } from '@src/index.js';
 import excerpt from '../excerpts/inspect.ts?raw';
@@ -41,9 +42,9 @@ export const inspect: Scenario = {
   title: 'Inspect & annotate',
   short: 'Inspect',
   group: 'surfaces',
-  tags: ['picking', 'gpu picking', 'crosshair', 'annotations', 'inspection'],
+  tags: ['picking', 'gpu picking', 'crosshair', 'annotations', 'inspection', 'geodesics', 'barycentric anchors', 'midpoint boundaries'],
   summary:
-    'Both fsaverage5 hemispheres with one data layer, for reading values off the cortex. Hover to pick a vertex (with the GPU picker or CPU raycasting) and read its index, value and coordinates; the margin times each pick. A crosshair follows the cursor; a click pins it as the selection and drops a labelled mark there. Marks are listed in the margin, where you can return to, remove or clear them.',
+    'Read values, place precise triangle anchors, and measure on the cortex. Show an example ruler or choose two points, compare surface distance with a straight chord, and grow a brush in millimetres. Compare midpoint borders with mesh edges and partition area with vertex membership. The picker and labelled marks remain available below.',
   synthetic:
     'The map is a constructed contrast (Gaussian effects at intraparietal, inferior frontal, visual and medial prefrontal foci, plus smooth noise), not a result.',
   excerpt,
@@ -201,7 +202,7 @@ export const inspect: Scenario = {
       id: 'inspect-clear-marks',
       label: 'Clear marks',
       onClick: () => {
-        viewer.clearAnnotations();
+        marks.forEach(mark => viewer.removeAnnotation(mark.id));
         marks.length = 0;
         activeMark = null;
         nextNumber = 1;
@@ -273,6 +274,7 @@ export const inspect: Scenario = {
       downAt = null;
     };
     const onClick = (event: SurfacePickEvent) => {
+      if (measurements.isActive()) return;
       const id = event.surfaceId as SurfaceId | null;
       if (!id || event.vertexIndex === null || !(id in values)) return;
       if (dragged) {
@@ -290,7 +292,10 @@ export const inspect: Scenario = {
         return;
       }
       const label = labelInput.value.trim() || `M${nextNumber}`;
-      const markId = viewer.addAnnotation(id, event.vertexIndex, { label }, MARK_STYLE);
+      const precise = viewer.pickSurfaceLocation();
+      const markId = precise.location && precise.surfaceId === id
+        ? viewer.annotations.addAnchor(id, { location: precise.location }, { label }, MARK_STYLE)
+        : viewer.addAnnotation(id, event.vertexIndex, { label }, MARK_STYLE);
       if (!markId) return;
       nextNumber++;
       labelInput.value = '';
@@ -331,7 +336,9 @@ export const inspect: Scenario = {
     const vertexCount = (left.vertices.length + right.vertices.length) / 3;
     ctx.perf(`${vertexCount.toLocaleString('en-US')} vertices`);
     ctx.setBusy(false);
+    const measurements = addSurfaceMeasurements(ctx, viewer, geometries);
     return () => {
+      measurements.dispose();
       canvas.removeEventListener('pointermove', onMove);
       canvas.removeEventListener('pointerleave', onLeave);
       canvas.removeEventListener('pointerdown', onDown);

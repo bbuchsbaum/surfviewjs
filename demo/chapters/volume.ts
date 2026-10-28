@@ -1,3 +1,4 @@
+import { addRibbonColumns } from '../kit/surface-geometry';
 import { DataLayer, MultiLayerNeuroSurface, THREE, VolumeProjectionLayer, VolumeTexture3D, projectVolume } from '@src/index.js';
 import type { AnatomicalView, VolumeDescriptor } from '@src/index.js';
 import excerpt from '../excerpts/volume.ts?raw';
@@ -107,9 +108,9 @@ export const volume: Scenario = {
   title: 'Volume to surface',
   short: 'Volume',
   group: 'surfaces',
-  tags: ['projectVolume', 'VolumeProjectionLayer', 'surface normals', 'ribbon sampling', 'WebGL2 3D texture'],
+  tags: ['projectVolume', 'VolumeProjectionLayer', 'surface normals', 'ribbon sampling', 'WebGL2 3D texture', 'column integration', 'coverage'],
   summary:
-    'One scalar volume on a 2 mm grid in millimetre space, mapped onto the fsaverage5 left pial surface two ways. Sample along normals runs projectVolume: choose a depth interval in millimetres along each vertex normal, the number of samples, nearest or linear interpolation and the mean or signed maximum-absolute reduction, and the result is shown as an ordinary DataLayer. Volume layer uses VolumeProjectionLayer and its vertex, fragment, hybrid and ribbon modes. Hover to read the projected value.',
+    'Map a synthetic 2 mm volume onto the fsaverage5 left pial surface. Compare normal sampling with GPU volume layers, then inspect a white–pial column: its volume-weighted mean, segment-sampled mean, and valid-volume coverage are reported separately. Choose an example column or click the cortex; the marker shows which vertex was measured.',
   synthetic:
     'The volume is constructed: Gaussian effects at visual, motor, deep auditory, inferior frontal and posterior cingulate foci plus smooth 3D noise (14 mm wavelength). The white surface for ribbon mode is the pial surface moved 2.5 mm inward along its normals, not a real white-matter surface.',
   excerpt,
@@ -412,7 +413,9 @@ export const volume: Scenario = {
     setMethod('normals');
     ctx.perf(`${vertexCount.toLocaleString('en-US')} vertices · ${(vol.data.length).toLocaleString('en-US')} voxels · ${surface.getCompositingMode()} compositing`);
     ctx.setBusy(false);
+    const removeColumns = addRibbonColumns(ctx, viewer, geometry, white, pial, vol);
     return () => {
+      removeColumns();
       viewer.off('vertex:hover', onHover);
       cleanup();
       volumeLayer?.dispose();

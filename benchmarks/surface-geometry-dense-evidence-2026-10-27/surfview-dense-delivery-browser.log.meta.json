@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "started_utc": "2026-10-27T22:21:14.018983+00:00",
+  "finished_utc": "2026-10-27T22:21:21.644703+00:00",
+  "duration_seconds": 7.625452,
+  "command": [
+    "npx",
+    "start-server-and-test",
+    "vite --host 127.0.0.1 --port 4192 --strictPort",
+    "http://127.0.0.1:4192/demo/",
+    "playwright test tests/e2e/surface-geometry.spec.ts --grep \"prepared worker|derived smoothing\" --workers=1"
+  ],
+  "cwd": "/Users/bbuchsbaum/code/jscode/surfviewjs",
+  "log": "/tmp/surfview-dense-delivery-browser.log",
+  "exit_code": 0,
+  "child_returncode": 0,
+  "reason": "exited",
+  "detail": null,
+  "timeout_seconds": 180.0,
+  "log_bytes": 1530
+}

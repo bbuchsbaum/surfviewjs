@@ -32,6 +32,8 @@ import {
   tToZ
 } from '../utils/statistics';
 import { finiteNumber, finitePair } from '../utils/validation';
+import { SurfaceMetric } from '../geometry/SurfaceDomain';
+import { clusterSurfaceByArea, type SurfaceAreaClusters } from '../geometry/SurfaceArea';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -328,9 +330,27 @@ export class StatisticalMapLayer extends DataLayer {
     this._invalidateRGBA();
   }
 
-  /**
-   * Remove all statistical corrections, restoring all supra-threshold vertices.
-   */
+  /** Descriptive area filtering in mm²; does not compute a cluster p-value. */
+  applyClusterAreaThreshold(threshold: number, options: { minAreaMm2: number; metric: SurfaceMetric; signMode?: 'separate' | 'absolute' }): SurfaceAreaClusters {
+    const data = this.getData();
+    if (!data) throw new Error('No data available for cluster thresholding');
+    const dense = new Float64Array(options.metric.domain.vertexCount); dense.fill(NaN);
+    for (let i = 0; i < this._statIndices.length; i++) {
+      const vertex = this._statIndices[i]!;
+      if (vertex >= dense.length) throw new RangeError('Statistical vertex index exceeds metric domain');
+      dense[vertex] = data[i] ?? NaN;
+    }
+    const result = clusterSurfaceByArea(options.metric, dense, { threshold, minAreaMm2: options.minAreaMm2, signMode: options.signMode ?? 'separate' });
+    this._correctionMethod = 'cluster'; this._correctionMask = null;
+    this._fdrQ = 0; this._bonferroniAlpha = 0;
+    this._clusterMask = result.mask.slice();
+    this._clusterResult = { clusterIds: result.clusterIds.slice(), clusterSizes: new Map(Array.from(result.sizes, (size, id) => [id, size])), clusterCount: result.sizes.length };
+    this._clusterThreshold = threshold; this._clusterMinSize = 0;
+    this._invalidateRGBA();
+    return result;
+  }
+
+  /** Remove all statistical corrections, restoring all supra-threshold vertices. */
   clearCorrection(): void {
     this._correctionMethod = 'none';
     this._correctionMask = null;

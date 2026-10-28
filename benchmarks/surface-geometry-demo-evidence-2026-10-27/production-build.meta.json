@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "started_utc": "2026-10-27T21:01:53.701214+00:00",
+  "finished_utc": "2026-10-27T21:01:54.295607+00:00",
+  "duration_seconds": 0.594273,
+  "command": [
+    "env",
+    "GITHUB_ACTIONS=true",
+    "npm",
+    "run",
+    "demo:build"
+  ],
+  "cwd": "/Users/bbuchsbaum/code/jscode/surfviewjs",
+  "log": "/tmp/surfview-demo-production-build-20261027.log",
+  "exit_code": 0,
+  "child_returncode": 0,
+  "reason": "exited",
+  "detail": null,
+  "timeout_seconds": 600.0,
+  "log_bytes": 3271
+}

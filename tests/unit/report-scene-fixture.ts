@@ -192,6 +192,7 @@ export function makeReportViewer(): NeuroSurfaceViewer {
     dispose: vi.fn()
   };
   mutable.annotations = {
+    updatePositions: vi.fn(),
     removeBySurface: vi.fn(),
     setDefaults: vi.fn(),
     dispose: vi.fn()

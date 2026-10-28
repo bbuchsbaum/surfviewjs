@@ -1,0 +1,44 @@
+
+> surfview@3.1.0 demo:build
+> vite build --config vite.demo.config.ts
+
+vite v8.2.2 building client environment for production...
+transforming...
+✓ 224 modules transformed.
+rendering chunks...
+computing gzip size...
+demo-dist/puzzle.html                                                    2.93 kB │ gzip:   1.24 kB
+demo-dist/map-lab.html                                                   2.95 kB │ gzip:   1.25 kB
+demo-dist/index.html                                                     3.82 kB │ gzip:   1.46 kB
+demo-dist/assets/jetbrains-mono-vietnamese-wght-normal-Bt-aOZkq.woff2    7.50 kB
+demo-dist/assets/jetbrains-mono-greek-wght-normal-Bw9x6K1M.woff2         9.00 kB
+demo-dist/assets/jetbrains-mono-cyrillic-wght-normal-D73BlboJ.woff2     12.10 kB
+demo-dist/assets/jetbrains-mono-latin-ext-wght-normal-DBQx-q_a.woff2    15.19 kB
+demo-dist/assets/archivo-vietnamese-wdth-normal-rJmnGBSt.woff2          34.46 kB
+demo-dist/assets/LICENSE-DB40f3cO.txt                                   35.14 kB │ gzip:  12.23 kB
+demo-dist/assets/jetbrains-mono-latin-wght-normal-B9CIFXIH.woff2        40.40 kB
+demo-dist/assets/geometryWorker-BffuCn8Z.js                             45.42 kB
+demo-dist/assets/archivo-latin-ext-wdth-normal-7khWdh9v.woff2           86.24 kB
+demo-dist/assets/archivo-latin-wdth-normal-DY7AcnAa.woff2               90.10 kB
+demo-dist/assets/fs_LR.32k.L.sulcal_depth.shape-D2-C7i1r.gii            90.52 kB
+demo-dist/assets/left-fslr32k-BvYcnlyw.json                            113.83 kB │ gzip:   9.02 kB
+demo-dist/assets/left-fslr32k-7networks-DNnia8wn.json                  124.04 kB │ gzip:   8.53 kB
+demo-dist/assets/left-fslr32k-17networks-DbZ21ABk.json                 124.64 kB │ gzip:   8.68 kB
+demo-dist/assets/gaussian_splat_demo.func-Cp9ywRYX.gii                 168.63 kB
+demo-dist/assets/fsaverage5-lh-pial-CIMUXoYI.gii                       270.96 kB
+demo-dist/assets/fsaverage5-rh-pial-peV36aq4.gii                       271.02 kB
+demo-dist/assets/ascii.surf-BxB-881A.gii                               460.84 kB
+demo-dist/assets/fs_LR.32k.L.inflated.surf-BcuysaGX.gii                723.68 kB
+demo-dist/assets/parcelPuzzle-BYm4HP4k.css                               1.80 kB │ gzip:   0.62 kB
+demo-dist/assets/parcelMapLab-hkpyvJyA.css                               5.12 kB │ gzip:   1.30 kB
+demo-dist/assets/gallery-kg5B2Rna.css                                   14.82 kB │ gzip:   2.72 kB
+demo-dist/assets/atlasPalettes-BGCQrieG.css                             21.03 kB │ gzip:   7.25 kB
+demo-dist/assets/mapLab-BjLwRx43.js                                      0.13 kB │ gzip:   0.12 kB
+demo-dist/assets/puzzle-DAmHs4Ce.js                                      0.13 kB │ gzip:   0.12 kB
+demo-dist/assets/parcel-standalone-CsXKLhmM.js                           1.33 kB │ gzip:   0.67 kB
+demo-dist/assets/parcelPuzzle-5992wU4-.js                               30.23 kB │ gzip:   9.36 kB
+demo-dist/assets/parcelMapLab-D149UfpH.js                               31.07 kB │ gzip:  12.25 kB
+demo-dist/assets/gallery-B_cBMeSk.js                                   481.97 kB │ gzip: 144.57 kB
+demo-dist/assets/atlasPalettes-BV5kLZNX.js                             988.29 kB │ gzip: 261.72 kB
+
+✓ built in 250ms

@@ -1,9 +1,20 @@
-import { AlignmentQAWorkspace, loadSurfaceFromFile } from '@src/index.js';
-import type { AlignmentQAConfig, NeuroSurfaceViewer } from '@src/index.js';
+import { AlignmentQAWorkspace, loadSurfaceFromFile, SurfaceResamplingPlan, exportSurfaceResamplingPlan, importSurfaceResamplingPlan } from '@src/index.js';
+import type { AlignmentQAConfig, NeuroSurfaceViewer, SurfaceDomain } from '@src/index.js';
 
 // In: a GIFTI, ASCII PLY or FreeSurfer surface picked by the user.
 export async function readSurface(file: File) {
   return loadSurfaceFromFile(file, 'auto'); // format detected from the file name
+}
+
+export async function reusableMapping(domain: SurfaceDomain, values: Float32Array, labels: Uint32Array) {
+  const n = domain.vertexCount;
+  const plan = new SurfaceResamplingPlan(domain, domain, {
+    offsets: Uint32Array.from({ length: n + 1 }, (_, i) => i),
+    indices: Uint32Array.from({ length: n }, (_, i) => i), weights: new Float64Array(n).fill(1)
+  }, { method: 'provided', correspondence: 'explicit-identity' });
+  const artifact = await exportSurfaceResamplingPlan(plan); // serialize as JSON
+  const restored = await importSurfaceResamplingPlan(artifact, domain, domain); // identity + checksum validation
+  return { scalars: restored.apply(values), categories: restored.applyLabels(labels), artifact };
 }
 
 // Out: state, a share link, and a scene manifest.

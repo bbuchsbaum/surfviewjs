@@ -1,0 +1,145 @@
+{
+  "runtime": "v26.7.0",
+  "hardware": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M3 Max",
+    "totalMemoryBytes": 38654705664
+  },
+  "fixture": "/tmp/surfview-cortical-templates/fsLR-32k-midthickness.surf.gii",
+  "coldBuildSamples": 1,
+  "cases": [
+    {
+      "frame": "fsLR-template-RAS",
+      "level": 0,
+      "vertices": 32492,
+      "faces": 64980,
+      "fwhmMm": 2,
+      "inputSha256": "036a8b6c84fa4b581b7ad7b36d99190b57ad6755c9d7ef7adc3e9ffc6448f1af",
+      "bundleSha256": "34dbcd70b080ce3b6167bf1d84259f17aafd592bfa8afbdc63586add5fa264c1",
+      "budgetBytes": 536870912,
+      "buildMs": 426.5396669999999,
+      "retainedBytes": 7563436,
+      "ordinary16Ms": {
+        "p50": 34.66016599999989,
+        "p95": 37.52350000000001,
+        "samples": 7,
+        "warmup": 1,
+        "samplesMs": [
+          34.41125000000011,
+          34.61804200000006,
+          34.65208299999995,
+          34.66016599999989,
+          35.11708399999998,
+          35.47608300000002,
+          37.52350000000001
+        ]
+      },
+      "prepared16Ms": {
+        "p50": 28.674415999999837,
+        "p95": 36.30666599999995,
+        "samples": 7,
+        "warmup": 1,
+        "samplesMs": [
+          27.11258399999997,
+          28.015292000000045,
+          28.04950000000008,
+          28.674415999999837,
+          29.17833399999995,
+          32.40804200000002,
+          36.30666599999995
+        ]
+      },
+      "maxBatchDifference": 0,
+      "isolatedProcessMaxRssBytes": 412041216
+    },
+    {
+      "frame": "fsLR-template-RAS",
+      "level": 0,
+      "vertices": 32492,
+      "faces": 64980,
+      "fwhmMm": 4,
+      "inputSha256": "036a8b6c84fa4b581b7ad7b36d99190b57ad6755c9d7ef7adc3e9ffc6448f1af",
+      "bundleSha256": "34dbcd70b080ce3b6167bf1d84259f17aafd592bfa8afbdc63586add5fa264c1",
+      "budgetBytes": 536870912,
+      "buildMs": 1400.0058749999998,
+      "retainedBytes": 28542220,
+      "ordinary16Ms": {
+        "p50": 111.61525000000029,
+        "p95": 114.37695800000029,
+        "samples": 7,
+        "warmup": 1,
+        "samplesMs": [
+          111.24037499999986,
+          111.52879100000018,
+          111.59216700000025,
+          111.61525000000029,
+          111.83799999999974,
+          111.91458299999977,
+          114.37695800000029
+        ]
+      },
+      "prepared16Ms": {
+        "p50": 92.92987499999981,
+        "p95": 96.71008299999994,
+        "samples": 7,
+        "warmup": 1,
+        "samplesMs": [
+          91.54733400000032,
+          92.60254200000008,
+          92.65945800000009,
+          92.92987499999981,
+          95.4402500000001,
+          96.09575000000041,
+          96.71008299999994
+        ]
+      },
+      "maxBatchDifference": 0,
+      "isolatedProcessMaxRssBytes": 400424960
+    },
+    {
+      "frame": "fsLR-template-RAS",
+      "level": 0,
+      "vertices": 32492,
+      "faces": 64980,
+      "fwhmMm": 8,
+      "inputSha256": "036a8b6c84fa4b581b7ad7b36d99190b57ad6755c9d7ef7adc3e9ffc6448f1af",
+      "bundleSha256": "34dbcd70b080ce3b6167bf1d84259f17aafd592bfa8afbdc63586add5fa264c1",
+      "budgetBytes": 536870912,
+      "buildMs": 5492.881915999999,
+      "retainedBytes": 111880180,
+      "ordinary16Ms": {
+        "p50": 421.50841599999876,
+        "p95": 425.6443340000005,
+        "samples": 7,
+        "warmup": 1,
+        "samplesMs": [
+          420.57029200000034,
+          420.88037499999973,
+          421.31545800000004,
+          421.50841599999876,
+          421.80991600000016,
+          422.05758400000013,
+          425.6443340000005
+        ]
+      },
+      "prepared16Ms": {
+        "p50": 336.52729200000067,
+        "p95": 341.52958300000137,
+        "samples": 7,
+        "warmup": 1,
+        "samplesMs": [
+          334.8186249999999,
+          335.3199999999997,
+          336.4638329999998,
+          336.52729200000067,
+          339.6442499999994,
+          341.313791999999,
+          341.52958300000137
+        ]
+      },
+      "maxBatchDifference": 0,
+      "isolatedProcessMaxRssBytes": 495173632
+    }
+  ]
+}

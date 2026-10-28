@@ -1,0 +1,386 @@
+{
+  "/tmp/surfview-profile-production-20261027/10k-32k/adaptive-barycentric-area-false-labels.label.gii.ascii.gii": {
+    "sha256": "ac6e751b5e5260c6b36d1a756012979819a1594395bb7082c779ad4d3f93a603",
+    "bytes": 361281
+  },
+  "/tmp/surfview-profile-production-20261027/10k-32k/adaptive-barycentric-area-false-labels.roi.func.gii.ascii.gii": {
+    "sha256": "088768c2ad00281c646c7774dcd2161e69cd8095be4b1d7cca4f670951797170",
+    "bytes": 296006
+  },
+  "/tmp/surfview-profile-production-20261027/10k-32k/adaptive-barycentric-area-false-scalar.func.gii.ascii.gii": {
+    "sha256": "1fb1b1d2c8c6be5869e8395a984ec15dd68a1c0bf09651500b6762bdc950293b",
+    "bytes": 544313
+  },
+  "/tmp/surfview-profile-production-20261027/10k-32k/adaptive-barycentric-area-false-scalar.roi.func.gii.ascii.gii": {
+    "sha256": "46a5519fd498a69fba2b6e80cb4084237a4bd055dd8fa2e5fe4d982455a6d1e6",
+    "bytes": 296005
+  },
+  "/tmp/surfview-profile-production-20261027/10k-32k/adaptive-barycentric-area-true-labels.label.gii.ascii.gii": {
+    "sha256": "d974648fceae35455ae4b55b518bab26cca9d0cdca42e0e72ba28829e0949372",
+    "bytes": 361355
+  },
+  "/tmp/surfview-profile-production-20261027/10k-32k/adaptive-barycentric-area-true-labels.roi.func.gii.ascii.gii": {
+    "sha256": "59fab264d16d5871791cd5ab89af6e07ee192cb259359e4ea4a183e15bfdec2f",
+    "bytes": 296080
+  },
+  "/tmp/surfview-profile-production-20261027/10k-32k/adaptive-barycentric-area-true-scalar.func.gii.ascii.gii": {
+    "sha256": "bd96f44e7c818b4d0868c8c30b5caeee4344f21ffaebea969cef27436ca53ce6",
+    "bytes": 543982
+  },
+  "/tmp/surfview-profile-production-20261027/10k-32k/adaptive-barycentric-area-true-scalar.roi.func.gii.ascii.gii": {
+    "sha256": "fc92c3a918a429c447b249311eb942b5215a2829a64e4146157c01242a6927a0",
+    "bytes": 296079
+  },
+  "/tmp/surfview-profile-production-20261027/10k-32k/barycentric-closest-false-labels.label.gii.ascii.gii": {
+    "sha256": "8fd530e1827ff30a87a08a1799fcf8a6a4c21a5bc537cabf6939209c531e2b69",
+    "bytes": 360586
+  },
+  "/tmp/surfview-profile-production-20261027/10k-32k/barycentric-closest-false-labels.roi.func.gii.ascii.gii": {
+    "sha256": "8a1aa1aa09c1623e590437fc8949d3decf2e6b38219423e95a86f6d8ef5624ef",
+    "bytes": 295311
+  },
+  "/tmp/surfview-profile-production-20261027/10k-32k/barycentric-closest-false-scalar.func.gii.ascii.gii": {
+    "sha256": "1ca0089b0e2925547a21d09b7b465d2fbb553b96cfc00b9fd4f095839862d0ce",
+    "bytes": 543674
+  },
+  "/tmp/surfview-profile-production-20261027/10k-32k/barycentric-closest-false-scalar.roi.func.gii.ascii.gii": {
+    "sha256": "8385d18845e079ecf497f93d23b1c56f0e5f82e6b180ac095446ac39c3636776",
+    "bytes": 295310
+  },
+  "/tmp/surfview-profile-production-20261027/10k-32k/barycentric-closest-true-labels.label.gii.ascii.gii": {
+    "sha256": "8e52197b9e39e2668b9cf3588f323f7b030d390011ba8945bf836219becafd87",
+    "bytes": 360660
+  },
+  "/tmp/surfview-profile-production-20261027/10k-32k/barycentric-closest-true-labels.roi.func.gii.ascii.gii": {
+    "sha256": "3925246d6497db3482ab18fbb280a7e828cd462d7a58d282838a73b86303d242",
+    "bytes": 295385
+  },
+  "/tmp/surfview-profile-production-20261027/10k-32k/barycentric-closest-true-scalar.func.gii.ascii.gii": {
+    "sha256": "780a87866fb6f27fd447024c770ceacdf168d47ef7d64c79c39171771e35fa78",
+    "bytes": 543303
+  },
+  "/tmp/surfview-profile-production-20261027/10k-32k/barycentric-closest-true-scalar.roi.func.gii.ascii.gii": {
+    "sha256": "99d3bdc42aaf8e021743df275dc0c2c638b8592f920b7e5cc18913cffc0757b4",
+    "bytes": 295384
+  },
+  "/tmp/surfview-profile-production-20261027/164k-32k/adaptive-barycentric-area-false-labels.label.gii.ascii.gii": {
+    "sha256": "34f0790cf7a1f6a00ac14ef1da5d368a53e8025cbeaaa9cc98b633a984626fdd",
+    "bytes": 361284
+  },
+  "/tmp/surfview-profile-production-20261027/164k-32k/adaptive-barycentric-area-false-labels.roi.func.gii.ascii.gii": {
+    "sha256": "4416cb70ce6aa759e70bd512eeb6582a015be61bbca0ee14fe65dca8dc8835bb",
+    "bytes": 296009
+  },
+  "/tmp/surfview-profile-production-20261027/164k-32k/adaptive-barycentric-area-false-scalar.func.gii.ascii.gii": {
+    "sha256": "8161d0cb83cb48937ea5e39d16ad0a7a98d017bcc47d7453f3f22ab128851fa6",
+    "bytes": 556519
+  },
+  "/tmp/surfview-profile-production-20261027/164k-32k/adaptive-barycentric-area-false-scalar.roi.func.gii.ascii.gii": {
+    "sha256": "a8aaa72d18c2c6f9189cf9c119983f7f1efaa3fe349ef04ad499d4e594b6bf16",
+    "bytes": 296008
+  },
+  "/tmp/surfview-profile-production-20261027/164k-32k/adaptive-barycentric-area-true-labels.label.gii.ascii.gii": {
+    "sha256": "4f1f3e9b1907678d8a9ad13324e96ed9d69fd2114e8e2972eaa638f1f5dd8aa6",
+    "bytes": 361359
+  },
+  "/tmp/surfview-profile-production-20261027/164k-32k/adaptive-barycentric-area-true-labels.roi.func.gii.ascii.gii": {
+    "sha256": "868583de62832385a4bcfb27eca9015b460aa28c30d949d1d31cea46f2d61c8c",
+    "bytes": 296084
+  },
+  "/tmp/surfview-profile-production-20261027/164k-32k/adaptive-barycentric-area-true-scalar.func.gii.ascii.gii": {
+    "sha256": "cd13485ab6a08f7279d6e00e0ec0d041a06b49e036cfc82214e2ca19418f15bc",
+    "bytes": 555489
+  },
+  "/tmp/surfview-profile-production-20261027/164k-32k/adaptive-barycentric-area-true-scalar.roi.func.gii.ascii.gii": {
+    "sha256": "0702c37737931364340ec484027fbddd4a389a405f0df517e9b368dc11b6a360",
+    "bytes": 296083
+  },
+  "/tmp/surfview-profile-production-20261027/164k-32k/barycentric-closest-false-labels.label.gii.ascii.gii": {
+    "sha256": "4b8cce14454c1c5aa7e17ba5744a5cda05b678becf01ecd8bd6afaeb83a483b4",
+    "bytes": 360589
+  },
+  "/tmp/surfview-profile-production-20261027/164k-32k/barycentric-closest-false-labels.roi.func.gii.ascii.gii": {
+    "sha256": "ab6575f219194584676bbaba273228d9d31bd9702e9ad3823d1f3eedaa131f36",
+    "bytes": 295314
+  },
+  "/tmp/surfview-profile-production-20261027/164k-32k/barycentric-closest-false-scalar.func.gii.ascii.gii": {
+    "sha256": "82c13f7091a65ce5c69d8e41de68b9355d7ffa56ca08657db78058d216579d43",
+    "bytes": 543504
+  },
+  "/tmp/surfview-profile-production-20261027/164k-32k/barycentric-closest-false-scalar.roi.func.gii.ascii.gii": {
+    "sha256": "e3df8a32ae3a67edae2964df991b0090bd64c21ae7f9f3ac75b68cda90b4ef30",
+    "bytes": 295313
+  },
+  "/tmp/surfview-profile-production-20261027/164k-32k/barycentric-closest-true-labels.label.gii.ascii.gii": {
+    "sha256": "f240050e749e65cc6d8a56677352eca1e5d033d5fea2d5f29988e945e7948f56",
+    "bytes": 360642
+  },
+  "/tmp/surfview-profile-production-20261027/164k-32k/barycentric-closest-true-labels.roi.func.gii.ascii.gii": {
+    "sha256": "298a53ad9c5f0d9bb5901c836a3f83aa3cc5144b50c8a57d73305bc2ff7fce2a",
+    "bytes": 295389
+  },
+  "/tmp/surfview-profile-production-20261027/164k-32k/barycentric-closest-true-scalar.func.gii.ascii.gii": {
+    "sha256": "c3117552138f4d0691e57acea0daf7b3dfc0a442f80c441becae15286b95c50a",
+    "bytes": 543235
+  },
+  "/tmp/surfview-profile-production-20261027/164k-32k/barycentric-closest-true-scalar.roi.func.gii.ascii.gii": {
+    "sha256": "2d6e20502c133cda811951c4c70be0f2e68173c35c41576371b068026d86fc47",
+    "bytes": 295388
+  },
+  "/tmp/surfview-profile-production-20261027/32k-10k/adaptive-barycentric-area-false-labels.label.gii.ascii.gii": {
+    "sha256": "7d6fd0a553be4e086302fffd26fcafdc05e819ee3dc929402d9610c4622eca51",
+    "bytes": 116531
+  },
+  "/tmp/surfview-profile-production-20261027/32k-10k/adaptive-barycentric-area-false-labels.roi.func.gii.ascii.gii": {
+    "sha256": "9432d8761598b7ff351378cd93c2b3b0f8a1ad3f02cb98e3ae079f52a0c6cf30",
+    "bytes": 95756
+  },
+  "/tmp/surfview-profile-production-20261027/32k-10k/adaptive-barycentric-area-false-scalar.func.gii.ascii.gii": {
+    "sha256": "5cc6f8ffc298fe9092bb2ca1c3b916c47ea31932d95a6334e8500db18d921f9e",
+    "bytes": 177521
+  },
+  "/tmp/surfview-profile-production-20261027/32k-10k/adaptive-barycentric-area-false-scalar.roi.func.gii.ascii.gii": {
+    "sha256": "0acc680e18e0387bc5f1c57a0b58523f4ca143455928991ff8f30e640a5a4e82",
+    "bytes": 95755
+  },
+  "/tmp/surfview-profile-production-20261027/32k-10k/adaptive-barycentric-area-true-labels.label.gii.ascii.gii": {
+    "sha256": "d36a673878329ef16c85c7e49bf068f9503aeb6a805a2d0eb98082c7755f08c9",
+    "bytes": 116605
+  },
+  "/tmp/surfview-profile-production-20261027/32k-10k/adaptive-barycentric-area-true-labels.roi.func.gii.ascii.gii": {
+    "sha256": "5c327ba0cba9d11b120d7b96b915aebf1ef7f0f7b23bf11f418f21707c77d1c9",
+    "bytes": 95830
+  },
+  "/tmp/surfview-profile-production-20261027/32k-10k/adaptive-barycentric-area-true-scalar.func.gii.ascii.gii": {
+    "sha256": "8ea09d7d9a0ae44ea617554c5f6f5198930ef8b68ed147b1befd576adeba6f56",
+    "bytes": 177441
+  },
+  "/tmp/surfview-profile-production-20261027/32k-10k/adaptive-barycentric-area-true-scalar.roi.func.gii.ascii.gii": {
+    "sha256": "e91021bb556f58c9e7b468fb7ea209c8b5b2290c78fe25787d7ed905d58d3f46",
+    "bytes": 95829
+  },
+  "/tmp/surfview-profile-production-20261027/32k-10k/barycentric-closest-false-labels.label.gii.ascii.gii": {
+    "sha256": "1779fc0fff28952894b50e0787568194e5ae5076d366a6cc5e3735507d49c7a4",
+    "bytes": 115836
+  },
+  "/tmp/surfview-profile-production-20261027/32k-10k/barycentric-closest-false-labels.roi.func.gii.ascii.gii": {
+    "sha256": "1ba2dbe83a9034264889cf346c842aee2ff2a7d2f2c91f7dfa55bcc749394611",
+    "bytes": 95061
+  },
+  "/tmp/surfview-profile-production-20261027/32k-10k/barycentric-closest-false-scalar.func.gii.ascii.gii": {
+    "sha256": "89cefb14f60c85d72838b1cb84bef4ea37f0c11ae6df22feb688eeb96af97ba2",
+    "bytes": 174677
+  },
+  "/tmp/surfview-profile-production-20261027/32k-10k/barycentric-closest-false-scalar.roi.func.gii.ascii.gii": {
+    "sha256": "c1c7f314256db5b85009f8c9003ea9e6283f2ba46785a41280ee388088d94efe",
+    "bytes": 95060
+  },
+  "/tmp/surfview-profile-production-20261027/32k-10k/barycentric-closest-true-labels.label.gii.ascii.gii": {
+    "sha256": "c9fa38eac39488827afa8c8691bebb4df6a5a733831f5ed5b3aada0fd83a6f89",
+    "bytes": 115910
+  },
+  "/tmp/surfview-profile-production-20261027/32k-10k/barycentric-closest-true-labels.roi.func.gii.ascii.gii": {
+    "sha256": "ddab26216b3d350e639ebf6798fd75a4a92a045e633c8c90e812c786ac449372",
+    "bytes": 95135
+  },
+  "/tmp/surfview-profile-production-20261027/32k-10k/barycentric-closest-true-scalar.func.gii.ascii.gii": {
+    "sha256": "4c66f5bb34adf878b87007285b07044083af7aa6a38de9ac65b8579a47b43efd",
+    "bytes": 174647
+  },
+  "/tmp/surfview-profile-production-20261027/32k-10k/barycentric-closest-true-scalar.roi.func.gii.ascii.gii": {
+    "sha256": "7d0989792bc99c8821ee099b9760c8fd83c000660016158d8c7356af88f10b0f",
+    "bytes": 95134
+  },
+  "/tmp/surfview-profile-production-20261027/32k-164k/adaptive-barycentric-area-false-labels.label.gii.ascii.gii": {
+    "sha256": "081a08b8c94681b05ec8e3b625bf20c2dc00e527c50b94387c10adc1524c8b9f",
+    "bytes": 1806135
+  },
+  "/tmp/surfview-profile-production-20261027/32k-164k/adaptive-barycentric-area-false-labels.roi.func.gii.ascii.gii": {
+    "sha256": "06ad3381bc9178e19e7cf16d77d47426711546a0be51fe88c705bff443f576c3",
+    "bytes": 1478160
+  },
+  "/tmp/surfview-profile-production-20261027/32k-164k/adaptive-barycentric-area-false-scalar.func.gii.ascii.gii": {
+    "sha256": "12296ef5715b4a4fec7ce78a3787aad3c973a3fb64782a30cae350d21a62349e",
+    "bytes": 2718635
+  },
+  "/tmp/surfview-profile-production-20261027/32k-164k/adaptive-barycentric-area-false-scalar.roi.func.gii.ascii.gii": {
+    "sha256": "c2034e236beb6285bb440e752da12845ed79ef96d979de5aaa89b6a302d7c2de",
+    "bytes": 1478159
+  },
+  "/tmp/surfview-profile-production-20261027/32k-164k/adaptive-barycentric-area-true-labels.label.gii.ascii.gii": {
+    "sha256": "fac3d26b35127cd1e271bfa13d2a8c84e9562cc9cd5a505215750d213cc5caae",
+    "bytes": 1806210
+  },
+  "/tmp/surfview-profile-production-20261027/32k-164k/adaptive-barycentric-area-true-labels.roi.func.gii.ascii.gii": {
+    "sha256": "816ce62ded24caa39d297dbda303795d41ddf97f12f0aa3b08d04610e8d289c5",
+    "bytes": 1478235
+  },
+  "/tmp/surfview-profile-production-20261027/32k-164k/adaptive-barycentric-area-true-scalar.func.gii.ascii.gii": {
+    "sha256": "97f372e77c41762db523320b89d49c533536aee5b23c0cfe81e4df7e2284ec8a",
+    "bytes": 2717357
+  },
+  "/tmp/surfview-profile-production-20261027/32k-164k/adaptive-barycentric-area-true-scalar.roi.func.gii.ascii.gii": {
+    "sha256": "7acf91e7d19a846b1bb10fb0413df4b47543ea7ca5a75907ff8c06222c571c36",
+    "bytes": 1478234
+  },
+  "/tmp/surfview-profile-production-20261027/32k-164k/barycentric-closest-false-labels.label.gii.ascii.gii": {
+    "sha256": "485f911d3c067b43817cc136861d3fd3ebc4cc69feb9dca2757b75de5fca1aff",
+    "bytes": 1805440
+  },
+  "/tmp/surfview-profile-production-20261027/32k-164k/barycentric-closest-false-labels.roi.func.gii.ascii.gii": {
+    "sha256": "4bc17b022c2fc62b6631197687909ff9fabe78cf2681ca482261e37f4f7da33b",
+    "bytes": 1477465
+  },
+  "/tmp/surfview-profile-production-20261027/32k-164k/barycentric-closest-false-scalar.func.gii.ascii.gii": {
+    "sha256": "2c187a5bb733d896d04bdbab74544d4c9d3b648c0a23ef43dc5b616d65eb2ecd",
+    "bytes": 2718221
+  },
+  "/tmp/surfview-profile-production-20261027/32k-164k/barycentric-closest-false-scalar.roi.func.gii.ascii.gii": {
+    "sha256": "faab2582dc6814863aad4fe06228abbecc156efc7bd8f6b46313994150ccb32d",
+    "bytes": 1477464
+  },
+  "/tmp/surfview-profile-production-20261027/32k-164k/barycentric-closest-true-labels.label.gii.ascii.gii": {
+    "sha256": "d0676a7328631d3d66fe28b419cb13eb237809f5c8816ee681b90f9e69487920",
+    "bytes": 1805515
+  },
+  "/tmp/surfview-profile-production-20261027/32k-164k/barycentric-closest-true-labels.roi.func.gii.ascii.gii": {
+    "sha256": "ae7e57597577cf5c1f73fcc7845fd7a7a2d783fddd534b0db702e5688b02d5b0",
+    "bytes": 1477540
+  },
+  "/tmp/surfview-profile-production-20261027/32k-164k/barycentric-closest-true-scalar.func.gii.ascii.gii": {
+    "sha256": "c103a8854c088ff54b72fa856dbecc7685cb3392c53d6254c950df0695212ce2",
+    "bytes": 2716820
+  },
+  "/tmp/surfview-profile-production-20261027/32k-164k/barycentric-closest-true-scalar.roi.func.gii.ascii.gii": {
+    "sha256": "b16f7e74b48b6ea749e23b4290b33563db6352fd10e4885321742e2770488f6a",
+    "bytes": 1477539
+  },
+  "/tmp/surfview-anatomical-qualified-20261027/10k-164k/adaptive-barycentric-area-false-labels.label.gii.ascii.gii": {
+    "sha256": "dbbe4e8bbc8ba62fe85c6e19b5cdf3d155eb453754df669ba7e6c9ec944b570f",
+    "bytes": 1805419
+  },
+  "/tmp/surfview-anatomical-qualified-20261027/10k-164k/adaptive-barycentric-area-false-labels.roi.func.gii.ascii.gii": {
+    "sha256": "e73290e76ce912e6dad1c68f2b2e684731f525062dbabc94770cd1e8df223187",
+    "bytes": 1477444
+  },
+  "/tmp/surfview-anatomical-qualified-20261027/10k-164k/adaptive-barycentric-area-false-scalar.func.gii.ascii.gii": {
+    "sha256": "626f0f70c34e3661f1dd9f93c1ab5628fdb845c284afa7c342aace718bc70a6b",
+    "bytes": 2719845
+  },
+  "/tmp/surfview-anatomical-qualified-20261027/10k-164k/adaptive-barycentric-area-false-scalar.roi.func.gii.ascii.gii": {
+    "sha256": "8429f820dab1ff757c3a70eddf022b040494f58e61a889fbea6e38ee7d9551de",
+    "bytes": 1477443
+  },
+  "/tmp/surfview-anatomical-qualified-20261027/10k-164k/adaptive-barycentric-area-true-labels.label.gii.ascii.gii": {
+    "sha256": "0556a9d5a14c1f58ac4e24b156681de91b66e64d1402edeea9d7de0690976306",
+    "bytes": 1804664
+  },
+  "/tmp/surfview-anatomical-qualified-20261027/10k-164k/adaptive-barycentric-area-true-labels.roi.func.gii.ascii.gii": {
+    "sha256": "8d82cfad68917db6d902d61a00461402f89d71c49f1332ef36edc34caaa8ffc7",
+    "bytes": 1477521
+  },
+  "/tmp/surfview-anatomical-qualified-20261027/10k-164k/adaptive-barycentric-area-true-scalar.func.gii.ascii.gii": {
+    "sha256": "ed27b88ca6a4c7908a7bb07f2bd2d14573dece68c11b3225dc77f9aacc91a2fb",
+    "bytes": 2715087
+  },
+  "/tmp/surfview-anatomical-qualified-20261027/10k-164k/adaptive-barycentric-area-true-scalar.roi.func.gii.ascii.gii": {
+    "sha256": "9d3a2866683092b792aa74780f4482dbf90a1b3db61ef1439fbdfb45154ff2e7",
+    "bytes": 1477520
+  },
+  "/tmp/surfview-anatomical-qualified-20261027/10k-164k/barycentric-closest-false-labels.label.gii.ascii.gii": {
+    "sha256": "22e6449fd7cc34737613d1d02b328061ee0cb542e5416d7c594e6082ccb8c4c8",
+    "bytes": 1804811
+  },
+  "/tmp/surfview-anatomical-qualified-20261027/10k-164k/barycentric-closest-false-labels.roi.func.gii.ascii.gii": {
+    "sha256": "cb1bd94ee659e0a055926547e1e721580f2b1b4a3ed9cd65c509d2e0eabe397a",
+    "bytes": 1476836
+  },
+  "/tmp/surfview-anatomical-qualified-20261027/10k-164k/barycentric-closest-false-scalar.func.gii.ascii.gii": {
+    "sha256": "486eb3d7e2dfda6fb80f23a6c05b6ccf50e5f7256963ce6b710c2451076ea897",
+    "bytes": 2719604
+  },
+  "/tmp/surfview-anatomical-qualified-20261027/10k-164k/barycentric-closest-false-scalar.roi.func.gii.ascii.gii": {
+    "sha256": "d8dcb235427d95aa5541536a82e952973ab406e9cd78af6a55b8a10ae32d1401",
+    "bytes": 1476835
+  },
+  "/tmp/surfview-anatomical-qualified-20261027/10k-164k/barycentric-closest-true-labels.label.gii.ascii.gii": {
+    "sha256": "cfd4e898f6bdf904fa0ef0cd25d90a019192fce6d8931ff0d1caed3f245c3ef3",
+    "bytes": 1804056
+  },
+  "/tmp/surfview-anatomical-qualified-20261027/10k-164k/barycentric-closest-true-labels.roi.func.gii.ascii.gii": {
+    "sha256": "02dc27eeef0c06b86038d88055ac16480c49f26783d782dade0c1a5851d16e4d",
+    "bytes": 1476913
+  },
+  "/tmp/surfview-anatomical-qualified-20261027/10k-164k/barycentric-closest-true-scalar.func.gii.ascii.gii": {
+    "sha256": "3c0744dbd4cb226509cb0b26e1e92c99bcea602c6c096b27727c877201953294",
+    "bytes": 2714774
+  },
+  "/tmp/surfview-anatomical-qualified-20261027/10k-164k/barycentric-closest-true-scalar.roi.func.gii.ascii.gii": {
+    "sha256": "3861ac4f09836577d1e2553b6299d8092045b331e18b58d0b12868604b8ac340",
+    "bytes": 1476912
+  },
+  "/tmp/surfview-anatomical-qualified-20261027/164k-10k/adaptive-barycentric-area-false-labels.label.gii.ascii.gii": {
+    "sha256": "2a99535fa3ba3b2b169bfdbfac2b55ae4b93ed456d85beff87477b556b83606a",
+    "bytes": 115818
+  },
+  "/tmp/surfview-anatomical-qualified-20261027/164k-10k/adaptive-barycentric-area-false-labels.roi.func.gii.ascii.gii": {
+    "sha256": "9ff5d590bf8809771e9ee3fccd2b6366b060dcd0578eb0282d878411a2853181",
+    "bytes": 95043
+  },
+  "/tmp/surfview-anatomical-qualified-20261027/164k-10k/adaptive-barycentric-area-false-scalar.func.gii.ascii.gii": {
+    "sha256": "e0bfa9c71d4afd8ea7f7b2463073acbe7c5a78eeefbd0bad9e0cae8769751ace",
+    "bytes": 182651
+  },
+  "/tmp/surfview-anatomical-qualified-20261027/164k-10k/adaptive-barycentric-area-false-scalar.roi.func.gii.ascii.gii": {
+    "sha256": "ff303aff5a9e2a18163476a77b664aedcb54577ebbaaccd2419672e618a94a8b",
+    "bytes": 95042
+  },
+  "/tmp/surfview-anatomical-qualified-20261027/164k-10k/adaptive-barycentric-area-true-labels.label.gii.ascii.gii": {
+    "sha256": "736ff0e8888e94969a34dcdd7679e3dccc3f7ca8df3126639c63fd884fab84d9",
+    "bytes": 115895
+  },
+  "/tmp/surfview-anatomical-qualified-20261027/164k-10k/adaptive-barycentric-area-true-labels.roi.func.gii.ascii.gii": {
+    "sha256": "caaa74e33c2d0c55938f52e20fbc8274ab4d02652f2485797f93572b4fad7604",
+    "bytes": 95120
+  },
+  "/tmp/surfview-anatomical-qualified-20261027/164k-10k/adaptive-barycentric-area-true-scalar.func.gii.ascii.gii": {
+    "sha256": "0b8fecd6ab99bb2386f62142a92707f614e77ee598330eb9774edc96d470ffdf",
+    "bytes": 182137
+  },
+  "/tmp/surfview-anatomical-qualified-20261027/164k-10k/adaptive-barycentric-area-true-scalar.roi.func.gii.ascii.gii": {
+    "sha256": "b498cc117b7acbced4ea7f6e4ad42628a8ff3e29bf790c0764f64d43cc91b803",
+    "bytes": 95119
+  },
+  "/tmp/surfview-anatomical-qualified-20261027/164k-10k/barycentric-closest-false-labels.label.gii.ascii.gii": {
+    "sha256": "94e8ff9f53d4a1bf8e60f56652acc0e24b962a8caa27c9e14391557fa066bd26",
+    "bytes": 115210
+  },
+  "/tmp/surfview-anatomical-qualified-20261027/164k-10k/barycentric-closest-false-labels.roi.func.gii.ascii.gii": {
+    "sha256": "4519a8585e3310559495a086fe31adea1200c9dae37c05ae9d160e3ce31cd937",
+    "bytes": 94435
+  },
+  "/tmp/surfview-anatomical-qualified-20261027/164k-10k/barycentric-closest-false-scalar.func.gii.ascii.gii": {
+    "sha256": "3feccfa45f1d09dd9dd0013cfe7aa3ce75968324eca8862e13469be1ac9c7c51",
+    "bytes": 173230
+  },
+  "/tmp/surfview-anatomical-qualified-20261027/164k-10k/barycentric-closest-false-scalar.roi.func.gii.ascii.gii": {
+    "sha256": "408e10984492f1fd108b1b3635a219fff501a825565987ddc6a086a959b395cb",
+    "bytes": 94434
+  },
+  "/tmp/surfview-anatomical-qualified-20261027/164k-10k/barycentric-closest-true-labels.label.gii.ascii.gii": {
+    "sha256": "b3a199b18e0b68b10710328b01d2208d28a969a3e91ba3a0bb56f1e68c7069d8",
+    "bytes": 114525
+  },
+  "/tmp/surfview-anatomical-qualified-20261027/164k-10k/barycentric-closest-true-labels.roi.func.gii.ascii.gii": {
+    "sha256": "53bffa9f11020775cb308d1b55a9bb2ff42349a828d84750b4d5d8a5cc70af6f",
+    "bytes": 94512
+  },
+  "/tmp/surfview-anatomical-qualified-20261027/164k-10k/barycentric-closest-true-scalar.func.gii.ascii.gii": {
+    "sha256": "9b11a7240d193b084adc70e18291b41b70f44b2d116771c85035aadb1ce507a4",
+    "bytes": 170458
+  },
+  "/tmp/surfview-anatomical-qualified-20261027/164k-10k/barycentric-closest-true-scalar.roi.func.gii.ascii.gii": {
+    "sha256": "ba440bc5e172b04b714695d2a04c6da8dca220bcabcf9fbece5b07d27e520683",
+    "bytes": 94511
+  }
+}

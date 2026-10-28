@@ -1,0 +1,72 @@
+{
+  "date": "2026-10-27",
+  "baseCommit": "7b44e4491c52f7cea4f0eaae6472d906de041010",
+  "state": "Local uncommitted implementation and qualification. No publication. Prior unrelated work preserved. User demo server remains at http://127.0.0.1:4190/.",
+  "delivered": [
+    "Two-pass exact-size smoothing CSR allocation and owned buffers; unchanged normalization, cutoff and reduction order",
+    "Cooperative fixed-validity preparation and tiled batch execution through worker handles",
+    "Explicit owned-worker initialization limits; reject shared-worker configuration and later reconfiguration, including after release",
+    "Submission-time frame, mask and initialization-queue snapshots; retained dependencies, cancellation/stale-result semantics",
+    "Temporal demo and public excerpt now use prepared worker batches",
+    "Opt-in radius normalization for registered spheres, with center/radius/policy in checksummed provenance; default raw projection unchanged",
+    "Expanded pinned HCP full-template up/downsample scalar/label fixtures plus independent one-hot diagnosis",
+    "True fsLR32k and fsaverage164k cortical process measurements and worker round-trip/cancellation measurements"
+  ],
+  "checks": {
+    "unit": "105 files / 1209 tests passed",
+    "browser": "15 surface-geometry/time-series tests passed; configured lock followup 1 passed; final delivered worker and playback followup 2 passed.",
+    "types": "type-check, type-check:demo, test:types passed; declaration build passed",
+    "builds": "Library, demo and docs builds passed",
+    "package": "Packed consumers passed; 2773055 bytes archive, 10874774 unpacked; original ceilings retained",
+    "size": "Core 172.92 kB Brotli under 180 kB; other existing ceilings pass",
+    "visualDetector": "One pass on changed demo helper: []"
+  },
+  "benchmarks": {
+    "exactAllocation": "../surface-geometry-cortical-exact-2026-10-27.json",
+    "true32k": "../surface-geometry-fsLR32k-release-2026-10-27.json",
+    "true164k": "../surface-geometry-fsaverage164k-final-2026-10-27.json",
+    "worker164k": "../surface-geometry-worker164k-final-2026-10-27.json",
+    "capacity": "Same 512 MiB algorithm allocation budget: 41k/8 mm and 164k/2 mm stress cases recovered. True 32k cases at 2/4/8 mm and true 164k/2 mm complete. True/stress 164k/4 and 8 mm still refuse the budget. No accuracy reduction or default budget increase.",
+    "tradeoff": "Neighborhoods are searched twice; common-case construction is slower. Retained weights remain unchanged. Algorithm budgets exclude caller-owned fixture objects; observed process peaks can exceed budget.",
+    "measurementLimits": "One cold-build sample; application timings use one warmup/seven samples, p95=max. Separate processes do not establish idle-host isolation. Worker_threads transport adapter timings include copies and structured cloning, exclude GPU upload. Hardware/raw timing samples are retained where measured."
+  },
+  "externalQualification": {
+    "raw": "parity/raw/receipt.json",
+    "radius": "parity/radius/receipt.json",
+    "onehot": "onehot/receipt.json",
+    "sourceManifest": "input-manifest.json",
+    "gates": "max absolute scalar 5e-5 and RMS 1e-5, identical supported masks, categorical equality except exact ties; unchanged",
+    "rawResult": "6/16 scalar comparisons and 12/16 categorical comparisons pass. All supported masks agree.",
+    "radiusResult": "6/16 scalar comparisons and 16/16 categorical comparisons pass. All supported masks agree.",
+    "diagnosis": "At target 119351, Workbench selects an edge; independent float-normalized least-squares/closed-edge projection selects a closer adjacent face. Weight snapping, tolerance relaxation and generic closest-point changes were not used.",
+    "boundaries": "Left HCP registration spheres only. Adaptive qualification uses sphere-derived areas, not anatomical area metrics. No Workbench compatibility or population accuracy admission."
+  },
+  "remaining": [
+    "Workbench near-edge support/classification compatibility requires a separately specified numerical policy; failed gates retained",
+    "Anatomical adaptive-area and ribbon external parity remain open",
+    "164k wide retained kernels still require more storage than allowed by this construction budget or explicit existing streaming",
+    "No browser GPU-upload/transfer matrix, right-hemisphere or population qualification"
+  ],
+  "sourceSha256": {
+    "src/geometry/SurfaceSmoothing.ts": "866de38c4802d60157819557df23f373497f8dc5e02185250cabed74074e8efa",
+    "src/geometry/SparsePlan.ts": "5a0e6b2dd6b9d1f6bc83de5b3c53977fe48ea3bf3e1ae9d4777d854226edc817",
+    "src/geometry/PreparedSmoothing.ts": "fa5a29d0e6aafc60840ef57c7be8dbed5de32d1c4706fd37bb1c040ed908294c",
+    "src/geometry/SurfaceResampling.ts": "ac0967b6ad1f8c4a167220ec7e990a92976996cd264127cfe0a2d906acd4d087",
+    "src/geometry/geometryWorkerProtocol.ts": "02a0c0cd45d8a2a1c3072c6ef796478f1d6618bb02d4136621e9e16393b11636",
+    "src/geometry/geometryWorker.ts": "0546e37fba70f065c6e5e7729767bedf677938de6432986f383a96e5a806e824",
+    "src/geometry/GeometryWorkerClient.ts": "d339b6d63feb2869988d4a2d268a0f41a3921ffb52b17266546f0a02e180e424",
+    "demo/kit/surface-smoothing.ts": "400e3343aa5b24335aff111af120d167066c764cdc551af3d8dd6606d8278d22",
+    "demo/excerpts/timeSeries.ts": "b9f786cc2face687542c18bdf38ff04e33fc48eab81790c2aa5b31d55c620939",
+    "docs/guide/surface-geometry.md": "6459f791baec15f66d10f3aca1830d91d0cbf38b5a2d6131963e855be4348b10",
+    "tests/unit/geometry/dense-smoothing.test.ts": "0669d2b28b73e889334bca9dfe4c07d91af1ea0d25e4cdd76300c718227801ba",
+    "tests/unit/geometry/sphere-normalization.test.ts": "7f3d64e08178ebf5fb0c72358c689bba36f449f2b1f37f8ebeeee93f60f3b33e",
+    "tests/geometry-fixture.html": "5660dc65f9cebfaf52150d04bcc97ac1622487d451c5d276ef082e71cc15180d",
+    "tests/e2e/surface-geometry.spec.ts": "68d6f818430cad818bfa4973da2caea6ae0dd52d40e56d48881d7694ca1ed6c5",
+    "scripts/qualify-template-resampling.mjs": "dc030e4c92a384fcb2bd30100f3ab0abb13ccb0e5157730b1217eaf93d52de9d",
+    "scripts/benchmark-cortical-geometry.mjs": "21362e646bf391c46bafcb73ae36ef853b5bc1f812b250328053c886fa9ca0b8",
+    "scripts/benchmark-worker-batches.mjs": "d163b4a48ae1911d6d32f616bc46e6273c46f1b762e141e45bf66d4dd22fa3f0"
+  },
+  "deliveryBundleSha256": "b16ae33acb10447049e02cda8e64ded164fac88ccf493de94815a3655258f8fd",
+  "evidenceScope": "Numerical reports pin the bundles actually measured; later worker ownership/configuration guards do not alter smoothing or resampling arithmetic. Final delivery tests cover those guards.",
+  "cleanup": "Task-owned test servers/browsers closed and audit empty. Workbench read-only mount detached. User-requested demo server retained."
+}

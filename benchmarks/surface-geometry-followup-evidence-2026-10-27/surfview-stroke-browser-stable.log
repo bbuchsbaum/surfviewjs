@@ -1,0 +1,21 @@
+
+Running 14 tests using 1 worker
+
+(node:4823) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 [chromium] › tests/e2e/chapter-inspect.spec.ts:17:3 › Inspect & annotate chapter › picks time each hover, and the picker can be switched (3.4s)
+  ✓   2 [chromium] › tests/e2e/chapter-inspect.spec.ts:41:3 › Inspect & annotate chapter › clicks place labelled marks that can be selected, removed and cleared (7.3s)
+  ✓   3 [chromium] › tests/e2e/surface-geometry.spec.ts:6:1 › native morph triangles, precise picks, markers and midpoint borders agree (981ms)
+  ✓   4 [chromium] › tests/e2e/surface-geometry.spec.ts:18:45 › esm consumer resolves standalone worker and matches synchronous results (528ms)
+  ✓   5 [chromium] › tests/e2e/surface-geometry.spec.ts:18:45 › umd consumer resolves standalone worker and matches synchronous results (789ms)
+  ✓   6 [chromium] › tests/e2e/surface-geometry.spec.ts:18:45 › embed consumer resolves standalone worker and matches synchronous results (709ms)
+  ✓   7 [chromium] › tests/e2e/surface-geometry.spec.ts:24:1 › example ruler, live brush radius and both border styles produce visible results (8.1s)
+  ✓   8 [chromium] › tests/e2e/surface-geometry.spec.ts:49:1 › precise anchors move through inflation while anatomical distance and area stay fixed (4.8s)
+  ✓   9 [chromium] › tests/e2e/surface-geometry.spec.ts:66:1 › area cluster controls use physical extent and keep the threshold editable (1.4s)
+  ✓  10 [chromium] › tests/e2e/surface-geometry.spec.ts:79:1 › derived smoothing follows temporal frames and survives chapter disposal (3.4s)
+  ✓  11 [chromium] › tests/e2e/surface-geometry.spec.ts:109:1 › mapping demo supports scalar/label transfer, persisted identity, and invalid artifact recovery (2.4s)
+  ✓  12 [chromium] › tests/e2e/surface-geometry.spec.ts:145:1 › ribbon inspector reports a valid column on the cortical display (2.4s)
+  ✓  13 [chromium] › tests/e2e/surface-geometry.spec.ts:164:1 › surface tools are discoverable and keyboard operable on a narrow screen (3.5s)
+  ✓  14 [chromium] › tests/e2e/surface-geometry.spec.ts:180:2 › folded strokes remain visible from the adjacent face at two zoom levels (903ms)
+
+  14 passed (41.9s)

@@ -1,0 +1,21 @@
+
+> surfview@3.1.0 size
+> size-limit
+
+  
+  ESM bundle
+  Size limit: 180 kB
+  Size:       172.92 kB brotlied
+  
+  Controls ESM bundle
+  Size limit: 30 kB
+  Size:       17.36 kB brotlied
+  
+  Report ESM adapter
+  Size limit: 1 kB
+  Size:       170 B brotlied
+  
+  Controls React ESM bundle
+  Size limit: 3 kB
+  Size:       818 B brotlied
+  

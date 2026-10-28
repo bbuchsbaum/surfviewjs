@@ -81,6 +81,8 @@ export interface DataLayerFactoryConfig extends BuiltInLayerConfigBase<'data'> {
 
 export interface OutlineLayerFactoryConfig extends BuiltInLayerConfigBase<'outline'> {
   roiLabels: Uint32Array | Int32Array | number[];
+  boundaryMode?: 'transition-edges' | 'midpoint';
+  backgroundLabel?: number;
   color?: THREE.ColorRepresentation;
   width?: number;
   halo?: boolean;
@@ -460,6 +462,8 @@ const BUILT_IN_LAYER_FACTORIES: {
     if (config.haloWidth !== undefined) options.haloWidth = config.haloWidth;
     if (config.offset !== undefined) options.offset = config.offset;
     if (config.roiSubset !== undefined) options.roiSubset = config.roiSubset;
+    if (config.boundaryMode !== undefined) options.boundaryMode = config.boundaryMode;
+    if (config.backgroundLabel !== undefined) options.backgroundLabel = config.backgroundLabel;
     return new OutlineLayer(config.id, options);
   },
   label: config => {

@@ -1,0 +1,189 @@
+1: starting server using command "vite --host 127.0.0.1 --port 4189 --strictPort"
+and when url "[ 'http://127.0.0.1:4189/tests/geometry-fixture.html' ]" is responding with HTTP status code 200
+running tests using command "playwright test tests/e2e/surface-geometry.spec.ts tests/e2e/chapter-inspect.spec.ts tests/e2e/chapter-anatomy.spec.ts tests/e2e/chapter-statistics.spec.ts tests/e2e/chapter-time-series.spec.ts tests/e2e/chapter-data.spec.ts tests/e2e/normal-projection.spec.ts --workers=1"
+
+
+  VITE v8.2.2  ready in 125 ms
+
+  ➜  Local:   http://127.0.0.1:4189/
+
+Running 29 tests using 1 worker
+
+(node:73445) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+4:17:56 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+4:17:56 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:17:56 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:17:56 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:17:56 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:17:57 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+4:17:57 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:17:57 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:17:58 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:17:58 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:17:58 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+4:17:58 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:17:58 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:17:58 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:17:58 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:17:59 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+4:17:59 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:17:59 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:17:59 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:17:59 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:17:59 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+4:17:59 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:17:59 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:17:59 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:17:59 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓   1 [chromium] › tests/e2e/chapter-anatomy.spec.ts:32:3 › Anatomy & views chapter › opens from the chapter strip and from the old scenario ids (4.2s)
+4:18:00 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+4:18:00 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:00 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:00 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:00 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓   2 [chromium] › tests/e2e/chapter-anatomy.spec.ts:48:3 › Anatomy & views chapter › views: anatomical views, hemisphere choice and gap respond (2.0s)
+4:18:02 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+4:18:02 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:02 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:02 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:02 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓   3 [chromium] › tests/e2e/chapter-anatomy.spec.ts:80:3 › Anatomy & views chapter › views: camera responds to drag after a preset view (3.2s)
+4:18:06 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+4:18:06 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:06 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:06 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:06 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓   4 [chromium] › tests/e2e/chapter-anatomy.spec.ts:91:3 › Anatomy & views chapter › clip: planes cut the surface and presets apply (2.4s)
+4:18:08 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+4:18:08 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:08 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:08 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:08 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓   5 [chromium] › tests/e2e/chapter-anatomy.spec.ts:122:3 › Anatomy & views chapter › inflate: morph slider and stage buttons reshape the cortex (6.2s)
+4:18:14 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+4:18:14 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:14 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:14 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:14 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓   6 [chromium] › tests/e2e/chapter-anatomy.spec.ts:177:3 › Anatomy & views chapter › flat map: linked views, seeded ROI, exports and clear (2.2s)
+4:18:16 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+4:18:16 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:16 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓   7 [chromium] › tests/e2e/chapter-anatomy.spec.ts:214:3 › Anatomy & views chapter › flat map: a lasso drawn on the map creates an ROI (1.9s)
+4:18:18 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+4:18:18 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:18 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓   8 [chromium] › tests/e2e/chapter-data.spec.ts:33:3 › Data in & out chapter › loads bundled samples and the local formats the copy names (1.9s)
+4:18:20 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+4:18:20 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:20 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:20 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:20 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:22 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+4:18:22 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:22 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:22 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:22 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓   9 [chromium] › tests/e2e/chapter-data.spec.ts:62:3 › Data in & out chapter › saves, restores and shares viewer state, and downloads a scene manifest (2.8s)
+4:18:23 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+4:18:23 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:23 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:23 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:23 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:24 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+4:18:24 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:24 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓  10 [chromium] › tests/e2e/chapter-data.spec.ts:129:3 › Data in & out chapter › alignment QA renders all panels and exposes shifted-transform metrics (1.8s)
+4:18:25 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+4:18:25 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:25 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:25 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:25 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓  11 [chromium] › tests/e2e/chapter-inspect.spec.ts:17:3 › Inspect & annotate chapter › picks time each hover, and the picker can be switched (1.7s)
+4:18:27 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+4:18:27 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:27 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:27 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:27 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓  12 [chromium] › tests/e2e/chapter-inspect.spec.ts:41:3 › Inspect & annotate chapter › clicks place labelled marks that can be selected, removed and cleared (4.3s)
+4:18:31 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+4:18:31 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:31 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:31 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:31 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓  13 [chromium] › tests/e2e/chapter-statistics.spec.ts:20:3 › Statistical maps chapter › corrections start at FDR and change what survives (2.9s)
+4:18:34 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+4:18:34 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:34 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:34 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:34 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓  14 [chromium] › tests/e2e/chapter-statistics.spec.ts:62:3 › Statistical maps chapter › hover prints statistics into the film corner (1.4s)
+4:18:35 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+4:18:35 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:35 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:35 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:35 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓  15 [chromium] › tests/e2e/chapter-statistics.spec.ts:78:3 › Statistical maps chapter › effect × confidence mode draws a TwoDataLayer with switchable 2D colormaps (2.3s)
+4:18:38 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+4:18:38 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:38 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:38 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:38 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓  16 [chromium] › tests/e2e/chapter-time-series.spec.ts:4:3 › Time series chapter › opens without errors, plays, pauses, scrubs and stops (2.8s)
+4:18:40 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+4:18:40 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:40 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:40 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:40 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓  17 [chromium] › tests/e2e/chapter-time-series.spec.ts:50:3 › Time series chapter › the margin plots a vertex time course with axes, and hovering changes the vertex (1.4s)
+4:18:42 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+4:18:42 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:42 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓  18 [chromium] › tests/e2e/normal-projection.spec.ts:14:1 › volume chapter projects along normals and recomputes ordinary vertex data (4.1s)
+4:18:46 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+4:18:46 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:46 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓  19 [chromium] › tests/e2e/normal-projection.spec.ts:51:1 › volume layer modes report the sampling path they use (4.3s)
+4:18:50 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+4:18:50 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:18:50 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓  20 [chromium] › tests/e2e/normal-projection.spec.ts:123:1 › volume chapter colormap select recolours every projection method and mode (6.7s)
+  ✓  21 [chromium] › tests/e2e/surface-geometry.spec.ts:4:1 › native morph triangles, precise picks, markers and midpoint borders agree (973ms)
+  ✓  22 [chromium] › tests/e2e/surface-geometry.spec.ts:16:45 › esm consumer resolves standalone worker and matches synchronous results (551ms)
+  ✓  23 [chromium] › tests/e2e/surface-geometry.spec.ts:16:45 › umd consumer resolves standalone worker and matches synchronous results (778ms)
+4:18:59 PM [vite] (client) [console.warn] THREE.WARNING: Multiple instances of Three.js being imported.
+  ✓  24 [chromium] › tests/e2e/surface-geometry.spec.ts:16:45 › embed consumer resolves standalone worker and matches synchronous results (642ms)
+4:19:00 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+4:19:00 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:19:00 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:19:00 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:19:00 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓  25 [chromium] › tests/e2e/surface-geometry.spec.ts:22:1 › inspect chapter measures an anatomical brush with a midpoint border (1.6s)
+4:19:01 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+4:19:01 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:19:01 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:19:01 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:19:01 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓  26 [chromium] › tests/e2e/surface-geometry.spec.ts:33:1 › area cluster controls use physical extent and keep the threshold editable (1.3s)
+4:19:03 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+4:19:03 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:19:03 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:19:03 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:19:03 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:19:04 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+4:19:04 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:19:04 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:19:04 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:19:04 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓  27 [chromium] › tests/e2e/surface-geometry.spec.ts:46:1 › derived smoothing follows temporal frames and survives chapter disposal (2.4s)
+4:19:05 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+4:19:05 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:19:05 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓  28 [chromium] › tests/e2e/surface-geometry.spec.ts:63:1 › mapping demo downloads a verified artifact and applies its scalar map (1.1s)
+4:19:06 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+4:19:06 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+4:19:06 PM [vite] (client) [console.warn] GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+  ✓  29 [chromium] › tests/e2e/surface-geometry.spec.ts:78:1 › ribbon inspector reports a valid column on the cortical display (1.5s)
+
+  29 passed (1.3m)

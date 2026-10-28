@@ -4,6 +4,8 @@ import { finiteNumber, opacity as validateOpacity } from './utils/validation';
 
 export interface OutlineLayerOptions extends LayerConfig {
   roiLabels: Uint32Array | Int32Array | number[];
+  boundaryMode?: 'transition-edges' | 'midpoint';
+  backgroundLabel?: number;
   color?: THREE.ColorRepresentation;
   width?: number;
   halo?: boolean;
@@ -15,6 +17,8 @@ export interface OutlineLayerOptions extends LayerConfig {
 
 export interface OutlineLayerUpdate extends LayerUpdateData {
   roiLabels?: Uint32Array | Int32Array | number[];
+  boundaryMode?: 'transition-edges' | 'midpoint';
+  backgroundLabel?: number;
   color?: THREE.ColorRepresentation;
   width?: number;
   halo?: boolean;
@@ -32,7 +36,12 @@ export interface OutlineLayerUpdate extends LayerUpdateData {
  * THREE.Line objects that are attached to the surface mesh.
  */
 export class OutlineLayer extends Layer {
-  roiLabels: Uint32Array;
+  roiLabels: Uint32Array | Int32Array;
+  boundaryMode: 'transition-edges' | 'midpoint';
+  backgroundLabel: number;
+  labelRevision = 0;
+  private labelEdits: { fromRevision: number; changes: readonly { vertex: number; label: number }[] } | undefined;
+  get lastLabelEdits() { return this.labelEdits; }
   color: number;
   width: number;
   halo: boolean;
@@ -59,11 +68,9 @@ export class OutlineLayer extends Layer {
       throw new Error('OutlineLayer requires roiLabels');
     }
 
-    this.roiLabels = options.roiLabels instanceof Uint32Array
-      ? options.roiLabels
-      : options.roiLabels instanceof Int32Array
-        ? new Uint32Array(options.roiLabels)
-        : new Uint32Array(options.roiLabels);
+    this.roiLabels = copyOutlineLabels(options.roiLabels);
+    this.boundaryMode = validateBoundaryMode(options.boundaryMode ?? 'transition-edges');
+    this.backgroundLabel = finiteNumber(options.backgroundLabel ?? 0, 'backgroundLabel', { integer: true });
 
     this.color = new THREE.Color(options.color ?? 0x000000).getHex();
     this.width = finiteNumber(options.width ?? 1.5, 'width', {
@@ -85,10 +92,23 @@ export class OutlineLayer extends Layer {
     return new Float32Array(vertexCount * 4);
   }
 
+  /** Local categorical edits; midpoint geometry updates only affected faces. */
+  updateLabelVertices(changes: readonly { vertex: number; label: number }[]): void {
+    for (const change of changes) {
+      if (!Number.isSafeInteger(change.vertex) || change.vertex < 0 || change.vertex >= this.roiLabels.length) throw new RangeError('Outline vertex index out of range');
+      const low = this.roiLabels instanceof Int32Array ? -2147483648 : 0, high = this.roiLabels instanceof Int32Array ? 2147483647 : 4294967295;
+      if (!Number.isInteger(change.label) || change.label < low || change.label > high) throw new RangeError('Label edit must fit the current signed/unsigned label array');
+    }
+    const owned = Object.freeze(changes.map(change => Object.freeze({ ...change })));
+    this.labelEdits = Object.freeze({ fromRevision: this.labelRevision, changes: owned });
+    for (const change of owned) this.roiLabels[change.vertex] = change.label;
+    this.labelRevision++; this._notifyChange();
+  }
+
   update(update: OutlineLayerUpdate): void {
     assertLayerUpdateFields(update, 'OutlineLayer', [
       'roiLabels', 'color', 'width', 'halo', 'haloColor', 'haloWidth',
-      'offset', 'roiSubset', 'order'
+      'offset', 'roiSubset', 'order', 'boundaryMode', 'backgroundLabel'
     ]);
     if (update.width !== undefined) {
       finiteNumber(update.width, 'width', { minimum: 0, minimumExclusive: true });
@@ -99,13 +119,12 @@ export class OutlineLayer extends Layer {
     if (update.offset !== undefined) finiteNumber(update.offset, 'offset');
     if (update.opacity !== undefined) validateOpacity(update.opacity);
     if (update.order !== undefined) finiteNumber(update.order, 'order');
-    if (update.roiLabels) {
-      this.roiLabels = update.roiLabels instanceof Uint32Array
-        ? update.roiLabels
-        : update.roiLabels instanceof Int32Array
-          ? new Uint32Array(update.roiLabels)
-          : new Uint32Array(update.roiLabels);
-    }
+    const nextLabels = update.roiLabels ? copyOutlineLabels(update.roiLabels) : undefined;
+    const nextMode = update.boundaryMode === undefined ? this.boundaryMode : validateBoundaryMode(update.boundaryMode);
+    const nextBackground = update.backgroundLabel === undefined ? this.backgroundLabel : finiteNumber(update.backgroundLabel, 'backgroundLabel', { integer: true });
+    if (nextLabels) { this.roiLabels = nextLabels; this.labelRevision++; this.labelEdits = undefined; }
+    if (nextBackground !== this.backgroundLabel) this.labelRevision++;
+    this.boundaryMode = nextMode; this.backgroundLabel = nextBackground;
     if (update.color !== undefined) {
       this.color = new THREE.Color(update.color).getHex();
     }
@@ -134,7 +153,9 @@ export class OutlineLayer extends Layer {
       halo: this.halo,
       haloColor: this.haloColor,
       haloWidth: this.haloWidth,
-      offset: this.offset
+      offset: this.offset,
+      boundaryMode: this.boundaryMode,
+      backgroundLabel: this.backgroundLabel
     };
   }
 
@@ -165,4 +186,15 @@ export class OutlineLayer extends Layer {
       this.haloObject = null;
     }
   }
+}
+
+function validateBoundaryMode(mode: string): 'transition-edges' | 'midpoint' {
+  if (mode !== 'transition-edges' && mode !== 'midpoint') throw new RangeError('Unknown outline boundary mode');
+  return mode;
+}
+function copyOutlineLabels(labels: ArrayLike<number>): Uint32Array | Int32Array {
+  let negative = false, unsigned = false;
+  for (let i = 0; i < labels.length; i++) { const value = labels[i]!; if (!Number.isInteger(value) || value < -2147483648 || value > 4294967295) throw new RangeError('Outline labels must be 32-bit integers'); negative ||= value < 0; unsigned ||= value > 2147483647; }
+  if (negative && unsigned) throw new RangeError('One outline cannot mix negative IDs and IDs above signed 32-bit range');
+  return negative || labels instanceof Int32Array ? Int32Array.from(labels) : Uint32Array.from(labels);
 }

@@ -1,0 +1,254 @@
+{
+  "date": "2026-10-27",
+  "base_commit": "7b44e4491c52f7cea4f0eaae6472d906de041010",
+  "state": "Local uncommitted demo enhancement; no commit, push or deployment.",
+  "scope": "Six feature links in First look and expanded owning chapters, shared helpers, public API excerpts, native browser workflows.",
+  "demos": {
+    "ruler_borders": "?scenario=inspect&task=measure",
+    "morph_anchors": "?scenario=anatomy&mode=morph&task=measure",
+    "area_clusters": "?scenario=statistics&task=area",
+    "physical_smoothing": "?scenario=time-series&task=smoothing",
+    "mapping": "?scenario=data&task=mapping",
+    "ribbon_columns": "?scenario=volume&task=column"
+  },
+  "results": {
+    "unit_tests": {
+      "files": 101,
+      "passed": 1196
+    },
+    "owning_chapter_browser_tests": {
+      "passed": 35
+    },
+    "production_browser_tests": {
+      "passed": 3,
+      "base": "/surfviewjs/demo/",
+      "covers": [
+        "worker smoothing and disposal",
+        "scalar and categorical mapping, download, checksum and mesh rejection, saved reload",
+        "ribbon column versus segment samples, coverage, disposal"
+      ]
+    },
+    "demo_typecheck": {
+      "command": "npm run type-check:demo",
+      "exit_code": 0
+    },
+    "production_build": {
+      "command": "GITHUB_ACTIONS=true npm run demo:build",
+      "exit_code": 0
+    },
+    "scoped_diff_check": {
+      "command": "git diff --check -- demo tests/e2e/surface-geometry.spec.ts",
+      "exit_code": 0
+    },
+    "browser_cleanup": "Owned browsers and preview server closed; audit reported no automated top-level browser processes."
+  },
+  "visual_review": {
+    "desktop": [
+      1440,
+      1000
+    ],
+    "mobile": [
+      390,
+      844
+    ],
+    "screenshots": [
+      "column-desktop.png",
+      "first-look-desktop.png",
+      "first-look-mobile.png",
+      "mapping-desktop.png",
+      "ruler-desktop.png",
+      "ruler-mobile.png",
+      "smoothing-desktop.png"
+    ],
+    "result": "Inspected one batch of seven final specimens. New tools, synthetic labels, controls and readouts are legible; no horizontal mobile overflow or correction needed.",
+    "detector": "One Impeccable detector pass: two advisory colors in categorical overlay palette (#719baf, #cdbba0). Retained intentionally as data colors, not interface colors."
+  },
+  "resolved_failures": [
+    "Initial focused run: 10 pass, 1 fail. Test imported saved weights before Tetrahedron finished loading; added explicit loaded-mesh readiness assertion. Stale mapping cancellation remained intact.",
+    "First resumed chapter run lost the inherited dev server after session recovery; subsequent lifecycle-managed server run passed all 35.",
+    "Global git diff --check flags pre-existing CRLF/trailing whitespace in .claude/settings.json; left unrelated file untouched. Scoped demo check passes."
+  ],
+  "boundaries": [
+    "Mapping demo uses explicit identity and local-neighbor weights with synthetic fields/labels; it does not demonstrate anatomical registration accuracy.",
+    "Ribbon demo uses the existing synthetic 2.5 mm white surface; column and segment estimands differ. No Workbench parity or scientific acceptance claim.",
+    "Browser checks use installed Playwright Chromium; no cross-browser or performance benchmark claim.",
+    "Worker smoothing coalesces frames and rejects stale results; worker ribbon inspection caches up to three selected columns."
+  ],
+  "source_sha256": {
+    "demo/kit/surface-geometry.ts": "c221f74e74ac5309a5a0ba389004507aa3d8f21864dd9c2cadbf59f56c0d58ac",
+    "demo/kit/surface-measurements.ts": "10e4960f21664c4ea516a2625afee7dcb9f56b6a68a41591656d90af2da3c819",
+    "demo/kit/surface-smoothing.ts": "574a51d867a94cb9409f23bdc6b13e1459b2b697e1ba34718fab1e16874e80b8",
+    "demo/kit/surface-mapping.ts": "4e5ea8b19b55796440ff3fd10a6c40f820edad3d96b6b9de28dadd8f2499ca35",
+    "demo/kit/ribbon-columns.ts": "dd04f116b73769827bbb42838a579f0e5b13e7dc354b20dcb6e8b45b78fa4f7e",
+    "demo/chapters/firstLook.ts": "86b944308f25567a5a81ca681f721007794a0e5c44b8d5d14951e2b79edb5c76",
+    "demo/chapters/inspect.ts": "829e1769fc4b9a617081ecc6a92ffa8fb6d1d9f25f9caa81ae2558d9958e5599",
+    "demo/chapters/anatomy.ts": "c2351b81364c21e7387e17865b9699b6a39aec49a10fb429286b98b3d4894e79",
+    "demo/chapters/statistics.ts": "b8e80081e004c301bf1f9aa9a33755f904ae36079edd4e85f0cbdc973a65c716",
+    "demo/chapters/timeSeries.ts": "f6eab7f8c221753a50d26c00eae8f1662e61b5542d6cc3bcb995cf6b07dcb82e",
+    "demo/chapters/dataInOut.ts": "18a744b5c28a320ee01f193d6e9b8dcd69deee3c46102b0c9a6bf38dec1338a6",
+    "demo/chapters/volume.ts": "ce2f03ba191c102ca26748cc71a43b47e3254fe2687ec5395d26a9ab8faa786e",
+    "demo/excerpts/inspect.ts": "24af560553508d4465e5bcf94ed1330b790e11fd87b554b71a9719d7683548cb",
+    "demo/excerpts/anatomy.ts": "4bdf90770bebc7ad9f1c10dadde467df94a6b05d365fdcc54e1d332846e251db",
+    "demo/excerpts/statistics.ts": "885dc25f4485957f7f6870ef44358fed4ab9e17549047d4eebcab24f9844f324",
+    "demo/excerpts/timeSeries.ts": "adb664baa7b43717fbf3182e334c38b65642c36e2bb65f1c2a85f233acc44d28",
+    "demo/excerpts/dataInOut.ts": "0f01fed0d263175ee5d77c074627c86010ec33d4fd16d1d7316f4809bebc2c4b",
+    "demo/excerpts/volume.ts": "975f7cc2b5bf3420a5afb1530b06b07fce3847b9ac634fd887bae2dc2919ef21",
+    "tests/e2e/surface-geometry.spec.ts": "8bced67d54d445d83d712df43e186ab82e736b420a8672b428d658881d8181f1",
+    "vite.demo.config.ts": "37d65501769215deb247af10049127718f8824609665eb435c253ff1b748b264",
+    "playwright.config.ts": "8c3a93fce44c46d3dabaf551fc64254bd78262adba7c040dc6e02c471249373a",
+    "package.json": "8f03bb99d1855cdf71adeea35eb3d9a5770d67dcc3766dd3514cc46404008c03",
+    "package-lock.json": "71f361d19a6ffb6d6889b17033b079fe0beb113d6e6b03c4349f6a4dbbc5f5b1",
+    "tsconfig.demo.json": "4f6a484a3c5eaf7c5e7d795b8140ea163cdd354d93d5af2e0d9717627e40fe3a"
+  },
+  "built_assets_sha256": {
+    "demo-dist/assets/atlasPalettes-BV5kLZNX.js": "88bc75889fad933e2a78d4c47f7904b96dc6a37f26d7b61763d5318cd33160e6",
+    "demo-dist/assets/gallery-B_cBMeSk.js": "5e5c25007f8d64355e4af4812e2a269482be22f3ab0e584f8133c6e3984040ae",
+    "demo-dist/assets/geometryWorker-BffuCn8Z.js": "9bd20e8430beab5ff69ef9480961cd3f71be76b226050a303274c21a2d852424",
+    "demo-dist/assets/mapLab-BjLwRx43.js": "e1e2b0e7dea426e34724c9ddba1e24a1353e0cbea8d1a59e597e826a1f8ea527",
+    "demo-dist/assets/parcel-standalone-CsXKLhmM.js": "525505720c8538904d1e42f2f4c96c25adf32abb28f405574de729c57e971dbd",
+    "demo-dist/assets/parcelMapLab-D149UfpH.js": "a1a6d54422535c64b7881b3b0ea5ae80b962e8638619f1d272aa95b254e63746",
+    "demo-dist/assets/parcelPuzzle-5992wU4-.js": "82b979db6bab2746e45265b35371c47ed0c82dd2bee234670a0cf6f06ffb89db",
+    "demo-dist/assets/puzzle-DAmHs4Ce.js": "1de48f00101453f88b44cba6582810b45625c29b8d009a416f166327d5a65b69"
+  },
+  "logs": {
+    "unit": {
+      "schema_version": 1,
+      "started_utc": "2026-10-27T20:56:29.493491+00:00",
+      "finished_utc": "2026-10-27T20:56:39.768887+00:00",
+      "duration_seconds": 10.275214,
+      "command": [
+        "npm",
+        "test"
+      ],
+      "cwd": "/Users/bbuchsbaum/code/jscode/surfviewjs",
+      "log": "/tmp/surfview-demo-geometry-unit-20261027.log",
+      "exit_code": 0,
+      "child_returncode": 0,
+      "reason": "exited",
+      "detail": null,
+      "timeout_seconds": 600.0,
+      "log_bytes": 278,
+      "retained_log": "unit.log"
+    },
+    "owning-chapters": {
+      "schema_version": 1,
+      "started_utc": "2026-10-27T21:02:37.680394+00:00",
+      "finished_utc": "2026-10-27T21:03:35.419359+00:00",
+      "duration_seconds": 57.738252,
+      "command": [
+        "npx",
+        "start-server-and-test",
+        "vite --host 127.0.0.1 --port 4190 --strictPort",
+        "http://127.0.0.1:4190/demo/",
+        "playwright test tests/e2e/surface-geometry.spec.ts tests/e2e/chapter-inspect.spec.ts tests/e2e/chapter-anatomy.spec.ts tests/e2e/chapter-statistics.spec.ts tests/e2e/chapter-time-series.spec.ts tests/e2e/chapter-data.spec.ts tests/e2e/normal-projection.spec.ts tests/e2e/demo-gallery.spec.ts --workers=2"
+      ],
+      "cwd": "/Users/bbuchsbaum/code/jscode/surfviewjs",
+      "log": "/tmp/surfview-demo-geometry-owning-final-20261027.log",
+      "exit_code": 0,
+      "child_returncode": 0,
+      "reason": "exited",
+      "detail": null,
+      "timeout_seconds": 600.0,
+      "log_bytes": 30684,
+      "retained_log": "owning-chapters.log"
+    },
+    "production-workflows": {
+      "schema_version": 1,
+      "started_utc": "2026-10-27T21:02:40.151699+00:00",
+      "finished_utc": "2026-10-27T21:02:48.550430+00:00",
+      "duration_seconds": 8.398417,
+      "command": [
+        "npx",
+        "playwright",
+        "test",
+        "tests/e2e/surface-geometry.spec.ts",
+        "--grep",
+        "derived smoothing|mapping demo|ribbon inspector",
+        "--workers=1",
+        "--output=/tmp/surfview-demo-production-results"
+      ],
+      "cwd": "/Users/bbuchsbaum/code/jscode/surfviewjs",
+      "log": "/tmp/surfview-demo-geometry-production-20261027.log",
+      "exit_code": 0,
+      "child_returncode": 0,
+      "reason": "exited",
+      "detail": null,
+      "timeout_seconds": 600.0,
+      "log_bytes": 674,
+      "retained_log": "production-workflows.log"
+    },
+    "production-build": {
+      "schema_version": 1,
+      "started_utc": "2026-10-27T21:01:53.701214+00:00",
+      "finished_utc": "2026-10-27T21:01:54.295607+00:00",
+      "duration_seconds": 0.594273,
+      "command": [
+        "env",
+        "GITHUB_ACTIONS=true",
+        "npm",
+        "run",
+        "demo:build"
+      ],
+      "cwd": "/Users/bbuchsbaum/code/jscode/surfviewjs",
+      "log": "/tmp/surfview-demo-production-build-20261027.log",
+      "exit_code": 0,
+      "child_returncode": 0,
+      "reason": "exited",
+      "detail": null,
+      "timeout_seconds": 600.0,
+      "log_bytes": 3271,
+      "retained_log": "production-build.log"
+    },
+    "initial-mapping-race": {
+      "schema_version": 1,
+      "started_utc": "2026-10-27T20:56:28.314886+00:00",
+      "finished_utc": "2026-10-27T20:56:57.448248+00:00",
+      "duration_seconds": 29.132948,
+      "command": [
+        "npx",
+        "playwright",
+        "test",
+        "tests/e2e/surface-geometry.spec.ts",
+        "--workers=1"
+      ],
+      "cwd": "/Users/bbuchsbaum/code/jscode/surfviewjs",
+      "log": "/tmp/surfview-demo-geometry-focused-20261027.log",
+      "exit_code": 1,
+      "child_returncode": 1,
+      "reason": "exited",
+      "detail": null,
+      "timeout_seconds": 600.0,
+      "log_bytes": 5791,
+      "retained_log": "initial-mapping-race.log"
+    },
+    "interrupted-server": {
+      "schema_version": 1,
+      "started_utc": "2026-10-27T21:01:34.026105+00:00",
+      "finished_utc": "2026-10-27T21:02:10.645216+00:00",
+      "duration_seconds": 36.618603,
+      "command": [
+        "npx",
+        "playwright",
+        "test",
+        "tests/e2e/surface-geometry.spec.ts",
+        "tests/e2e/chapter-inspect.spec.ts",
+        "tests/e2e/chapter-anatomy.spec.ts",
+        "tests/e2e/chapter-statistics.spec.ts",
+        "tests/e2e/chapter-time-series.spec.ts",
+        "tests/e2e/chapter-data.spec.ts",
+        "tests/e2e/normal-projection.spec.ts",
+        "tests/e2e/demo-gallery.spec.ts",
+        "--workers=2"
+      ],
+      "cwd": "/Users/bbuchsbaum/code/jscode/surfviewjs",
+      "log": "/tmp/surfview-demo-geometry-owning-20261027.log",
+      "exit_code": 1,
+      "child_returncode": 1,
+      "reason": "exited",
+      "detail": null,
+      "timeout_seconds": 600.0,
+      "log_bytes": 123689,
+      "retained_log": "interrupted-server.log"
+    }
+  }
+}

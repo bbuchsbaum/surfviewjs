@@ -1,0 +1,29 @@
+
+> surfview@3.1.0 docs:build
+> npm run test:docs-examples && npm run docs:api && vitepress build docs
+
+
+> surfview@3.1.0 test:docs-examples
+> node scripts/check-documentation-examples.mjs
+
+documentation example linkage passed: README and guides use the canonical packed-consumer examples
+
+> surfview@3.1.0 docs:api
+> typedoc
+
+[info] Loaded plugin typedoc-plugin-markdown
+[info] Loaded plugin typedoc-vitepress-theme
+[info] markdown generated at ./docs/api
+
+  vitepress v1.6.4
+
+- building client + server bundles...
+
+(!) Some chunks are larger than 3000 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[32m✓[0m building client + server bundles...
+- rendering pages...
+[32m✓[0m rendering pages...
+build complete in 22.74s.

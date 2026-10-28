@@ -1,5 +1,7 @@
 import {
   MultiLayerNeuroSurface,
+  SurfaceMetric,
+  getDisplayGeometryBinding,
   StatisticalMapLayer,
   computeBonferroniThreshold,
   computeFDRThreshold,
@@ -15,7 +17,7 @@ import './statistics.css';
 
 type Side = 'left' | 'right';
 type HemiId = 'lh' | 'rh';
-type Correction = 'none' | 'fdr' | 'bonferroni' | 'cluster';
+type Correction = 'none' | 'fdr' | 'bonferroni' | 'cluster' | 'area';
 type Mode = 'stat' | 'bivariate';
 
 const DF = 28;
@@ -32,7 +34,8 @@ const CORRECTIONS: ReadonlyArray<{ value: Correction; label: string }> = [
   { value: 'none', label: 'None' },
   { value: 'fdr', label: 'FDR' },
   { value: 'bonferroni', label: 'Bonferroni' },
-  { value: 'cluster', label: 'Cluster extent' }
+  { value: 'cluster', label: 'Cluster extent' },
+  { value: 'area', label: 'Cluster area (descriptive)' }
 ];
 
 const COLORMAPS = [
@@ -125,9 +128,9 @@ export const statistics: Scenario = {
   title: 'Statistical maps',
   short: 'Statistics',
   group: 'surfaces',
-  tags: ['StatisticalMapLayer', 'FDR', 'Bonferroni', 'cluster extent', 'dual threshold', 'TwoDataLayer', '2D colormap'],
+  tags: ['StatisticalMapLayer', 'FDR', 'Bonferroni', 'cluster extent', 'cluster area', 'dual threshold', 'TwoDataLayer', '2D colormap'],
   summary:
-    'A t-map on both fsaverage5 hemispheres drawn with StatisticalMapLayer. Choose a multiple-comparison correction (FDR, Bonferroni or cluster extent), set the display threshold and colour window, or split positive and negative values onto separate colour scales. Hover to read t, z, uncorrected and corrected p and cluster membership. The second mode draws effect size against confidence with one 2D colormap (TwoDataLayer).',
+    'A synthetic t-map on both fsaverage5 hemispheres. Apply FDR or Bonferroni correction, or filter clusters by vertex count or physical area in mm². Area filtering keeps positive and negative clusters separate and is descriptive, not a cluster significance test. Adjust the display threshold and colour window, or compare effect size with confidence in the second mode.',
   synthetic:
     'The t-map (df 28) is constructed: Gaussian effects at visual, motor, auditory, intraparietal, inferior frontal, posterior cingulate and medial prefrontal foci plus smooth and seeded per-vertex noise. Effect size is t/√29; confidence is 1 − p. Corrections run within each hemisphere’s layer (10,242 tests each).',
   excerpt,
@@ -138,10 +141,11 @@ export const statistics: Scenario = {
 
     const state = {
       mode: 'stat' as Mode,
-      correction: 'fdr' as Correction,
+      correction: (ctx.params.get('task') === 'area' ? 'area' : 'fdr') as Correction,
       rate: 0.05,
       clusterT: 3,
       clusterSize: 20,
+      clusterArea: 100,
       threshold: 2,
       window: 7,
       colormap: 'coolwarm' as string,
@@ -151,6 +155,8 @@ export const statistics: Scenario = {
     };
 
     const hemispheres: Hemisphere[] = [];
+    const areaMetrics = new Map<HemiId, SurfaceMetric>();
+    const areaSurvivors = new Map<HemiId, { count: number; detail: string }>();
     for (const [id, geometry, side, mesh] of [
       ['lh', left, 'left', 'fsaverage5Left'],
       ['rh', right, 'right', 'fsaverage5Right']
@@ -198,6 +204,7 @@ export const statistics: Scenario = {
           const result = computeBonferroniThreshold(hemi.p, state.rate);
           return { count: result.survivingCount, detail: `p ≤ ${formatP(result.pThreshold)}` };
         }
+        case 'area': return areaSurvivors.get(hemi.id) ?? { count: 0, detail: 'no area clusters' };
         case 'cluster': {
           let count = 0;
           const clusters = new Set<number>();
@@ -222,7 +229,12 @@ export const statistics: Scenario = {
         if (state.correction === 'fdr') layer.applyFDR(state.rate);
         else if (state.correction === 'bonferroni') layer.applyBonferroni(state.rate);
         else if (state.correction === 'cluster') layer.applyClusterThreshold(state.clusterT, { minClusterSize: state.clusterSize });
-        else layer.clearCorrection();
+        else if (state.correction === 'area') {
+          let metric = areaMetrics.get(hemi.id);
+          if (!metric) { metric = new SurfaceMetric(getDisplayGeometryBinding(hemi.surface.mesh!).domain, { positions: hemi.geometry.vertices, frame: 'fsaverage5-RAS', units: 'mm' }); areaMetrics.set(hemi.id, metric); }
+          const result = layer.applyClusterAreaThreshold(state.clusterT, { metric, minAreaMm2: state.clusterArea, signMode: 'separate' });
+          areaSurvivors.set(hemi.id, { count: result.mask.reduce((a, b) => a + b, 0), detail: `≥ ${state.clusterArea} mm², signs separate` });
+        } else layer.clearCorrection();
       }
       const [lh, rh] = hemispheres.map(survivors) as [ReturnType<typeof survivors>, ReturnType<typeof survivors>];
       const label = CORRECTIONS.find(entry => entry.value === state.correction)!.label;
@@ -233,9 +245,10 @@ export const statistics: Scenario = {
       survivingReadout.set(state.correction === 'none'
         ? 'all vertices (display threshold only)'
         : `L ${lh.count.toLocaleString('en-US')} · R ${rh.count.toLocaleString('en-US')} (${lh.detail} | ${rh.detail})`);
-      rateSlider.input.disabled = state.correction === 'none' || state.correction === 'cluster';
-      clusterTSlider.input.disabled = state.correction !== 'cluster';
+      rateSlider.input.disabled = state.correction !== 'fdr' && state.correction !== 'bonferroni';
+      clusterTSlider.input.disabled = state.correction !== 'cluster' && state.correction !== 'area';
       clusterSizeSlider.input.disabled = state.correction !== 'cluster';
+      clusterAreaSlider.input.disabled = state.correction !== 'area';
     };
 
     const applyDisplay = () => {
@@ -304,6 +317,8 @@ export const statistics: Scenario = {
       min: 1, max: 150, step: 1, value: state.clusterSize,
       onInput: value => { state.clusterSize = value; applyCorrection(); }
     });
+    const clusterAreaSlider = slider(correction, { id: 'stats-cluster-area', label: 'Minimum cluster area (mm²)', min: 10, max: 500, step: 10, value: state.clusterArea, onInput: value => { state.clusterArea = value; applyCorrection(); } });
+    note(correction, 'Area filtering is descriptive and keeps positive and negative clusters separate. It supplies no cluster p-value.');
     const surviving = readout(correction, 'Surviving', 'stats-surviving');
     survivingReadout.set = surviving.set;
 

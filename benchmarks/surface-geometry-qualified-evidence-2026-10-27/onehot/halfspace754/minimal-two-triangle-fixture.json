@@ -1,0 +1,100 @@
+{
+  "description": "target754, fsaverage10k to164k; two source triangles; use binary32 FMA radius100 normalization before chart construction",
+  "queryRaw": [
+    -61.43833923339844,
+    78.5878677368164,
+    -7.019809722900391
+  ],
+  "trianglesRaw": [
+    {
+      "face": 5257,
+      "nodes": [
+        2674,
+        754,
+        2673
+      ],
+      "vertices": [
+        [
+          -60.14999771118164,
+          79.80999755859375,
+          -3.510000228881836
+        ],
+        [
+          -61.44000244140625,
+          78.58999633789062,
+          -7.020000457763672
+        ],
+        [
+          -63.23999786376953,
+          77.3800048828125,
+          -3.510000228881836
+        ]
+      ]
+    },
+    {
+      "face": 5258,
+      "nodes": [
+        2674,
+        2675,
+        754
+      ],
+      "vertices": [
+        [
+          -60.14999771118164,
+          79.80999755859375,
+          -3.510000228881836
+        ],
+        [
+          -58.60000228881836,
+          80.7699966430664,
+          -6.449999809265137
+        ],
+        [
+          -61.44000244140625,
+          78.58999633789062,
+          -7.020000457763672
+        ]
+      ]
+    }
+  ],
+  "expectedIsolatedWeightsBySourceVertex": {
+    "5257": {
+      "754": 0.9999997615814209,
+      "2673": 2.384185791015625e-07
+    },
+    "5258": {
+      "754": 0.9999997615814209,
+      "2674": 2.384185791015625e-07
+    }
+  },
+  "expectedCombinedWeightsBySourceVertex": {
+    "754": 0.9999997615814209,
+    "2674": 2.384185791015625e-07
+  },
+  "sourceMask": {
+    "754": 0.0,
+    "2673": 1.0,
+    "2674": 1.0,
+    "2675": 1.0
+  },
+  "expectedMaskedWeightsBySourceVertex": {
+    "2674": 1.0
+  },
+  "expectedMaskedValid": true,
+  "boundaryWitness": {
+    "face": 5257,
+    "edgeSourceVertices": [
+      2673,
+      754
+    ],
+    "roundedResidualSide": -1.7988770650845254e-07,
+    "doubleChartBeta": 0.9999997633835651,
+    "doubleChartGamma": 1.2193542260448309e-07
+  },
+  "provenance": {
+    "workbenchVersion": "2.2.1 arm64",
+    "commit": "01164ffa47f2778088bd6ff472ec9cd9a57f5b42",
+    "sourceSha256": "38b13855694098fde897ef3984f0420bd6bce4eac1562ce0c285bcaf565d56b8",
+    "targetSha256": "9bf5b673cc1c4738b1137ac53ff724ff0ef45e12f5550448efa2da50bb521c32"
+  }
+}

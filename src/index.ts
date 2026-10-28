@@ -754,6 +754,8 @@ export * from './surfaces/ParcelSurface';
 export * from './events';
 
 // Pure numerical volume projection (no layer or texture construction).
+export * from './geometry';
+export type { ViewerPickResult, ViewerPickOptions } from './viewer/ViewerPickingController';
 export { projectVolume, projectRibbonVolume } from './projectVolume';
 export type {
   RibbonProjectionSurface, ProjectRibbonVolumeOptions,

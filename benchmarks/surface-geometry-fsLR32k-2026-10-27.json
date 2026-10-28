@@ -1,0 +1,82 @@
+{
+  "runtime": "v26.7.0",
+  "fixture": "/tmp/surfview-cortical-templates/fsLR-32k-midthickness.surf.gii",
+  "coldBuildSamples": 1,
+  "cases": [
+    {
+      "level": 0,
+      "vertices": 32492,
+      "faces": 64980,
+      "fwhmMm": 2,
+      "inputSha256": "036a8b6c84fa4b581b7ad7b36d99190b57ad6755c9d7ef7adc3e9ffc6448f1af",
+      "bundleSha256": "efae1d9a6f993fc489984e551cced7b8edeb400c67489a7462714a80224408a4",
+      "budgetBytes": 536870912,
+      "buildMs": 402.57516699999996,
+      "retainedBytes": 7563436,
+      "ordinary16Ms": {
+        "p50": 35.423041999999896,
+        "p95": 38.20775000000003,
+        "samples": 7,
+        "warmup": 1
+      },
+      "prepared16Ms": {
+        "p50": 28.767541000000165,
+        "p95": 32.711291000000074,
+        "samples": 7,
+        "warmup": 1
+      },
+      "maxBatchDifference": 0,
+      "isolatedProcessMaxRssBytes": 396165120
+    },
+    {
+      "level": 0,
+      "vertices": 32492,
+      "faces": 64980,
+      "fwhmMm": 4,
+      "inputSha256": "036a8b6c84fa4b581b7ad7b36d99190b57ad6755c9d7ef7adc3e9ffc6448f1af",
+      "bundleSha256": "efae1d9a6f993fc489984e551cced7b8edeb400c67489a7462714a80224408a4",
+      "budgetBytes": 536870912,
+      "buildMs": 1378.991916,
+      "retainedBytes": 28542220,
+      "ordinary16Ms": {
+        "p50": 114.11537499999986,
+        "p95": 116.08737500000007,
+        "samples": 7,
+        "warmup": 1
+      },
+      "prepared16Ms": {
+        "p50": 97.51191700000027,
+        "p95": 147.9260419999996,
+        "samples": 7,
+        "warmup": 1
+      },
+      "maxBatchDifference": 0,
+      "isolatedProcessMaxRssBytes": 402849792
+    },
+    {
+      "level": 0,
+      "vertices": 32492,
+      "faces": 64980,
+      "fwhmMm": 8,
+      "inputSha256": "036a8b6c84fa4b581b7ad7b36d99190b57ad6755c9d7ef7adc3e9ffc6448f1af",
+      "bundleSha256": "efae1d9a6f993fc489984e551cced7b8edeb400c67489a7462714a80224408a4",
+      "budgetBytes": 536870912,
+      "buildMs": 5718.2633749999995,
+      "retainedBytes": 111880180,
+      "ordinary16Ms": {
+        "p50": 421.9562500000002,
+        "p95": 429.51866599999994,
+        "samples": 7,
+        "warmup": 1
+      },
+      "prepared16Ms": {
+        "p50": 338.57424999999967,
+        "p95": 341.79679100000067,
+        "samples": 7,
+        "warmup": 1
+      },
+      "maxBatchDifference": 0,
+      "isolatedProcessMaxRssBytes": 474808320
+    }
+  ]
+}

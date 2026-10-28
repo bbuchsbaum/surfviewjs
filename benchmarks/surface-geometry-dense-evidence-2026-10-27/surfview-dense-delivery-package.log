@@ -1,0 +1,5 @@
+
+> surfview@3.1.0 test:package-consumers
+> node scripts/check-package-consumers.mjs
+
+packed consumer audit passed on Node v26.7.0: 164 entries, 2773055 B archive, 10874774 B unpacked; surfview.umd.js and surfview.umd.cjs are the one intentional 2.x browser/CommonJS compatibility duplicate; legacy neurosurface aliases match byte-for-byte and legacy source maps resolve to complete canonical maps; canonical documentation examples compiled/executed against the archive

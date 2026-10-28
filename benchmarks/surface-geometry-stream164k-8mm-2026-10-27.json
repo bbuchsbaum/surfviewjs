@@ -1,0 +1,36 @@
+{
+  "vertices": 163842,
+  "fwhmMm": 8,
+  "frames": 3,
+  "budgetBytes": 134217728,
+  "inputSha256": "6420425e7760b4bedd6855cfa88f57af8e0fc01455ef9ff14009d9133722d4fc",
+  "bundleSha256": "5779181500f87f1be1c6215294e01ba92c49801bfab19cf02bc6eda1cf6c4376",
+  "runtime": "v26.7.0",
+  "hardware": {
+    "cpu": "Apple M3 Max",
+    "arch": "arm64"
+  },
+  "note": "One cold run; row-streamed, shared-neighborhood 3-frame batch with changing validity. Process RSS includes parser/fixture/caller frames. No GPU or latency-percentile claim.",
+  "elapsedMs": 83148.795541,
+  "constantError": 4.618527782440651e-14,
+  "validCounts": [
+    163842,
+    163842,
+    163842
+  ],
+  "coverageRanges": [
+    {
+      "min": 0.9999999999999905,
+      "max": 1
+    },
+    {
+      "min": 0.8309042637994511,
+      "max": 0.9824709543088178
+    },
+    {
+      "min": 0.8256191740161326,
+      "max": 0.9813744435822745
+    }
+  ],
+  "processMaxRssBytes": 409419776
+}

@@ -1,0 +1,25 @@
+{
+  "level": 0,
+  "vertices": 163842,
+  "faces": 327680,
+  "fwhmMm": 2,
+  "inputSha256": "6420425e7760b4bedd6855cfa88f57af8e0fc01455ef9ff14009d9133722d4fc",
+  "bundleSha256": "efae1d9a6f993fc489984e551cced7b8edeb400c67489a7462714a80224408a4",
+  "budgetBytes": 536870912,
+  "buildMs": 11213.829334,
+  "retainedBytes": 176574436,
+  "ordinary16Ms": {
+    "p50": 707.5670420000006,
+    "p95": 713.5775420000009,
+    "samples": 7,
+    "warmup": 1
+  },
+  "prepared16Ms": {
+    "p50": 731.8088749999988,
+    "p95": 751.1655410000021,
+    "samples": 7,
+    "warmup": 1
+  },
+  "maxBatchDifference": 0,
+  "isolatedProcessMaxRssBytes": 847773696
+}

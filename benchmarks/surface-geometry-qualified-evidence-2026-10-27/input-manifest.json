@@ -1,0 +1,62 @@
+{
+  "hcpCommit": "a0937443c13092c60909e54e990c354b64f9af28",
+  "inputs": [
+    {
+      "name": "fs_LR-deformed_to-fsaverage.L.sphere.32k_fs_LR.surf.gii",
+      "url": "https://raw.githubusercontent.com/Washington-University/HCPpipelines/a0937443c13092c60909e54e990c354b64f9af28/global/templates/standard_mesh_atlases/resample_fsaverage/fs_LR-deformed_to-fsaverage.L.sphere.32k_fs_LR.surf.gii",
+      "sha256": "31987d139b6cdf1040188d1795bf23c213c57f8e84fb45f2c04823d996b0defc",
+      "bytes": 720487
+    },
+    {
+      "name": "fsaverage5_std_sphere.L.10k_fsavg_L.surf.gii",
+      "url": "https://raw.githubusercontent.com/Washington-University/HCPpipelines/a0937443c13092c60909e54e990c354b64f9af28/global/templates/standard_mesh_atlases/resample_fsaverage/fsaverage5_std_sphere.L.10k_fsavg_L.surf.gii",
+      "sha256": "38b13855694098fde897ef3984f0420bd6bce4eac1562ce0c285bcaf565d56b8",
+      "bytes": 204479
+    },
+    {
+      "name": "fsaverage_std_sphere.L.164k_fsavg_L.surf.gii",
+      "url": "https://raw.githubusercontent.com/Washington-University/HCPpipelines/a0937443c13092c60909e54e990c354b64f9af28/global/templates/standard_mesh_atlases/resample_fsaverage/fsaverage_std_sphere.L.164k_fsavg_L.surf.gii",
+      "sha256": "9bf5b673cc1c4738b1137ac53ff724ff0ef45e12f5550448efa2da50bb521c32",
+      "bytes": 4093613
+    },
+    {
+      "name": "fsLR-32k-midthickness.surf.gii",
+      "url": "https://templateflow.s3.amazonaws.com/tpl-fsLR/tpl-fsLR_den-32k_hemi-L_midthickness.surf.gii",
+      "sha256": "036a8b6c84fa4b581b7ad7b36d99190b57ad6755c9d7ef7adc3e9ffc6448f1af",
+      "bytes": 726059
+    },
+    {
+      "name": "fsaverage-164k-midthickness.surf.gii",
+      "url": "https://templateflow.s3.amazonaws.com/tpl-fsaverage/tpl-fsaverage_hemi-L_den-164k_midthickness.surf.gii",
+      "sha256": "6420425e7760b4bedd6855cfa88f57af8e0fc01455ef9ff14009d9133722d4fc",
+      "bytes": 4322550
+    },
+    {
+      "name": "fsaverage10k-pial.surf.gii",
+      "url": "https://templateflow.s3.amazonaws.com/tpl-fsaverage/tpl-fsaverage_hemi-L_den-10k_pial.surf.gii",
+      "sha256": "2201cd917aae312477747c06c6a7a4a7cc8debe28b053190afbe1622ae0ee699",
+      "bytes": 270927
+    },
+    {
+      "name": "fsaverage10k-white.surf.gii",
+      "url": "https://templateflow.s3.amazonaws.com/tpl-fsaverage/tpl-fsaverage_hemi-L_den-10k_white.surf.gii",
+      "sha256": "ee707e6eaee1a4c9ce7abbb9a3a22bb1d47d4452259bf2c5c9cd269c325a3f8f",
+      "bytes": 270838
+    },
+    {
+      "name": "fsaverage164k-pial.surf.gii",
+      "url": "https://templateflow.s3.amazonaws.com/tpl-fsaverage/tpl-fsaverage_hemi-L_den-164k_pial.surf.gii",
+      "sha256": "1885260c528e462a5bc16817647d46edff3a2a97551af113ea52c72966803317",
+      "bytes": 4342097
+    }
+  ],
+  "derivedInputs": [
+    {
+      "name": "fsaverage10k-midthickness.surf.gii",
+      "sha256": "995bc3ec334db893f4e23cdc15308a9e79d33c71a4b5f3ced11cfb7bf8af9bdf",
+      "recipe": "wb_command -surface-average OUTPUT -surf fsaverage10k-white.surf.gii -surf fsaverage10k-pial.surf.gii",
+      "tool": "Workbench 2.2.1 arm64; version in receipts"
+    }
+  ],
+  "binding": "Anatomical area metrics checked against corresponding registered sphere vertex count and complete unordered face-set equality before domain binding. Common anatomical frame fsaverage-surface-RAS."
+}

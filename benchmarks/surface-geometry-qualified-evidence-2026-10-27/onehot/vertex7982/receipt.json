@@ -1,0 +1,67 @@
+[
+  {
+    "node": 7982,
+    "masked": false,
+    "equalRaw": false,
+    "roi": {
+      "347": 1.0,
+      "1776": 1.0,
+      "5634": 1.0,
+      "7981": 1.0,
+      "7982": 0.0,
+      "7984": 1.0,
+      "7985": 1.0
+    },
+    "weights": {
+      "7981": 5.960464477539063e-08,
+      "7982": 0.9999999403953552
+    },
+    "complement": 0.0,
+    "valid": 1.0,
+    "command": [
+      "/tmp/surfview-workbench-mount/ConnectomeWorkbench.app/Contents/usr/bin/wb_command",
+      "-metric-resample",
+      "/tmp/surfview-wb-mask7982/input.func.gii",
+      "/tmp/surfview-hcp-fixtures/fsaverage5_std_sphere.L.10k_fsavg_L.surf.gii",
+      "/tmp/surfview-hcp-fixtures/fsaverage_std_sphere.L.164k_fsavg_L.surf.gii",
+      "BARYCENTRIC",
+      "/tmp/surfview-wb-mask7982/output-False.func.gii",
+      "-valid-roi-out",
+      "/tmp/surfview-wb-mask7982/valid-False.func.gii"
+    ],
+    "exitCode": 0
+  },
+  {
+    "node": 7982,
+    "masked": true,
+    "equalRaw": false,
+    "roi": {
+      "347": 1.0,
+      "1776": 1.0,
+      "5634": 1.0,
+      "7981": 1.0,
+      "7982": 0.0,
+      "7984": 1.0,
+      "7985": 1.0
+    },
+    "weights": {
+      "7981": 1.0
+    },
+    "complement": 0.0,
+    "valid": 1.0,
+    "command": [
+      "/tmp/surfview-workbench-mount/ConnectomeWorkbench.app/Contents/usr/bin/wb_command",
+      "-metric-resample",
+      "/tmp/surfview-wb-mask7982/input.func.gii",
+      "/tmp/surfview-hcp-fixtures/fsaverage5_std_sphere.L.10k_fsavg_L.surf.gii",
+      "/tmp/surfview-hcp-fixtures/fsaverage_std_sphere.L.164k_fsavg_L.surf.gii",
+      "BARYCENTRIC",
+      "/tmp/surfview-wb-mask7982/output-True.func.gii",
+      "-valid-roi-out",
+      "/tmp/surfview-wb-mask7982/valid-True.func.gii",
+      "-current-roi",
+      "/tmp/surfview-anatomical-constraints-diagnostic-20261027/10k-164k/roi.func.gii"
+    ],
+    "exitCode": 0
+  }
+]

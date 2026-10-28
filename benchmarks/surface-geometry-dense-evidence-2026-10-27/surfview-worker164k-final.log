@@ -1,0 +1,33 @@
+GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+GZipBase64Binary payload used zlib framing; compatibility fallback succeeded.
+{
+  "vertices": 163842,
+  "fwhmMm": 2,
+  "inputSha256": "6420425e7760b4bedd6855cfa88f57af8e0fc01455ef9ff14009d9133722d4fc",
+  "bundleSha256": "34dbcd70b080ce3b6167bf1d84259f17aafd592bfa8afbdc63586add5fa264c1",
+  "note": "Node worker_threads with Web Worker transport adapter; round trips include client copies and structured cloning. Not browser GPU upload timing.",
+  "runtime": "v26.7.0",
+  "registrationBuildPrepareMs": 15019.846042000001,
+  "maxOrdinaryDifference": 0,
+  "constantError": 1.2434497875801753e-14,
+  "batch16RoundTripMs": {
+    "p50": 934.0795419999995,
+    "p95": 962.3451669999995,
+    "samplesMs": [
+      917.2009170000019,
+      921.106582999997,
+      932.765000000003,
+      934.0795419999995,
+      934.4312500000015,
+      940.0068750000028,
+      962.3451669999995
+    ],
+    "warmup": 1
+  },
+  "cancellation": {
+    "cancelled": true
+  },
+  "clientCancellationMs": 0.44624999999723514,
+  "workerReleaseAfterAbortMs": 7.291000000001077,
+  "processMaxRssBytes": 1370226688
+}

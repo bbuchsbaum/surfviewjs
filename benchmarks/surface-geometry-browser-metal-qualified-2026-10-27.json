@@ -1,0 +1,95 @@
+{
+  "vertices": 10242,
+  "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Max, Unspecified Version)",
+  "frameHashes": [
+    1318386737,
+    1735834834
+  ],
+  "timerExtension": true,
+  "timingNote": "CPU wall clock: submit includes copies; worker round trip includes execution and transport. drawAndFinish includes DataLayer update, viewer render, uploads/draw and gl.finish; it is not isolated GPU upload time. Two warmups, seven samples.",
+  "samples": [
+    {
+      "gpuUploadDrawMs": 0.289458,
+      "submitCopyMs": 0,
+      "workerRoundTripMs": 2.199999988079071,
+      "displayBufferMs": 0.10000002384185791,
+      "drawAndFinishMs": 1,
+      "totalMs": 3.300000011920929
+    },
+    {
+      "gpuUploadDrawMs": 0.262625,
+      "submitCopyMs": 0.09999999403953552,
+      "workerRoundTripMs": 2.399999976158142,
+      "displayBufferMs": 0,
+      "drawAndFinishMs": 1,
+      "totalMs": 3.399999976158142
+    },
+    {
+      "gpuUploadDrawMs": 0.331958,
+      "submitCopyMs": 0.10000002384185791,
+      "workerRoundTripMs": 1.300000011920929,
+      "displayBufferMs": 0,
+      "drawAndFinishMs": 1,
+      "totalMs": 2.300000011920929
+    },
+    {
+      "gpuUploadDrawMs": 0.270208,
+      "submitCopyMs": 0,
+      "workerRoundTripMs": 1,
+      "displayBufferMs": 0,
+      "drawAndFinishMs": 1,
+      "totalMs": 2
+    },
+    {
+      "gpuUploadDrawMs": 0.350874,
+      "submitCopyMs": 0,
+      "workerRoundTripMs": 0.9000000059604645,
+      "displayBufferMs": 0.09999999403953552,
+      "drawAndFinishMs": 0.800000011920929,
+      "totalMs": 1.800000011920929
+    },
+    {
+      "gpuUploadDrawMs": 0.984749,
+      "submitCopyMs": 0,
+      "workerRoundTripMs": 0.7999999821186066,
+      "displayBufferMs": 0.09999999403953552,
+      "drawAndFinishMs": 0.9000000059604645,
+      "totalMs": 1.7999999821186066
+    },
+    {
+      "gpuUploadDrawMs": 0.280666,
+      "submitCopyMs": 0,
+      "workerRoundTripMs": 0.800000011920929,
+      "displayBufferMs": 0,
+      "drawAndFinishMs": 0.9000000059604645,
+      "totalMs": 1.7000000178813934
+    }
+  ],
+  "maxDynamicMaskDifference": 0,
+  "cancellation": {
+    "cancelled": true
+  },
+  "clientCancelMs": 0.20000001788139343,
+  "releaseAfterAbortMs": 6.5,
+  "nonblackPixels": 96447,
+  "heap": {
+    "used": 47763616,
+    "total": 56775260
+  },
+  "browserVersion": "151.0.7922.34",
+  "launch": {
+    "headless": false,
+    "args": [
+      "--use-angle=metal"
+    ]
+  },
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+  "fixtureSha256": "12e6ed311632ea73c64de86d4faec079bfa6982056f5b3dc93ecffa07e9e6afc",
+  "witnesses": {
+    "pageErrors": [],
+    "dynamicMask": true,
+    "cancelled": true,
+    "pixels": true,
+    "frameChanged": true
+  }
+}

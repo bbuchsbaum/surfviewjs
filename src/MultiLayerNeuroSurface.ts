@@ -41,6 +41,9 @@ import {
   finiteNumber
 } from './utils/validation';
 import { OutlineLayer } from './OutlineLayer';
+import { SurfaceBoundaryGraph } from './geometry/SurfaceBoundaries';
+import { getDisplayGeometryBinding } from './geometry/DisplayGeometryBinding';
+import { evaluateSurfaceStrokePoint } from './geometry/SurfaceLocation';
 import { ConnectivityLayer } from './ConnectivityLayer';
 import { ParcelValueLayer, ParcelValueLayerConfig } from './layers/ParcelValueLayer';
 import { TemporalDataLayer } from './temporal/TemporalDataLayer';
@@ -129,6 +132,8 @@ export interface LayerUpdate {
   blendMode?: 'normal' | 'additive' | 'multiply';
   order?: number;
   roiLabels?: Uint32Array | Int32Array | number[];
+  boundaryMode?: 'transition-edges' | 'midpoint';
+  backgroundLabel?: number;
   halo?: boolean;
   haloColor?: THREE.ColorRepresentation;
   haloWidth?: number;
@@ -187,6 +192,8 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
   private useGPUCompositing: boolean;
   private gpuCompositingRequested: boolean;
   private gpuCompositor: GPULayerCompositor | null = null;
+  private boundaryGraphs = new WeakMap<OutlineLayer, { graph: SurfaceBoundaryGraph; labelRevision: number; displayRevision: string; positions: Float32Array; key: string }>();
+  private outlineModes = new WeakMap<OutlineLayer, 'midpoint' | 'transition-edges'>();
   private outlineResolution: THREE.Vector2 | null = null;
   private useWideLines: boolean;
   private shadingUniforms!: SurfaceShadingUniforms;
@@ -291,12 +298,18 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
   private applyOutlineLayer(layer: OutlineLayer): void {
     if (!this.mesh) return;
 
-    // Dispose previous objects if any
-    this.detachOutlineLayer(layer);
-
+    // Midpoint styles reuse topology and line buffers. Halo presence changes object layout.
+    if (layer.boundaryMode === 'midpoint' && this.outlineModes.get(layer) === 'midpoint' && this.boundaryGraphs.has(layer) && layer.lineObject && !!layer.haloObject === layer.halo) {
+      this.updateMidpointOutline(layer, true); layer.needsUpdate = false;
+      this.emit('layer:updated', { surface: this, layer }); this.requestColorUpdate(); return;
+    }
     const outlineObjects = this.buildOutlineObjects(layer);
+    this.detachOutlineLayer(layer);
     if (!outlineObjects) {
       debugLog('OutlineLayer', layer.id, ': no boundary edges found');
+      layer.needsUpdate = false;
+      this.emit('layer:updated', { surface: this, layer });
+      this.requestColorUpdate();
       return;
     }
 
@@ -309,6 +322,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     outlineObjects.line.renderOrder = layer.order || 0;
     this.mesh.add(outlineObjects.line);
     layer.lineObject = outlineObjects.line;
+    this.outlineModes.set(layer, layer.boundaryMode);
 
     layer.needsUpdate = false;
     this.emit('layer:updated', { surface: this, layer });
@@ -339,6 +353,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     removeObject(layer.haloObject);
     layer.lineObject = null;
     layer.haloObject = null;
+    this.outlineModes.delete(layer);
   }
 
   private ensureOutlineResolution(): void {
@@ -397,12 +412,13 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
       );
     }
 
+    let positions: Float32Array | number[];
+    if (layer.boundaryMode === 'midpoint') positions = this.midpointPositions(layer);
+    else {
     const edges = computeBoundaryEdges(this.geometry.faces, layer.roiLabels, layer.roiSubset);
-    if (!edges.length) {
-      return null;
-    }
 
-    const positions: number[] = [];
+
+    const legacyPositions: number[] = [];
     const pos = positionAttr.array as ArrayLike<number>;
     const normals = normalAttr.array as ArrayLike<number>;
     const offset = layer.offset || 0;
@@ -422,7 +438,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
       const bny = normals[b * 3 + 1]!;
       const bnz = normals[b * 3 + 2]!;
 
-      positions.push(
+      legacyPositions.push(
         ax + anx * offset,
         ay + any * offset,
         az + anz * offset,
@@ -431,6 +447,10 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
         bz + bnz * offset
       );
     }
+
+      positions = legacyPositions;
+    }
+    if (!positions.length) return null;
 
     this.ensureOutlineResolution();
     const resolutionX = this.outlineResolution?.x || 1;
@@ -454,12 +474,14 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
           depthWrite: false
         });
         mat.resolution.set(resolutionX, resolutionY);
+        mat.clippingPlanes = this.clipPlanes.getThreePlanes();
         return mat;
       }
       return new THREE.LineBasicMaterial({
         color,
         transparent: opacity < 1,
-        opacity
+        opacity,
+        clippingPlanes: this.clipPlanes.getThreePlanes()
       });
     };
 
@@ -484,6 +506,61 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     }
 
     return halo === undefined ? { line } : { line, halo };
+  }
+
+  private midpointPositions(layer: OutlineLayer): Float32Array {
+    const binding = getDisplayGeometryBinding(this.mesh!), revision = binding.revision;
+    let cache = this.boundaryGraphs.get(layer);
+    if (cache && cache.graph.domain === binding.domain && cache.graph.background === layer.backgroundLabel && cache.labelRevision !== layer.labelRevision && layer.lastLabelEdits?.fromRevision === cache.labelRevision) {
+      cache.graph.updateLabels(layer.lastLabelEdits.changes); cache.labelRevision = layer.labelRevision;
+    }
+    if (!cache || cache.graph.domain !== binding.domain || cache.labelRevision !== layer.labelRevision) {
+      cache = { graph: new SurfaceBoundaryGraph(binding.domain, layer.roiLabels, { background: layer.backgroundLabel }), labelRevision: layer.labelRevision, displayRevision: '', positions: new Float32Array(), key: '' };
+      this.boundaryGraphs.set(layer, cache);
+    }
+    const key = `${cache.graph.revision}:${layer.offset}:${layer.roiSubset?.join(',') ?? ''}`;
+    if (cache.displayRevision === revision && cache.key === key) return cache.positions;
+    const segments = cache.graph.segments(layer.roiSubset?.length ? { parcels: layer.roiSubset } : {});
+    if (cache.positions.length !== segments.length * 6) cache.positions = new Float32Array(segments.length * 6);
+    const evaluated = new Map<number, Float64Array>();
+    segments.forEach((segment, i) => [segment.from, segment.to].forEach((id, end) => {
+      let p = evaluated.get(id);
+      if (!p) { p = evaluateSurfaceStrokePoint(cache!.graph.location(id), binding, layer.offset); evaluated.set(id, p); }
+      cache!.positions.set(p, i * 6 + end * 3);
+    }));
+    cache.displayRevision = revision; cache.key = key; return cache.positions;
+  }
+  private updateMidpointOutline(layer: OutlineLayer, style = false): void {
+    const before = this.boundaryGraphs.get(layer), revision = before?.displayRevision, key = before?.key;
+    const positions = this.midpointPositions(layer), after = this.boundaryGraphs.get(layer)!;
+    const changed = before !== after || revision !== after.displayRevision || key !== after.key;
+    for (const [object, halo] of [[layer.lineObject, false], [layer.haloObject, true]] as const) {
+      if (!object) continue;
+      const line = object as THREE.LineSegments;
+      if (changed) {
+        const geometry = line.geometry;
+        if (geometry instanceof LineSegmentsGeometry) {
+          const start = geometry.getAttribute('instanceStart'), end = geometry.getAttribute('instanceEnd');
+          if (!start || start.count !== positions.length / 6) geometry.setPositions(positions);
+          else { for (let i = 0; i < start.count; i++) { start.setXYZ(i, positions[i * 6]!, positions[i * 6 + 1]!, positions[i * 6 + 2]!); end.setXYZ(i, positions[i * 6 + 3]!, positions[i * 6 + 4]!, positions[i * 6 + 5]!); } start.needsUpdate = true; end.needsUpdate = true; }
+        } else {
+          const attribute = geometry.getAttribute('position');
+          if (!attribute || attribute.count !== positions.length / 3) geometry.setAttribute('position', new THREE.BufferAttribute(positions.slice(), 3));
+          else { (attribute.array as Float32Array).set(positions); attribute.needsUpdate = true; }
+        }
+        geometry.computeBoundingBox(); geometry.computeBoundingSphere();
+      }
+      if (style) {
+        const material = line.material as THREE.LineBasicMaterial;
+        material.color.setHex(halo ? layer.haloColor : layer.color); material.opacity = halo ? layer.opacity * 0.6 : layer.opacity;
+        material.transparent = material.opacity < 1; material.linewidth = halo ? layer.width + layer.haloWidth : layer.width; material.needsUpdate = true;
+        line.visible = layer.visible; line.renderOrder = layer.order - (halo ? 0.5 : 0);
+      }
+    }
+  }
+  /** Refresh only attachment positions affected by morph/variant changes. */
+  updateSurfaceAttachments(): void {
+    for (const layer of this.layerStack.getAllLayers()) if (layer instanceof OutlineLayer && layer.boundaryMode === 'midpoint' && layer.lineObject) this.updateMidpointOutline(layer);
   }
 
   updateOutlineResolution(width: number, height: number, dpr: number = 1): void {
@@ -562,6 +639,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
 
   private wireLayerChange(layer: Layer): void {
     layer._onChangeCallback = (changes) => {
+      if (layer instanceof OutlineLayer) { this.applyOutlineLayer(layer); return; }
       const requiresComposite = Object.keys(changes).some(key => key !== 'presentation');
       try {
         this.emit('layer:updated', { surface: this, layer, changes: { ...changes } });
@@ -894,6 +972,11 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     this.layerStack.getAllLayers().forEach(layer => {
       if (layer instanceof ConnectivityLayer) {
         layer.setClipPlanes(threePlanes2.length > 0 ? threePlanes2 : null);
+      } else if (layer instanceof OutlineLayer) {
+        for (const object of [layer.lineObject, layer.haloObject]) object?.traverse(child => {
+          const material = (child as THREE.LineSegments).material;
+          if (material) for (const item of Array.isArray(material) ? material : [material]) { item.clippingPlanes = threePlanes2.length ? threePlanes2 : null; item.needsUpdate = true; }
+        });
       }
     });
 
@@ -1045,6 +1128,8 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
             if (props.roiLabels) {
               layer = new OutlineLayer(id, {
                 roiLabels: props.roiLabels,
+                ...(props.boundaryMode === undefined ? {} : { boundaryMode: props.boundaryMode }),
+                ...(props.backgroundLabel === undefined ? {} : { backgroundLabel: props.backgroundLabel }),
                 ...(props.color === undefined ? {} : { color: props.color }),
                 ...(props.width === undefined ? {} : { width: props.width }),
                 ...(props.opacity === undefined ? {} : { opacity: props.opacity }),

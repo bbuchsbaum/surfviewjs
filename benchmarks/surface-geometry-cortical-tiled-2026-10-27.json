@@ -1,0 +1,188 @@
+{
+  "runtime": "v26.7.0",
+  "fixture": "Bundled fsaverage5-lh-pial; levels 1 and 2 use planar midpoint subdivision, preserving its piecewise-linear cortex. These are density stress fixtures, not independent fsaverage6/7 acquisitions.",
+  "coldBuildSamples": 1,
+  "cases": [
+    {
+      "level": 0,
+      "vertices": 10242,
+      "faces": 20480,
+      "fwhmMm": 2,
+      "inputSha256": "b425b4914362af4aaf43bb5d022afd39a0c5f6ec4601e353631cdd737884c951",
+      "bundleSha256": "de31c2197abfffd2b6157cfbee93efb7112c69e4ca0686e13365f1823ef773d0",
+      "budgetBytes": 536870912,
+      "buildMs": 59.10041699999999,
+      "retainedBytes": 837220,
+      "ordinary16Ms": {
+        "p50": 5.057666999999924,
+        "p95": 5.424583999999982,
+        "samples": 7,
+        "warmup": 1
+      },
+      "prepared16Ms": {
+        "p50": 4.317874999999958,
+        "p95": 8.38658399999997,
+        "samples": 7,
+        "warmup": 1
+      },
+      "maxBatchDifference": 0,
+      "isolatedProcessMaxRssBytes": 297353216
+    },
+    {
+      "level": 0,
+      "vertices": 10242,
+      "faces": 20480,
+      "fwhmMm": 4,
+      "inputSha256": "b425b4914362af4aaf43bb5d022afd39a0c5f6ec4601e353631cdd737884c951",
+      "bundleSha256": "de31c2197abfffd2b6157cfbee93efb7112c69e4ca0686e13365f1823ef773d0",
+      "budgetBytes": 536870912,
+      "buildMs": 117.712041,
+      "retainedBytes": 2780812,
+      "ordinary16Ms": {
+        "p50": 12.585249999999974,
+        "p95": 12.671500000000037,
+        "samples": 7,
+        "warmup": 1
+      },
+      "prepared16Ms": {
+        "p50": 9.648832999999968,
+        "p95": 10.034708000000023,
+        "samples": 7,
+        "warmup": 1
+      },
+      "maxBatchDifference": 0,
+      "isolatedProcessMaxRssBytes": 304578560
+    },
+    {
+      "level": 0,
+      "vertices": 10242,
+      "faces": 20480,
+      "fwhmMm": 8,
+      "inputSha256": "b425b4914362af4aaf43bb5d022afd39a0c5f6ec4601e353631cdd737884c951",
+      "bundleSha256": "de31c2197abfffd2b6157cfbee93efb7112c69e4ca0686e13365f1823ef773d0",
+      "budgetBytes": 536870912,
+      "buildMs": 354.3628749999999,
+      "retainedBytes": 10270444,
+      "ordinary16Ms": {
+        "p50": 40.07658300000003,
+        "p95": 40.19304199999988,
+        "samples": 7,
+        "warmup": 1
+      },
+      "prepared16Ms": {
+        "p50": 32.31245799999988,
+        "p95": 32.387917000000016,
+        "samples": 7,
+        "warmup": 1
+      },
+      "maxBatchDifference": 0,
+      "isolatedProcessMaxRssBytes": 332988416
+    },
+    {
+      "level": 1,
+      "vertices": 40962,
+      "faces": 81920,
+      "fwhmMm": 2,
+      "inputSha256": "b425b4914362af4aaf43bb5d022afd39a0c5f6ec4601e353631cdd737884c951",
+      "bundleSha256": "de31c2197abfffd2b6157cfbee93efb7112c69e4ca0686e13365f1823ef773d0",
+      "budgetBytes": 536870912,
+      "buildMs": 464.73579200000006,
+      "retainedBytes": 11483812,
+      "ordinary16Ms": {
+        "p50": 51.96104199999991,
+        "p95": 57.14637499999981,
+        "samples": 7,
+        "warmup": 1
+      },
+      "prepared16Ms": {
+        "p50": 44.60095799999999,
+        "p95": 51.85612500000002,
+        "samples": 7,
+        "warmup": 1
+      },
+      "maxBatchDifference": 0,
+      "isolatedProcessMaxRssBytes": 489259008
+    },
+    {
+      "level": 1,
+      "vertices": 40962,
+      "faces": 81920,
+      "fwhmMm": 4,
+      "inputSha256": "b425b4914362af4aaf43bb5d022afd39a0c5f6ec4601e353631cdd737884c951",
+      "bundleSha256": "de31c2197abfffd2b6157cfbee93efb7112c69e4ca0686e13365f1823ef773d0",
+      "budgetBytes": 536870912,
+      "buildMs": 1492.2304159999999,
+      "retainedBytes": 42623092,
+      "ordinary16Ms": {
+        "p50": 168.01354200000014,
+        "p95": 169.80379200000016,
+        "samples": 7,
+        "warmup": 1
+      },
+      "prepared16Ms": {
+        "p50": 134.6088749999999,
+        "p95": 139.5360839999994,
+        "samples": 7,
+        "warmup": 1
+      },
+      "maxBatchDifference": 0,
+      "isolatedProcessMaxRssBytes": 597262336
+    },
+    {
+      "level": 1,
+      "vertices": 40962,
+      "faces": 81920,
+      "fwhmMm": 8,
+      "inputSha256": "b425b4914362af4aaf43bb5d022afd39a0c5f6ec4601e353631cdd737884c951",
+      "bundleSha256": "de31c2197abfffd2b6157cfbee93efb7112c69e4ca0686e13365f1823ef773d0",
+      "budgetBytes": 536870912,
+      "error": {
+        "code": "budget-exceeded",
+        "message": "Computation requires 536883552 bytes; budget is 536870912"
+      },
+      "isolatedProcessMaxRssBytes": 658440192
+    },
+    {
+      "level": 2,
+      "vertices": 163842,
+      "faces": 327680,
+      "fwhmMm": 2,
+      "inputSha256": "b425b4914362af4aaf43bb5d022afd39a0c5f6ec4601e353631cdd737884c951",
+      "bundleSha256": "de31c2197abfffd2b6157cfbee93efb7112c69e4ca0686e13365f1823ef773d0",
+      "budgetBytes": 536870912,
+      "error": {
+        "code": "budget-exceeded",
+        "message": "Computation requires 536872704 bytes; budget is 536870912"
+      },
+      "isolatedProcessMaxRssBytes": 770195456
+    },
+    {
+      "level": 2,
+      "vertices": 163842,
+      "faces": 327680,
+      "fwhmMm": 4,
+      "inputSha256": "b425b4914362af4aaf43bb5d022afd39a0c5f6ec4601e353631cdd737884c951",
+      "bundleSha256": "de31c2197abfffd2b6157cfbee93efb7112c69e4ca0686e13365f1823ef773d0",
+      "budgetBytes": 536870912,
+      "error": {
+        "code": "budget-exceeded",
+        "message": "Computation requires 536877632 bytes; budget is 536870912"
+      },
+      "isolatedProcessMaxRssBytes": 819576832
+    },
+    {
+      "level": 2,
+      "vertices": 163842,
+      "faces": 327680,
+      "fwhmMm": 8,
+      "inputSha256": "b425b4914362af4aaf43bb5d022afd39a0c5f6ec4601e353631cdd737884c951",
+      "bundleSha256": "de31c2197abfffd2b6157cfbee93efb7112c69e4ca0686e13365f1823ef773d0",
+      "budgetBytes": 536870912,
+      "error": {
+        "code": "budget-exceeded",
+        "message": "Computation requires 536900736 bytes; budget is 536870912"
+      },
+      "isolatedProcessMaxRssBytes": 733134848
+    }
+  ]
+}
