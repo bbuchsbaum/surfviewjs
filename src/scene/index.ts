@@ -2,6 +2,7 @@ export {
   SURFVIEW_SCENE_SCHEMA,
   SURFVIEW_SCENE_SCHEMA_V2,
   SceneManifestError,
+  sceneGeometryInitialVariant,
   validateSceneManifest
 } from './SceneManifest';
 

@@ -351,6 +351,7 @@ export type {
   BlendMode,
   LayerConfig,
   DataLayerConfig,
+  MagnitudeOpacity,
   TwoDataLayerConfig,
   LayerUpdateData,
   RGBALayerUpdateData,
@@ -761,3 +762,6 @@ export type {
   RibbonProjectionSurface, ProjectRibbonVolumeOptions,
   VolumeDescriptor, ProjectionSurface, ProjectVolumeOptions, ProjectVolumeResult, NormalProjectionReducer
 } from './projectVolume';
+
+export { magnitudeOpacityAt, normalizeMagnitudeOpacity } from './layers/magnitudeOpacity';
+export type { ResolvedMagnitudeOpacity } from './layers/magnitudeOpacity';

@@ -1,3 +1,6 @@
+import { normalizeMagnitudeOpacity } from '../layers/magnitudeOpacity';
+import type { MagnitudeOpacity } from '../layers/magnitudeOpacity';
+
 export const SURFVIEW_SCENE_SCHEMA = 'surfview.scene.v1' as const;
 /** Required for persistent references; v1 runtimes reject this version. */
 export const SURFVIEW_SCENE_SCHEMA_V2 = 'surfview.scene.v2' as const;
@@ -26,6 +29,15 @@ export interface SceneGeometryManifest {
   vertices: string;
   faces: string;
   curvature?: string;
+  /**
+   * Optional alternative embeddings that share this topology, curvature and
+   * per-vertex data (for example inflated, pial and white): variant name ->
+   * vertices asset id. `vertices` must be one of the listed assets; it is the
+   * initial embedding. Every geometry in a scene lists the same names, so one
+   * switch changes both hemispheres. Runtimes without variant support ignore
+   * this field and show `vertices`.
+   */
+  variants?: Record<string, string>;
   vertexCount: number;
   faceCount: number;
   metadata?: Record<string, unknown>;
@@ -60,6 +72,8 @@ export interface SceneMapLayerManifest extends SceneLayerCommon {
   colorMap: string | string[];
   limits: [number, number];
   threshold?: [number, number];
+  /** Optional fade by |value|; see `MagnitudeOpacity`. Older runtimes ignore it. */
+  magnitudeOpacity?: MagnitudeOpacity;
 }
 
 export interface SceneReferenceLayerManifest extends SceneLayerCommon {
@@ -72,6 +86,7 @@ export interface SceneReferenceLayerManifest extends SceneLayerCommon {
   colorMap?: never;
   limits?: never;
   threshold?: never;
+  magnitudeOpacity?: never;
   legend?: never;
   units?: never;
 }
@@ -149,6 +164,50 @@ function requireAsset(
   return asset;
 }
 
+const VARIANT_NAME = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/;
+
+/** Validate one geometry's variant table and return its names. */
+function validateGeometryVariants(
+  manifest: SurfViewSceneManifest,
+  geometryId: string,
+  geometry: SceneGeometryManifest
+): string[] {
+  const path = `$.geometries.${geometryId}.variants`;
+  const variants = geometry.variants;
+  if (variants === null || typeof variants !== 'object' || Array.isArray(variants)) {
+    throw new SceneManifestError(path, 'must map variant names to vertices assets');
+  }
+  const entries = Object.entries(variants);
+  if (entries.length < 2) {
+    throw new SceneManifestError(path, 'must list at least two embeddings');
+  }
+  let includesBase = false;
+  for (const [name, assetId] of entries) {
+    if (!VARIANT_NAME.test(name)) {
+      throw new SceneManifestError(`${path}.${name}`, 'variant names use letters, digits, _, . and -');
+    }
+    if (typeof assetId !== 'string') {
+      throw new SceneManifestError(`${path}.${name}`, 'must name a vertices asset');
+    }
+    const asset = requireAsset(manifest, assetId, `${path}.${name}`, 'vertices');
+    if (asset.dtype !== 'float32' || asset.shape.join('x') !== `${geometry.vertexCount}x3`) {
+      throw new SceneManifestError(`${path}.${name}`, 'must be float32 with shape [vertexCount, 3]');
+    }
+    if (assetId === geometry.vertices) includesBase = true;
+  }
+  if (!includesBase) {
+    throw new SceneManifestError(path, 'must include the geometry vertices asset');
+  }
+  return entries.map(([name]) => name);
+}
+
+/** The initial variant name of a geometry, or null without variants. */
+export function sceneGeometryInitialVariant(geometry: SceneGeometryManifest): string | null {
+  if (!geometry.variants) return null;
+  const match = Object.entries(geometry.variants).find(([, assetId]) => assetId === geometry.vertices);
+  return match ? match[0] : null;
+}
+
 export function validateSceneManifest(manifest: SurfViewSceneManifest): SurfViewSceneManifest {
   if (!manifest || typeof manifest !== 'object') {
     throw new SceneManifestError('$', 'must be an object');
@@ -205,6 +264,9 @@ export function validateSceneManifest(manifest: SurfViewSceneManifest): SurfView
     throw new SceneManifestError('$.geometries', 'must contain at least one geometry');
   }
   const hemispheres = new Set<SceneHemisphere>();
+  // Variant names shared by every geometry: null before the first geometry,
+  // '' when geometries carry no variants.
+  let variantKey: string | null = null;
   for (const [geometryId, geometry] of geometryEntries) {
     if (geometry.id !== geometryId) {
       throw new SceneManifestError(`$.geometries.${geometryId}.id`, 'must match its object key');
@@ -247,6 +309,25 @@ export function validateSceneManifest(manifest: SurfViewSceneManifest): SurfView
         `$.geometries.${geometryId}.faces`,
         'must be uint32 with shape [faceCount, 3]'
       );
+    }
+    if (geometry.variants !== undefined) {
+      const names = validateGeometryVariants(manifest, geometryId, geometry);
+      const key = names.slice().sort().join('\u0000');
+      if (variantKey === null) {
+        variantKey = key;
+      } else if (variantKey !== key) {
+        throw new SceneManifestError(
+          `$.geometries.${geometryId}.variants`,
+          'must list the same variant names as every other geometry'
+        );
+      }
+    } else if (variantKey !== null && variantKey !== '') {
+      throw new SceneManifestError(
+        `$.geometries.${geometryId}.variants`,
+        'must be present when another geometry lists variants'
+      );
+    } else {
+      variantKey = '';
     }
     if (geometry.curvature) {
       const curvature = requireAsset(
@@ -298,7 +379,7 @@ export function validateSceneManifest(manifest: SurfViewSceneManifest): SurfView
       if (layer.boundary !== 'midpoint') {
         throw new SceneManifestError(`$.layers.${layerId}.boundary`, 'must be midpoint');
       }
-      for (const field of ['colorMap', 'limits', 'threshold', 'legend', 'units']) {
+      for (const field of ['colorMap', 'limits', 'threshold', 'magnitudeOpacity', 'legend', 'units']) {
         if (field in layer) throw new SceneManifestError(`$.layers.${layerId}.${field}`, 'not supported for references');
       }
       if (Object.keys(layer.values ?? {}).length !== geometryEntries.length) {
@@ -307,6 +388,16 @@ export function validateSceneManifest(manifest: SurfViewSceneManifest): SurfView
     } else {
       requireFinitePair(layer.limits, `$.layers.${layerId}.limits`);
       if (layer.threshold) requireFinitePair(layer.threshold, `$.layers.${layerId}.threshold`);
+      if (layer.magnitudeOpacity !== undefined) {
+        try {
+          normalizeMagnitudeOpacity(layer.magnitudeOpacity);
+        } catch (error) {
+          throw new SceneManifestError(
+            `$.layers.${layerId}.magnitudeOpacity`,
+            error instanceof Error ? error.message : String(error)
+          );
+        }
+      }
     }
     if (layer.opacity !== undefined &&
         (!Number.isFinite(layer.opacity) || layer.opacity < 0 || layer.opacity > 1)) {

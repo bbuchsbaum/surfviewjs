@@ -1,3 +1,9 @@
+import {
+  magnitudeOpacityAt,
+  normalizeMagnitudeOpacity
+} from './layers/magnitudeOpacity';
+import type { MagnitudeOpacity, ResolvedMagnitudeOpacity } from './layers/magnitudeOpacity';
+export type { MagnitudeOpacity } from './layers/magnitudeOpacity';
 import * as THREE from 'three';
 import { createVoxelSampler, createLineProjector, type VoxelSampler, type LineProjector } from './volumeProjectionCore';
 import ColorMap, { Color, ColorArray } from './ColorMap';
@@ -122,6 +128,8 @@ export interface LayerConfig {
 export interface DataLayerConfig extends LayerConfig {
   range?: [number, number];
   threshold?: [number, number];
+  /** Fade colours by |value| (see `MagnitudeOpacity`); null or absent keeps colormap alpha. */
+  magnitudeOpacity?: MagnitudeOpacity | null;
 }
 
 export interface VolumeProjectionLayerConfig extends DataLayerConfig {
@@ -239,6 +247,7 @@ export interface DataLayerUpdateData extends LayerUpdateData {
   colorMap?: ColorMap | string | Color[];
   range?: [number, number];
   threshold?: [number, number];
+  magnitudeOpacity?: MagnitudeOpacity | null;
 }
 
 export interface VolumeProjectionLayerUpdateData extends LayerUpdateData {
@@ -585,6 +594,7 @@ export class DataLayer extends Layer {
   private colorMapName: string | null = null;
   private range: [number, number];
   private threshold: [number, number];
+  private magnitudeOpacity: ResolvedMagnitudeOpacity | null;
   private _cachedRGBABuffer: Float32Array | null = null;
   private dataRevision = 0;
   private summaryDomainSize: number | null = null;
@@ -602,6 +612,7 @@ export class DataLayer extends Layer {
     super(id, config);
     this.range = finitePair(config.range ?? [0, 1], 'range');
     this.threshold = finitePair(config.threshold ?? [0, 0], 'threshold');
+    this.magnitudeOpacity = normalizeMagnitudeOpacity(config.magnitudeOpacity);
     
     // Initialize data
     this.setData(data, indices);
@@ -826,6 +837,23 @@ export class DataLayer extends Layer {
     return [...this.threshold] as [number, number];
   }
 
+  /** Fade colours by |value|; null restores the colormap's own alpha. */
+  setMagnitudeOpacity(spec: MagnitudeOpacity | null): void {
+    this.magnitudeOpacity = normalizeMagnitudeOpacity(spec);
+    this._notifyChange({ magnitudeOpacity: this.getMagnitudeOpacity() });
+  }
+
+  getMagnitudeOpacity(): MagnitudeOpacity | null {
+    return this.magnitudeOpacity ? { ...this.magnitudeOpacity } : null;
+  }
+
+  /** The opacity multiplier the magnitude fade gives `value` (1 without a fade). */
+  protected magnitudeAlpha(value: number): number {
+    return this.magnitudeOpacity
+      ? magnitudeOpacityAt(value, this.magnitudeOpacity, this.range, this.threshold)
+      : 1;
+  }
+
   /**
    * Per-vertex inputs for fragment-level threshold edges.
    *
@@ -865,7 +893,7 @@ export class DataLayer extends Layer {
       colors[offset] = color[0];
       colors[offset + 1] = color[1];
       colors[offset + 2] = color[2];
-      colors[offset + 3] = color[3] ?? 1;
+      colors[offset + 3] = (color[3] ?? 1) * this.magnitudeAlpha(value);
     }
     return true;
   }
@@ -912,7 +940,8 @@ export class DataLayer extends Layer {
       type: 'data',
       colorMapName: this.getColorMapName(),
       range: this.getRange(),
-      threshold: this.getThreshold()
+      threshold: this.getThreshold(),
+      ...(this.magnitudeOpacity ? { magnitudeOpacity: this.getMagnitudeOpacity() } : {})
     };
   }
 
@@ -957,7 +986,7 @@ export class DataLayer extends Layer {
         rgbaData[offset] = color[0];     // R
         rgbaData[offset + 1] = color[1]; // G
         rgbaData[offset + 2] = color[2]; // B
-        rgbaData[offset + 3] = color[3] ?? 1;
+        rgbaData[offset + 3] = (color[3] ?? 1) * this.magnitudeAlpha(value);
 
         // Track transparency for debugging
         if (collectDebugStats) {
@@ -986,9 +1015,10 @@ export class DataLayer extends Layer {
 
   update(updates: DataLayerUpdateData): void {
     assertLayerUpdateFields(updates, 'DataLayer', [
-      'data', 'indices', 'colorMap', 'range', 'threshold'
+      'data', 'indices', 'colorMap', 'range', 'threshold', 'magnitudeOpacity'
     ]);
     // Validate every numeric field before any requested mutation is applied.
+    if (updates.magnitudeOpacity !== undefined) normalizeMagnitudeOpacity(updates.magnitudeOpacity);
     if (updates.range !== undefined) finitePair(updates.range, 'range');
     if (updates.threshold !== undefined) finitePair(updates.threshold, 'threshold');
     if (updates.opacity !== undefined) validateOpacity(updates.opacity);
@@ -1006,6 +1036,9 @@ export class DataLayer extends Layer {
     }
     if (updates.threshold !== undefined) {
       this.setThreshold(updates.threshold);
+    }
+    if (updates.magnitudeOpacity !== undefined) {
+      this.setMagnitudeOpacity(updates.magnitudeOpacity);
     }
     if (updates.opacity !== undefined) {
       this.setOpacity(updates.opacity);

@@ -7,7 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2.0] - 2026-11-05
+
+### Added
+- Report scenes can ship alternative embeddings of the same meshes (for
+  example inflated, pial and white): a geometry's optional `variants` maps
+  variant names to vertices assets that share its topology, curvature and
+  data. Mount handles gain `getSurfaceVariants()`, `getSurfaceVariant()` and
+  `setSurfaceVariant(name)`; a named view is re-posed and refitted, and after
+  free rotation the reader's camera is kept. Runtimes without variant support
+  ignore the field (still `surfview.scene.v1`).
+- `DataLayer` `magnitudeOpacity` (`{ low, high, gamma, floor }`): colours fade
+  by |value| so weak effects recede over the anatomy; the fade follows live
+  threshold and range changes. Scene map layers carry it as
+  `magnitudeOpacity`. `magnitudeOpacityAt()` and
+  `normalizeMagnitudeOpacity()` are exported for consumers that draw keys or
+  static figures with the same rule.
+- `ReportSceneController.refreshGeometry()` and
+  `relayoutReportMeshesInPlace()` re-place report surfaces after an in-place
+  geometry change.
+- Surface geometry toolkit: parcel boundaries, geodesic tools, precise surface
+  anchors, area-aware statistics and smoothing, registered-sphere resampling
+  and volume-weighted ribbon integration; bounded streamed batches, prepared
+  workers and an optional binary32 projection profile.
+
 ### Fixed
+- Shared-worker isolation, terminal failure handling, annotation
+  refresh/upload/disposal and ill-conditioned triangle interpolation in the
+  geometry workers.
 - `exportPNG()` no longer draws a generic "Value" colour key when the viewer
   has no scalar layer to describe; presets with `figure.colorbar` now omit the
   key unless the caller passes `colorbar: true`, `colorbarRange` or

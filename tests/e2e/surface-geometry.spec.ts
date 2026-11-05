@@ -37,7 +37,9 @@ test('example ruler, live brush radius and both border styles produce visible re
   expect(Number(await area.getAttribute('data-partition-area'))).toBeGreaterThan(beforeArea);
   const canvas = page.locator('#viewer-slot canvas'), midpoint = await canvas.screenshot();
   await page.getByRole('radio', { name: 'Label-crossing edges', exact: true }).check();
-  await expect.poll(async () => (await canvas.screenshot()).equals(midpoint)).toBe(false);
+  // The border restyle redraws within ~0.5 s locally; software-GL CI runners
+  // can take several seconds, beyond the default 5 s poll.
+  await expect.poll(async () => (await canvas.screenshot()).equals(midpoint), { timeout: 20000 }).toBe(false);
   await expect(page.locator('#inspect-marks li')).toHaveCount(0);
   await page.locator('#surface-measure-clear').click();
   await expect(distance).toContainText('Choose two points'); await expect(area).toHaveText('—');

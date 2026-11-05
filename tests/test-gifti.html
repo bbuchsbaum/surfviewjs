@@ -181,14 +181,20 @@
     }
     
     // Show message
+    // One clear timer at a time: an earlier message's timer must not wipe a
+    // later message (this raced the e2e check on slow software-GL runners).
+    let messageTimer = null;
     function showMessage(message, type = 'info') {
       const messageEl = document.getElementById('message');
+      clearTimeout(messageTimer);
+      messageTimer = null;
       messageEl.className = type;
       messageEl.textContent = message;
       if (type !== 'error') {
-        setTimeout(() => {
+        messageTimer = setTimeout(() => {
           messageEl.textContent = '';
           messageEl.className = '';
+          messageTimer = null;
         }, 5000);
       }
     }

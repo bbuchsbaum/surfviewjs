@@ -57,7 +57,9 @@ try {
     '--pack-destination', fixtureRoot,
     '--cache', join(fixtureRoot, 'npm-cache')
   ]);
-  const [packResult] = JSON.parse(packOutput);
+  // npm <= 11 prints an array of results; npm >= 12 an object keyed by name.
+  const packed = JSON.parse(packOutput);
+  const packResult = Array.isArray(packed) ? packed[0] : Object.values(packed)[0];
   assert.ok(packResult?.filename, 'npm pack did not report an archive filename');
   const archivePath = join(fixtureRoot, packResult.filename);
   const packedPaths = new Set(packResult.files.map(file => file.path));
