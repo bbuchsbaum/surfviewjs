@@ -63,8 +63,12 @@ try {
     .filter(item => typeof item === 'object' && item.severity === 'high')
     .map(item => item.url)
     .sort();
+  // Reviewed 2026-11-05: VitePress pins its own Vite (docs dev server only,
+  // never shipped). GHSA-587h-7wmj-h5pm (launch-editor `fs.existsSync()`
+  // bypass, Windows dev server) is high and has no fix within VitePress's Vite
+  // range; the previously reviewed GHSA-fx2h-pf6j-xcff is now rated moderate.
   assert.deepEqual(highAdvisoryUrls, [
-    'https://github.com/advisories/GHSA-fx2h-pf6j-xcff'
+    'https://github.com/advisories/GHSA-587h-7wmj-h5pm'
   ]);
 
   const remaining = vulnerabilities

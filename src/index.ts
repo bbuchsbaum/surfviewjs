@@ -764,3 +764,4 @@ export type {
 } from './projectVolume';
 
 export { magnitudeOpacityAt, normalizeMagnitudeOpacity } from './layers/magnitudeOpacity';
+export type { ResolvedMagnitudeOpacity } from './layers/magnitudeOpacity';
