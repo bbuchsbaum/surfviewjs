@@ -1,0 +1,208 @@
+name: Release
+
+# Publishing a GitHub release is the ONLY way a version reaches npm.
+# Manual dispatch runs the identical build and release gate, then
+# `npm publish --dry-run`; it never publishes. See RELEASING.md.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Tag (e.g. v3.2.0) or branch to dry-run. Tags must match package.json.'
+        required: true
+        default: main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event.release.tag_name || inputs.ref }}
+  cancel-in-progress: false
+
+env:
+  # Tag name (release) or the requested ref (dry run); used for the version check.
+  REF: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.ref }}
+  # What to check out. For a release this is the commit the event was raised
+  # for, so a tag moved after publication cannot change what is built.
+  CHECKOUT_REF: ${{ github.event_name == 'release' && github.sha || inputs.ref }}
+  NPM_VERSION: 11.21.0 # trusted publishing needs npm >= 11.5.1
+
+jobs:
+  build:
+    name: Build and gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      dist_tag: ${{ steps.version.outputs.dist_tag }}
+      tarball: ${{ steps.pack.outputs.tarball }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 24
+          # No dependency cache in release builds (cache poisoning).
+          package-manager-cache: false
+
+      - name: Check tag, prerelease flag and dist-tag
+        id: version
+        shell: bash
+        env:
+          RELEASE_PRERELEASE: ${{ github.event.release.prerelease }}
+        run: |
+          fail() { echo "::error::$1"; exit 1; }
+          is_release() { [[ "$GITHUB_EVENT_NAME" == "release" ]]; }
+          version=$(node -p "require('./package.json').version")
+          name=$(node -p "require('./package.json').name")
+
+          if [[ "$REF" == v[0-9]* ]]; then
+            [[ "${REF#v}" == "$version" ]] || fail "Tag $REF does not match package.json version $version"
+          elif is_release; then
+            fail "Release tag '$REF' must look like v<version>"
+          else
+            echo "::warning::Dry run of non-tag ref '$REF' (package.json version $version)"
+          fi
+
+          # Prereleases (1.2.0-rc.1) go to the 'next' dist-tag, never 'latest',
+          # and the GitHub release's pre-release flag must agree.
+          if [[ "$version" == *-* ]]; then prerelease=true; dist_tag=next; else prerelease=false; dist_tag=latest; fi
+          if is_release && [[ "$RELEASE_PRERELEASE" != "$prerelease" ]]; then
+            fail "Version $version implies prerelease=$prerelease but the GitHub release has prerelease=$RELEASE_PRERELEASE. Delete the release and create it again with the matching pre-release setting; re-running this run reuses the original event and fails the same way."
+          fi
+
+          # Never move 'latest' backwards or onto an existing version.
+          if [[ "$dist_tag" == latest ]]; then
+            current=$(npm view "$name" dist-tags.latest 2>/dev/null || true)
+            if [[ -n "$current" ]]; then
+              order=$(node -e '
+                const [a, b] = process.argv.slice(1).map((v) => v.split("-")[0].split(".").map(Number));
+                for (let i = 0; i < 3; i++) if (a[i] !== b[i]) { console.log(a[i] > b[i] ? "newer" : "older"); process.exit(0); }
+                console.log("same");' "$version" "$current")
+              if [[ "$order" != newer ]]; then
+                msg="$name@$version is not newer than the current 'latest' ($current); publishing it would move 'latest' backwards or republish a version."
+                if is_release; then
+                  fail "$msg This workflow only publishes to 'latest' and 'next'. To release a backport, publish it manually under a different dist-tag (see RELEASING.md)."
+                fi
+                echo "::warning::$msg (dry run continues)"
+              fi
+            fi
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "dist_tag=$dist_tag" >> "$GITHUB_OUTPUT"
+          echo "Releasing $name@$version with dist-tag '$dist_tag'"
+
+      - run: npm ci
+
+      # The release gate runs here, explicitly, exactly once. `prepublishOnly`
+      # also runs verify:release, so every later npm pack/publish passes
+      # --ignore-scripts: the gate is a visible step in the log, and the bytes
+      # that were tested are the bytes that get packed and published.
+      - name: Release gate (verify:release)
+        run: npm run verify:release
+
+      - name: Pack
+        id: pack
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/pack"
+          tarball=$(npm pack --ignore-scripts --json --pack-destination "$RUNNER_TEMP/pack" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s)[0].filename))")
+          echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
+          sha256sum "$RUNNER_TEMP/pack/$tarball"
+
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: npm-tarball
+          path: ${{ runner.temp }}/pack/${{ steps.pack.outputs.tarball }}
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Publish dry run
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          TARBALL: ${{ steps.pack.outputs.tarball }}
+          DIST_TAG: ${{ steps.version.outputs.dist_tag }}
+        run: npm publish "$RUNNER_TEMP/pack/$TARBALL" --dry-run --ignore-scripts --access public --tag "$DIST_TAG"
+
+  publish:
+    name: Publish to npm
+    if: github.event_name == 'release'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Must match the environment configured for the Trusted Publisher on npmjs.com.
+    environment:
+      name: npm
+      url: https://www.npmjs.com/package/surfview/v/${{ needs.build.outputs.version }}
+    permissions:
+      contents: read
+      id-token: write # OIDC token for npm Trusted Publishing + provenance; no NPM_TOKEN
+    steps:
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Install npm with trusted-publishing support
+        shell: bash
+        run: |
+          npm install -g "npm@$NPM_VERSION"
+          [[ "$(npm --version)" == "$NPM_VERSION" ]] || { echo "::error::npm $(npm --version) is not $NPM_VERSION"; exit 1; }
+
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: npm-tarball
+          path: ${{ runner.temp }}/pack
+
+      # Publishes exactly the tarball the gate produced. --provenance is the
+      # default under trusted publishing; it is explicit so a misconfigured
+      # OIDC setup fails loudly instead of silently publishing without it.
+      - name: npm publish
+        env:
+          TARBALL: ${{ needs.build.outputs.tarball }}
+          DIST_TAG: ${{ needs.build.outputs.dist_tag }}
+        run: npm publish "$RUNNER_TEMP/pack/$TARBALL" --provenance --access public --ignore-scripts --tag "$DIST_TAG"
+
+  verify:
+    name: Verify published package
+    if: github.event_name == 'release'
+    needs: [build, publish]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: npm-tarball
+          path: ${{ runner.temp }}/pack
+
+      # Registry tarball vs. the tarball CI built from the tag: byte-identical
+      # (dist.integrity), same files, modes and per-file SHA-256, and an SLSA
+      # provenance attestation whose subject digest, repository and workflow
+      # match. Retries cover registry propagation delay right after publish.
+      - name: Compare registry tarball with CI build
+        env:
+          TARBALL: ${{ needs.build.outputs.tarball }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: >-
+          node scripts/verify-published.mjs "$VERSION"
+          --local-tarball "$RUNNER_TEMP/pack/$TARBALL"
+          --require-provenance
+          --expected-repo "https://github.com/$GITHUB_REPOSITORY"
+          --expected-workflow .github/workflows/release.yml
+          --retries 10 --retry-delay 30
