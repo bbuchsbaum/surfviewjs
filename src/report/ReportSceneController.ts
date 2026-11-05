@@ -214,6 +214,23 @@ export function layoutReportAnatomicalBrain(
     throw new RangeError('hemisphereGap must be a finite, non-negative number');
   }
   const axes = reportBrainViewAxes(view, oblique);
+  placeAnatomicalPair(targets, axesQuaternion(axes.direction, axes.up), hemisphereGap);
+  for (const target of targets) {
+    target.mesh.visible = axes.hide !== target.hemisphere;
+  }
+}
+
+/**
+ * Place a pair as one brain under a shared rotation: each hemisphere keeps its
+ * RAS placement, is pushed laterally to clear the midline by `hemisphereGap`,
+ * and the pair rotates rigidly about its common centre. Visibility is left to
+ * the caller.
+ */
+function placeAnatomicalPair(
+  targets: readonly ReportAnatomicalMesh[],
+  rotation: THREE.Quaternion,
+  hemisphereGap: number
+): void {
   const offsets = new Map<string, THREE.Vector3>();
   const combined = new THREE.Box3();
   for (const target of targets) {
@@ -231,14 +248,34 @@ export function layoutReportAnatomicalBrain(
     combined.union(box.clone().translate(offset));
   }
   const center = combined.getCenter(new THREE.Vector3());
-  const rotation = axesQuaternion(axes.direction, axes.up);
   for (const target of targets) {
     const offset = offsets.get(target.id)!;
     target.mesh.quaternion.copy(rotation);
     target.mesh.position.copy(offset.clone().sub(center).applyQuaternion(rotation));
-    target.mesh.visible = axes.hide !== target.hemisphere;
     target.mesh.updateMatrixWorld(true);
   }
+}
+
+/**
+ * Re-place report meshes whose vertex positions changed in place (for example
+ * an inflated/pial switch) without changing their orientation. Anatomical
+ * pairs keep their shared rotation; split meshes keep their own rotations and
+ * are re-centred side by side. Visibility is unchanged.
+ */
+export function relayoutReportMeshesInPlace(
+  targets: readonly ReportAnatomicalMesh[],
+  hemisphereGap: number,
+  anatomical: boolean
+): void {
+  if (!Number.isFinite(hemisphereGap) || hemisphereGap < 0) {
+    throw new RangeError('hemisphereGap must be a finite, non-negative number');
+  }
+  if (targets.length === 0) return;
+  if (anatomical) {
+    placeAnatomicalPair(targets, targets[0]!.mesh.quaternion.clone(), hemisphereGap);
+    return;
+  }
+  placeSplitMeshes(targets, hemisphereGap, targets.length > 1);
 }
 
 function normalizeFitInsets(insets: ReportFitInsets = {}): Required<ReportFitInsets> {
@@ -331,11 +368,22 @@ export function layoutReportAnatomicalMeshes(
   if (!Number.isFinite(hemisphereGap) || hemisphereGap < 0) {
     throw new RangeError('hemisphereGap must be a finite, non-negative number');
   }
+  for (const target of targets) {
+    target.mesh.visible = true;
+    target.mesh.quaternion.copy(viewQuaternion(target.hemisphere, view));
+  }
+  placeSplitMeshes(targets, hemisphereGap, paired);
+}
+
+/** Centre each mesh under its current rotation and, when paired, set them side by side. */
+function placeSplitMeshes(
+  targets: readonly ReportAnatomicalMesh[],
+  hemisphereGap: number,
+  paired: boolean
+): void {
   const dimensions = new Map<string, THREE.Vector3>();
   for (const target of targets) {
     target.mesh.position.set(0, 0, 0);
-    target.mesh.visible = true;
-    target.mesh.quaternion.copy(viewQuaternion(target.hemisphere, view));
     target.mesh.updateMatrixWorld(true);
     dimensions.set(
       target.id,
@@ -808,6 +856,37 @@ export class ReportSceneController {
     return target
       ? this.setAnatomicalView(this.initialView, target, { fit: true })
       : failure('unsupported', 'No coordinated report view target is available.');
+  }
+
+  /**
+   * Re-place the report surfaces after their vertex positions changed in place
+   * (for example a switch between inflated and pial embeddings). A named view
+   * is re-posed and refitted with its original angle; after free rotation the
+   * surfaces keep their orientation and the reader's camera is left alone.
+   */
+  refreshGeometry(): ControlCommandResult {
+    const unavailable = this.commandUnavailable();
+    if (unavailable) return unavailable;
+    if (this.currentBrainView) return this.setBrainView(this.currentBrainView, { fit: true });
+    if (this.currentView) {
+      return this.setAnatomicalView(this.currentView.view, this.currentView.target, { fit: true });
+    }
+    const targets = this.resolveViewSurfaces();
+    if ('ok' in targets) return targets;
+    return this.withMutationBoundary(() => {
+      this.changingView = true;
+      try {
+        relayoutReportMeshesInPlace(
+          targets.map(({ id, hemisphere, surface }) => ({ id, hemisphere, mesh: surface.mesh! })),
+          this.hemisphereGap,
+          this.layout === 'anatomical'
+        );
+        this.viewer.requestRender();
+      } finally {
+        this.changingView = false;
+      }
+      return SUCCESS;
+    });
   }
 
   resizeFit(): void {

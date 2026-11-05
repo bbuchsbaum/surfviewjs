@@ -19,6 +19,7 @@ import type {
 } from '../controls';
 import {
   loadSceneAsset,
+  sceneGeometryInitialVariant,
   validateSceneManifest
 } from '../scene';
 import type {
@@ -125,6 +126,18 @@ export interface SurfViewMountHandle {
   /** Update the canvas insets kept clear of the fitted brain, and refit. */
   setFitInsets(insets: ReportFitInsets): void;
   getAnatomicalViewCapabilities(): AnatomicalViewCapabilities;
+  /**
+   * Names of the alternative surface embeddings the scene ships (for example
+   * inflated, pial, white), in manifest order; empty without variants.
+   */
+  getSurfaceVariants(): readonly string[];
+  /** The embedding currently shown, or null when the scene has no variants. */
+  getSurfaceVariant(): string | null;
+  /**
+   * Show another embedding on every hemisphere. Data, threshold, curvature and
+   * the current view are kept; a named view is re-posed and refitted.
+   */
+  setSurfaceVariant(name: string): void;
   resize(width?: number, height?: number): void;
   exportPNG(options?: FigureExportOptions): string;
   dispose(): void;
@@ -185,7 +198,8 @@ export function createSceneDataLayer(
       opacity: manifest.opacity ?? 1,
       visible,
       presentation,
-      ...(manifest.threshold === undefined ? {} : { threshold: manifest.threshold })
+      ...(manifest.threshold === undefined ? {} : { threshold: manifest.threshold }),
+      ...(manifest.magnitudeOpacity === undefined ? {} : { magnitudeOpacity: manifest.magnitudeOpacity })
     }
   );
 }
@@ -216,6 +230,10 @@ class SceneMount implements SurfViewMountHandle {
   private selectedView: AnatomicalView;
   private selectedBrainView: ReportBrainView | null = null;
   private viewGroup: BilateralSurfaceGroup | null = null;
+  private readonly variantNames: readonly string[];
+  private selectedVariant: string | null;
+  /** Per surface id: variant name -> owned copy of its vertex positions. */
+  private readonly variantPositions = new Map<string, Map<string, Float32Array>>();
   private resolveReady!: () => void;
   private rejectReady!: (error: Error) => void;
 
@@ -243,6 +261,9 @@ class SceneMount implements SurfViewMountHandle {
       Object.values(manifest.layers).find(layer => layer.role !== 'reference' && layer.visible)?.id ??
       Object.values(manifest.layers).find(layer => layer.role !== 'reference')?.id ?? '';
     this.selectedView = this.options.initialView;
+    const firstGeometry = Object.values(manifest.geometries)[0];
+    this.variantNames = Object.freeze(Object.keys(firstGeometry?.variants ?? {}));
+    this.selectedVariant = firstGeometry ? sceneGeometryInitialVariant(firstGeometry) : null;
 
     this.ready = new Promise<void>((resolve, reject) => {
       this.resolveReady = resolve;
@@ -397,6 +418,47 @@ class SceneMount implements SurfViewMountHandle {
     });
   }
 
+  getSurfaceVariants(): readonly string[] {
+    return this.variantNames;
+  }
+
+  getSurfaceVariant(): string | null {
+    return this.selectedVariant;
+  }
+
+  setSurfaceVariant(name: string): void {
+    if (!this.variantNames.includes(name)) {
+      throw new Error(`Unknown surface variant: ${name}`);
+    }
+    if (name === this.selectedVariant) return;
+    this.selectedVariant = name;
+    if (!this.mounted) return;
+    this.applySurfaceVariant(name);
+    if (this.reportController) {
+      const result = this.reportController.refreshGeometry();
+      if (!result.ok) throw new Error(result.message);
+    }
+    this.currentViewer?.requestRender();
+  }
+
+  /** Swap every surface's vertex positions to `name`, as VariantSurface does. */
+  private applySurfaceVariant(name: string): void {
+    for (const { id, surface } of this.surfaces) {
+      const target = this.variantPositions.get(id)?.get(name);
+      const geometry = surface.mesh?.geometry;
+      const position = geometry?.getAttribute('position');
+      if (!target || !geometry || !position) continue;
+      (position.array as Float32Array).set(target);
+      position.needsUpdate = true;
+      geometry.computeVertexNormals();
+      geometry.computeBoundingBox();
+      geometry.computeBoundingSphere();
+      surface.geometry.vertices.set(target);
+      surface.geometry.invalidateBounds?.();
+      surface.emit('geometry:updated', { surface });
+    }
+  }
+
   resize(width?: number, height?: number): void {
     const measured = this.container.getBoundingClientRect();
     const nextWidth = finiteSize(width, finiteSize(measured.width, this.options.width ?? 640));
@@ -482,6 +544,12 @@ class SceneMount implements SurfViewMountHandle {
       this.reportTarget = createReportSceneControlTarget(this.reportController);
       this.mounted = true;
       this.status.remove();
+      // A variant chosen before mounting is applied before the first pose.
+      const initialVariant = Object.values(this.manifest.geometries)[0];
+      if (this.selectedVariant && initialVariant &&
+          this.selectedVariant !== sceneGeometryInitialVariant(initialVariant)) {
+        this.applySurfaceVariant(this.selectedVariant);
+      }
 
       this.selectLayer(this.selectedLayer);
       if (this.options.layout === 'anatomical') {
@@ -547,6 +615,14 @@ class SceneMount implements SurfViewMountHandle {
             `Geometry ${geometryManifest.id} face index ${faces[index]} exceeds vertex count`
           );
         }
+      }
+      if (geometryManifest.variants) {
+        // Own every embedding: the displayed geometry is rewritten in place.
+        const positions = new Map<string, Float32Array>();
+        for (const [name, assetId] of Object.entries(geometryManifest.variants)) {
+          positions.set(name, new Float32Array(this.requireFloat32(assets, assetId)));
+        }
+        this.variantPositions.set(geometryManifest.id, positions);
       }
       const geometry = new SurfaceGeometry(
         vertices,
