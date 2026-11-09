@@ -86,4 +86,35 @@ export class SurfaceSet {
   getCurv(name: string): Float32Array | null {
     return this.curv[name] || null;
   }
+
+  /**
+   * Add or replace an embedding after construction (a geometry loaded or
+   * computed later). The positions are copied and must match the set's
+   * vertex count; curvature of another length is ignored, as in the
+   * constructor.
+   */
+  addVariant(name: string, positions: Float32Array | number[], curv?: Float32Array | number[]): void {
+    if (!name) throw new Error('SurfaceSet: variant name must be non-empty');
+    const arr = new Float32Array(positions);
+    if (arr.length !== this.vertexCount * 3) {
+      throw new Error(`SurfaceSet: variant "${name}" vertex count ${arr.length / 3} does not match default ${this.vertexCount}`);
+    }
+    this.variants[name] = arr;
+    if (curv) {
+      const values = new Float32Array(curv);
+      if (values.length === this.vertexCount) this.curv[name] = values;
+      else debugLog('SurfaceSet: ignoring curv for', name, '; expected', this.vertexCount, 'values, got', values.length);
+    }
+  }
+
+  /**
+   * Remove an embedding. The default variant cannot be removed (it defines
+   * the set); returns false for it and for unknown names.
+   */
+  removeVariant(name: string): boolean {
+    if (name === this.defaultVariant || !(name in this.variants)) return false;
+    delete this.variants[name];
+    delete this.curv[name];
+    return true;
+  }
 }

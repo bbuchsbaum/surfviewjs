@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `SurfaceSet.addVariant(name, positions, curv?)` / `removeVariant(name)` and
+  the same on `VariantSurface`: embeddings can be added (a geometry loaded or
+  computed later) or removed after construction. Replacing the shown variant
+  redraws it; the default, shown and pending variants cannot be removed.
+- `VariantSurface.targetVariant()` and `isAnimating()`, and a per-frame
+  `variant:animating` event (`progress` time fraction, `weight` eased shape
+  fraction) so hosts can follow a switch, e.g. to keep the camera framed.
+
+### Fixed
+- `VariantSurface.setVariant()` during a running switch back to the variant
+  it started from was ignored (the name changed only when a switch ended),
+  leaving the mesh on its way to the other shape.
+- Normals now follow an animated variant switch (interpolated per frame,
+  recomputed exactly at the end) instead of keeping the starting shape's
+  shading until it ends.
+- Bounds cover both shapes during a switch and are recomputed after it, so
+  frustum culling and raycasting see an inflated (larger) shape.
+
 ## [3.2.0] - 2026-11-05
 
 ### Added

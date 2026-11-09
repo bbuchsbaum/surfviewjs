@@ -25,6 +25,12 @@ export interface SurfaceEventMap {
   'geometry:updated': { surface: NeuroSurface };
   'geometry:smoothed': { surface: NeuroSurface; iterations: number; lambda: number; method: string };
   'variant:changed': { surface: NeuroSurface; variant: string };
+  /**
+   * Each frame of an animated variant switch: `progress` is the time fraction
+   * in [0, 1] (as `morph:animating`), `weight` the eased shape fraction (0 =
+   * the shape the switch started from, 1 = `variant`).
+   */
+  'variant:animating': { surface: NeuroSurface; variant: string; progress: number; weight: number };
   'material:updated': { surface: NeuroSurface };
   'morph:changed': { surface: NeuroSurface; target?: string; weight?: number; weights?: Record<string, number> };
   'morph:animating': { surface: NeuroSurface; progress: number };
