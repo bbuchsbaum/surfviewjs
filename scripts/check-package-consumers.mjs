@@ -13,7 +13,7 @@ const packageJson = JSON.parse(await readFile(
 ));
 assert.deepEqual(
   Object.keys(packageJson.exports).sort(),
-  ['.', './controls', './controls/react', './geometry-worker', './react', './report'],
+  ['.', './controls', './controls/react', './flatmap', './geometry-worker', './react', './report'],
   'Every advertised package export must have an explicit packed-consumer case'
 );
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
@@ -79,6 +79,8 @@ try {
     'dist/surfview.controls.react.es.js',
     'dist/surfview.report.es.js',
     'dist/surfview.geometry.worker.js',
+    'dist/surfview.flatmap.es.js',
+    'dist/types/index.flatmap.d.ts',
     'dist/types/geometry/geometryWorker.d.ts',
     'dist/types/index.d.ts'
   ]) {
@@ -191,6 +193,27 @@ assert.equal(typeof NeuroSurfaceViewer, 'function');
   run(process.execPath, ['core-only.cjs'], { cwd: coreOnlyRoot });
   run(process.execPath, ['core-only.mjs'], { cwd: coreOnlyRoot });
 
+  await writeFile(join(coreOnlyRoot, 'flatmap.mjs'), `
+import assert from 'node:assert/strict';
+import { SurfaceDomain, SurfaceMetric, ColorMap, getDisplayGeometryBinding, triangleLocation } from 'surfview';
+import { FlatMapChart, FlatMapFrame, FlatMapSampler, FlatMapField, FlatMapSurfaceBinding, buildSurfaceRelief } from 'surfview/flatmap';
+const domain = new SurfaceDomain({id:'packed-flatmap',structure:'left',vertexCount:3,faces:[0,1,2]});
+const white = new SurfaceMetric(domain,{positions:[0,0,0,1,0,0,0,1,0],frame:'test',units:'mm'});
+const pial = new SurfaceMetric(domain,{positions:[0,0,2,1,0,2,0,1,2],frame:'test',units:'mm'});
+const chart = new FlatMapChart({domain,coordinates:[0,0,1,0,0,1],faces:[0,1,2],anatomicalVertices:[0,1,2],anatomicalFaces:[0],units:'mm'});
+const sampler = new FlatMapSampler({kind:'vertex-scalar',domain}), frame = new FlatMapFrame([0,1,2]);
+assert.ok(Math.abs(sampler.inspect(triangleLocation(domain,0,[.5,.2,.3]),frame).value-.8)<1e-12);
+const relief = buildSurfaceRelief(chart,white,pial);
+assert.deepEqual([...relief.copyRawHeightMm()],[2,2,2]);
+const field = new FlatMapField({colorMap:ColorMap.fromPreset('viridis')});
+const surface = new FlatMapSurfaceBinding(chart,pial,field,{relief});
+assert.equal(getDisplayGeometryBinding(surface.mesh).domain,domain);
+surface.setDeformation(1,3);assert.equal(surface.display.position(0)[2],6);
+surface.dispose();field.dispose();
+process.stdout.write('Optional flatmap entry shares core identity and executes numeric kernels\\n');
+`);
+  run(process.execPath, ['flatmap.mjs'], { cwd: coreOnlyRoot });
+
   // The worker subpath is an artifact URL, not a module to execute on the UI/main thread.
   await writeFile(join(coreOnlyRoot, 'geometry-worker.mjs'), `
 import assert from 'node:assert/strict';
@@ -283,15 +306,17 @@ process.stdout.write('ESM and optional-subpath consumers passed\\n');
 `);
   run(process.execPath, ['consumer.mjs'], { cwd: consumerRoot });
 
-  const [quickstartExample, statisticsExample, geometryExample] = await Promise.all([
+  const [quickstartExample, statisticsExample, flatmapExample, geometryExample] = await Promise.all([
     readFile(join(projectRoot, 'examples/quickstart.ts'), 'utf8'),
     readFile(join(projectRoot, 'examples/statistical-equivalence.js'), 'utf8'),
+    readFile(join(projectRoot, 'examples/quantitative-flatmap.ts'), 'utf8'),
     readFile(join(projectRoot, 'examples/surface-geometry.ts'), 'utf8')
   ]);
   await Promise.all([
     writeFile(join(consumerRoot, 'quickstart.ts'), quickstartExample),
     writeFile(join(consumerRoot, 'statistical-equivalence.js'), statisticsExample),
-    writeFile(join(consumerRoot, 'surface-geometry.ts'), geometryExample)
+    writeFile(join(consumerRoot, 'surface-geometry.ts'), geometryExample),
+    writeFile(join(consumerRoot, 'quantitative-flatmap.ts'), flatmapExample)
   ]);
   run(process.execPath, ['statistical-equivalence.js'], { cwd: consumerRoot });
   run(process.execPath, ['surface-geometry.ts'], { cwd: consumerRoot });
@@ -337,7 +362,7 @@ tToZ('2', 10);
       skipLibCheck: false,
       lib: ['ES2020', 'DOM', 'DOM.Iterable']
     },
-    include: ['consumer.tsx', 'quickstart.ts', 'surface-geometry.ts']
+    include: ['consumer.tsx', 'quickstart.ts', 'surface-geometry.ts', 'quantitative-flatmap.ts']
   }, null, 2));
   run(process.execPath, [
     join(projectRoot, 'node_modules/typescript/bin/tsc'),

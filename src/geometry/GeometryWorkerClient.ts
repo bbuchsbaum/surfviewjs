@@ -1,11 +1,15 @@
 import { GeometryError, checkBudget } from './GeometryError';
 import type { GeometryJobOptions } from './GeometryExecutor';
-import type { GeometryWorkerCommand, GeometryWorkerResponse } from './geometryWorkerProtocol';
+import type { FlatMapWorkerCommand, FlatMapWorkerResults, GeometryWorkerDiagnostics, GeometryWorkerCommand, GeometryWorkerResponse } from './geometryWorkerProtocol';
 import type { SurfaceDomain, SurfaceMetric } from './SurfaceDomain';
 import type { SurfaceSmoothingOptions, SurfaceSmoothingBatchOptions } from './SurfaceSmoothing';
 import type { ApplySurfaceOptions, SurfaceComputationResult } from './SparsePlan';
 import type { RibbonIntegrationResult } from './RibbonIntegration';
 import type { GeodesicOptions, GeodesicNeighborhood } from './GeodesicIndex';
+import type { SurfaceReliefOptions } from '../relief/SurfaceRelief';
+import type { FlatMapChart } from '../flatmap/FlatMapChart';
+import type { FlatMapFrame, FlatMapMissingPolicy, FlatMapSamples } from '../flatmap/FlatMapSamplingPlan';
+import type { FlatMapRasterGrid, FlatMapTile } from '../flatmap/FlatMapRasterPlan';
 
 export type GeometryWorker = Pick<Worker, 'postMessage' | 'addEventListener' | 'removeEventListener' | 'terminate'>;
 interface Pending { resolve(value: unknown): void; reject(error: unknown): void; options: GeometryJobOptions; cleanup(): void }
@@ -92,9 +96,46 @@ export class GeometryWorkerClient {
       catch (error) { this.awaiting.delete(id); this.pending.delete(id); cleanup(); reject(error); }
     });
   }
+  /** Shared-worker totals, including resources retained by other clients. */
+  diagnostics(): Promise<GeometryWorkerDiagnostics> { return this.request({ type: 'diagnostics' }); }
   async registerDomain(domain: SurfaceDomain, options?: GeometryJobOptions): Promise<string> {
     const handle = await this.request<string>({ type: 'domain', options: { id: domain.id, structure: domain.structure, vertexCount: domain.vertexCount, faces: domain.copyFaces() } }, options);
     this.domains.set(handle, domain); return handle;
+  }
+  private flatMapRequest<C extends FlatMapWorkerCommand>(command: C, job?: GeometryJobOptions): Promise<FlatMapWorkerResults[C['type']]> {
+    return this.request(command, job);
+  }
+  registerFlatMapSampler(domain: string, volume?: Extract<FlatMapWorkerCommand, { type: 'flatmap-sampler' }>['volume'], job?: GeometryJobOptions): Promise<string> {
+    return this.flatMapRequest({ type: 'flatmap-sampler', domain, ...(volume ? { volume } : {}) }, job);
+  }
+  registerFlatMapChart(domain: string, chart: FlatMapChart, job?: GeometryJobOptions): Promise<string> {
+    if (this.domains.get(domain) !== chart.domain) return Promise.reject(new GeometryError('invalid-domain', 'Chart does not belong to registered domain'));
+    return this.flatMapRequest({ type: 'flatmap-chart', domain, options: { coordinates: chart.copyCoordinates(), faces: chart.copyFaces(),
+      anatomicalVertices: chart.copyAnatomicalVertices(), anatomicalFaces: chart.copyAnatomicalFaces(), units: chart.units,
+      ...(chart.mmPerUnit === undefined ? {} : { mmPerUnit: chart.mmPerUnit }) } }, job);
+  }
+  /** One preparation job; temporary registration handles are released even on cancellation. */
+  async computeSurfaceRelief(chart: FlatMapChart, white: SurfaceMetric, pial: SurfaceMetric, options: SurfaceReliefOptions = {}, job: GeometryJobOptions = {}): Promise<FlatMapWorkerResults['flatmap-relief']> {
+    if (white.domain !== chart.domain || pial.domain !== chart.domain) throw new GeometryError('invalid-domain', 'Relief metrics differ from chart');
+    const handles: string[] = [];
+    const keep = (handle: string) => { handles.push(handle); return handle; };
+    try {
+      const domain = keep(await this.registerDomain(chart.domain, job));
+      const chartHandle = keep(await this.registerFlatMapChart(domain, chart, job));
+      const w = keep(await this.registerMetric(domain, white, job)), p = keep(await this.registerMetric(domain, pial, job));
+      const result = await this.flatMapRequest({ type: 'flatmap-relief', chart: chartHandle, white: w, pial: p, options }, job);
+      return result;
+    } finally { for (const handle of handles.reverse()) await this.release(handle).catch(() => {}); }
+  }
+  registerFlatMapFrame(frame: FlatMapFrame, job?: GeometryJobOptions): Promise<string> {
+    const validity = frame.copyValidity();
+    return this.flatMapRequest({ type: 'flatmap-frame', values: frame.copyValues(), ...(validity ? { validity } : {}) }, job);
+  }
+  prepareFlatMapTile(chart: string, sampler: string, grid: FlatMapRasterGrid, tile: FlatMapTile, job?: GeometryJobOptions): Promise<string> {
+    return this.flatMapRequest({ type: 'flatmap-prepare', chart, sampler, grid, tile }, job);
+  }
+  applyFlatMapTile(plan: string, frame: string, options: FlatMapMissingPolicy = {}, job?: GeometryJobOptions): Promise<FlatMapSamples> {
+    return this.flatMapRequest({ type: 'flatmap-apply', plan, frame, options }, job);
   }
   registerMetric(domain: string, metric: SurfaceMetric, options?: GeometryJobOptions): Promise<string> {
     if (this.domains.get(domain) !== metric.domain) return Promise.reject(new GeometryError('invalid-domain', 'Metric does not belong to the registered domain handle'));

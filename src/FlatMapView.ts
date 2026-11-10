@@ -10,6 +10,15 @@ import {
 } from './roi';
 import { finiteNumber } from './utils/validation';
 
+/** Optional quantitative provider. Construct one from surfview/flatmap to attach it. */
+export interface QuantitativeFlatMapAttachment {
+  paint(context: CanvasRenderingContext2D): void;
+  paintSelection(context: CanvasRenderingContext2D, color: string, radius: number): void;
+  pickVertex(x: number, y: number): number | null;
+  selectAt(x: number, y: number): void;
+  dispose(): void;
+}
+
 export interface FlatMapGeometryInput {
   vertices: Float32Array | number[];
   faces?: Uint32Array | number[];
@@ -146,6 +155,8 @@ export class FlatMapView extends EventEmitter<FlatMapEventMap> {
   private handleClick: (event: MouseEvent) => void;
   private handleDoubleClick: (event: MouseEvent) => void;
 
+  private quantitative: QuantitativeFlatMapAttachment | undefined;
+
   constructor(container: HTMLElement, geometry: FlatMapGeometryInput, options: FlatMapViewOptions = {}) {
     super();
     const normalized = normalizedGeometry(geometry);
@@ -234,6 +245,7 @@ export class FlatMapView extends EventEmitter<FlatMapEventMap> {
       }
       if (this.drawingOptions?.mode === 'lasso') return;
       const vertexIndex = this.pickVertexAt(point.x, point.y);
+      this.quantitative?.selectAt(point.x, point.y);
       this.setSelection(vertexIndex, { emit: true });
       const mapPoint = vertexIndex === null ? null : this.projectVertex(vertexIndex);
       this.emit('vertex:click', {
@@ -463,6 +475,7 @@ export class FlatMapView extends EventEmitter<FlatMapEventMap> {
     const nextX = finiteNumber(x, 'x');
     const nextY = finiteNumber(y, 'y');
     const nextMaxDistance = finiteNumber(maxDistance, 'maxDistance', { minimum: 0 });
+    if (this.quantitative) return this.quantitative.pickVertex(nextX, nextY);
     let bestIndex: number | null = null;
     let bestDistance = nextMaxDistance * nextMaxDistance;
     for (let i = 0; i < this.vertices.length / 3; i++) {
@@ -482,6 +495,10 @@ export class FlatMapView extends EventEmitter<FlatMapEventMap> {
     const nextVertexIndex = this.validateVertexIndex(vertexIndex, 'vertexIndex')!;
     const x = this.vertices[nextVertexIndex * 3]!;
     const y = this.vertices[nextVertexIndex * 3 + 1]!;
+    return this.projectPoint(x, y);
+  }
+
+  projectPoint(x: number, y: number): { x: number; y: number } {
     const width = this.canvas.width;
     const height = this.canvas.height;
     const padding = this.options.padding;
@@ -501,6 +518,21 @@ export class FlatMapView extends EventEmitter<FlatMapEventMap> {
     };
   }
 
+  unprojectPoint(x: number, y: number): { x: number; y: number } {
+    const a = this.projectPoint(0, 0), b = this.projectPoint(1, 1);
+    return { x: (x - a.x) / (b.x - a.x), y: (y - a.y) / (b.y - a.y) };
+  }
+
+  attachQuantitative(attachment: QuantitativeFlatMapAttachment): void {
+    if (this.quantitative === attachment) return;
+    this.quantitative?.dispose();
+    this.quantitative = attachment;
+  }
+  /** Called by the borrowed attachment on detach. */
+  detachQuantitative(attachment: QuantitativeFlatMapAttachment): void {
+    if (this.quantitative === attachment) { this.quantitative = undefined; this.requestRender(); }
+  }
+
   render(): void {
     const ctx = this.ctx;
     if (!ctx) return;
@@ -512,7 +544,8 @@ export class FlatMapView extends EventEmitter<FlatMapEventMap> {
     ctx.strokeStyle = this.options.strokeStyle;
     ctx.lineWidth = 1;
 
-    for (let i = 0; i < this.faces.length; i += 3) {
+    if (this.quantitative) this.quantitative.paint(ctx);
+    else for (let i = 0; i < this.faces.length; i += 3) {
       // Geometry normalization validates complete in-range triangles.
       const a = this.projectVertex(this.faces[i]!);
       const b = this.projectVertex(this.faces[i + 1]!);
@@ -529,10 +562,12 @@ export class FlatMapView extends EventEmitter<FlatMapEventMap> {
     this.drawROIs();
     this.drawDraftROI();
     this.drawVertex(this.hoverVertexIndex, this.options.hoverStyle, this.options.pointRadius);
-    this.drawVertex(this.selectedVertexIndex, this.options.selectionStyle, this.options.pointRadius + 1);
+    if (this.quantitative) this.quantitative.paintSelection(ctx, this.options.selectionStyle, this.options.pointRadius + 1);
+    else this.drawVertex(this.selectedVertexIndex, this.options.selectionStyle, this.options.pointRadius + 1);
   }
 
   dispose(): void {
+    this.quantitative?.dispose();
     this.canvas.removeEventListener('mousedown', this.handleMouseDown);
     this.canvas.removeEventListener('mousemove', this.handleMouseMove);
     this.canvas.removeEventListener('mouseup', this.handleMouseUp);

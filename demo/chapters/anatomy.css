@@ -17,13 +17,13 @@
 
 #app[data-scenario='anatomy'] .anat-viewer {
   position: absolute;
-  inset: 0;
+  inset: 0 0 120px;
 }
 
 /* FlatMapView keeps the map's aspect ratio, so the sheet simply fills the cell. */
 #app[data-scenario='anatomy'] .anat-flat-sheet {
   position: absolute;
-  inset: 36px;
+  inset: 36px 36px 120px;
 }
 
 #app[data-scenario='anatomy'] .anat-flat-sheet canvas {
@@ -37,7 +37,7 @@
 
 #app[data-scenario='anatomy'] .anat-cell-label {
   position: absolute;
-  bottom: 12px;
+  bottom: 64px;
   left: 50%;
   transform: translateX(-50%);
   color: var(--ink-lo);
@@ -90,6 +90,34 @@
   }
 
   #app[data-scenario='anatomy'] .anat-flat-sheet {
-    inset: 20px;
+    inset: 12px 20px 110px;
+  }
+
+  #app[data-scenario='anatomy'] .anat-cell:first-child .anat-viewer {
+    inset: 64px 0 32px;
+  }
+
+  #app[data-scenario='anatomy'] .anat-cell:first-child .anat-cell-label {
+    bottom: 12px;
+  }
+
+  #app[data-scenario='anatomy'] .anat-cell:last-child .anat-viewer {
+    bottom: 110px;
+  }
+
+  #app[data-scenario='anatomy'] .anat-cell-label {
+    font-size: 10.5px;
+    letter-spacing: 0.05em;
   }
 }
+
+#app[data-scenario='anatomy'] .anat-viewer[hidden],
+#app[data-scenario='anatomy'] .anat-flat-sheet[hidden] { display: none; }
+#app[data-scenario='anatomy'] .anat-quant-legend {
+  position: absolute; left: 18%; right: 18%; bottom: 86px; display: grid; gap: 4px;
+  font: 10px var(--font-data); text-align: center; color: var(--ink-lo); pointer-events: none;
+}
+#app[data-scenario='anatomy'] .anat-quant-bar { height: 6px; border-radius: 1px; }
+#app[data-scenario='anatomy'] .anat-pair[data-pending='true'] .anat-cell-label::after { content: ' · preparing'; }
+#app[data-scenario='anatomy'] #qf-vertex { width: 100%; box-sizing: border-box; margin: 6px 0; }
+#app[data-scenario='anatomy'] details > summary { cursor: pointer; margin-block: 12px; }

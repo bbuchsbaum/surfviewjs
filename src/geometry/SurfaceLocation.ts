@@ -6,7 +6,8 @@ export type SurfaceLocation = Readonly<{ domain: SurfaceDomain; kind: 'vertex'; 
 
 export interface SurfacePositionBinding {
   readonly domain: SurfaceDomain;
-  position(vertex: number, out?: Float64Array): Float64Array;
+  incidentFaces?(vertex: number): readonly number[];
+  position(vertex: number, out?: Float64Array, face?: number): Float64Array;
 }
 export interface SurfaceAnchor {
   readonly location: SurfaceLocation;
@@ -38,7 +39,7 @@ export function evaluateSurfaceLocation(location: SurfaceLocation, binding: Surf
   const ids = location.domain.triangle(location.face);
   out.fill(0); const p = new Float64Array(3);
   for (let j = 0; j < 3; j++) {
-    binding.position(ids[j]!, p);
+    binding.position(ids[j]!, p, location.face);
     for (let axis = 0; axis < 3; axis++) out[axis]! += location.weights[j]! * p[axis]!;
   }
   return out;
@@ -54,11 +55,11 @@ export function evaluateSurfaceAnchor(anchor: SurfaceAnchor, binding: SurfacePos
     throw new GeometryError('frame-mismatch', 'Metric offsets require a SurfaceMetric');
   }
   const location = anchor.location;
-  const faces = location.kind === 'triangle' ? [location.face] : location.domain.topology.incidentFaces(location.vertex);
+  const faces = location.kind === 'triangle' ? [location.face] : binding.incidentFaces?.(location.vertex) ?? location.domain.topology.incidentFaces(location.vertex);
   const normal = [0, 0, 0];
   for (const face of faces) {
     const ids = location.domain.triangle(face);
-    const a = binding.position(ids[0]), b = binding.position(ids[1]), c = binding.position(ids[2]);
+    const a = binding.position(ids[0], undefined, face), b = binding.position(ids[1], undefined, face), c = binding.position(ids[2], undefined, face);
     const ux = b[0]! - a[0]!, uy = b[1]! - a[1]!, uz = b[2]! - a[2]!;
     const vx = c[0]! - a[0]!, vy = c[1]! - a[1]!, vz = c[2]! - a[2]!;
     normal[0]! += uy * vz - uz * vy; normal[1]! += uz * vx - ux * vz; normal[2]! += ux * vy - uy * vx;
@@ -140,10 +141,10 @@ export function evaluateSurfaceStrokePoint(location: SurfaceLocation, binding: S
   checkFinite(offset, 'offset');
   if (!offset) return point;
   const support = location.kind === 'vertex' ? [location.vertex] : location.domain.triangle(location.face).filter((_, i) => location.weights[i]! > 1e-12);
-  const faces = [...location.domain.topology.incidentFaces(support[0]!)].filter(face => support.every(v => location.domain.triangle(face).includes(v)));
+  const faces = [...(binding.incidentFaces?.(support[0]!) ?? location.domain.topology.incidentFaces(support[0]!))].filter(face => support.every(v => location.domain.triangle(face).includes(v)));
   const normals: number[][] = [];
   for (const face of faces) {
-    const ids = location.domain.triangle(face), a = binding.position(ids[0]), b = binding.position(ids[1]), c = binding.position(ids[2]);
+    const ids = location.domain.triangle(face), a = binding.position(ids[0], undefined, face), b = binding.position(ids[1], undefined, face), c = binding.position(ids[2], undefined, face);
     const u = b.map((x, i) => x - a[i]!), v = c.map((x, i) => x - a[i]!);
     const n = [u[1]! * v[2]! - u[2]! * v[1]!, u[2]! * v[0]! - u[0]! * v[2]!, u[0]! * v[1]! - u[1]! * v[0]!], length = Math.hypot(...n);
     if (length > 0) normals.push(n.map(x => x / length));

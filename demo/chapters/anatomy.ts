@@ -1,3 +1,4 @@
+import { quantitativeFlatmapMode } from '../kit/quantitative-flatmap';
 import { addSurfaceMeasurements } from '../kit/surface-geometry';
 import {
   DataLayer,
@@ -13,7 +14,8 @@ import {
   roiToSVG
 } from '@src/index.js';
 import type { AnatomicalView, NeuroSurfaceViewer, SurfaceGeometry, VertexHoverEvent, VertexROI } from '@src/index.js';
-import excerpt from '../excerpts/anatomy.ts?raw';
+import anatomyExcerpt from '../excerpts/anatomy.ts?raw';
+import flatmapExcerpt from '../../examples/quantitative-flatmap.ts?raw';
 import { inflateMesh, projectFlat } from '../kit/anatomy-geometry';
 import { action, actions, choice, fmt, note, readout, section, select, slider, toggle } from '../kit/controls';
 import { CURVATURE_UNDERLAY, DEPTH_UNDERLAY, curvatureOf, loadBilateral, loadMesh, sulcalDepthOf } from '../kit/data';
@@ -22,6 +24,8 @@ import { createFilmViewer } from '../kit/film';
 import type { FilmOverlay } from '../kit/film';
 import type { Scenario, ScenarioRunContext } from '../types';
 import './anatomy.css';
+
+const excerpt = `${anatomyExcerpt}\n\n${flatmapExcerpt}`;
 
 type Mode = 'views' | 'clip' | 'morph' | 'flatmap';
 type SurfaceId = 'lh' | 'rh';
@@ -489,288 +493,12 @@ async function morphMode({ ctx, film, panel, isCurrent }: ModeContext): Promise<
 
 // ───────────────────────────── Flat map ─────────────────────────────
 
-async function flatmapMode({ ctx, film, panel, isCurrent }: ModeContext): Promise<ModeCleanup | null> {
-  const [pial, depth] = await Promise.all([loadMesh('fsaverage5Left'), sulcalDepthOf('fsaverage5Left')]);
-  if (!isCurrent()) return null;
-  ctx.setBusy(true, 'Inflating and projecting the left hemisphere');
-  await new Promise(resolve => requestAnimationFrame(resolve));
-  if (!isCurrent()) return null;
-  const vertexCount = pial.vertices.length / 3;
-  const inflatedPositions = inflated('fsaverage5Left', pial, INFLATE_ITERATIONS);
-  const flat = projectFlat(inflated('fsaverage5Left', pial, VERY_INFLATE_ITERATIONS), pial.faces, 'left');
-
-  const pair = document.createElement('div');
-  pair.className = 'anat-pair';
-  pair.dataset.visualQa = 'linked-flatmap';
-  const solid = document.createElement('div');
-  solid.className = 'anat-cell';
-  const solidMount = document.createElement('div');
-  solidMount.className = 'anat-viewer';
-  const solidLabel = document.createElement('span');
-  solidLabel.className = 'anat-cell-label';
-  solidLabel.textContent = 'Folded 3D';
-  solid.append(solidMount, solidLabel);
-  const sheetCell = document.createElement('div');
-  sheetCell.className = 'anat-cell anat-cell-flat';
-  const sheet = document.createElement('div');
-  sheet.className = 'anat-flat-sheet';
-  const sheetLabel = document.createElement('span');
-  sheetLabel.className = 'anat-cell-label';
-  sheetLabel.textContent = 'Flat map';
-  sheetCell.append(sheet, sheetLabel);
-  pair.append(solid, sheetCell);
-  ctx.mount.replaceChildren(pair);
-
-  const { viewer, cleanup } = createFilmViewer(solidMount, { hoverCrosshair: true, hoverCrosshairColor: CURSOR, hoverCrosshairSize: 4 });
-  const set = new SurfaceSet({
-    hemi: 'left',
-    faces: pial.faces,
-    defaultVariant: 'folded',
-    variants: { folded: pial.vertices, inflated: inflatedPositions }
-  });
-  const surface = new VariantSurface(set, { ...SURFACE_STYLE, curvature: curvatureOf('fsaverage5Left', pial) });
-  surface.hemisphere = 'left';
-  const mask = new Float32Array(vertexCount);
-  surface.addLayer(new DataLayer('roi', mask, null, [MARK, MARK], {
-    range: [0, 1],
-    threshold: [-0.5, 0.5],
-    opacity: 0.72,
-    presentation: { label: 'ROI', units: '' }
-  }));
-  viewer.addSurface(surface, 'lh');
-  viewer.setAnatomicalView('lateral', { layout: 'single', surfaceId: 'lh', fit: true });
-  viewer.fitToView({ padding: 0.06 });
-
-  const sheetSize = () => [
-    Math.max(64, Math.floor(sheet.clientWidth || 420)),
-    Math.max(64, Math.floor(sheet.clientHeight || 420))
-  ] as const;
-  const [initialWidth, initialHeight] = sheetSize();
-  // FlatMapView draws one flat fill, so the folding pattern is painted on a canvas beneath
-  // it from the same projected vertices (projectVertex), and the map itself is transparent.
-  const underlay = document.createElement('canvas');
-  underlay.className = 'anat-flat-underlay';
-  underlay.setAttribute('aria-hidden', 'true');
-  sheet.append(underlay);
-  // An unlit flat sheet shows depth with more contrast than the lit 3D underlay needs.
-  const shade = curvatureToGrayscale(depth, { brightness: 0.55, contrast: 0.5, smoothness: 0.5 });
-  const flatmap = new FlatMapView(sheet, { surfaceId: 'lh', vertices: flat.vertices, faces: flat.faces }, {
-    width: initialWidth,
-    height: initialHeight,
-    padding: 18,
-    background: 'rgba(0, 0, 0, 0)',
-    fillStyle: 'rgba(0, 0, 0, 0)',
-    strokeStyle: 'rgba(0, 0, 0, 0)',
-    hoverStyle: '#edf2f5',
-    selectionStyle: MARK,
-    pointRadius: 3.5
-  });
-  const paintUnderlay = () => {
-    underlay.width = flatmap.canvas.width;
-    underlay.height = flatmap.canvas.height;
-    const context = underlay.getContext('2d');
-    if (!context) return;
-    const points = new Float32Array(vertexCount * 2);
-    for (let v = 0; v < vertexCount; v++) {
-      const point = flatmap.projectVertex(v);
-      points[v * 2] = point.x;
-      points[v * 2 + 1] = point.y;
-    }
-    // Sulci in the film's darker step (--d2), gyri toward --ink-lo.
-    const dark = [22, 33, 43], light = [147, 166, 180];
-    context.lineWidth = 0.6;
-    for (let f = 0; f < flat.faces.length; f += 3) {
-      const a = flat.faces[f]!, b = flat.faces[f + 1]!, c = flat.faces[f + 2]!;
-      const t = (shade[a]! + shade[b]! + shade[c]!) / 3;
-      const color = `rgb(${dark.map((d, i) => Math.round(d + (light[i]! - d) * t)).join(', ')})`;
-      context.fillStyle = color;
-      context.strokeStyle = color;
-      context.beginPath();
-      context.moveTo(points[a * 2]!, points[a * 2 + 1]!);
-      context.lineTo(points[b * 2]!, points[b * 2 + 1]!);
-      context.lineTo(points[c * 2]!, points[c * 2 + 1]!);
-      context.closePath();
-      context.fill();
-      context.stroke();
-    }
-  };
-  paintUnderlay();
-  flatmap.canvas.dataset.visualQa = 'linked-flatmap-canvas';
-  flatmap.canvas.setAttribute('aria-label', 'Flat map of the left hemisphere');
-  const workspace = new LinkedBrainWorkspace({ viewer, flatmap, surfaceId: 'lh' });
-  let resizeFrame = 0;
-  const observer = new ResizeObserver(() => {
-    cancelAnimationFrame(resizeFrame);
-    resizeFrame = requestAnimationFrame(() => {
-      const [width, height] = sheetSize();
-      if (width !== flatmap.canvas.width || height !== flatmap.canvas.height) {
-        flatmap.resize(width, height);
-        paintUnderlay();
-      }
-    });
-  });
-  observer.observe(sheet);
-  ctx.setBusy(false);
-
-  film.set('tl', 'surface', 'Surface', 'fsaverage5 pial, left');
-  film.set('tl', 'flat', 'Flat', 'equal-area projection');
-  film.set('bl', 'rois', 'ROIs', '0');
-
-  const link = section(panel, 'Linked views');
-  const linkStatus = readout(link, 'Status', 'lf-status');
-  linkStatus.element.dataset.linkedFlatmapStatus = '';
-  linkStatus.set(`Ready: ${vertexCount} linked vertices`);
-  choice(link, {
-    id: 'anatomy-variant',
-    label: '3D surface',
-    options: [
-      { value: 'folded', label: 'Folded' },
-      { value: 'inflated', label: 'Inflated' }
-    ] as const,
-    value: 'folded',
-    print: { film, corner: 'tr', key: 'variant', label: '3D' },
-    onChange: next => {
-      surface.setVariant(next, { animate: true, duration: 640 });
-      solidLabel.textContent = next === 'folded' ? 'Folded 3D' : 'Inflated 3D';
-    }
-  });
-  note(link, 'Hover either view to find the same vertex in the other; a click on the flat map pins it in 3D.');
-
-  const rois = section(panel, 'Regions of interest');
-  const roiStatus = readout(rois, 'ROI', 'roi-status');
-  roiStatus.element.dataset.roiStatus = '';
-  roiStatus.set('No ROI');
-  const drawRow = actions(rois);
-  const polygon = action(drawRow, { id: 'roi-polygon', label: 'Draw polygon', onClick: () => startDrawing('polygon') });
-  const lasso = action(drawRow, { id: 'roi-lasso', label: 'Draw lasso', onClick: () => startDrawing('lasso') });
-  action(drawRow, { id: 'roi-seed', label: 'Seed ROI', onClick: () => seed() });
-  action(drawRow, { id: 'roi-clear', label: 'Clear ROIs', onClick: () => clearROIs() });
-  const drawNote = note(rois, 'Polygon: click points on the flat map, double-click to close. Lasso: press and drag.');
-  const exportRow = actions(rois);
-  const svgButton = action(exportRow, { id: 'roi-svg', label: 'SVG', onClick: () => showExport('svg') });
-  const giftiButton = action(exportRow, { id: 'roi-label', label: 'Label GIFTI', onClick: () => showExport('gifti') });
-  const download = document.createElement('a');
-  download.className = 'action';
-  download.id = 'roi-download';
-  download.hidden = true;
-  exportRow.append(download);
-  const exportBox = document.createElement('pre');
-  exportBox.className = 'anat-export';
-  exportBox.dataset.roiExport = '';
-  exportBox.hidden = true;
-  exportBox.tabIndex = 0;
-  exportBox.setAttribute('aria-label', 'ROI export');
-  rois.append(exportBox);
-
-  let activeROI: VertexROI | null = null;
-  let downloadUrl: string | null = null;
-
-  const syncButtons = () => {
-    svgButton.disabled = !activeROI;
-    giftiButton.disabled = !activeROI;
-  };
-  const updateMask = () => {
-    const next = new Float32Array(vertexCount);
-    for (const roi of flatmap.rois.list()) for (const index of roi.vertexIndices) next[index] = 1;
-    viewer.updateLayer('lh', 'roi', { data: next });
-    film.set('bl', 'rois', 'ROIs', String(flatmap.rois.list().length));
-  };
-  const setDrawing = (mode: 'polygon' | 'lasso' | null) => {
-    polygon.setAttribute('aria-pressed', String(mode === 'polygon'));
-    lasso.setAttribute('aria-pressed', String(mode === 'lasso'));
-    drawNote.classList.toggle('anat-note-active', mode !== null);
-  };
-  const nextName = () => `ROI_${flatmap.rois.list().length + 1}`;
-  function startDrawing(mode: 'polygon' | 'lasso') {
-    flatmap.startROIDrawing({ mode, name: nextName(), color: MARK, provenance: { sourceSurface: 'lh' } });
-    setDrawing(mode);
-    roiStatus.set(mode === 'polygon' ? 'Drawing a polygon' : 'Drawing a lasso');
-  }
-  function seed() {
-    const { width, height } = flatmap.canvas;
-    const roi = flatmap.createROIFromPolygon([
-      { x: width * 0.4, y: height * 0.36 },
-      { x: width * 0.6, y: height * 0.36 },
-      { x: width * 0.64, y: height * 0.58 },
-      { x: width * 0.44, y: height * 0.64 }
-    ], { name: nextName(), color: MARK, provenance: { sourceSurface: 'lh', tool: 'seed' } });
-    if (roi) {
-      const focus = roi.vertexIndices[Math.floor(roi.vertexIndices.length / 2)];
-      if (focus !== undefined) flatmap.setSelection(focus);
-    }
-  }
-  function clearROIs() {
-    flatmap.cancelROIDrawing();
-    flatmap.clearROIs();
-    activeROI = null;
-    exportBox.textContent = '';
-    exportBox.hidden = true;
-    download.hidden = true;
-    roiStatus.set('No ROI');
-    setDrawing(null);
-    syncButtons();
-    updateMask();
-    ctx.status('ROIs cleared');
-  }
-  function showExport(kind: 'svg' | 'gifti') {
-    if (!activeROI) return;
-    const text = kind === 'svg'
-      ? roiToSVG(activeROI, { width: flatmap.canvas.width, height: flatmap.canvas.height, stroke: MARK })
-      : roiToLabelGIFTI(activeROI, { vertexCount });
-    exportBox.textContent = text.length > 900 ? `${text.slice(0, 900)}…` : text;
-    exportBox.hidden = false;
-    if (downloadUrl) URL.revokeObjectURL(downloadUrl);
-    downloadUrl = URL.createObjectURL(new Blob([text], { type: kind === 'svg' ? 'image/svg+xml' : 'application/xml' }));
-    download.href = downloadUrl;
-    download.download = `${activeROI.name}.${kind === 'svg' ? 'svg' : 'label.gii'}`;
-    download.textContent = `Save ${download.download}`;
-    download.hidden = false;
-  }
-
-  const onCreated = ({ roi }: { roi: VertexROI }) => {
-    activeROI = roi;
-    roiStatus.set(`${roi.name}: ${roi.vertexIndices.length} vertices`);
-    setDrawing(null);
-    syncButtons();
-    updateMask();
-    ctx.status(`${roi.name}: ${roi.vertexIndices.length} vertices`);
-  };
-  const onDrawing = ({ mode }: { mode: 'polygon' | 'lasso' | null }) => { if (mode === null) setDrawing(null); };
-  const onSelection = ({ vertexIndex }: { vertexIndex: number | null }) => {
-    linkStatus.set(vertexIndex === null ? 'No flat-map selection' : `Selected vertex ${vertexIndex}`);
-    film.set('br', 'selected', 'Selected', vertexIndex === null ? '—' : `LH ${vertexIndex}`);
-    if (vertexIndex !== null) viewer.showCrosshair('lh', vertexIndex, { mode: 'selection', color: 0xf2c230, size: 4 });
-  };
-  const print = hoverPrinter(film, { lh: pial });
-  const offs = [
-    flatmap.on('roi:created', onCreated),
-    flatmap.on('roi:drawing', onDrawing),
-    flatmap.on('selection:changed', onSelection),
-    flatmap.on('vertex:hover', print)
-  ];
-  viewer.on('vertex:hover', print);
-  film.set('br', 'selected', 'Selected', '—');
-  setDrawing(null);
-  syncButtons();
-  ctx.perf(`${vertexCount.toLocaleString('en-US')} linked vertices · ${flat.droppedFaces} faces cut at the medial wall`);
-
-  return () => {
-    for (const off of offs) off();
-    viewer.off('vertex:hover', print);
-    cancelAnimationFrame(resizeFrame);
-    observer.disconnect();
-    if (downloadUrl) URL.revokeObjectURL(downloadUrl);
-    workspace.dispose();
-    flatmap.dispose();
-    cleanup();
-  };
-}
 
 const BUILDERS: Record<Mode, (context: ModeContext) => Promise<ModeCleanup | null>> = {
   views: viewsMode,
   clip: clipMode,
   morph: morphMode,
-  flatmap: flatmapMode
+  flatmap: quantitativeFlatmapMode
 };
 
 export const anatomy: Scenario = {
@@ -781,9 +509,9 @@ export const anatomy: Scenario = {
   group: 'surfaces',
   tags: ['anatomical views', 'hemispheres', 'clip planes', 'morphing', 'inflation', 'flat map', 'linked views', 'ROI'],
   summary:
-    'The fsaverage5 cortex itself, four ways. Views: the six anatomical views of either or both hemispheres, with an adjustable gap between them. Clip: sagittal, coronal and axial cut planes with position and side, plus presets. Inflate: morph the pial surface toward a smoothed, inflated shape and back. Flat map: the left hemisphere in 3D beside a flat map that shares its vertices; draw or seed an ROI on the map, see it on the cortex, and export it as SVG or a label GIFTI.',
+    'Explore cortical viewpoints, clipping, inflation and quantitative flatmaps. In Flat map, inspect the same scalar or volume signal on folded and flat anatomy, draw an ROI, and compare display-only relief with chart distortion.',
   synthetic:
-    'The meshes are real fsaverage5 pial surfaces. The inflated shapes are computed in the browser by Laplacian smoothing of the pial mesh and rescaling (an approximation of FreeSurfer inflation, not mris_inflate), and the flat map is an equal-area projection of the smoothed left hemisphere with the medial wall cut (not a FreeSurfer flat patch). No data maps are shown.',
+    'Views and Inflate use fsaverage5 with browser-generated inflation. Flat map uses matched real S1 surfaces from pycortex; its scalar and volume signals and missing regions are constructed. Relief does not change anatomy or data.',
   excerpt,
   run: async ctx => {
     const film = ctx.film;
@@ -812,7 +540,7 @@ export const anatomy: Scenario = {
       body.replaceChildren();
       film.clear();
       ctx.perf('');
-      ctx.setBusy(true, 'Loading fsaverage5');
+      ctx.setBusy(true, next === 'flatmap' ? 'Loading matched S1 surfaces' : 'Loading fsaverage5');
       const url = new URL(location.href);
       if (next === 'views') url.searchParams.delete('mode');
       else url.searchParams.set('mode', next);

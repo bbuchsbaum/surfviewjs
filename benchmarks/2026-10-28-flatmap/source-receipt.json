@@ -1,0 +1,433 @@
+{
+  "schema": "surfview.flatmap-delivery.v1",
+  "recordedAt": "2026-10-28T18:52:41.238364+00:00",
+  "baseHead": "a05f87fcd98a6e0c3766092b74a105bec10d44c6",
+  "state": "uncommitted local implementation; not published",
+  "sourceTreeSha256": "1fb68bcbcf01764314fa9e03ea555e3b83cbc7eb3efc0f45ba39ce256fd18d39",
+  "source": {
+    "PRODUCT.md": {
+      "sha256": "2caf6bc23c020b05e1cb81ff0e25f49179ae987233ca0bd3a3d7eaf2f2b9484a",
+      "bytes": 4205
+    },
+    "benchmarks/2026-10-28-flatmap/reference.py": {
+      "sha256": "32270de55a7e1b59004581be65ca02a42bb7749f4451fe69fcb66ec36172f862",
+      "bytes": 4946
+    },
+    "benchmarks/2026-10-28-flatmap/run.mjs": {
+      "sha256": "4548ef8e8e0355c456c42dacbc904fcf9cd71a8021acb6fb7c73e14cca715df3",
+      "bytes": 868
+    },
+    "demo/chapters/anatomy.css": {
+      "sha256": "6f603af4cf97db4f8de1b596e3b7be28b42513752f1c6eb8e79802e971265d43",
+      "bytes": 3319
+    },
+    "demo/chapters/anatomy.ts": {
+      "sha256": "183b67dfb8caf23467523ba3dd09b106f118e3ec2e4445b8a6bf08ab7583ab86",
+      "bytes": 22314
+    },
+    "demo/data/flatmap/LICENSE": {
+      "sha256": "418163499f05a6d9504ef8a7c79a54000f65c6872735d6d8d3ccae32a9879057",
+      "bytes": 1318
+    },
+    "demo/data/flatmap/README.md": {
+      "sha256": "6880c61953d95affca42ad8396bdb5cb51d9f2e2828fd345131a60671cd146e0",
+      "bytes": 3100
+    },
+    "demo/data/flatmap/manifest.json": {
+      "sha256": "99b6df12c7d7dc00ec1a3361971065e6281d380f218ed9a8499ab0db07b815b6",
+      "bytes": 7495
+    },
+    "demo/data/flatmap/s1-lh.bin.gz": {
+      "sha256": "40fba3dc46ff47bb55c0fd90295e1d63cc32821f2370cabfe2316113b03495c9",
+      "bytes": 8988236
+    },
+    "demo/kit/flatmap-data.ts": {
+      "sha256": "97a37d3f90cca32a38b61121163fc8455660e30105afdaf17f2643e9fd5ffb55",
+      "bytes": 3664
+    },
+    "demo/kit/quantitative-flatmap.ts": {
+      "sha256": "a2841e00eebe8e50b2623f85269a4ab3e2331b90dd8f5e28a3d32e3a8dd1b48f",
+      "bytes": 24483
+    },
+    "demo/main.ts": {
+      "sha256": "0aa6d0611a88d83c237e50446bbd6d44f0183172a2307d865dee9988c44e4f91",
+      "bytes": 9749
+    },
+    "docs/.vitepress/config.ts": {
+      "sha256": "04195f4c0cf5345cb145c69d0241968e7262b6868864af5acaa63e4c5d5c9842",
+      "bytes": 6874
+    },
+    "docs/api-entry.ts": {
+      "sha256": "664d8757ee8131cbcd6ea073c4afdd9cc11eff617592bdfd508ac23ddce2046c",
+      "bytes": 203
+    },
+    "docs/architecture/quantitative-flatmap-relief-plan.md": {
+      "sha256": "c38b80409a3fff500ab3e3e0431beb82ee44c96e63d967945fcc1ba6a8213ef2",
+      "bytes": 45397
+    },
+    "docs/guide/quantitative-flatmaps.md": {
+      "sha256": "0e18e6cea2968452dc356400df2b71fbb215f45c4167081f07e4080a2225dbb7",
+      "bytes": 8992
+    },
+    "examples/quantitative-flatmap.ts": {
+      "sha256": "b760394ad01bd34a7aee77c6a725eb8d5180fa19c4ee77177a0145dd74e51af0",
+      "bytes": 2262
+    },
+    "package.json": {
+      "sha256": "efc3a4c98b7394626cd2a082251a18d8e2d4575dbfea54c7b88281b0655f720d",
+      "bytes": 6536
+    },
+    "scripts/check-documentation-examples.mjs": {
+      "sha256": "f75d6db741c0379f4f486c9f879b9e9f2fc68497d4a0799b07591cc3dc360846",
+      "bytes": 2711
+    },
+    "scripts/check-package-consumers.mjs": {
+      "sha256": "b9dab81d078fda731608eaf8e9b0f6a56071b387568a8fc3f140a0261a945303",
+      "bytes": 17426
+    },
+    "scripts/prepare-flatmap-data.py": {
+      "sha256": "7af243ad365b5abfa68c6792202ee32e7841cc4761c71b300bbcf66b2ce3d766",
+      "bytes": 9776
+    },
+    "src/FlatMapView.ts": {
+      "sha256": "bb8a831d5c27e7d2419350e84bef57f27e60a84150156db47395b87d1a6eb673",
+      "bytes": 24272
+    },
+    "src/flatmap/FlatMapChart.ts": {
+      "sha256": "4e7c896e8c145015610100d115717339b87e57a232cbd09fed4f3e96f30ec261",
+      "bytes": 14750
+    },
+    "src/flatmap/FlatMapController.ts": {
+      "sha256": "0ef762d7b4552ad95ca24587be93d9c4c3ca4ec1c20f92f7e0705dde0b572268",
+      "bytes": 14363
+    },
+    "src/flatmap/FlatMapExport.ts": {
+      "sha256": "ec708ce10e97fe1b34973916da2401f5a62ba22a8dd4a6515b7246fe7c728b2f",
+      "bytes": 4252
+    },
+    "src/flatmap/FlatMapFieldMaterial.ts": {
+      "sha256": "bc70c61310eca32b89c609bbe1e9a3ad4f592b990c8149db791e14399f3f7cb7",
+      "bytes": 6285
+    },
+    "src/flatmap/FlatMapPresentation.ts": {
+      "sha256": "d2e83d0d109865e18da50e7b2ef10101a0a09a399ca1ce215e24f9cad3c918a9",
+      "bytes": 2734
+    },
+    "src/flatmap/FlatMapRasterPlan.ts": {
+      "sha256": "2ad974d248dcd7eb55a0c0e34849b68eb485463b7e1ebbb2cd7bb4e3168982b7",
+      "bytes": 3195
+    },
+    "src/flatmap/FlatMapRenderer.ts": {
+      "sha256": "9ad60d905bd557f0f5c5a5e04454d60415e7125c3fcee6e9da1164dfd5ca6385",
+      "bytes": 6717
+    },
+    "src/flatmap/FlatMapSamplingPlan.ts": {
+      "sha256": "7580763ff57cee560820f12a92625c24051fe4c7fe2703c88ed4b5a85a2d0c6b",
+      "bytes": 17507
+    },
+    "src/flatmap/FlatMapSurfaceBinding.ts": {
+      "sha256": "93b47dca6a53a7729a1b3f83a328f5af2d4d6a8263adce3cc627d42cb090f1ef",
+      "bytes": 6622
+    },
+    "src/flatmap/FlatMapTileCache.ts": {
+      "sha256": "19aa23ddc94c84715e5a6a6389fe914ff0145a4fa070e8e8d2e190dd6774205c",
+      "bytes": 1490
+    },
+    "src/flatmap/FlatMapViewAttachment.ts": {
+      "sha256": "09872fac7832d32fd6a2a532c45d8eef955c616974d8e7c6a59d28cf601d192e",
+      "bytes": 3483
+    },
+    "src/geometry/DisplayDeformation.ts": {
+      "sha256": "f8a58a225b1d83bf31f81cb5ff9e9564f8f6b34549b10c3c2c67edea754c7713",
+      "bytes": 785
+    },
+    "src/geometry/DisplayGeometryBinding.ts": {
+      "sha256": "28b7f24dc432a846881403619e7892386d5ce5203f305899047024b65b2d6d80",
+      "bytes": 5826
+    },
+    "src/geometry/GeometryWorkerClient.ts": {
+      "sha256": "f51d36644e48377e5aeb88da4aee3ee174241785161577db7ddc84bdd4bacaf1",
+      "bytes": 13925
+    },
+    "src/geometry/SurfaceLocation.ts": {
+      "sha256": "36e7828fe295bac086691756328ba454822ffebdf2ca4a6a3407de31182de9e5",
+      "bytes": 10861
+    },
+    "src/geometry/geometryWorker.ts": {
+      "sha256": "61ab2b3e767205c598db43e27c4c21e49ab9a287b1e8cca7713eeaac30f47197",
+      "bytes": 9981
+    },
+    "src/geometry/geometryWorkerProtocol.ts": {
+      "sha256": "9ed9bbff39f60a7b6fe295c64e3dfa4f2bfe3552dddb7e21b15dbc837cd65277",
+      "bytes": 4372
+    },
+    "src/geometry/index.ts": {
+      "sha256": "33fad12b5649a109a84f9d1e7e0bca1c3818572809fe15976a9a203bf5a3845a",
+      "bytes": 3367
+    },
+    "src/index.flatmap.ts": {
+      "sha256": "ed2b3e8c0969dddb074e06c1b2719af7900ecc29c418da5caf7f2199bd67783d",
+      "bytes": 2006
+    },
+    "src/index.ts": {
+      "sha256": "b1b187331d1a4ed35c769059e1881e5c4b197c144417cb12cc9afb59dfa48aa4",
+      "bytes": 21724
+    },
+    "src/relief/FlatMapDistortion.ts": {
+      "sha256": "f4633e40f25f75efc5a60cb2d84d4fee6ac88ed7372d02770f6c93f1369033f0",
+      "bytes": 3580
+    },
+    "src/relief/ReliefDisplayBinding.ts": {
+      "sha256": "6d04c3a2f135d2443da56751a65a062a84f126a072d6a6686953f8f8250009da",
+      "bytes": 7333
+    },
+    "src/relief/SurfaceRelief.ts": {
+      "sha256": "9dca50e28449e261e0d7c7c47ebf12a61bc5344b2c59c8c072a4a614533e1682",
+      "bytes": 7937
+    },
+    "src/utils/GPUPicker.ts": {
+      "sha256": "4c8bcb065b665d289019d2df5c08e8551e06ebed50fa8e1ca08ae09640bff3e6",
+      "bytes": 19012
+    },
+    "src/viewer/ViewerPickingController.ts": {
+      "sha256": "6d384d0deede83f091587b382c2a7ecd162a74056419ccae611bfee61f76455b",
+      "bytes": 7197
+    },
+    "tests/e2e/chapter-anatomy.spec.ts": {
+      "sha256": "926e7a5909ddc31afdf25c20a8b87696ec65ea74b90f82e193b79cd1008658f3",
+      "bytes": 11745
+    },
+    "tests/e2e/flatmap-relief.spec.ts": {
+      "sha256": "ad492c64ccb06695b24a197ec264103b59dfa69b2e78e82fdf857dc59158175c",
+      "bytes": 4776
+    },
+    "tests/e2e/quantitative-flatmap.spec.ts": {
+      "sha256": "e20bc4cd4596df7a957a2c15774465aaeb24abaf3e42169f2aec608ccd098f40",
+      "bytes": 1357
+    },
+    "tests/flatmap-fixture.html": {
+      "sha256": "0e7c3234fe6a5f1a6da37c4d458a2b2e7f0bde7e58a9ea473291d4a8a64c8840",
+      "bytes": 177
+    },
+    "tests/flatmap-fixture.ts": {
+      "sha256": "c98f675a46ff6985f9d25eba2043049dc448140b4c6b8e56346811ec0c7ff664",
+      "bytes": 7981
+    },
+    "tests/flatmap-performance.html": {
+      "sha256": "1a28660dc8a534d65d89f9a8f6bbcccc6fe3e6a92e841f23328abbe9e59ec455",
+      "bytes": 178
+    },
+    "tests/flatmap-performance.ts": {
+      "sha256": "320ae5a66ad45036748e5db849ae4e0c4d5d8add1d201545a5f897a58d4e5038",
+      "bytes": 11571
+    },
+    "tests/unit/flatmap/chart.test.ts": {
+      "sha256": "24a8ff081527e0389b0fd22194f09c84000fd405a406431a88799f5f5fee86de",
+      "bytes": 4853
+    },
+    "tests/unit/flatmap/controller.test.ts": {
+      "sha256": "15db0c565f0a46ebfef1e5307de8c083612f2ad6b58f7da96959f41599100fd8",
+      "bytes": 6683
+    },
+    "tests/unit/flatmap/real-data.test.ts": {
+      "sha256": "c209c6e81d06f8fd8aae6a26ffb332781d2d591ef3f26e7131a7be765f0c0481",
+      "bytes": 2871
+    },
+    "tests/unit/flatmap/sampling.test.ts": {
+      "sha256": "3d8b19fb5feffd28ae0d43dfb5b17ce03c81e50a040841da34ae96b080482668",
+      "bytes": 9699
+    },
+    "tests/unit/relief/display.test.ts": {
+      "sha256": "852eb92c11f88a0d9236882c14d7ceff15b91f34bbca0521a0646407a47fbdaa",
+      "bytes": 3457
+    },
+    "tests/unit/relief/numerical.test.ts": {
+      "sha256": "0857f4e77d19b715d81254de06971d1b4d22938b68cd2e228e05031eef9ce5a0",
+      "bytes": 5025
+    },
+    "tsconfig.demo.json": {
+      "sha256": "d87c256d78710fd1a57552eb59ddf4f1d1a65b1dae75c0890e078af03f69b6a3",
+      "bytes": 467
+    },
+    "tsconfig.docs.json": {
+      "sha256": "75bccded14274ef2a29187858f15846bab03688573554293e87f2e79713447ef",
+      "bytes": 150
+    },
+    "typedoc.json": {
+      "sha256": "ade9f29327864a306a4974a274f92cffe7d404386a180ef106021c63226e4c8b",
+      "bytes": 767
+    },
+    "vite.config.flatmap.js": {
+      "sha256": "054eae78dde68d3d584a4bec37ad35bc1b86a8faccc0a70c198511b17765e44a",
+      "bytes": 1288
+    }
+  },
+  "builtArtifacts": {
+    "dist/surfview.es.js": {
+      "sha256": "68cd852d70bd7e022f85b832051b9e0d013f67138d8cf50e04927687b8528e4e",
+      "bytes": 774260
+    },
+    "dist/surfview.flatmap.es.js": {
+      "sha256": "782e2e3fc1a9f2623ead913b5ad0e1e38d2b464588e6842d34592995e82e2244",
+      "bytes": 51739
+    },
+    "dist/surfview.geometry.worker.js": {
+      "sha256": "32c7422264743dac87d2fe045d4f955ca07513d76b2c4e61e05effc965a396d1",
+      "bytes": 81769
+    },
+    "dist/types/index.flatmap.d.ts": {
+      "sha256": "0490e6a3d13a4db3ce257199e4944b5f69abea641072ad548f388a548b317746",
+      "bytes": 1922
+    }
+  },
+  "evidence": {
+    "README.md": {
+      "sha256": "d2022f02dc98fcf37e47658e62caf74b9b47460f0bfcc4511a9f802fb37bfea5",
+      "bytes": 10675
+    },
+    "distortion-desktop.png": {
+      "sha256": "812908ed4e9b3196b286d45a5211a05dc8440835297283921718d8271d5c1665",
+      "bytes": 406601
+    },
+    "logs/browser-audit-final.log": {
+      "sha256": "9dc7f724c714f9fea49ba90ebf458169ba2ffdbf64334690895511d5075baecf",
+      "bytes": 48
+    },
+    "logs/build.log": {
+      "sha256": "a283035cfb1ad9afaa931be075058d86ab9817f8448f103719491fd9dc7e1048",
+      "bytes": 3148
+    },
+    "logs/consumers.log": {
+      "sha256": "c77ce351a954ac315d250b75081d0b56d906bd05d1847a97ee63d2ab038e621e",
+      "bytes": 469
+    },
+    "logs/data-admission-v2.log": {
+      "sha256": "ff5a368365b55d93d6f95e1854e5e4c043dde326e514e8d5bc2f5b5a8a926a85",
+      "bytes": 214
+    },
+    "logs/demo-build.log": {
+      "sha256": "9113ea3beaa13d5402c6d954dbd3a79f44bad8ee9eaa317ada5ebf792f54f5d0",
+      "bytes": 3420
+    },
+    "logs/demo-types.log": {
+      "sha256": "474d9258f269c5e6fc608a6e340ecce04d2174dd5bed494c3a879413d3cc4fc5",
+      "bytes": 63
+    },
+    "logs/docs.log": {
+      "sha256": "2fd29b1aa1d02030f09f4936b453f8d060fd1e23292f4910dc3cf20832ddbd2c",
+      "bytes": 976
+    },
+    "logs/e2e-all.log": {
+      "sha256": "f7751ac5ceed2b826ef5176e583d1d6902f95b92bb41d8b44845258f2ad45640",
+      "bytes": 20316
+    },
+    "logs/e2e-final.log": {
+      "sha256": "068a6cb5415d5af62922e669d0da7e4603bfa7af83578ec7687d63a08cfd8961",
+      "bytes": 1620
+    },
+    "logs/full-tests.log": {
+      "sha256": "48206a6b88f1c33d44e07691fc31d0769039dd34422d0d9e435add7612b4ed5e",
+      "bytes": 278
+    },
+    "logs/lint.log": {
+      "sha256": "e1428b320db9a28c52e3d6e4cc7e0d9143620b50b6cfb65df251e2350947009d",
+      "bytes": 274
+    },
+    "logs/performance-including-setup.log": {
+      "sha256": "8d3f445991e3f8c2d84554f75bc85a225adb763243200eaa4998388601ee454e",
+      "bytes": 3221
+    },
+    "logs/performance.log": {
+      "sha256": "e9c3ab4176e8c14ac2bb1ef256926cb7ee3317f786636b47f3d7431016a85b99",
+      "bytes": 3239
+    },
+    "logs/reference.log": {
+      "sha256": "9b519be41c289036a57ac8d62fd8e93cf024faade69211fd2359b3fb67619bf3",
+      "bytes": 54
+    },
+    "logs/size.log": {
+      "sha256": "aa464ac9b958e76372f4031cc09e3dc81d17a42dbc7aab6114a90c74ba70a5f2",
+      "bytes": 420
+    },
+    "logs/type-contracts.log": {
+      "sha256": "4d09829439a1823e3ebe71d21228619277014f2c1f5a2c803d9fc56d2d387efc",
+      "bytes": 63
+    },
+    "logs/types.log": {
+      "sha256": "2557b810aa9b4ec3a81e247a0a63bb14dd9628bd434c226923c1edcc2cc0a99f",
+      "bytes": 45
+    },
+    "logs/visual-final.log": {
+      "sha256": "0eb181477eed2903bb5f53b476a6ff3fa56ffdd8359ecf45539b161e985aea2b",
+      "bytes": 374
+    },
+    "map-desktop.png": {
+      "sha256": "efe15ea81a7269e2c50f6cfd7ea23dbb9008c679c837288646f06fa10437e587",
+      "bytes": 303457
+    },
+    "map-narrow.png": {
+      "sha256": "f4e924d1ff37b6b17000cfa05b108508a3ddc6052522699e2fb83a5d356d1f11",
+      "bytes": 210018
+    },
+    "performance-including-setup.json": {
+      "sha256": "5402ad0d2fb23736bc1638860a8fb545c44a1f8760efa8d9779273392269dbe0",
+      "bytes": 6512
+    },
+    "performance.json": {
+      "sha256": "3b76859abc34a257565b245fd5d3f0282bb09abc0ff0e10f8fa3d2a4b4214077",
+      "bytes": 6607
+    },
+    "reference.json": {
+      "sha256": "05f5b6541f1f639717810cf8b5bea6e878f84fb6e028c2dcca7b47197e2c3821",
+      "bytes": 43170
+    },
+    "reference.py": {
+      "sha256": "32270de55a7e1b59004581be65ca02a42bb7749f4451fe69fcb66ec36172f862",
+      "bytes": 4946
+    },
+    "relief-desktop.png": {
+      "sha256": "079afe1fe1aa80857699aa579d1ec9842c482af87cc36f276ec1d28db0107c84",
+      "bytes": 351620
+    },
+    "relief-narrow.png": {
+      "sha256": "7ae65dad1eea2cce1eac31ca89a0f9ac6b5846a73bf0a3248e34529370da8e3a",
+      "bytes": 211931
+    },
+    "run.mjs": {
+      "sha256": "4548ef8e8e0355c456c42dacbc904fcf9cd71a8021acb6fb7c73e14cca715df3",
+      "bytes": 868
+    },
+    "volume-desktop.png": {
+      "sha256": "3cebc4f9a1e7e0dce5deb8347295bb29f3d6b0a9ed42097903494c83d09e97ca",
+      "bytes": 268317
+    }
+  },
+  "excludedUnrelated": [
+    ".claude/settings.json",
+    "docs/architecture/cortical-evidence-plan.md",
+    "output/"
+  ],
+  "checks": {
+    "unitTests": 1285,
+    "unitFiles": 115,
+    "browserTests": 86,
+    "finalAffectedVisualWorkflow": "passed after final landmark/caption/readout-only changes",
+    "typeCheck": "pass",
+    "typeContracts": "pass",
+    "demoTypesAndBrowserFixtures": "pass",
+    "lint": "pass with one pre-existing unused-variable warning",
+    "build": "pass",
+    "packedConsumers": "pass",
+    "size": "pass",
+    "demoBuild": "pass",
+    "docsBuild": "pass",
+    "browserCleanup": "no automated top-level browsers found"
+  },
+  "limitations": [
+    "single S1 left hemisphere with explicit admitted chart cuts",
+    "constructed functional values and masks",
+    "Gaussian relief differs from pycortex screened-Poisson smoothing",
+    "SwiftShader measurements; paired 3D input-to-present target unqualified",
+    "component memory accounting rather than process or driver peak memory"
+  ]
+}

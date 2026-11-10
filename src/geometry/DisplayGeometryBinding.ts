@@ -60,13 +60,28 @@ export class DisplayGeometryBinding implements SurfacePositionBinding {
   }
 }
 
-const bindings = new WeakMap<THREE.Mesh, DisplayGeometryBinding>();
+/** Narrow extension point for cut charts and display-only deformations. */
+export interface DisplayBinding extends SurfacePositionBinding {
+  readonly revision: string;
+  clearCache(): void;
+  locationAt(face: number, worldPoint: THREE.Vector3): SurfaceLocation;
+  anatomicalVertex?(displayVertex: number): number;
+}
+const bindings = new WeakMap<THREE.Mesh, DisplayBinding>();
+export function registerDisplayBinding(mesh: THREE.Mesh, binding: DisplayBinding): () => void {
+  const previous = bindings.get(mesh);
+  bindings.set(mesh, binding);
+  return () => { if (bindings.get(mesh) === binding) { if (previous) bindings.set(mesh, previous); else bindings.delete(mesh); } };
+}
+export function anatomicalDisplayVertex(mesh: THREE.Mesh, vertex: number): number {
+  return bindings.get(mesh)?.anatomicalVertex?.(vertex) ?? vertex;
+}
 /** Explicitly assert correspondence after checking every triangle index. */
 export function bindSurfaceDomain(mesh: THREE.Mesh, domain: SurfaceDomain): DisplayGeometryBinding {
   const binding = new DisplayGeometryBinding(domain, mesh); bindings.set(mesh, binding); return binding;
 }
 /** Session-local identity by default; sharing a domain requires bindSurfaceDomain. */
-export function getDisplayGeometryBinding(mesh: THREE.Mesh): DisplayGeometryBinding {
+export function getDisplayGeometryBinding(mesh: THREE.Mesh): DisplayBinding {
   let binding = bindings.get(mesh);
   if (!binding) {
     const index = mesh.geometry.getIndex(), position = mesh.geometry.getAttribute('position');

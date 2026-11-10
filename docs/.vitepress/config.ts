@@ -107,6 +107,7 @@ export default defineConfig({
             { text: 'Parcel map laboratory', link: '/guide/parcel-map-lab' },
             { text: 'Surfaces', link: '/guide/surfaces' },
             { text: 'Surface geometry', link: '/guide/surface-geometry' },
+            { text: 'Quantitative flatmaps', link: '/guide/quantitative-flatmaps' },
             { text: 'Atlas illustration', link: '/guide/atlas-illustration' },
             { text: 'Layers', link: '/guide/layers' },
             { text: 'Colormaps', link: '/guide/colormaps' },

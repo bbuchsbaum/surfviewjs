@@ -42,6 +42,11 @@
     "./geometry-worker": {
       "types": "./dist/types/geometry/geometryWorker.d.ts",
       "default": "./dist/surfview.geometry.worker.js"
+    },
+    "./flatmap": {
+      "types": "./dist/types/index.flatmap.d.ts",
+      "import": "./dist/surfview.flatmap.es.js",
+      "default": "./dist/surfview.flatmap.es.js"
     }
   },
   "files": [
@@ -51,7 +56,7 @@
   "scripts": {
     "dev": "vite",
     "demo": "vite --config vite.demo.config.ts --open",
-    "build": "npm run clean && vite build && vite build --config vite.config.embed.js && vite build --config vite.config.react.js && vite build --config vite.config.report.js && vite build --config vite.config.controls.js && vite build --config vite.config.controls-react.js && vite build --config vite.config.geometry-worker.js && npm run build:types && npm run test:package-types && npm run check:controls-artifacts",
+    "build": "npm run clean && vite build && vite build --config vite.config.embed.js && vite build --config vite.config.react.js && vite build --config vite.config.report.js && vite build --config vite.config.controls.js && vite build --config vite.config.controls-react.js && vite build --config vite.config.geometry-worker.js && vite build --config vite.config.flatmap.js && npm run build:types && npm run test:package-types && npm run check:controls-artifacts",
     "demo:build": "vite build --config vite.demo.config.ts",
     "build:types": "tsc --emitDeclarationOnly",
     "clean": "rm -rf dist",
@@ -178,6 +183,11 @@
       "name": "Controls React ESM bundle",
       "path": "dist/surfview.controls.react.es.js",
       "limit": "3 KB"
+    },
+    {
+      "name": "Quantitative flatmap ESM",
+      "path": "dist/surfview.flatmap.es.js",
+      "limit": "20 KB"
     }
   ]
 }

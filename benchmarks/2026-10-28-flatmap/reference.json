@@ -1,0 +1,2214 @@
+{
+  "schema": "surfview.flatmap-reference.v1",
+  "sourceRevision": "1e4c0790b66bcbcd836b5832650908f83327c399",
+  "sources": [
+    {
+      "url": "https://raw.githubusercontent.com/gallantlab/pycortex/1e4c0790b66bcbcd836b5832650908f83327c399/cortex/polyutils/misc.py",
+      "sha256": "36e42c3061dab31bb0bd86408130f2be67a255382c9630581994bba5c9b1efba",
+      "functions": [
+        "face_area"
+      ]
+    },
+    {
+      "url": "https://raw.githubusercontent.com/gallantlab/pycortex/1e4c0790b66bcbcd836b5832650908f83327c399/cortex/polyutils/bumpy.py",
+      "sha256": "b3bf6b866dd268425ef0eb76dda531d44ac86636d22d3bb04e84c001729d5526",
+      "functions": [
+        "_lumped",
+        "folding_height"
+      ]
+    }
+  ],
+  "assetSha256": "40fba3dc46ff47bb55c0fd90295e1d63cc32821f2370cabfe2316113b03495c9",
+  "arithmetic": "float64 from original float32 geometry",
+  "scope": "Pinned raw folding formula on complete anatomical topology; smoothing bypassed. Volume witness uses independent analytic field and corner support, not pycortex rasterization.",
+  "relief": [
+    {
+      "chartVertex": 0,
+      "anatomicalVertex": 0,
+      "heightMm": 4.62711134433841
+    },
+    {
+      "chartVertex": 1152,
+      "anatomicalVertex": 1152,
+      "heightMm": 2.533368113860639
+    },
+    {
+      "chartVertex": 2304,
+      "anatomicalVertex": 2304,
+      "heightMm": 4.658972652372167
+    },
+    {
+      "chartVertex": 3458,
+      "anatomicalVertex": 3458,
+      "heightMm": 1.968043188174832
+    },
+    {
+      "chartVertex": 4611,
+      "anatomicalVertex": 4611,
+      "heightMm": 2.5631327686448597
+    },
+    {
+      "chartVertex": 5764,
+      "anatomicalVertex": 5764,
+      "heightMm": 1.376033496104621
+    },
+    {
+      "chartVertex": 6924,
+      "anatomicalVertex": 6924,
+      "heightMm": 2.263920686547062
+    },
+    {
+      "chartVertex": 8086,
+      "anatomicalVertex": 8086,
+      "heightMm": 0.6782030939209657
+    },
+    {
+      "chartVertex": 9248,
+      "anatomicalVertex": 9248,
+      "heightMm": 4.855948681794491
+    },
+    {
+      "chartVertex": 10407,
+      "anatomicalVertex": 10407,
+      "heightMm": 1.6787092081904056
+    },
+    {
+      "chartVertex": 11561,
+      "anatomicalVertex": 11561,
+      "heightMm": 1.1393387158601045
+    },
+    {
+      "chartVertex": 12720,
+      "anatomicalVertex": 12720,
+      "heightMm": 1.1684462176987054
+    },
+    {
+      "chartVertex": 13876,
+      "anatomicalVertex": 13876,
+      "heightMm": 1.7517949955026086
+    },
+    {
+      "chartVertex": 15032,
+      "anatomicalVertex": 15032,
+      "heightMm": 2.6327278079055474
+    },
+    {
+      "chartVertex": 16185,
+      "anatomicalVertex": 16185,
+      "heightMm": 4.58337612326158
+    },
+    {
+      "chartVertex": 17340,
+      "anatomicalVertex": 17340,
+      "heightMm": 2.1698524390622844
+    },
+    {
+      "chartVertex": 18495,
+      "anatomicalVertex": 18495,
+      "heightMm": 0.7600268904565585
+    },
+    {
+      "chartVertex": 19648,
+      "anatomicalVertex": 19648,
+      "heightMm": 5.397399254568236
+    },
+    {
+      "chartVertex": 20805,
+      "anatomicalVertex": 20805,
+      "heightMm": 8.934227116197315
+    },
+    {
+      "chartVertex": 21958,
+      "anatomicalVertex": 21958,
+      "heightMm": 8.034663449777753
+    },
+    {
+      "chartVertex": 23112,
+      "anatomicalVertex": 23112,
+      "heightMm": 6.998415658810159
+    },
+    {
+      "chartVertex": 24265,
+      "anatomicalVertex": 24265,
+      "heightMm": 2.0085439338327746
+    },
+    {
+      "chartVertex": 25418,
+      "anatomicalVertex": 25418,
+      "heightMm": 2.0526585505325334
+    },
+    {
+      "chartVertex": 26571,
+      "anatomicalVertex": 26571,
+      "heightMm": 2.199548705494466
+    },
+    {
+      "chartVertex": 27725,
+      "anatomicalVertex": 27725,
+      "heightMm": 7.402805421359562
+    },
+    {
+      "chartVertex": 28878,
+      "anatomicalVertex": 28878,
+      "heightMm": 3.37746586340405
+    },
+    {
+      "chartVertex": 30034,
+      "anatomicalVertex": 30034,
+      "heightMm": 2.2613999820869832
+    },
+    {
+      "chartVertex": 31187,
+      "anatomicalVertex": 31187,
+      "heightMm": 4.601858583357232
+    },
+    {
+      "chartVertex": 32340,
+      "anatomicalVertex": 32340,
+      "heightMm": 1.14845429247045
+    },
+    {
+      "chartVertex": 33495,
+      "anatomicalVertex": 33495,
+      "heightMm": 5.296951410048784
+    },
+    {
+      "chartVertex": 34649,
+      "anatomicalVertex": 34649,
+      "heightMm": 5.644909897083608
+    },
+    {
+      "chartVertex": 35802,
+      "anatomicalVertex": 35802,
+      "heightMm": 2.781400159125879
+    },
+    {
+      "chartVertex": 36956,
+      "anatomicalVertex": 36956,
+      "heightMm": 2.5043638682105827
+    },
+    {
+      "chartVertex": 38108,
+      "anatomicalVertex": 38108,
+      "heightMm": 5.362307410762901
+    },
+    {
+      "chartVertex": 39262,
+      "anatomicalVertex": 39262,
+      "heightMm": 2.903822895085835
+    },
+    {
+      "chartVertex": 40416,
+      "anatomicalVertex": 40416,
+      "heightMm": 1.9722133349511888
+    },
+    {
+      "chartVertex": 41569,
+      "anatomicalVertex": 41569,
+      "heightMm": 1.6716942507285941
+    },
+    {
+      "chartVertex": 42723,
+      "anatomicalVertex": 42723,
+      "heightMm": 2.5045147580165694
+    },
+    {
+      "chartVertex": 43878,
+      "anatomicalVertex": 43878,
+      "heightMm": 3.4332679238085415
+    },
+    {
+      "chartVertex": 45031,
+      "anatomicalVertex": 45031,
+      "heightMm": 4.4618452675101805
+    },
+    {
+      "chartVertex": 46185,
+      "anatomicalVertex": 46185,
+      "heightMm": 4.275795827511185
+    },
+    {
+      "chartVertex": 47340,
+      "anatomicalVertex": 47340,
+      "heightMm": 2.8796906902268145
+    },
+    {
+      "chartVertex": 48493,
+      "anatomicalVertex": 48493,
+      "heightMm": 6.450837332899762
+    },
+    {
+      "chartVertex": 49667,
+      "anatomicalVertex": 49667,
+      "heightMm": 4.500555061093453
+    },
+    {
+      "chartVertex": 50834,
+      "anatomicalVertex": 50834,
+      "heightMm": 2.212277101771152
+    },
+    {
+      "chartVertex": 52013,
+      "anatomicalVertex": 52013,
+      "heightMm": 4.219041348133531
+    },
+    {
+      "chartVertex": 53240,
+      "anatomicalVertex": 53240,
+      "heightMm": 4.298944897697784
+    },
+    {
+      "chartVertex": 54488,
+      "anatomicalVertex": 54488,
+      "heightMm": 2.554088082778955
+    },
+    {
+      "chartVertex": 55707,
+      "anatomicalVertex": 55707,
+      "heightMm": 5.187744062470622
+    },
+    {
+      "chartVertex": 56933,
+      "anatomicalVertex": 56933,
+      "heightMm": 4.18532418182333
+    },
+    {
+      "chartVertex": 58170,
+      "anatomicalVertex": 58170,
+      "heightMm": 4.0078153562140475
+    },
+    {
+      "chartVertex": 59401,
+      "anatomicalVertex": 59401,
+      "heightMm": 3.8469249049730703
+    },
+    {
+      "chartVertex": 60617,
+      "anatomicalVertex": 60617,
+      "heightMm": 3.9279458762391943
+    },
+    {
+      "chartVertex": 61832,
+      "anatomicalVertex": 61832,
+      "heightMm": 2.6333464740213643
+    },
+    {
+      "chartVertex": 63056,
+      "anatomicalVertex": 63056,
+      "heightMm": 1.3781434371068515
+    },
+    {
+      "chartVertex": 64281,
+      "anatomicalVertex": 64281,
+      "heightMm": 0.9852885751141517
+    },
+    {
+      "chartVertex": 65532,
+      "anatomicalVertex": 65532,
+      "heightMm": 0.982181436242143
+    },
+    {
+      "chartVertex": 66828,
+      "anatomicalVertex": 66828,
+      "heightMm": 2.680436735827996
+    },
+    {
+      "chartVertex": 68084,
+      "anatomicalVertex": 68084,
+      "heightMm": 4.4433479301348635
+    },
+    {
+      "chartVertex": 69354,
+      "anatomicalVertex": 69354,
+      "heightMm": 1.5469403034152656
+    },
+    {
+      "chartVertex": 70608,
+      "anatomicalVertex": 70608,
+      "heightMm": 1.0297196480776678
+    },
+    {
+      "chartVertex": 71848,
+      "anatomicalVertex": 71848,
+      "heightMm": 2.0294079089325647
+    },
+    {
+      "chartVertex": 73089,
+      "anatomicalVertex": 73089,
+      "heightMm": 2.111235663111327
+    },
+    {
+      "chartVertex": 73840,
+      "anatomicalVertex": 73840,
+      "heightMm": 0.01695025575582843
+    },
+    {
+      "chartVertex": 74321,
+      "anatomicalVertex": 74321,
+      "heightMm": 3.7791512082072507
+    },
+    {
+      "chartVertex": 75557,
+      "anatomicalVertex": 75557,
+      "heightMm": 1.3099268526821428
+    },
+    {
+      "chartVertex": 76832,
+      "anatomicalVertex": 76832,
+      "heightMm": 2.8538345573032693
+    },
+    {
+      "chartVertex": 78087,
+      "anatomicalVertex": 78087,
+      "heightMm": 6.936960188981704
+    },
+    {
+      "chartVertex": 79353,
+      "anatomicalVertex": 79353,
+      "heightMm": 4.741609716460178
+    },
+    {
+      "chartVertex": 80620,
+      "anatomicalVertex": 80620,
+      "heightMm": 2.833103440365979
+    },
+    {
+      "chartVertex": 81895,
+      "anatomicalVertex": 81895,
+      "heightMm": 1.2970519556328124
+    },
+    {
+      "chartVertex": 83185,
+      "anatomicalVertex": 83185,
+      "heightMm": 5.778789450492979
+    },
+    {
+      "chartVertex": 84546,
+      "anatomicalVertex": 84546,
+      "heightMm": 1.6241744098740798
+    },
+    {
+      "chartVertex": 85844,
+      "anatomicalVertex": 85844,
+      "heightMm": 7.015283642012527
+    },
+    {
+      "chartVertex": 87125,
+      "anatomicalVertex": 87125,
+      "heightMm": 3.5906707546937757
+    },
+    {
+      "chartVertex": 88387,
+      "anatomicalVertex": 88387,
+      "heightMm": 6.560310581780814
+    },
+    {
+      "chartVertex": 89640,
+      "anatomicalVertex": 89640,
+      "heightMm": 3.236532985166173
+    },
+    {
+      "chartVertex": 90890,
+      "anatomicalVertex": 90890,
+      "heightMm": 1.5761454729434883
+    },
+    {
+      "chartVertex": 92148,
+      "anatomicalVertex": 92148,
+      "heightMm": 2.296799817691603
+    },
+    {
+      "chartVertex": 93409,
+      "anatomicalVertex": 93409,
+      "heightMm": 2.451894074300312
+    },
+    {
+      "chartVertex": 94684,
+      "anatomicalVertex": 94684,
+      "heightMm": 6.477641426459916
+    },
+    {
+      "chartVertex": 95955,
+      "anatomicalVertex": 95955,
+      "heightMm": 1.567517619143479
+    },
+    {
+      "chartVertex": 97310,
+      "anatomicalVertex": 97310,
+      "heightMm": 5.137076090060645
+    },
+    {
+      "chartVertex": 98569,
+      "anatomicalVertex": 98569,
+      "heightMm": 3.8336572313442776
+    },
+    {
+      "chartVertex": 99831,
+      "anatomicalVertex": 99831,
+      "heightMm": 3.9522588617428784
+    },
+    {
+      "chartVertex": 101079,
+      "anatomicalVertex": 101079,
+      "heightMm": 3.721795478270273
+    },
+    {
+      "chartVertex": 102331,
+      "anatomicalVertex": 102331,
+      "heightMm": 6.61004585281461
+    },
+    {
+      "chartVertex": 103586,
+      "anatomicalVertex": 103586,
+      "heightMm": 5.290504984031387
+    },
+    {
+      "chartVertex": 104842,
+      "anatomicalVertex": 104842,
+      "heightMm": 1.8242552288418608
+    },
+    {
+      "chartVertex": 106113,
+      "anatomicalVertex": 106113,
+      "heightMm": 3.7277675920993283
+    },
+    {
+      "chartVertex": 107369,
+      "anatomicalVertex": 107369,
+      "heightMm": 3.0569131595570913
+    },
+    {
+      "chartVertex": 108631,
+      "anatomicalVertex": 108631,
+      "heightMm": 1.5476022445786513
+    },
+    {
+      "chartVertex": 109909,
+      "anatomicalVertex": 109909,
+      "heightMm": 4.951995920545133
+    },
+    {
+      "chartVertex": 111219,
+      "anatomicalVertex": 111219,
+      "heightMm": 3.3525760895276124
+    },
+    {
+      "chartVertex": 112462,
+      "anatomicalVertex": 112462,
+      "heightMm": 1.9862466745363303
+    },
+    {
+      "chartVertex": 113714,
+      "anatomicalVertex": 113714,
+      "heightMm": 6.405117493703716
+    },
+    {
+      "chartVertex": 114955,
+      "anatomicalVertex": 114955,
+      "heightMm": 2.6295597012724454
+    },
+    {
+      "chartVertex": 116178,
+      "anatomicalVertex": 116178,
+      "heightMm": 2.6994186820254047
+    },
+    {
+      "chartVertex": 117401,
+      "anatomicalVertex": 117401,
+      "heightMm": 4.678387559907903
+    },
+    {
+      "chartVertex": 118617,
+      "anatomicalVertex": 118617,
+      "heightMm": 0.9003518140405343
+    },
+    {
+      "chartVertex": 119883,
+      "anatomicalVertex": 119883,
+      "heightMm": 4.821199626259946
+    },
+    {
+      "chartVertex": 121093,
+      "anatomicalVertex": 121093,
+      "heightMm": 4.8718944087736995
+    },
+    {
+      "chartVertex": 122294,
+      "anatomicalVertex": 122294,
+      "heightMm": 3.5131645560141234
+    },
+    {
+      "chartVertex": 123504,
+      "anatomicalVertex": 123504,
+      "heightMm": 4.014687627960488
+    },
+    {
+      "chartVertex": 124686,
+      "anatomicalVertex": 124686,
+      "heightMm": 2.3925078835592033
+    },
+    {
+      "chartVertex": 125873,
+      "anatomicalVertex": 125873,
+      "heightMm": 3.483205712432597
+    },
+    {
+      "chartVertex": 127067,
+      "anatomicalVertex": 127067,
+      "heightMm": 2.9424268278559023
+    },
+    {
+      "chartVertex": 128279,
+      "anatomicalVertex": 128279,
+      "heightMm": 6.364039495596889
+    },
+    {
+      "chartVertex": 129465,
+      "anatomicalVertex": 129465,
+      "heightMm": 3.953022167512031
+    },
+    {
+      "chartVertex": 130678,
+      "anatomicalVertex": 130678,
+      "heightMm": 3.0971831762240236
+    },
+    {
+      "chartVertex": 131767,
+      "anatomicalVertex": 131767,
+      "heightMm": 19.667299321430082
+    },
+    {
+      "chartVertex": 131863,
+      "anatomicalVertex": 131863,
+      "heightMm": 2.8563692222312915
+    },
+    {
+      "chartVertex": 133046,
+      "anatomicalVertex": 133046,
+      "heightMm": 1.9164141955838063
+    },
+    {
+      "chartVertex": 134240,
+      "anatomicalVertex": 134240,
+      "heightMm": 3.528523995317497
+    },
+    {
+      "chartVertex": 135395,
+      "anatomicalVertex": 135395,
+      "heightMm": 1.3209191402008222
+    },
+    {
+      "chartVertex": 136550,
+      "anatomicalVertex": 136550,
+      "heightMm": 7.1356180793638435
+    },
+    {
+      "chartVertex": 137703,
+      "anatomicalVertex": 137703,
+      "heightMm": 4.276719674904604
+    },
+    {
+      "chartVertex": 138858,
+      "anatomicalVertex": 138858,
+      "heightMm": 0.9256332177727304
+    },
+    {
+      "chartVertex": 140012,
+      "anatomicalVertex": 140012,
+      "heightMm": 3.220348835505319
+    },
+    {
+      "chartVertex": 141167,
+      "anatomicalVertex": 141167,
+      "heightMm": 4.8919039251069245
+    },
+    {
+      "chartVertex": 142322,
+      "anatomicalVertex": 142322,
+      "heightMm": 2.332779482309323
+    },
+    {
+      "chartVertex": 143478,
+      "anatomicalVertex": 143478,
+      "heightMm": 7.5862255565575865
+    },
+    {
+      "chartVertex": 144634,
+      "anatomicalVertex": 144634,
+      "heightMm": 2.4889958672414605
+    },
+    {
+      "chartVertex": 145787,
+      "anatomicalVertex": 145787,
+      "heightMm": 1.5356230624427003
+    },
+    {
+      "chartVertex": 146942,
+      "anatomicalVertex": 146942,
+      "heightMm": 3.404435840206306
+    },
+    {
+      "chartVertex": 148097,
+      "anatomicalVertex": 148097,
+      "heightMm": 2.7046840972813917
+    },
+    {
+      "chartVertex": 149256,
+      "anatomicalVertex": 149256,
+      "heightMm": 4.657906252590397
+    },
+    {
+      "chartVertex": 150427,
+      "anatomicalVertex": 150427,
+      "heightMm": 6.968026424946982
+    },
+    {
+      "chartVertex": 151597,
+      "anatomicalVertex": 151597,
+      "heightMm": 5.244589158779175
+    },
+    {
+      "chartVertex": 152893,
+      "anatomicalVertex": 86865,
+      "heightMm": 0.08532759630030123
+    }
+  ],
+  "volume": [
+    {
+      "chartFace": 0,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.6528249841332436
+    },
+    {
+      "chartFace": 2291,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.6936624783277512
+    },
+    {
+      "chartFace": 4583,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.5162948020100593
+    },
+    {
+      "chartFace": 6875,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.4943107426166534
+    },
+    {
+      "chartFace": 9167,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.5395286300182343
+    },
+    {
+      "chartFace": 11459,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.6671657940149307
+    },
+    {
+      "chartFace": 13750,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.41508163166046136
+    },
+    {
+      "chartFace": 16042,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.34748140001297
+    },
+    {
+      "chartFace": 18334,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.43595620107650757
+    },
+    {
+      "chartFace": 20626,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 0.25,
+      "geometricCoverage": 1.0,
+      "valid": false,
+      "value": null
+    },
+    {
+      "chartFace": 22918,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.40260888147354124
+    },
+    {
+      "chartFace": 25210,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 0.0,
+      "geometricCoverage": 1.0,
+      "valid": false,
+      "value": null
+    },
+    {
+      "chartFace": 27501,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 0.0,
+      "geometricCoverage": 1.0,
+      "valid": false,
+      "value": null
+    },
+    {
+      "chartFace": 29793,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.629564903497696
+    },
+    {
+      "chartFace": 32085,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.6476308107376099
+    },
+    {
+      "chartFace": 34377,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.4907584583163261
+    },
+    {
+      "chartFace": 36669,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.5976478362083435
+    },
+    {
+      "chartFace": 38961,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.4507698067426682
+    },
+    {
+      "chartFace": 41252,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.5231533851623535
+    },
+    {
+      "chartFace": 43544,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.48865703004598615
+    },
+    {
+      "chartFace": 45836,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.3086978359222412
+    },
+    {
+      "chartFace": 48128,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 0.0,
+      "geometricCoverage": 1.0,
+      "valid": false,
+      "value": null
+    },
+    {
+      "chartFace": 50420,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.12584745049476623
+    },
+    {
+      "chartFace": 52712,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.5051983652114868
+    },
+    {
+      "chartFace": 55003,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.6150404276847838
+    },
+    {
+      "chartFace": 57295,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.47896539950370787
+    },
+    {
+      "chartFace": 59587,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.32501287472248075
+    },
+    {
+      "chartFace": 61879,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.3977782142162323
+    },
+    {
+      "chartFace": 64171,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.3838813807964325
+    },
+    {
+      "chartFace": 66462,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.48912417608499525
+    },
+    {
+      "chartFace": 68754,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.2601264309883118
+    },
+    {
+      "chartFace": 71046,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.25897871947288514
+    },
+    {
+      "chartFace": 73338,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.39730671024322517
+    },
+    {
+      "chartFace": 75630,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.02876048290729522
+    },
+    {
+      "chartFace": 77922,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.05022240018844606
+    },
+    {
+      "chartFace": 80213,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.5790352821350098
+    },
+    {
+      "chartFace": 82505,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.42123802232742313
+    },
+    {
+      "chartFace": 84797,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.25626658284664156
+    },
+    {
+      "chartFace": 87089,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.4585842373371124
+    },
+    {
+      "chartFace": 89381,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.38158801025152206
+    },
+    {
+      "chartFace": 91673,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.3249604890346527
+    },
+    {
+      "chartFace": 93964,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.28051001381874086
+    },
+    {
+      "chartFace": 96256,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.07773843169212341
+    },
+    {
+      "chartFace": 98548,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.062191199272871006
+    },
+    {
+      "chartFace": 100840,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.3174942789077759
+    },
+    {
+      "chartFace": 103132,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.13348193788528442
+    },
+    {
+      "chartFace": 105424,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.18659518241882325
+    },
+    {
+      "chartFace": 107715,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.21801817774772644
+    },
+    {
+      "chartFace": 110007,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.31414564514160154
+    },
+    {
+      "chartFace": 112299,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.23280376970767974
+    },
+    {
+      "chartFace": 114591,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.314070821762085
+    },
+    {
+      "chartFace": 116883,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.10005097699165344
+    },
+    {
+      "chartFace": 119174,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.1662158107757568
+    },
+    {
+      "chartFace": 121466,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.3686431350708008
+    },
+    {
+      "chartFace": 123758,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.22152409696578979
+    },
+    {
+      "chartFace": 126050,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.15039275598526
+    },
+    {
+      "chartFace": 128342,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.20471498441696168
+    },
+    {
+      "chartFace": 130634,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.21589392471313476
+    },
+    {
+      "chartFace": 132925,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.14124405574798582
+    },
+    {
+      "chartFace": 135217,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.32524840641021724
+    },
+    {
+      "chartFace": 137509,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.22319060635566712
+    },
+    {
+      "chartFace": 139801,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.24658423256874085
+    },
+    {
+      "chartFace": 142093,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.237697468996048
+    },
+    {
+      "chartFace": 144385,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.08591984987258913
+    },
+    {
+      "chartFace": 146676,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.1749599118232727
+    },
+    {
+      "chartFace": 148968,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.10177393531799318
+    },
+    {
+      "chartFace": 151260,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.1361015243530273
+    },
+    {
+      "chartFace": 153552,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.15106169605255124
+    },
+    {
+      "chartFace": 155844,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.23272798728942873
+    },
+    {
+      "chartFace": 158136,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.1560544033050537
+    },
+    {
+      "chartFace": 160427,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.3273737460076809
+    },
+    {
+      "chartFace": 162719,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.03035626363754272
+    },
+    {
+      "chartFace": 165011,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.07954085969924926
+    },
+    {
+      "chartFace": 167303,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.03554023015499113
+    },
+    {
+      "chartFace": 169595,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.026320409297943104
+    },
+    {
+      "chartFace": 171887,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.01037185835838315
+    },
+    {
+      "chartFace": 174178,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.006744413375854496
+    },
+    {
+      "chartFace": 176470,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": -0.08245367240905763
+    },
+    {
+      "chartFace": 178762,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.5200770752727986
+    },
+    {
+      "chartFace": 181054,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.3011793251037598
+    },
+    {
+      "chartFace": 183346,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.4316322716474533
+    },
+    {
+      "chartFace": 185637,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.2223631944656372
+    },
+    {
+      "chartFace": 187929,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.1709128189086914
+    },
+    {
+      "chartFace": 190221,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.07115370798110959
+    },
+    {
+      "chartFace": 192513,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.16937532961368557
+    },
+    {
+      "chartFace": 194805,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.017261223793029787
+    },
+    {
+      "chartFace": 197097,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.1485959339141846
+    },
+    {
+      "chartFace": 199388,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.11306654644012451
+    },
+    {
+      "chartFace": 201680,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.030133178234100368
+    },
+    {
+      "chartFace": 203972,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.6197646996974945
+    },
+    {
+      "chartFace": 206264,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.433203948020935
+    },
+    {
+      "chartFace": 208556,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.3556142377853393
+    },
+    {
+      "chartFace": 210848,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.2554980869293213
+    },
+    {
+      "chartFace": 213139,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.1677625370025635
+    },
+    {
+      "chartFace": 215431,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.19697987031936645
+    },
+    {
+      "chartFace": 217723,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.22335703849792482
+    },
+    {
+      "chartFace": 220015,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.0661999650001526
+    },
+    {
+      "chartFace": 222307,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.1629115900993347
+    },
+    {
+      "chartFace": 224599,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.5854405312538147
+    },
+    {
+      "chartFace": 226890,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.26640576279163364
+    },
+    {
+      "chartFace": 229182,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.17353707599639895
+    },
+    {
+      "chartFace": 231474,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.5739739956855774
+    },
+    {
+      "chartFace": 233766,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.4031672885417938
+    },
+    {
+      "chartFace": 236058,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.530303925871849
+    },
+    {
+      "chartFace": 238349,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.24001150512695307
+    },
+    {
+      "chartFace": 240641,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.6706489336490631
+    },
+    {
+      "chartFace": 242933,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.5455944313406944
+    },
+    {
+      "chartFace": 245225,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.7887330665588379
+    },
+    {
+      "chartFace": 247517,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.48332568883895866
+    },
+    {
+      "chartFace": 249809,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.4800893216133117
+    },
+    {
+      "chartFace": 252100,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.5963929500579834
+    },
+    {
+      "chartFace": 254392,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.4960088616013527
+    },
+    {
+      "chartFace": 256684,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.636176965713501
+    },
+    {
+      "chartFace": 258976,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.7925985388755798
+    },
+    {
+      "chartFace": 261268,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.7227554103136062
+    },
+    {
+      "chartFace": 263560,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.7509760746955871
+    },
+    {
+      "chartFace": 265851,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.7186271825432777
+    },
+    {
+      "chartFace": 268143,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.6745718746185303
+    },
+    {
+      "chartFace": 270435,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.7112786369323731
+    },
+    {
+      "chartFace": 272727,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.8378484025001525
+    },
+    {
+      "chartFace": 275019,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.6503088151216507
+    },
+    {
+      "chartFace": 277311,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.8676134279966354
+    },
+    {
+      "chartFace": 279602,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.934302526831627
+    },
+    {
+      "chartFace": 281894,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.7207023218870163
+    },
+    {
+      "chartFace": 284186,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.9561656337976455
+    },
+    {
+      "chartFace": 286478,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.8323682273626327
+    },
+    {
+      "chartFace": 288770,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.98897110080719
+    },
+    {
+      "chartFace": 291062,
+      "weights": [
+        0.2,
+        0.3,
+        0.5
+      ],
+      "coverage": 1.0,
+      "geometricCoverage": 1.0,
+      "valid": true,
+      "value": 0.38332372331619263
+    }
+  ]
+}

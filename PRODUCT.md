@@ -51,12 +51,15 @@ Schaefer atlases, anatomical views) rather than generic 3D-mesh viewing.
 ## Capabilities and Constraints
 
 - Real geometry on hand: fsaverage5 left and right pial (`tests/data/`),
-  fs_LR 32k inflated left, sample GIFTI/PLY fixtures.
+  fs_LR 32k inflated left, sample GIFTI/PLY fixtures. The user-required matched
+  S1 left white/pial/inflated/flat set lives in `demo/data/flatmap/`, with pinned
+  provenance, explicit chart exclusions and seam correspondence.
 - Atlases on hand: Glasser HCP-MMP1.0 and Schaefer 400 (7 and 17 networks) on
   fs_LR 32k left, with licences and provenance READMEs (`demo/data/`).
 - Data maps in the demo are synthetic but must be placed anatomically on real
   meshes and labelled synthetic wherever a visitor could mistake them for
-  results. No new downloaded datasets.
+  results. Additional datasets require a task-specific reason and provenance;
+  the matched S1 set was explicitly requested for flatmap/relief acceptance.
 - `three` is a peer dependency; the demo must keep working from the library's
   public exports (`src/index.ts`), not deep imports.
 - WebGL2 is required for GPU compositing and 3D volume textures; CPU fallbacks

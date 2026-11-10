@@ -5,8 +5,20 @@ import type { RibbonIntegrationOptions, RibbonVolumeGrid } from './RibbonIntegra
 import type { ApplySurfaceOptions } from './SparsePlan';
 import type { GeometryErrorCode } from './GeometryError';
 import type { GeodesicOptions } from './GeodesicIndex';
+import type { FlatMapChartOptions } from '../flatmap/FlatMapChart';
+import type { FlatMapRasterGrid, FlatMapTile } from '../flatmap/FlatMapRasterPlan';
+import type { FlatMapVolumeSource, FlatMapMissingPolicy, FlatMapSamples } from '../flatmap/FlatMapSamplingPlan';
+import type { SurfaceReliefOptions } from '../relief/SurfaceRelief';
 
+export interface GeometryWorkerDiagnostics { resources: number; retainedBytes: number; pendingJobs: number }
 export type GeometryWorkerCommand =
+  | { type: 'diagnostics' }
+  | { type: 'flatmap-chart'; domain: string; options: Omit<FlatMapChartOptions, 'domain'> }
+  | { type: 'flatmap-frame'; values: Float64Array; validity?: Uint8Array }
+  | { type: 'flatmap-sampler'; domain: string; volume?: Omit<FlatMapVolumeSource, 'white' | 'pial'> & { white: string; pial: string } }
+  | { type: 'flatmap-prepare'; chart: string; sampler: string; grid: FlatMapRasterGrid; tile: FlatMapTile }
+  | { type: 'flatmap-apply'; plan: string; frame: string; options?: FlatMapMissingPolicy }
+  | { type: 'flatmap-relief'; chart: string; white: string; pial: string; options?: SurfaceReliefOptions }
   | { type: 'configure'; budgetBytes: number; planBudgetBytes: number }
   | { type: 'domain'; options: SurfaceDomainOptions }
   | { type: 'metric'; domain: string; options: SurfaceMetricOptions }
@@ -22,6 +34,19 @@ export type GeometryWorkerCommand =
   | { type: 'geodesic-index'; metric: string; options?: GeodesicOptions }
   | { type: 'geodesic-query'; index: string; seeds: Uint32Array; radiusMm: number }
   | { type: 'release'; handle: string };
+/** Result types for the quantitative feature's protocol boundary. */
+export interface FlatMapWorkerResults {
+  'flatmap-chart': string;
+  'flatmap-frame': string;
+  'flatmap-sampler': string;
+  'flatmap-prepare': string;
+  'flatmap-apply': FlatMapSamples;
+  'flatmap-relief': {
+    rawHeightMm: Float64Array; heightMm: Float64Array; valid: Uint8Array; attributes: Float32Array;
+    method: 'log-gaussian-relief-v1'; mmPerUnit: number; regularizationFwhmMm: number; detrendFwhmMm: number;
+  };
+}
+export type FlatMapWorkerCommand = Extract<GeometryWorkerCommand, { type: keyof FlatMapWorkerResults }>;
 /**
  * `clientId` scopes request ids for workers shared by independently-created
  * clients (including clients from separate copies of the package).

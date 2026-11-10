@@ -1,0 +1,13 @@
+{
+  "before": {
+    "representedPixels": 92000,
+    "fractionChangingByAtLeast20": 0.005467391304347826,
+    "meanMaximumChannelChange": 3.129021739130435
+  },
+  "after": {
+    "representedPixels": 91985,
+    "fractionChangingByAtLeast20": 0.6408544871446431,
+    "meanMaximumChannelChange": 34.16204816002609
+  },
+  "method": "1440x900 screenshots; same x=560:980,y=200:680 flatmap crop; exclude pixels within five RGB levels of the film background in either image; fixed color range [-1.2,1.2]"
+}

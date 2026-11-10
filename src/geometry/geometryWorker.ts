@@ -7,9 +7,13 @@ import { buildSurfaceResamplingPlanSteps, SurfaceResamplingPlan } from './Surfac
 import { buildRibbonIntegrationPlanSteps, RibbonIntegrationPlan } from './RibbonIntegration';
 import { GeodesicIndex } from './GeodesicIndex';
 import type { GeometryWorkerRequest, GeometryWorkerCancellation, GeometryWorkerCommand, GeometryWorkerResponse } from './geometryWorkerProtocol';
+import { FlatMapChart } from '../flatmap/FlatMapChart';
+import { buildFlatMapRasterSteps } from '../flatmap/FlatMapRasterPlan';
+import { FlatMapFrame, FlatMapSampler, PreparedFlatMapTile } from '../flatmap/FlatMapSamplingPlan';
+import { buildSurfaceReliefSteps } from '../relief/SurfaceRelief';
 
 let executor = new GeometryExecutor({ timeSliceMs: 4 });
-type Resource = PreparedSurfaceSmoothing | SurfaceDomain | SurfaceMetric | SurfaceSmoothingPlan | SurfaceResamplingPlan | RibbonIntegrationPlan | GeodesicIndex;
+type Resource = PreparedSurfaceSmoothing | SurfaceDomain | SurfaceMetric | SurfaceSmoothingPlan | SurfaceResamplingPlan | RibbonIntegrationPlan | GeodesicIndex | FlatMapChart | FlatMapFrame | FlatMapSampler | PreparedFlatMapTile;
 const resources = new Map<string, { value: Resource; dependencies: string[]; released: boolean }>();
 const controllers = new Map<string, AbortController>();
 let configurationLocked = false;
@@ -32,6 +36,29 @@ function release(id: string): void {
 function* execute(command: GeometryWorkerCommand): Generator<void, unknown, void> {
   yield;
   switch (command.type) {
+    case 'diagnostics': return { resources: resources.size, retainedBytes: executor.retainedBytes, pendingJobs: Math.max(0, executor.pendingJobs - 1) };
+    case 'flatmap-chart': return retain(new FlatMapChart({ ...command.options, domain: resource(command.domain, SurfaceDomain) }), [command.domain]);
+    case 'flatmap-frame': return retain(new FlatMapFrame(command.values, command.validity, executor.planBudgetBytes));
+    case 'flatmap-sampler': {
+      const domain = resource(command.domain, SurfaceDomain), volume = command.volume;
+      if (!volume) return retain(new FlatMapSampler({ kind: 'vertex-scalar', domain }), [command.domain]);
+      const white = resource(volume.white, SurfaceMetric), pial = resource(volume.pial, SurfaceMetric);
+      if (white.domain !== domain || pial.domain !== domain) throw new GeometryError('invalid-domain', 'Volume metrics belong to another domain');
+      return retain(new FlatMapSampler({ ...volume, white, pial }), [command.domain, volume.white, volume.pial]);
+    }
+    case 'flatmap-prepare': {
+      const sampler = resource(command.sampler, FlatMapSampler);
+      const rasterBytes = command.tile.width * command.tile.height * 56;
+      checkBudget(rasterBytes + command.tile.width * command.tile.height * sampler.sampleCount * (sampler.slots * 12 + 1), executor.planBudgetBytes);
+      const raster = yield* buildFlatMapRasterSteps(resource(command.chart, FlatMapChart), command.grid, command.tile, executor.planBudgetBytes);
+      return retain(yield* sampler.prepareSteps(raster, executor.planBudgetBytes), [command.chart, command.sampler]);
+    }
+    case 'flatmap-apply': return yield* resource(command.plan, PreparedFlatMapTile).applySteps(resource(command.frame, FlatMapFrame), command.options);
+    case 'flatmap-relief': {
+      const relief = yield* buildSurfaceReliefSteps(resource(command.chart, FlatMapChart), resource(command.white, SurfaceMetric), resource(command.pial, SurfaceMetric), command.options);
+      return { rawHeightMm: relief.copyRawHeightMm(), heightMm: relief.copyHeightMm(), valid: relief.copyValidity(), attributes: relief.copyDisplayAttributes(),
+        method: relief.method, mmPerUnit: relief.mmPerUnit, regularizationFwhmMm: relief.regularizationFwhmMm, detrendFwhmMm: relief.detrendFwhmMm };
+    }
     case 'domain': return retain(new SurfaceDomain(command.options));
     case 'metric': return retain(new SurfaceMetric(resource(command.domain, SurfaceDomain), command.options), [command.domain]);
     case 'smoothing': return retain(yield* buildSurfaceSmoothingPlanSteps(resource(command.metric, SurfaceMetric), command.options), [command.metric]);

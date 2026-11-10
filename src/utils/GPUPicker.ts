@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { debugLog } from '../debug';
 import { finiteNumber } from './validation';
 import { isObjectDrawn } from './Picking';
+import { getDisplayDeformation } from '../geometry/DisplayDeformation';
+import { anatomicalDisplayVertex } from '../geometry/DisplayGeometryBinding';
 
 /**
  * Result of a GPU pick operation
@@ -45,6 +47,7 @@ export interface FacePickGeometry {
  * This allows encoding up to 16,777,216 vertices (2^24).
  */
 const pickingVertexShader = `
+  #include <clipping_planes_pars_vertex>
   attribute float faceId;
   varying vec3 vPickColor;
 
@@ -57,14 +60,18 @@ const pickingVertexShader = `
     float b = mod(floor(id / 65536.0), 256.0) / 255.0;
     vPickColor = vec3(r, g, b);
 
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+    gl_Position = projectionMatrix * mvPosition;
+    #include <clipping_planes_vertex>
   }
 `;
 
 const pickingFragmentShader = `
+  #include <clipping_planes_pars_fragment>
   varying vec3 vPickColor;
 
   void main() {
+    #include <clipping_planes_fragment>
     gl_FragColor = vec4(vPickColor, 1.0);
   }
 `;
@@ -163,21 +170,9 @@ export function pickNearestVertexOnFace(
   }
 
   const [aIndex, bIndex, cIndex] = vertexIndices;
-  const a = new THREE.Vector3(
-    position.getX(aIndex),
-    position.getY(aIndex),
-    position.getZ(aIndex)
-  ).applyMatrix4(mesh.matrixWorld);
-  const b = new THREE.Vector3(
-    position.getX(bIndex),
-    position.getY(bIndex),
-    position.getZ(bIndex)
-  ).applyMatrix4(mesh.matrixWorld);
-  const c = new THREE.Vector3(
-    position.getX(cIndex),
-    position.getY(cIndex),
-    position.getZ(cIndex)
-  ).applyMatrix4(mesh.matrixWorld);
+  const a = mesh.getVertexPosition(aIndex, new THREE.Vector3()).applyMatrix4(mesh.matrixWorld);
+  const b = mesh.getVertexPosition(bIndex, new THREE.Vector3()).applyMatrix4(mesh.matrixWorld);
+  const c = mesh.getVertexPosition(cIndex, new THREE.Vector3()).applyMatrix4(mesh.matrixWorld);
 
   // The ID buffer shows the face under the pixel centre, but the ray passes
   // through the exact cursor, so near an edge it can just miss that face. The
@@ -299,7 +294,13 @@ export class GPUPicker {
     }
 
     // Create pick mesh with shared material
-    const pickMesh = new THREE.Mesh(pickGeometry, this.pickMaterial);
+    const deformation = getDisplayDeformation(mesh);
+    const material = deformation ? new THREE.ShaderMaterial({
+      vertexShader: deformation.declarations + pickingVertexShader.replace('vec4(position, 1.0)', `vec4(${deformation.positionExpression}, 1.0)`),
+      fragmentShader: pickingFragmentShader, uniforms: deformation.uniforms, side: THREE.DoubleSide, clipping: true
+    }) : this.pickMaterial;
+    const pickMesh = new THREE.Mesh(pickGeometry, material);
+    pickMesh.frustumCulled = false; // Source bounds include the current deformation.
     pickMesh.matrixAutoUpdate = false; // We'll sync manually
 
     this.pickScene.add(pickMesh);
@@ -326,6 +327,7 @@ export class GPUPicker {
 
     this.pickScene.remove(surface.pickMesh);
     surface.pickMesh.geometry.dispose();
+    if (surface.pickMesh.material !== this.pickMaterial) (surface.pickMesh.material as THREE.Material).dispose();
     this.surfaces.delete(id);
     this.lastPickResult = null;
 
@@ -347,6 +349,11 @@ export class GPUPicker {
       // keeps surfaces outside the camera's layers unpickable too.
       surface.pickMesh.visible = isObjectDrawn(surface.mesh);
       surface.pickMesh.layers.mask = surface.mesh.layers.mask;
+      if (surface.pickMesh.material !== this.pickMaterial && !Array.isArray(surface.mesh.material)) {
+        const material = surface.pickMesh.material as THREE.ShaderMaterial;
+        material.clippingPlanes = surface.mesh.material.clippingPlanes;
+        material.clipIntersection = surface.mesh.material.clipIntersection;
+      }
     }
   }
 
@@ -506,7 +513,7 @@ export class GPUPicker {
     const hit = pickNearestVertexOnFace(surface.mesh, faceIndex, this.pickRaycaster.ray);
     return {
       surfaceId: surface.id,
-      vertexIndex: hit.vertexIndex,
+      vertexIndex: hit.vertexIndex === null ? null : anatomicalDisplayVertex(surface.mesh, hit.vertexIndex),
       point: hit.point,
       faceIndex
     };
@@ -556,6 +563,7 @@ export class GPUPicker {
 
     for (const surface of this.surfaces.values()) {
       surface.pickMesh.geometry.dispose();
+    if (surface.pickMesh.material !== this.pickMaterial) (surface.pickMesh.material as THREE.Material).dispose();
     }
     this.surfaces.clear();
 

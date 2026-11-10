@@ -7,7 +7,7 @@ export { GeometryExecutor, runGeometrySync } from './GeometryExecutor';
 export type { GeometryJobOptions } from './GeometryExecutor';
 export { GeometryWorkerClient } from './GeometryWorkerClient';
 export type { GeometryWorker } from './GeometryWorkerClient';
-export type { GeometryWorkerCommand } from './geometryWorkerProtocol';
+export type { GeometryWorkerCommand, GeometryWorkerDiagnostics } from './geometryWorkerProtocol';
 export { vertexLocation, triangleLocation, evaluateSurfaceStrokePoint, evaluateSurfaceLocation, evaluateSurfaceAnchor, exportSurfaceLocations, importSurfaceLocations, exportSurfaceAnchors, importSurfaceAnchors, remapSurfaceLocation } from './SurfaceLocation';
 export type { SurfaceLocation, SurfaceAnchor, SurfacePositionBinding, SerializedSurfaceLocations, SerializedSurfaceAnchors } from './SurfaceLocation';
 export { EditableSurfaceCurve, boundaryCurveToEditable, evaluateSurfacePolyline } from './SurfaceCurves';

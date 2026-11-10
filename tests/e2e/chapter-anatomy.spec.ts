@@ -180,7 +180,7 @@ test.describe('Anatomy & views chapter', () => {
     await openMode(page, 'Flat map');
 
     await expect(page.locator('[data-visual-qa="linked-flatmap"]')).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('[data-linked-flatmap-status]')).toContainText(/Ready: \d+ linked vertices/);
+    await expect(page.locator('[data-linked-flatmap-status]')).toContainText(/Ready: [\d,]+ linked vertices/);
 
     const flatmapCanvas = page.locator('[data-visual-qa="linked-flatmap-canvas"]');
     await expect(flatmapCanvas).toBeVisible();

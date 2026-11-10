@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GPUPicker } from '../utils/GPUPicker';
 import { isObjectDrawn } from '../utils/Picking';
-import { getDisplayGeometryBinding } from '../geometry/DisplayGeometryBinding';
+import { anatomicalDisplayVertex, getDisplayGeometryBinding } from '../geometry/DisplayGeometryBinding';
 import type { SurfaceLocation } from '../geometry/SurfaceLocation';
 
 export interface ViewerPickResult {
@@ -125,7 +125,7 @@ export class ViewerPickingController {
 
     return {
       surfaceId: hit.surfaceId ?? null,
-      vertexIndex: closestIndex,
+      vertexIndex: anatomicalDisplayVertex(mesh, closestIndex),
       point: hit.point.clone()
     };
   }

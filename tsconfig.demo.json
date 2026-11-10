@@ -13,7 +13,9 @@
     }
   },
   "include": [
-    "demo/**/*.ts"
+    "demo/**/*.ts",
+    "tests/flatmap-fixture.ts",
+    "tests/flatmap-performance.ts"
   ],
   "exclude": [
     "node_modules",

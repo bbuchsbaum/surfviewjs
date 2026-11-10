@@ -56,6 +56,8 @@ assert.ok(statisticsSource.includes("from 'surfview'"));
 
 const geometryGuide = await readFile(join(projectRoot, 'docs/guide/surface-geometry.md'), 'utf8');
 assert.ok(geometryGuide.includes('<<< ../../examples/surface-geometry.ts'));
+const flatmapGuide = await readFile(join(projectRoot, 'docs/guide/quantitative-flatmaps.md'), 'utf8');
+assert.ok(flatmapGuide.includes('<<< ../../examples/quantitative-flatmap.ts'));
 
 process.stdout.write(
   'documentation example linkage passed: README and guides use the canonical packed-consumer examples\n'

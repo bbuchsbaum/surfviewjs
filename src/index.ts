@@ -765,3 +765,11 @@ export type {
 
 export { magnitudeOpacityAt, normalizeMagnitudeOpacity } from './layers/magnitudeOpacity';
 export type { ResolvedMagnitudeOpacity } from './layers/magnitudeOpacity';
+// Display extension hooks and validation shared with optional feature entries.
+export { checkBudget, checkFinite, checkFraction, checkIndex, checkMask } from './geometry/GeometryError';
+export { geometryDigest } from './geometry/SurfaceDomain';
+export { registerDisplayBinding } from './geometry/DisplayGeometryBinding';
+export type { DisplayBinding } from './geometry/DisplayGeometryBinding';
+export { registerDisplayDeformation } from './geometry/DisplayDeformation';
+export type { DisplayDeformation } from './geometry/DisplayDeformation';
+export type { QuantitativeFlatMapAttachment } from './FlatMapView';

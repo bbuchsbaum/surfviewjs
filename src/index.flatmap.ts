@@ -1,0 +1,23 @@
+// Quantitative cut charts, scalar-before-LUT presentation and display-only relief.
+export { FlatMapChart } from './flatmap/FlatMapChart';
+export type { FlatMapChartOptions, FlatMapHit } from './flatmap/FlatMapChart';
+export { buildFlatMapRaster, buildFlatMapRasterSteps, rasterPoint } from './flatmap/FlatMapRasterPlan';
+export type { FlatMapRasterGrid, FlatMapTile, FlatMapRasterTile } from './flatmap/FlatMapRasterPlan';
+export { FlatMapFrame, FlatMapSampler, PreparedFlatMapTile, FLATMAP_SAMPLE_STATUSES } from './flatmap/FlatMapSamplingPlan';
+export type { FlatMapSamples, FlatMapInspection, FlatMapMissingPolicy, FlatMapVolumeSource, FlatMapVertexSource, FlatMapSource, FlatMapSampleStatus } from './flatmap/FlatMapSamplingPlan';
+export { FlatMapController } from './flatmap/FlatMapController';
+export type { FlatMapControllerOptions, FlatMapControllerDiagnostics, FlatMapControllerEvents } from './flatmap/FlatMapController';
+export { FlatMapField } from './flatmap/FlatMapFieldMaterial';
+export { CanvasFlatMapRenderer, WebGLFlatMapRenderer } from './flatmap/FlatMapRenderer';
+export type { FlatMapRenderer } from './flatmap/FlatMapRenderer';
+export type { FlatMapPresentation } from './flatmap/FlatMapPresentation';
+export { FlatMapViewAttachment } from './flatmap/FlatMapViewAttachment';
+export { FlatMapSurfaceBinding } from './flatmap/FlatMapSurfaceBinding';
+export type { FlatMapSurfaceOptions } from './flatmap/FlatMapSurfaceBinding';
+export { SurfaceRelief, buildSurfaceRelief, buildSurfaceReliefSteps, buildSurfaceReliefInWorker } from './relief/SurfaceRelief';
+export type { SurfaceReliefOptions } from './relief/SurfaceRelief';
+export { computeFlatMapDistortion, flatMapAreaCalibration } from './relief/FlatMapDistortion';
+export type { FlatMapDistortion } from './relief/FlatMapDistortion';
+export { ReliefDisplayBinding } from './relief/ReliefDisplayBinding';
+export { exportFlatMap } from './flatmap/FlatMapExport';
+export type { FlatMapExportOptions } from './flatmap/FlatMapExport';

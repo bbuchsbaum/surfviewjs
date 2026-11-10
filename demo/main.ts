@@ -114,6 +114,7 @@ function markActive() {
 function presentExcerpt(source: string): string {
   return source
     .replace(/from '@src\/index\.js'/g, "from 'surfview'")
+    .replace(/from '@src\/index\.flatmap\.js'/g, "from 'surfview/flatmap'")
     .replace(/from '@src\/controls-ui\/index\.js'/g, "from 'surfview/controls'")
     .replace(/^\/\/ @excerpt-hide[\s\S]*?\/\/ @excerpt-show\n/gm, '')
     .trim();
