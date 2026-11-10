@@ -33,6 +33,39 @@ function validateExport(record: any): void {
   expect(minimumRatio).toBeGreaterThanOrEqual(1e-4);
 }
 
+test('parcel inspection stays unavailable while a replacement dataset is loading', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/demo/map-lab.html?dataset=toy');
+  const root = page.locator('.parcel-map-lab');
+  const inspector = page.getByLabel('Inspect map parcel', { exact: true });
+  await expect(root).toHaveAttribute('data-ready', 'true', { timeout: 30000 });
+  await inspector.selectOption('1');
+  await expect(page.locator('.pml-detail')).toBeVisible();
+
+  let release!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/glasser/left-fslr32k.json*', async route => {
+    await held;
+    await route.continue();
+  });
+  await page.getByLabel('Map dataset', { exact: true }).selectOption('glasser');
+  try {
+    await expect(root).toHaveAttribute('data-ready', 'false');
+    await expect(inspector).toBeDisabled();
+    await expect(page.locator('.pml-detail')).toBeHidden();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.pml-detail')).toBeHidden();
+  } finally {
+    release();
+  }
+  await expect(root).toHaveAttribute('data-ready', 'true', { timeout: 30000 });
+  await expect(inspector).toBeEnabled();
+  await inspector.selectOption('1');
+  await expect(page.locator('[data-preview] canvas')).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test('small map supports optimization, original-shape inspection, saved comparisons, alternate boundaries, and mobile export', async ({ page }, testInfo) => {
   test.setTimeout(90000);
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));

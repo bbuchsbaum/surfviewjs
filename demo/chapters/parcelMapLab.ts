@@ -375,6 +375,10 @@ export const parcelMapLab: Scenario = {
       previewMesh = null;
     }
     function selectPiece(owner: number | null): void {
+      // Outline/dataset changes rebuild the shells asynchronously. A stale
+      // selection must not open a detail view against the previous mesh.
+      if (owner !== null && (!mesh || !shells || root.dataset.ready !== 'true' ||
+        !shells.pieces.has(mesh.parcelIds[owner]!))) owner = null;
       selected = owner;
       $('.pml-detail').hidden = owner === null;
       inspector.value = owner === null ? '' : String(mesh!.parcelIds[owner]);
@@ -541,6 +545,7 @@ export const parcelMapLab: Scenario = {
       abort = controller;
       root.dataset.ready = 'false';
       root.dataset.running = 'false';
+      inspector.disabled = true;
       loading.hidden = false;
       loading.textContent = 'Building the shared cortical sheet';
       selectPiece(null);
@@ -579,6 +584,7 @@ export const parcelMapLab: Scenario = {
         makeLoops();
         loading.hidden = true;
         root.dataset.ready = 'true';
+        inspector.disabled = false;
         root.dataset.dataset = dataset;
         refresh();
         save('Starting map');
