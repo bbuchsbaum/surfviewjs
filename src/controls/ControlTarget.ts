@@ -95,7 +95,17 @@ export interface OutlineControls {
 export interface LayerColorPreviewDescriptor {
   readonly kind: 'solid' | 'colormap' | 'categorical';
   readonly label: string;
+  /** Compact CSS swatch (a short gradient for colormaps). */
   readonly css: string;
+  /**
+   * Colormap previews only: CSS colours sampled evenly with the layer's own
+   * colour lookup from the low to the high end of `range`, ignoring the
+   * threshold mask. Present when the layer can sample its colour key, so
+   * custom colour arrays preview as drawn rather than as a generic ramp.
+   */
+  readonly stops?: readonly string[];
+  /** The value interval `stops` span (the layer's colour-key range). */
+  readonly range?: readonly [number, number];
 }
 
 /**

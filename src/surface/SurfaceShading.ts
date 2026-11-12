@@ -4,25 +4,45 @@ import * as THREE from 'three';
  * Fragment-level surface shading shared by CPU-composited surfaces.
  *
  * - Threshold edges: the top thresholded data layer is not baked into vertex
- *   colours. Its colour and a per-vertex visibility sign (+1 shown, -1
- *   hidden; see `writeThresholdEdgeSigns`) travel as vertex attributes.
- *   Interpolated across triangles, the sign crosses zero midway between a
- *   shown and a hidden vertex, so the shader draws the threshold as a smooth
- *   contour there rather than a per-vertex staircase. The anti-aliasing ramp
- *   is one-sided: fragments on the hidden side get no colour (no faint
- *   "ghost rings" around sub-threshold patches), fragments on the shown side
- *   get at least half colour and full colour within one pixel of the contour.
+ *   colours. Its colour and a per-vertex edge value travel as vertex
+ *   attributes, and the shader decides per fragment whether the map shows.
+ *   With `thresholdContour: 'vertex'` (the default) the edge value is each
+ *   vertex's visibility sign (+1 shown, -1 hidden; see
+ *   `writeThresholdEdgeSigns`): interpolated across triangles it crosses zero
+ *   midway between a shown and a hidden vertex, so the contour joins edge
+ *   midpoints and follows the mesh. With `'interpolated'` the edge value is
+ *   the data value itself (relative to the middle of the mask) and the shader
+ *   thresholds the barycentrically interpolated value, so the contour follows
+ *   the data's isoline, as a CPU rasteriser that thresholds after
+ *   interpolation draws it. Either way the anti-aliasing ramp is one-sided:
+ *   fragments on the hidden side get no colour (no faint "ghost rings" around
+ *   sub-threshold patches), fragments on the shown side get at least half
+ *   colour and full colour within one pixel of the contour, so every vertex
+ *   is drawn as the per-vertex colormap mask says at its own position.
  * - Threshold outline: an optional darker band just inside that isoline.
  * - Silhouette darkening: grazing-angle darkening that separates overlapping
  *   hemispheres and gives the cortex a solid, drawn edge.
+ * - Overlay lighting bounds: an optional cap on how far shading (diffuse and
+ *   specular light, silhouette darkening and emission together) may brighten
+ *   or darken the overlay, so map colours stay readable against their key.
  * - Colour management: vertex and overlay colours are display (sRGB) values,
  *   as colormaps and hex colours are written; the patch decodes them to linear
  *   per vertex so lighting happens in linear light and the renderer's sRGB
  *   output encoding is applied exactly once.
  */
+/**
+ * Where a fragment-level threshold contour runs between a shown and a hidden
+ * vertex: `'vertex'` midway along each triangle edge (it follows the mesh),
+ * `'interpolated'` where the linearly interpolated value crosses the threshold
+ * (it follows the data).
+ */
+export type ThresholdContour = 'vertex' | 'interpolated';
+
 export interface SurfaceShadingOptions {
   /** Draw thresholded data layers with per-fragment isolines. Default true. */
   thresholdEdges?: boolean;
+  /** How the threshold contour is placed; see {@link ThresholdContour}. Default `'vertex'`. */
+  thresholdContour?: ThresholdContour;
   /** Outline band width in screen-space derivative units (0 disables). Default 0. */
   thresholdOutline?: number;
   /** Colour multiplier inside the outline band (0 black, 1 invisible). Default 0.55. */
@@ -35,6 +55,16 @@ export interface SurfaceShadingOptions {
    * slopes); a partial emissive term keeps overlay hues true. Default 0.
    */
   overlayEmission?: number;
+  /**
+   * Bounds `[min, max]` on the factor by which shading may scale the overlay's
+   * displayed (sRGB) colour, e.g. `[0.85, 1.08]`: lighting still models the
+   * folds, but a peak never renders much lighter or darker than its
+   * colour-key colour. Applied in linear light as the gamma-2.2 equivalents.
+   * Null (the default) leaves overlay lighting unbounded. The top data layer
+   * is drawn as the fragment overlay whenever bounds are set, thresholded or
+   * not.
+   */
+  overlayLighting?: readonly [number, number] | null;
 }
 
 export interface SurfaceShadingUniforms {
@@ -44,6 +74,10 @@ export interface SurfaceShadingUniforms {
   surfviewOutlineShade: { value: number };
   surfviewSilhouette: { value: number };
   surfviewEmission: { value: number };
+  /** x: 1 when the edge attribute holds offsets from the mask's middle; y: mask half-width. */
+  surfviewThreshold: { value: THREE.Vector2 };
+  /** x, y: linear-light gain bounds; z: 1 when bounded. */
+  surfviewOverlayLighting: { value: THREE.Vector3 };
 }
 
 export const SURFACE_REFERENCE_ATTRIBUTE = 'surfviewReferenceMembership';
@@ -97,6 +131,32 @@ export function writeThresholdEdgeSigns(edges: Float32Array): Float32Array {
   return edges;
 }
 
+/** Display (sRGB) gain to the equivalent linear-light gain. */
+const DISPLAY_GAMMA = 2.2;
+
+function overlayLightingBounds(value: unknown): readonly [number, number] | null {
+  if (value === null) return null;
+  if (!Array.isArray(value) || value.length !== 2 ||
+      !value.every(bound => typeof bound === 'number' && Number.isFinite(bound) && bound >= 0) ||
+      value[0] > value[1]) {
+    throw new RangeError('overlayLighting must be null or [min, max] with 0 <= min <= max');
+  }
+  return [value[0], value[1]];
+}
+
+function thresholdContourOption(value: unknown): ThresholdContour {
+  if (value !== 'vertex' && value !== 'interpolated') {
+    throw new TypeError("thresholdContour must be 'vertex' or 'interpolated'");
+  }
+  return value;
+}
+
+/** Validate shading options without applying them. */
+export function validateSurfaceShadingOptions(options: SurfaceShadingOptions): void {
+  if (options.thresholdContour !== undefined) thresholdContourOption(options.thresholdContour);
+  if (options.overlayLighting !== undefined) overlayLightingBounds(options.overlayLighting);
+}
+
 function finiteIn(value: number | undefined, fallback: number, name: string, max = Infinity): number {
   if (value === undefined) return fallback;
   if (!Number.isFinite(value) || value < 0 || value > max) {
@@ -112,7 +172,9 @@ export function createSurfaceShadingUniforms(options: SurfaceShadingOptions = {}
     surfviewOutlineWidth: { value: 0 },
     surfviewOutlineShade: { value: 0.55 },
     surfviewSilhouette: { value: 0 },
-    surfviewEmission: { value: 0 }
+    surfviewEmission: { value: 0 },
+    surfviewThreshold: { value: new THREE.Vector2(0, 0) },
+    surfviewOverlayLighting: { value: new THREE.Vector3(0, 0, 0) }
   };
   updateSurfaceShadingUniforms(uniforms, options);
   return uniforms;
@@ -133,6 +195,18 @@ export function updateSurfaceShadingUniforms(
   }
   if (options.silhouetteDarkening !== undefined) {
     uniforms.surfviewSilhouette.value = finiteIn(options.silhouetteDarkening, 0, 'silhouetteDarkening', 1);
+  }
+  if (options.overlayLighting !== undefined) {
+    const bounds = overlayLightingBounds(options.overlayLighting);
+    if (bounds) {
+      uniforms.surfviewOverlayLighting.value.set(
+        Math.pow(bounds[0], DISPLAY_GAMMA),
+        Math.pow(bounds[1], DISPLAY_GAMMA),
+        1
+      );
+    } else {
+      uniforms.surfviewOverlayLighting.value.set(0, 0, 0);
+    }
   }
 }
 
@@ -166,12 +240,16 @@ uniform float surfviewOutlineWidth;
 uniform float surfviewOutlineShade;
 uniform float surfviewSilhouette;
 uniform float surfviewEmission;
+uniform vec2 surfviewThreshold;
+uniform vec3 surfviewOverlayLighting;
 varying vec4 vSurfviewOverlay;
 varying float vSurfviewEdge;
 `;
 
 const FRAGMENT_COLOR = `
 vec3 surfviewGlow = vec3( 0.0 );
+vec3 surfviewOverlayFill = vec3( 0.0 );
+float surfviewOverlayShare = 0.0;
 #if defined( USE_COLOR_ALPHA )
   vec4 surfviewBase = vColor;
 #elif defined( USE_COLOR )
@@ -183,19 +261,25 @@ vec3 surfviewGlow = vec3( 0.0 );
 // This is independent of map range, palette, threshold and opacity.
 float surfviewReferenceAlpha = step( 0.5, vSurfviewReference ) * surfviewReference.a;
 surfviewBase.rgb = mix( surfviewBase.rgb, surfviewReference.rgb, surfviewReferenceAlpha );
+vec3 surfviewUnderlay = surfviewBase.rgb;
 if ( surfviewEdgeEnabled > 0.5 ) {
-  float surfviewWidth = max( fwidth( vSurfviewEdge ), 1e-6 );
+  // Signed distance to the mask, > 0 where the map shows: the interpolated
+  // sign, or the interpolated value's distance outside the masked interval.
+  float surfviewEdgeDistance = surfviewThreshold.x > 0.5
+    ? abs( vSurfviewEdge ) - surfviewThreshold.y
+    : vSurfviewEdge;
+  float surfviewWidth = max( fwidth( surfviewEdgeDistance ), 1e-6 );
   // One-sided coverage: nothing on the hidden side of the contour, at least
   // half colour on the shown side, full colour one pixel inside.
-  float surfviewInside = vSurfviewEdge >= 0.0
-    ? max( 0.5, smoothstep( 0.0, surfviewWidth, vSurfviewEdge ) )
+  float surfviewInside = surfviewEdgeDistance >= 0.0
+    ? max( 0.5, smoothstep( 0.0, surfviewWidth, surfviewEdgeDistance ) )
     : 0.0;
   vec3 surfviewFill = vSurfviewOverlay.rgb;
   if ( surfviewOutlineWidth > 0.0 ) {
     float surfviewBand = 1.0 - smoothstep(
       surfviewOutlineWidth * surfviewWidth,
       ( surfviewOutlineWidth + 1.0 ) * surfviewWidth,
-      vSurfviewEdge
+      surfviewEdgeDistance
     );
     // Darken light fills fully and dark fills (saturated blues) less, so the
     // rim reads as one weight across the colormap.
@@ -206,7 +290,13 @@ if ( surfviewEdgeEnabled > 0.5 ) {
   float surfviewAlpha = surfviewInside * clamp( vSurfviewOverlay.a, 0.0, 1.0 );
   surfviewBase.rgb = mix( surfviewBase.rgb, surfviewFill * ( 1.0 - surfviewEmission ), surfviewAlpha );
   surfviewGlow = surfviewFill * surfviewEmission * surfviewAlpha;
+  surfviewOverlayFill = surfviewFill;
+  surfviewOverlayShare = surfviewAlpha;
 }
+// The colour this fragment would show unlit (overlay emission included), and
+// the overlay's own albedo, for the overlay lighting bounds.
+vec3 surfviewUnlit = diffuseColor.rgb * mix( surfviewUnderlay, surfviewOverlayFill, surfviewOverlayShare );
+vec3 surfviewOverlayAlbedo = diffuseColor.rgb * surfviewOverlayFill;
 diffuseColor *= surfviewBase;
 `;
 
@@ -219,6 +309,21 @@ const FRAGMENT_SILHOUETTE = `
 if ( surfviewSilhouette > 0.0 ) {
   float surfviewFacing = clamp( abs( dot( normalize( normal ), normalize( vViewPosition ) ) ), 0.0, 1.0 );
   outgoingLight *= mix( 1.0, 1.0 - surfviewSilhouette, pow( 1.0 - surfviewFacing, 2.5 ) );
+}
+// Overlay lighting bounds: the gain shading gave this fragment (lit over
+// unlit luminance) is clamped for the overlay's share of it, so the map's
+// colours stay within the bounds of their key while the underlay stays lit.
+if ( surfviewOverlayLighting.z > 0.5 && surfviewOverlayShare > 0.0 ) {
+  const vec3 surfviewLuma = vec3( 0.2126, 0.7152, 0.0722 );
+  float surfviewUnlitLuma = dot( surfviewUnlit, surfviewLuma );
+  if ( surfviewUnlitLuma > 1e-5 ) {
+    float surfviewGain = dot( outgoingLight, surfviewLuma ) / surfviewUnlitLuma;
+    float surfviewBounded = clamp( surfviewGain, surfviewOverlayLighting.x, surfviewOverlayLighting.y );
+    outgoingLight = max(
+      outgoingLight + surfviewOverlayShare * surfviewOverlayAlbedo * ( surfviewBounded - surfviewGain ),
+      vec3( 0.0 )
+    );
+  }
 }
 #include <opaque_fragment>
 `;
@@ -249,6 +354,6 @@ export function installSurfaceShading(
   };
   const previousKey = material.customProgramCacheKey;
   material.customProgramCacheKey = () =>
-    `${previousKey ? previousKey.call(material) : ''}|surfview-shading-v4`;
+    `${previousKey ? previousKey.call(material) : ''}|surfview-shading-v5`;
   material.needsUpdate = true;
 }

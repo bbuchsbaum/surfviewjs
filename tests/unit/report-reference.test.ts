@@ -85,6 +85,26 @@ describe('persistent report references', () => {
     } finally { controls.dispose(); fixture.dispose(); }
   });
 
+  it('shows the reference opacity as a percentage readout and aria-valuetext', async () => {
+    const fixture = makeReportFixture(true);
+    const controls = new ReportControls(fixture.target);
+    document.body.appendChild(controls.element);
+    try {
+      const slider = controls.element.querySelector<HTMLInputElement>('input[type=range]')!;
+      const readout = controls.element.querySelector<HTMLOutputElement>('output.surfview-report-opacity-value')!;
+      expect(readout.textContent).toBe('20%');
+      expect(slider.getAttribute('aria-valuetext')).toBe('20%');
+      expect(readout.htmlFor.contains(slider.id)).toBe(true);
+
+      slider.value = '0.45';
+      slider.dispatchEvent(new Event('input'));
+      expect(readout.textContent).toBe('45%');
+      await Promise.resolve();
+      expect(fixture.left.getLayer('reference')?.opacity).toBe(0.45);
+      expect(slider.getAttribute('aria-valuetext')).toBe('45%');
+    } finally { controls.dispose(); fixture.dispose(); }
+  });
+
   it('publishes complete bilateral changes atomically and fails reset without partial mutation', () => {
     const fixture = makeReportFixture(true);
     const delivered: unknown[] = [];

@@ -211,6 +211,10 @@ export function assertValidViewerStateNumbers(state: ViewerState): void {
         if (layer.invert !== undefined && typeof layer.invert !== 'boolean') {
           throw new TypeError(`${path}.invert must be a boolean`);
         }
+        if (layer.smoothnessScale !== undefined &&
+            layer.smoothnessScale !== 'data' && layer.smoothnessScale !== 'spread') {
+          throw new TypeError(`${path}.smoothnessScale must be 'data' or 'spread'`);
+        }
       }
     }
     for (const [index, clip] of (surface.clipPlanes ?? []).entries()) {

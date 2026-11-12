@@ -16,6 +16,7 @@ import type {
   SurfViewControlSubscription,
   SurfViewControlTarget
 } from '../controls/ControlTarget';
+import { installReportStyles } from './reportStyles';
 
 const VIEW_LABELS: Record<AnatomicalView, string> = {
   lateral: 'Lateral',
@@ -26,7 +27,30 @@ const VIEW_LABELS: Record<AnatomicalView, string> = {
   posterior: 'Posterior'
 };
 
-let nextViewGroupId = 1;
+let nextControlsId = 1;
+
+/**
+ * Colour-bar length assumed when dropping colliding tick labels (the default
+ * `--surfview-report-colorbar-width`, CSS px) and the 10px tick font's metrics.
+ */
+const COLORBAR_LABEL_WIDTH = 160;
+const TICK_CHAR_WIDTH = 5.6;
+const TICK_LABEL_GAP = 6;
+
+/** Compact tick label: three significant figures and a typographic minus. */
+function formatTick(value: number): string {
+  const rounded = Number(value.toPrecision(3));
+  return String(Object.is(rounded, -0) ? 0 : rounded).replace(/-/g, '\u2212');
+}
+
+/** A CSS percentage of `fraction`, rounded so float noise never reaches the DOM. */
+function percent(fraction: number): string {
+  return `${Number((fraction * 100).toFixed(4))}%`;
+}
+
+function opacityText(opacity: number): string {
+  return `${Math.round(Math.max(0, Math.min(1, opacity)) * 100)}%`;
+}
 
 export interface ReportControlsOptions {
   /** State local to this compact control surface. */
@@ -35,6 +59,12 @@ export interface ReportControlsOptions {
   readonly filename?: string;
   /** Receives a successful export. Defaults to downloading it in the owner document. */
   readonly onExport?: (result: FigureExportResult) => void;
+  /**
+   * Add the default stylesheet (`REPORT_STYLES`) to the document. Default
+   * true. Its rules have zero specificity, so host CSS overrides them without
+   * `!important`; pass false when the page supplies its own styles.
+   */
+  readonly styles?: boolean;
 }
 
 function metadataObject(
@@ -58,12 +88,54 @@ function findLayer(
   return null;
 }
 
+interface ColorbarTick {
+  readonly value: number;
+  readonly position: number;
+  readonly label: string;
+}
+
+/**
+ * Ticks at both limits and at the threshold endpoints inside them. A label
+ * that would collide with one already placed is dropped (limits win).
+ */
+function colorbarTicks(
+  range: readonly [number, number],
+  threshold: readonly [number, number] | null
+): ColorbarTick[] {
+  const [low, high] = range;
+  const span = high - low;
+  const values = [low, high];
+  if (threshold) {
+    for (const value of threshold) {
+      if (value > low && value < high) values.push(value);
+    }
+  }
+  const placed: ColorbarTick[] = [];
+  for (const value of values) {
+    if (placed.some(tick => tick.value === value)) continue;
+    const label = formatTick(value);
+    const position = (value - low) / span;
+    const collides = placed.some(tick => {
+      const separation = Math.abs(tick.position - position) * COLORBAR_LABEL_WIDTH;
+      return separation < ((tick.label.length + label.length) / 2) * TICK_CHAR_WIDTH + TICK_LABEL_GAP;
+    });
+    if (!collides) placed.push({ value, position, label });
+  }
+  return placed.sort((left, right) => left.position - right.position);
+}
+
 /**
  * Compact, dependency-light report controls over one panel-local session.
  *
  * The session is owned by this instance; the target remains caller-owned. The
  * ordinary native controls provide their own keyboard model, so this element
  * deliberately does not claim `role="toolbar"`.
+ *
+ * Presentation comes from class names (`surfview-report-*`) and the
+ * zero-specificity default stylesheet `REPORT_STYLES`, themed by
+ * `--surfview-report-*` custom properties, so hosts can restyle it without
+ * `!important`. No styles are set inline except the colour bar's data-driven
+ * gradient and band positions.
  */
 export class ReportControls {
   readonly element: HTMLElement;
@@ -72,10 +144,16 @@ export class ReportControls {
   private readonly events = new AbortController();
   private readonly subscription: SurfViewControlSubscription;
   private readonly select: HTMLSelectElement;
-  private readonly legend: HTMLSpanElement;
+  private readonly legend: HTMLDivElement;
+  private readonly legendTitle: HTMLSpanElement;
+  private readonly colorbar: HTMLSpanElement;
+  private readonly colorbarRamp: HTMLSpanElement;
+  private readonly colorbarMask: HTMLSpanElement;
+  private readonly legendSummary: HTMLSpanElement;
   private readonly referenceGroup: HTMLFieldSetElement;
   private readonly referenceToggle: HTMLInputElement;
   private readonly referenceOpacity: HTMLInputElement;
+  private readonly referenceOpacityValue: HTMLOutputElement;
   private readonly referenceName: HTMLSpanElement;
   private readonly referenceSwatch: HTMLSpanElement;
   private readonly feedback: HTMLSpanElement;
@@ -84,32 +162,27 @@ export class ReportControls {
   private readonly viewInputs = new Map<AnatomicalView, HTMLInputElement>();
   private readonly onExport: (result: FigureExportResult) => void;
   private optionSignature = '';
+  private colorbarSignature = '';
   private disposed = false;
 
   constructor(
     target: SurfViewControlTarget,
     options: ReportControlsOptions = {}
   ) {
-    this.element = document.createElement('section');
+    const doc = document;
+    if (options.styles !== false) installReportStyles(doc);
+    const instanceId = nextControlsId;
+    nextControlsId += 1;
+
+    this.element = doc.createElement('section');
     this.element.className = 'surfview-report-controls';
     this.element.setAttribute('aria-label', 'Surface report controls');
-    Object.assign(this.element.style, {
-      alignItems: 'center',
-      background: '#f8fafc',
-      border: '1px solid #d7dde5',
-      borderRadius: '6px',
-      color: '#111827',
-      display: 'flex',
-      flexWrap: 'wrap',
-      font: '12px/1.4 system-ui, sans-serif',
-      gap: '6px',
-      marginBottom: '8px',
-      padding: '7px'
-    });
 
-    const mapLabel = document.createElement('label');
+    const mapLabel = doc.createElement('label');
+    mapLabel.className = 'surfview-report-map';
     mapLabel.textContent = 'Map ';
-    this.select = document.createElement('select');
+    this.select = doc.createElement('select');
+    this.select.className = 'surfview-report-map-select';
     this.select.setAttribute('aria-label', 'Displayed surface map');
     this.select.addEventListener('change', () => {
       this.reportResult(this.session.setDisplayedLayer(this.select.value));
@@ -117,61 +190,63 @@ export class ReportControls {
     mapLabel.appendChild(this.select);
     this.element.appendChild(mapLabel);
 
-    this.referenceGroup = document.createElement('fieldset');
-    Object.assign(this.referenceGroup.style, { border: '0', margin: '0', padding: '0', display: 'flex', alignItems: 'center', gap: '6px' });
-    const referenceLegend = document.createElement('legend');
+    this.referenceGroup = doc.createElement('fieldset');
+    this.referenceGroup.className = 'surfview-report-reference';
+    const referenceLegend = doc.createElement('legend');
     referenceLegend.textContent = 'Anatomical reference';
     this.referenceGroup.appendChild(referenceLegend);
-    const referenceLabel = document.createElement('label');
-    this.referenceToggle = document.createElement('input');
+    const referenceLabel = doc.createElement('label');
+    referenceLabel.className = 'surfview-report-reference-toggle';
+    this.referenceToggle = doc.createElement('input');
     this.referenceToggle.type = 'checkbox';
-    this.referenceName = document.createElement('span');
-    this.referenceSwatch = document.createElement('span');
+    this.referenceName = doc.createElement('span');
+    this.referenceName.className = 'surfview-report-reference-name';
+    this.referenceSwatch = doc.createElement('span');
+    this.referenceSwatch.className = 'surfview-report-swatch';
     this.referenceSwatch.setAttribute('aria-hidden', 'true');
-    Object.assign(this.referenceSwatch.style, { display: 'inline-block', width: '12px', height: '12px', border: '1px solid currentColor', marginInline: '4px' });
     referenceLabel.append(this.referenceToggle, this.referenceSwatch, this.referenceName);
-    const opacityLabel = document.createElement('label');
+    const opacityId = `surfview-report-opacity-${instanceId}`;
+    // The readout sits beside the label, so the slider's name stays
+    // "Reference opacity"; aria-valuetext carries the percentage.
+    const opacityGroup = doc.createElement('span');
+    opacityGroup.className = 'surfview-report-opacity';
+    const opacityLabel = doc.createElement('label');
     opacityLabel.textContent = 'Reference opacity ';
-    this.referenceOpacity = document.createElement('input');
+    this.referenceOpacity = doc.createElement('input');
+    this.referenceOpacity.className = 'surfview-report-opacity-slider';
+    this.referenceOpacity.id = opacityId;
     this.referenceOpacity.type = 'range';
     this.referenceOpacity.min = '0';
     this.referenceOpacity.max = '1';
     this.referenceOpacity.step = '0.05';
-    this.referenceOpacity.style.width = '90px';
+    this.referenceOpacityValue = doc.createElement('output');
+    this.referenceOpacityValue.className = 'surfview-report-opacity-value';
+    this.referenceOpacityValue.htmlFor.add(opacityId);
     opacityLabel.appendChild(this.referenceOpacity);
+    opacityGroup.append(opacityLabel, this.referenceOpacityValue);
     this.referenceToggle.addEventListener('change', () => {
       const reference = this.session.getSnapshot().canonical.capabilities.referenceLayers?.layers[0];
       if (reference) this.reportResult(this.session.setLayerVisibility(reference.address, this.referenceToggle.checked));
     }, { signal: this.events.signal });
     this.referenceOpacity.addEventListener('input', () => {
+      const opacity = Number(this.referenceOpacity.value);
+      this.showOpacity(opacity);
       const reference = this.session.getSnapshot().canonical.capabilities.referenceLayers?.layers[0];
-      if (reference) this.reportResult(this.session.setLayerOpacity(reference.address, Number(this.referenceOpacity.value)));
+      if (reference) this.reportResult(this.session.setLayerOpacity(reference.address, opacity));
     }, { signal: this.events.signal });
-    this.referenceGroup.append(referenceLabel, opacityLabel);
+    this.referenceGroup.append(referenceLabel, opacityGroup);
 
-
-    const viewGroup = document.createElement('fieldset');
-    Object.assign(viewGroup.style, {
-      alignItems: 'center',
-      border: '0',
-      display: 'flex',
-      flexWrap: 'wrap',
-      gap: '4px',
-      margin: '0',
-      padding: '0'
-    });
-    const viewLegend = document.createElement('legend');
+    const viewGroup = doc.createElement('fieldset');
+    viewGroup.className = 'surfview-report-views';
+    const viewLegend = doc.createElement('legend');
     viewLegend.textContent = 'Anatomical view';
-    viewLegend.style.cssFloat = 'left';
-    viewLegend.style.marginRight = '2px';
     viewGroup.appendChild(viewLegend);
-    const viewGroupName = `surfview-report-view-${nextViewGroupId}`;
-    nextViewGroupId += 1;
+    const viewGroupName = `surfview-report-view-${instanceId}`;
 
     for (const view of ANATOMICAL_VIEWS) {
-      const label = document.createElement('label');
-      label.style.whiteSpace = 'nowrap';
-      const input = document.createElement('input');
+      const label = doc.createElement('label');
+      label.className = 'surfview-report-view';
+      const input = doc.createElement('input');
       input.type = 'radio';
       input.name = viewGroupName;
       input.value = view;
@@ -185,14 +260,15 @@ export class ReportControls {
           fit: true
         }));
       }, { signal: this.events.signal });
-      label.append(input, document.createTextNode(VIEW_LABELS[view]));
+      label.append(input, doc.createTextNode(VIEW_LABELS[view]));
       viewGroup.appendChild(label);
       this.viewInputs.set(view, input);
     }
     this.element.appendChild(viewGroup);
     this.element.appendChild(this.referenceGroup);
 
-    this.resetButton = document.createElement('button');
+    this.resetButton = doc.createElement('button');
+    this.resetButton.className = 'surfview-report-button surfview-report-reset';
     this.resetButton.type = 'button';
     this.resetButton.textContent = 'Reset';
     this.resetButton.addEventListener('click', () => {
@@ -200,7 +276,8 @@ export class ReportControls {
     }, { signal: this.events.signal });
     this.element.appendChild(this.resetButton);
 
-    this.exportButton = document.createElement('button');
+    this.exportButton = doc.createElement('button');
+    this.exportButton.className = 'surfview-report-button surfview-report-export';
     this.exportButton.type = 'button';
     this.exportButton.textContent = 'PNG';
     this.exportButton.setAttribute('aria-label', 'Export surface view as PNG');
@@ -209,14 +286,31 @@ export class ReportControls {
     }, { signal: this.events.signal });
     this.element.appendChild(this.exportButton);
 
-    this.legend = document.createElement('span');
-    this.legend.setAttribute('aria-live', 'polite');
-    this.legend.style.marginLeft = 'auto';
+    // Colour key: a visible title and gradient bar (hidden from assistive
+    // technology) plus a text summary that is announced when the map changes.
+    this.legend = doc.createElement('div');
+    this.legend.className = 'surfview-report-legend';
+    this.legendTitle = doc.createElement('span');
+    this.legendTitle.className = 'surfview-report-legend-title';
+    this.legendTitle.setAttribute('aria-hidden', 'true');
+    this.colorbar = doc.createElement('span');
+    this.colorbar.className = 'surfview-report-colorbar';
+    this.colorbar.setAttribute('aria-hidden', 'true');
+    this.colorbarRamp = doc.createElement('span');
+    this.colorbarRamp.className = 'surfview-report-colorbar-ramp';
+    this.colorbarMask = doc.createElement('span');
+    this.colorbarMask.className = 'surfview-report-colorbar-mask';
+    this.colorbarRamp.appendChild(this.colorbarMask);
+    this.colorbar.appendChild(this.colorbarRamp);
+    this.legendSummary = doc.createElement('span');
+    this.legendSummary.className = 'surfview-report-sr';
+    this.legendSummary.setAttribute('aria-live', 'polite');
+    this.legend.append(this.legendTitle, this.colorbar, this.legendSummary);
     this.element.appendChild(this.legend);
 
-    this.feedback = document.createElement('span');
+    this.feedback = doc.createElement('span');
+    this.feedback.className = 'surfview-report-feedback';
     this.feedback.setAttribute('aria-live', 'polite');
-    this.feedback.style.color = '#991b1b';
     this.element.appendChild(this.feedback);
 
     this.onExport = options.onExport ?? (result => {
@@ -270,17 +364,15 @@ export class ReportControls {
     this.select.value = exclusiveMap?.displayedLayerId ?? '';
     const reference = canonical.capabilities.referenceLayers?.layers[0];
     this.referenceGroup.hidden = !reference;
-    // A hidden fieldset must not retain its inline display:flex.
-    this.referenceGroup.style.display = reference ? 'flex' : 'none';
     if (reference) {
       this.referenceName.textContent = reference.label;
       this.referenceSwatch.style.backgroundColor = reference.color;
       this.referenceToggle.checked = reference.visible;
       this.referenceOpacity.value = String(reference.opacity);
+      this.showOpacity(reference.opacity);
       this.referenceToggle.disabled = !canonical.capabilities.referenceLayers?.availability.enabled;
       this.referenceOpacity.disabled = this.referenceToggle.disabled;
     }
-
 
     const viewAvailability = new Map(
       canonical.view.anatomicalViews.map(view => [view.id, view.availability])
@@ -295,23 +387,83 @@ export class ReportControls {
     this.renderLegend(snapshot, exclusiveMap?.displayedLayerId ?? null);
   }
 
+  private showOpacity(opacity: number): void {
+    const text = opacityText(opacity);
+    this.referenceOpacityValue.value = text;
+    this.referenceOpacityValue.textContent = text;
+    this.referenceOpacity.setAttribute('aria-valuetext', text);
+  }
+
   private renderLegend(
     snapshot: SurfViewControlSessionSnapshot,
     layerId: string | null
   ): void {
     const layer = layerId ? findLayer(snapshot, layerId) : null;
     if (!layer) {
-      this.legend.textContent = '';
+      this.legendSummary.textContent = '';
       this.legend.hidden = true;
       return;
     }
     const legend = metadataObject(layer.metadata, 'legend');
-    const range = layer.scalarMapping?.displayRange.value;
+    const mapping = layer.scalarMapping;
+    const preview = layer.colorPreview?.kind === 'colormap' ? layer.colorPreview : undefined;
+    const range = preview?.range ?? mapping?.displayRange.value;
+    const mask = mapping?.maskInterval.value;
+    const threshold = mask && mask[1] > mask[0] ? mask : null;
     const units = layer.units ? ` ${layer.units}` : '';
-    this.legend.textContent = range
+
+    this.legendTitle.textContent = layer.units ? `${layer.label} (${layer.units})` : layer.label;
+    let summary = range
       ? `${layer.label}: ${range[0]} to ${range[1]}${units}`
       : `${layer.label}${units}`;
+    if (range && threshold) {
+      summary += `; values from ${threshold[0]} to ${threshold[1]} are not shown`;
+    }
+    this.legendSummary.textContent = summary;
+    this.renderColorbar(preview?.stops, preview?.css, range, threshold);
     this.legend.hidden = legend?.visible === false;
+  }
+
+  private renderColorbar(
+    stops: readonly string[] | undefined,
+    css: string | undefined,
+    range: readonly [number, number] | undefined,
+    threshold: readonly [number, number] | null
+  ): void {
+    const gradient = stops && stops.length >= 2
+      ? `linear-gradient(90deg, ${stops.join(', ')})`
+      : css;
+    const usable = Boolean(gradient && range && range[1] > range[0]);
+    const signature = usable
+      ? `${gradient}\u0000${range!.join(',')}\u0000${threshold?.join(',') ?? ''}`
+      : '';
+    if (signature === this.colorbarSignature) return;
+    this.colorbarSignature = signature;
+    this.colorbar.hidden = !usable;
+    if (!usable) return;
+
+    const [low, high] = range!;
+    this.colorbarRamp.style.background = gradient!;
+    // The masked interval, clipped to the bar: values there are not drawn.
+    const bandLow = threshold ? Math.max(low, threshold[0]) : 0;
+    const bandHigh = threshold ? Math.min(high, threshold[1]) : 0;
+    const hasBand = Boolean(threshold) && bandHigh > bandLow;
+    this.colorbarMask.hidden = !hasBand;
+    if (hasBand) {
+      this.colorbarMask.style.left = percent((bandLow - low) / (high - low));
+      this.colorbarMask.style.width = percent((bandHigh - bandLow) / (high - low));
+    }
+
+    const ticks = colorbarTicks(range!, threshold);
+    this.colorbar.replaceChildren(this.colorbarRamp, ...ticks.map(tick => {
+      const element = document.createElement('span');
+      element.className = 'surfview-report-colorbar-tick';
+      if (tick.position === 0) element.classList.add('is-start');
+      if (tick.position === 1) element.classList.add('is-end');
+      element.style.left = percent(tick.position);
+      element.textContent = tick.label;
+      return element;
+    }));
   }
 
   private reportResult(result: ControlCommandResult): void {

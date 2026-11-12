@@ -27,6 +27,27 @@ const layer = new DataLayer(
 surface.addLayer(layer);
 ```
 
+When a thresholded `DataLayer` is the top visible layer, the shader draws its
+threshold per fragment rather than per vertex. `surface.setShading()` (or a
+style preset's lighting) chooses where that contour runs and how lighting
+treats the map:
+
+```javascript
+surface.setShading({
+  // 'vertex' (default): midway between a shown and a hidden vertex, so the
+  // edge follows the mesh. 'interpolated': where the value interpolated
+  // across the triangle crosses the threshold, so the edge follows the data.
+  thresholdContour: 'interpolated',
+  // Keep the map's displayed colour within these factors of its colour-key
+  // colour however the surface is lit (null: unbounded, the default).
+  overlayLighting: [0.85, 1.08]
+});
+```
+
+In both contour modes every vertex is drawn as the colormap's per-vertex
+mask says at its own position, and no colour leaks onto the hidden side. The
+`report` preset uses both settings.
+
 ### VolumeProjectionLayer (Volume Projection)
 
 Sample a 3D volume at each surface vertex and map it through a 1D colormap.
@@ -334,12 +355,27 @@ and the layer draws gyri light and sulci dark:
 gray = brightness − clamp(value / smoothness, −0.5, 0.5) · contrast
 ```
 
-`invert: true` flips the ramp (the mapping of releases before this one). A small
-`smoothness` (0.2–0.5 on normalised values) gives a crisp, near-binary
-underlay; 1 gives a graded one. Greys are display (sRGB) values.
+`invert: true` flips the ramp (the mapping of releases before this one).
+Greys are display (sRGB) values.
 
-`CurvatureLayer` state (`brightness`, `contrast`, `smoothness`, `invert`) is
-saved and restored with viewer state.
+By default `smoothness` is in the values' own units, so the ramp saturates at
+|value| = smoothness / 2 and the right setting depends on the input range. On
+`normalizeCurvature()` output ([-1, 1]) a small `smoothness` (0.2–0.5) gives a
+crisp, near-binary underlay and 1–2 a graded one; on a metric normalised to
+[-0.5, 0.5], 0.2 is already nearly two-tone. To make the ramp independent of
+normalisation, pass `smoothnessScale: 'spread'`: `smoothness` is then measured
+against the data's robust range (±98th percentile of |value|), and
+`smoothness: 1` spans the full grey ramp across it whatever the units:
+
+```ts
+new CurvatureLayer('curvature', anyMetric, {
+  brightness: 0.815, contrast: 0.23,          // sRGB 0.70 to 0.93
+  smoothness: 1, smoothnessScale: 'spread'    // continuous, unit-free
+});
+```
+
+`CurvatureLayer` state (`brightness`, `contrast`, `smoothness`,
+`smoothnessScale`, `invert`) is saved and restored with viewer state.
 
 Choose the values for the surface you show:
 

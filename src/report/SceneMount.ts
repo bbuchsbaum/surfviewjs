@@ -4,7 +4,12 @@ import { MultiLayerNeuroSurface } from '../MultiLayerNeuroSurface';
 import { ReferenceLayer } from '../layers/ReferenceLayer';
 import { DataLayer } from '../layers';
 import type { LayerPresentation } from '../layers';
-import type { FigureExportOptions, SurfViewStylePresetName } from '../StylePresets';
+import { getStylePreset } from '../StylePresets';
+import type {
+  FigureExportOptions,
+  SurfViewStylePreset,
+  SurfViewStylePresetName
+} from '../StylePresets';
 import {
   ANATOMICAL_VIEWS,
   freezeBilateralSurfaceGroup
@@ -41,6 +46,7 @@ import {
   ReportSceneControlTarget
 } from './ReportSceneControlTarget';
 import { ReportControls } from './ReportControls';
+import { installReportStyles } from './reportStyles';
 
 export {
   layoutReportAnatomicalBrain,
@@ -58,6 +64,13 @@ export type {
 
 export type SurfViewSceneView = AnatomicalView | 'reset';
 
+/**
+ * Canvas background of a report mount: `'transparent'` lets the page show
+ * through, an RGB integer (`0xffffff`) or CSS hex colour (`'#fff'`,
+ * `'#ffffff'`) paints that colour.
+ */
+export type SurfViewMountBackground = 'transparent' | number | string;
+
 export interface MountSurfViewOptions {
   /** Delay asset loading and WebGL creation until the container intersects the viewport. */
   lazy?: boolean;
@@ -73,8 +86,21 @@ export interface MountSurfViewOptions {
   height?: number;
   /** Viewer appearance preset. `paper-light` is the report default. */
   preset?: SurfViewStylePresetName;
+  /**
+   * Canvas background, replacing the preset's. `'transparent'` lets an
+   * embedded widget sit on the page colour; a colour paints that colour. PNG
+   * export follows it (transparent or that colour) unless export options say
+   * otherwise. Default: the preset's background.
+   */
+  background?: SurfViewMountBackground;
   /** Show the small report toolbar. This never loads an external pane UI. */
   controls?: boolean;
+  /**
+   * Add SurfView's default report stylesheet (`REPORT_STYLES`) to the
+   * document. Default true. Its rules have zero specificity, so host CSS wins
+   * without `!important`; pass false when the page supplies its own styles.
+   */
+  styles?: boolean;
   /** Initial anatomical view. */
   initialView?: AnatomicalView;
   /**
@@ -155,6 +181,45 @@ function abortError(message: string): DOMException {
 
 function asError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
+}
+
+/** Validate a mount background, returning its RGB value (null: transparent). */
+function mountBackgroundColor(background: SurfViewMountBackground): number | null {
+  if (background === 'transparent') return null;
+  if (typeof background === 'number') {
+    if (!Number.isInteger(background) || background < 0 || background > 0xffffff) {
+      throw new RangeError('mountSurfView background must be an RGB integer between 0x000000 and 0xffffff');
+    }
+    return background;
+  }
+  if (typeof background === 'string') {
+    const match = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(background.trim());
+    if (match) {
+      const hex = match[1]!.length === 3
+        ? match[1]!.split('').map(digit => digit + digit).join('')
+        : match[1]!;
+      return Number.parseInt(hex, 16);
+    }
+  }
+  throw new TypeError("mountSurfView background must be 'transparent', an RGB integer or a #rgb/#rrggbb colour");
+}
+
+/**
+ * The preset with its live and figure-export background replaced by a mount
+ * `background` option. Throws for an invalid background.
+ */
+export function reportPresetWithBackground(
+  preset: SurfViewStylePreset,
+  background: SurfViewMountBackground
+): SurfViewStylePreset {
+  const color = mountBackgroundColor(background);
+  return {
+    ...preset,
+    background: color === null
+      ? { css: 'transparent', clearColor: preset.background.clearColor, clearAlpha: 0 }
+      : { css: `#${color.toString(16).padStart(6, '0')}`, clearColor: color, clearAlpha: 1 },
+    figure: { ...preset.figure, transparent: color === null }
+  };
 }
 
 function finiteSize(value: number | undefined, fallback: number): number {
@@ -282,24 +347,14 @@ class SceneMount implements SurfViewMountHandle {
     this.stage.style.position = 'relative';
     this.stage.style.width = '100%';
 
+    if (this.options.styles !== false) installReportStyles(container.ownerDocument);
     this.status = document.createElement('div');
     this.status.className = 'surfview-status';
     this.status.setAttribute('role', 'status');
+    this.status.dataset.state = 'loading';
     this.status.textContent = this.options.lazy
       ? 'Surface view will load when visible.'
       : 'Loading surface view…';
-    Object.assign(this.status.style, {
-      alignItems: 'center',
-      background: '#f8fafc',
-      color: '#475569',
-      display: 'flex',
-      font: '13px/1.5 system-ui, sans-serif',
-      inset: '0',
-      justifyContent: 'center',
-      padding: '1rem',
-      position: 'absolute',
-      textAlign: 'center'
-    });
     this.stage.appendChild(this.status);
     this.root.appendChild(this.stage);
     container.appendChild(this.root);
@@ -525,6 +580,12 @@ class SceneMount implements SurfViewMountHandle {
         viewer.dispose();
         throw new Error('WebGL is unavailable; the surface view could not be initialized.');
       }
+      if (this.options.background !== undefined) {
+        // Before any surface exists, so surfaces and exports see one preset.
+        viewer.applyStylePreset(
+          reportPresetWithBackground(getStylePreset(this.options.preset), this.options.background)
+        );
+      }
       this.currentViewer = viewer;
       this.buildSurfaces(assets);
       this.reportController = new ReportSceneController(viewer, this.manifest, {
@@ -563,7 +624,7 @@ class SceneMount implements SurfViewMountHandle {
       if (this.options.controls) {
         this.reportControls = new ReportControls(
           this.reportTarget,
-          { filename: `${this.manifest.id}.png` }
+          { filename: `${this.manifest.id}.png`, styles: this.options.styles !== false }
         );
         this.root.insertBefore(this.reportControls.element, this.stage);
       }
@@ -646,7 +707,11 @@ class SceneMount implements SurfViewMountHandle {
           ...(style.lighting.thresholdOutlineShade === undefined
             ? {} : { thresholdOutlineShade: style.lighting.thresholdOutlineShade }),
           ...(style.lighting.overlayEmission === undefined
-            ? {} : { overlayEmission: style.lighting.overlayEmission })
+            ? {} : { overlayEmission: style.lighting.overlayEmission }),
+          ...(style.lighting.thresholdContour === undefined
+            ? {} : { thresholdContour: style.lighting.thresholdContour }),
+          ...(style.lighting.overlayLighting === undefined
+            ? {} : { overlayLighting: style.lighting.overlayLighting })
         },
         showCurvature: Boolean(curvature),
         useGPUCompositing: false,
@@ -728,15 +793,15 @@ class SceneMount implements SurfViewMountHandle {
     return values;
   }
 
+  /** Index assets (faces, sparse indices) as Uint32Array; uint16 assets are widened. */
   private requireUint32(
     assets: Map<string, SceneTypedArray>,
     id: string
   ): Uint32Array {
     const values = assets.get(id);
-    if (!(values instanceof Uint32Array)) {
-      throw new Error(`Asset ${id} was not loaded as Uint32Array`);
-    }
-    return values;
+    if (values instanceof Uint32Array) return values;
+    if (values instanceof Uint16Array) return Uint32Array.from(values);
+    throw new Error(`Asset ${id} was not loaded as an integer index array`);
   }
 
   private renderError(error: Error): void {
@@ -752,8 +817,7 @@ class SceneMount implements SurfViewMountHandle {
     this.viewGroup = null;
     this.mounted = false;
     this.status.setAttribute('role', 'alert');
-    this.status.style.color = '#991b1b';
-    this.status.style.background = '#fef2f2';
+    this.status.dataset.state = 'error';
     this.status.textContent = `Surface view unavailable: ${error.message}`;
     if (!this.status.isConnected) this.stage.appendChild(this.status);
     try {
@@ -780,5 +844,6 @@ export function mountSurfView(
     throw new TypeError('mountSurfView requires an HTMLElement container');
   }
   validateSceneManifest(manifest);
+  if (options.background !== undefined) mountBackgroundColor(options.background);
   return new SceneMount(container, manifest, options);
 }

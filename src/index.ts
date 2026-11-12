@@ -118,17 +118,21 @@ import { createColormapTexture } from './textures/createColormapTexture';
 import {
   SURFVIEW_SCENE_SCHEMA,
   SURFVIEW_SCENE_SCHEMA_V2,
+  SCENE_UINT16_MAX_VERTICES,
   SceneManifestError,
   validateSceneManifest,
   createSceneAsset,
-  loadSceneAsset
+  loadSceneAsset,
+  sceneIndexDType
 } from './scene';
 import {
   createReportSceneControlTarget,
   DEFAULT_REPORT_OBLIQUE,
+  installReportStyles,
   layoutReportAnatomicalMeshes,
   mountSurfView,
   REPORT_BRAIN_VIEWS,
+  REPORT_STYLES,
   ReportSceneController,
   ReportSceneControlTarget
 } from './report';
@@ -206,11 +210,15 @@ export {
   createColormapTexture,
   SURFVIEW_SCENE_SCHEMA,
   SURFVIEW_SCENE_SCHEMA_V2,
+  SCENE_UINT16_MAX_VERTICES,
   SceneManifestError,
   validateSceneManifest,
   createSceneAsset,
   loadSceneAsset,
+  sceneIndexDType,
   mountSurfView,
+  installReportStyles,
+  REPORT_STYLES,
   layoutReportAnatomicalMeshes,
   REPORT_BRAIN_VIEWS,
   DEFAULT_REPORT_OBLIQUE,
@@ -394,7 +402,7 @@ export type {
   MorphableSurfaceConfig
 } from './MorphableSurface';
 
-export type { SurfaceShadingOptions } from './surface/SurfaceShading';
+export type { SurfaceShadingOptions, ThresholdContour } from './surface/SurfaceShading';
 
 export type { LabelDefinition } from './LabeledNeuroSurface';
 export type { SurfaceDefinition, SurfaceType } from './SurfaceFactory';
@@ -414,7 +422,12 @@ export type {
 } from './materials/VolumeProjectionMaterial';
 export type { VolumeProjectedSurfaceOptions } from './surfaces/VolumeProjectedSurface';
 export type { VolumeTexture3DOptions, VolumeTextureFilter } from './textures/VolumeTexture3D';
-export type { CurvatureConfig, CurvatureLayerUpdateData } from './layers/CurvatureLayer';
+export type {
+  CurvatureConfig,
+  CurvatureLayerUpdateData,
+  CurvatureSmoothnessScale
+} from './layers/CurvatureLayer';
+export { curvatureSpread, CURVATURE_SPREAD_PERCENTILE } from './layers/CurvatureLayer';
 export type { MeanCurvatureOptions, SulcalDepthOptions } from './utils/curvature';
 
 export {
@@ -548,6 +561,7 @@ export type {
 
 export type {
   MountSurfViewOptions,
+  SurfViewMountBackground,
   SurfViewMountHandle,
   SurfViewSceneView,
   ReportAnatomicalMesh,

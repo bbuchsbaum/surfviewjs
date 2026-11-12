@@ -149,6 +149,7 @@ export interface CurvatureLayerFactoryConfig extends BuiltInLayerConfigBase<'cur
   brightness?: number;
   contrast?: number;
   smoothness?: number;
+  smoothnessScale?: 'data' | 'spread';
   invert?: boolean;
 }
 
@@ -526,6 +527,7 @@ const BUILT_IN_LAYER_FACTORIES: {
     if (config.brightness !== undefined) options.brightness = config.brightness;
     if (config.contrast !== undefined) options.contrast = config.contrast;
     if (config.smoothness !== undefined) options.smoothness = config.smoothness;
+    if (config.smoothnessScale !== undefined) options.smoothnessScale = config.smoothnessScale;
     if (config.invert !== undefined) options.invert = config.invert;
     return new CurvatureLayer(config.id, config.curvature, options);
   },

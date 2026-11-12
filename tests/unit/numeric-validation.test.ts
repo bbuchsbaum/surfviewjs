@@ -314,6 +314,7 @@ describe('transactional numeric validation', () => {
       brightness: 0.5,
       contrast: 0.5,
       smoothness: 1,
+      smoothnessScale: 'data',
       invert: false
     });
     expect(curvature.needsUpdate).toBe(false);

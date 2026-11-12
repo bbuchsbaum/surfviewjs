@@ -53,7 +53,9 @@ describe('surface shading uniforms', () => {
       surfviewOutlineWidth: { value: 0 },
       surfviewOutlineShade: { value: 0.55 },
       surfviewSilhouette: { value: 0 },
-      surfviewEmission: { value: 0 }
+      surfviewEmission: { value: 0 },
+      surfviewThreshold: { value: new THREE.Vector2(0, 0) },
+      surfviewOverlayLighting: { value: new THREE.Vector3(0, 0, 0) }
     });
     const uniforms = createSurfaceShadingUniforms({
       thresholdOutline: 2,
@@ -90,13 +92,29 @@ describe('surface shading uniforms', () => {
     ['overlayEmission', 2],
     ['overlayEmission', Number.POSITIVE_INFINITY],
     ['silhouetteDarkening', 1.5],
-    ['silhouetteDarkening', Number.NaN]
+    ['silhouetteDarkening', Number.NaN],
+    ['overlayLighting', [1.1, 0.9]],
+    ['overlayLighting', [-0.1, 1]],
+    ['overlayLighting', [0.85, Number.NaN]],
+    ['overlayLighting', [0.85]]
   ] as const)('rejects %s = %s with a RangeError', (field, value) => {
     const uniforms = createSurfaceShadingUniforms();
     const before = structuredClone(uniforms);
-    expect(() => updateSurfaceShadingUniforms(uniforms, { [field]: value })).toThrow(RangeError);
+    expect(() => updateSurfaceShadingUniforms(uniforms, { [field]: value } as never)).toThrow(RangeError);
     expect(uniforms).toEqual(before);
-    expect(() => createSurfaceShadingUniforms({ [field]: value })).toThrow(RangeError);
+    expect(() => createSurfaceShadingUniforms({ [field]: value } as never)).toThrow(RangeError);
+  });
+
+  it('holds overlay lighting bounds as linear-light gains and clears them with null', () => {
+    const uniforms = createSurfaceShadingUniforms({ overlayLighting: [0.85, 1.08] });
+    const bounds = uniforms.surfviewOverlayLighting.value;
+    expect(bounds.x).toBeCloseTo(Math.pow(0.85, 2.2), 6);
+    expect(bounds.y).toBeCloseTo(Math.pow(1.08, 2.2), 6);
+    expect(bounds.z).toBe(1);
+    updateSurfaceShadingUniforms(uniforms, { overlayEmission: 0.2 });
+    expect(uniforms.surfviewOverlayLighting.value.z).toBe(1);
+    updateSurfaceShadingUniforms(uniforms, { overlayLighting: null });
+    expect(uniforms.surfviewOverlayLighting.value.toArray()).toEqual([0, 0, 0]);
   });
 });
 
@@ -115,8 +133,13 @@ describe('installSurfaceShading', () => {
       `vSurfviewOverlay = vec4( surfviewSRGBToLinear( ${SURFACE_OVERLAY_ATTRIBUTE}.rgb ), ${SURFACE_OVERLAY_ATTRIBUTE}.a );`
     );
     expect(shader.vertexShader).toContain(`vSurfviewEdge = ${SURFACE_EDGE_ATTRIBUTE};`);
+    const uniformTypes: Record<string, string> = {
+      surfviewReference: 'vec4',
+      surfviewThreshold: 'vec2',
+      surfviewOverlayLighting: 'vec3'
+    };
     for (const name of Object.keys(uniforms)) {
-      expect(shader.fragmentShader).toContain(`uniform ${name === 'surfviewReference' ? 'vec4' : 'float'} ${name};`);
+      expect(shader.fragmentShader).toContain(`uniform ${uniformTypes[name] ?? 'float'} ${name};`);
     }
     expect(shader.fragmentShader).not.toContain('#include <color_fragment>');
     expect(shader.fragmentShader).toContain('diffuseColor *= surfviewBase;');
@@ -141,10 +164,32 @@ describe('installSurfaceShading', () => {
     // No symmetric ramp: it gave sub-threshold fragments partial colour.
     expect(fragment).not.toContain('smoothstep( -0.5 * surfviewWidth');
     expect(fragment).toContain(
-      'float surfviewInside = vSurfviewEdge >= 0.0 ? max( 0.5, smoothstep( 0.0, surfviewWidth, vSurfviewEdge ) ) : 0.0;'
+      'float surfviewInside = surfviewEdgeDistance >= 0.0 ? max( 0.5, smoothstep( 0.0, surfviewWidth, surfviewEdgeDistance ) ) : 0.0;'
+    );
+    // The distance is the interpolated sign, or, for interpolated contours,
+    // the interpolated value's distance outside the masked interval.
+    expect(fragment).toContain(
+      'float surfviewEdgeDistance = surfviewThreshold.x > 0.5 ? abs( vSurfviewEdge ) - surfviewThreshold.y : vSurfviewEdge;'
     );
     // A new cache key forces programs compiled with the old ramp to rebuild.
-    expect(material.customProgramCacheKey()).toContain('surfview-shading-v4');
+    expect(material.customProgramCacheKey()).toContain('surfview-shading-v5');
+  });
+
+  it('bounds the overlay gain after silhouette darkening and before output', () => {
+    const material = new THREE.MeshPhongMaterial();
+    installSurfaceShading(material, createSurfaceShadingUniforms());
+    const fragment = compile(material).fragmentShader.replace(/\s+/g, ' ');
+    expect(fragment).toContain(
+      'float surfviewBounded = clamp( surfviewGain, surfviewOverlayLighting.x, surfviewOverlayLighting.y );'
+    );
+    expect(fragment).toContain(
+      'outgoingLight + surfviewOverlayShare * surfviewOverlayAlbedo * ( surfviewBounded - surfviewGain )'
+    );
+    const silhouette = fragment.indexOf('surfviewSilhouette > 0.0');
+    const bounds = fragment.indexOf('surfviewOverlayLighting.z > 0.5');
+    expect(silhouette).toBeGreaterThan(-1);
+    expect(bounds).toBeGreaterThan(silhouette);
+    expect(fragment.indexOf('#include <opaque_fragment>')).toBeGreaterThan(bounds);
   });
 
   it('is idempotent', () => {
@@ -173,7 +218,7 @@ describe('installSurfaceShading', () => {
     expect(calls).toEqual(['previous']);
     expect(shader.fragmentShader).toContain('// previous-patch');
     expect(shader.fragmentShader).toContain('uniform float surfviewEdgeEnabled;');
-    expect(material.customProgramCacheKey()).toBe('previous-key|surfview-shading-v4');
+    expect(material.customProgramCacheKey()).toBe('previous-key|surfview-shading-v5');
   });
 });
 
@@ -471,6 +516,86 @@ describe('MultiLayerNeuroSurface fragment threshold edges', () => {
     }
   });
 
+  it('writes value offsets for interpolated contours, and signs again for vertex contours', () => {
+    const surface = makeSurface({ shading: { thresholdContour: 'interpolated' } });
+    try {
+      const layer = new DataLayer('map', [4, 0.5, -3, Number.NaN], null, 'viridis', {
+        range: [-5, 5],
+        threshold: [-1, 2]
+      });
+      surface.addLayer(layer);
+      surface.updateColors();
+      const uniforms = compile(material(surface)).uniforms;
+      expect(edgeEnabled(surface)).toBe(1);
+      // Offsets from the mask's middle (0.5); no data sits at the middle.
+      expect(Array.from(attribute(surface, SURFACE_EDGE_ATTRIBUTE))).toEqual([3.5, 0, -3.5, 0]);
+      expect((uniforms.surfviewThreshold!.value as THREE.Vector2).toArray()).toEqual([1, 1.5]);
+      // Shown exactly where |offset| exceeds the half-width, as the colormap says.
+      const shown = Array.from(attribute(surface, SURFACE_EDGE_ATTRIBUTE), offset => Math.abs(offset) > 1.5);
+      const shownByColormap = Array.from({ length: 4 }, (_, vertex) => layer.getRGBAData(4)[vertex * 4 + 3]! > 0);
+      expect(shown).toEqual(shownByColormap);
+
+      layer.setThreshold([-0.25, 0.25]);
+      surface.updateColors();
+      expect(Array.from(attribute(surface, SURFACE_EDGE_ATTRIBUTE))).toEqual([4, 0.5, -3, 0]);
+      expect((uniforms.surfviewThreshold!.value as THREE.Vector2).toArray()).toEqual([1, 0.25]);
+
+      surface.setShading({ thresholdContour: 'vertex' });
+      expect(surface.flushPendingColorUpdate()).toBe(true);
+      expect(Array.from(attribute(surface, SURFACE_EDGE_ATTRIBUTE))).toEqual([1, 1, 1, -1]);
+      expect((uniforms.surfviewThreshold!.value as THREE.Vector2).toArray()).toEqual([0, 0]);
+      expect(() => surface.setShading({ thresholdContour: 'smooth' as never })).toThrow(TypeError);
+    } finally {
+      surface.dispose();
+    }
+  });
+
+  it('draws an unthresholded top map as the overlay while lighting bounds are set', () => {
+    const surface = makeSurface();
+    try {
+      const layer = thresholded('map', { threshold: [0, 0], opacity: 0.5 });
+      surface.addLayer(layer);
+      surface.updateColors();
+      expect(edgeEnabled(surface)).toBe(0);
+
+      surface.setShading({ overlayLighting: [0.85, 1.08] });
+      expect(surface.flushPendingColorUpdate()).toBe(true);
+      expect(edgeEnabled(surface)).toBe(1);
+      // The map leaves the vertex colours and every vertex shows.
+      expect(colorAttribute(surface)[0]).toBeCloseTo(GRAY, 6);
+      expect(Array.from(attribute(surface, SURFACE_EDGE_ATTRIBUTE))).toEqual([1, 1, 1, 1]);
+      const overlay = attribute(surface, SURFACE_OVERLAY_ATTRIBUTE);
+      const rgba = layer.getRGBAData(4);
+      for (let offset = 0; offset < 16; offset++) {
+        const expected = offset % 4 === 3 ? rgba[offset]! * 0.5 : rgba[offset]!;
+        expect(overlay[offset]).toBeCloseTo(expected, 6);
+      }
+
+      surface.setShading({ overlayLighting: null });
+      expect(surface.flushPendingColorUpdate()).toBe(true);
+      expect(edgeEnabled(surface)).toBe(0);
+      expect(colorAttribute(surface)[0]).not.toBeCloseTo(GRAY, 3);
+    } finally {
+      surface.dispose();
+    }
+  });
+
+  it('keeps per-vertex masks under thresholdEdges:false even with lighting bounds', () => {
+    const surface = makeSurface({ shading: { thresholdEdges: false, overlayLighting: [0.9, 1] } });
+    try {
+      surface.addLayer(thresholded('map'));
+      surface.updateColors();
+      // The map is the overlay (bounded), but its mask stays per vertex.
+      expect(edgeEnabled(surface)).toBe(1);
+      expect(Array.from(attribute(surface, SURFACE_EDGE_ATTRIBUTE))).toEqual([1, 1, 1, 1]);
+      const overlay = attribute(surface, SURFACE_OVERLAY_ATTRIBUTE);
+      expect(overlay[3]).toBeGreaterThan(0); // shown vertex
+      expect(overlay[7]).toBe(0);            // masked vertex is transparent
+    } finally {
+      surface.dispose();
+    }
+  });
+
   it('validates shading updates through the surface', () => {
     const surface = makeSurface();
     try {
@@ -502,6 +627,17 @@ describe('report style preset', () => {
       thresholdOutlineShade: report.lighting.thresholdOutlineShade!,
       overlayEmission: report.lighting.overlayEmission!
     })).not.toThrow();
+    // Static-figure parity (#18): interpolated contours, bounded overlay
+    // lighting and a normalisation-independent continuous sulcal ramp.
+    expect(report.lighting.thresholdContour).toBe('interpolated');
+    expect(report.lighting.overlayLighting).toEqual([0.85, 1.08]);
+    expect(report.curvature).toMatchObject({ smoothness: 1, smoothnessScale: 'spread' });
+    const ramp = [
+      report.curvature.brightness - report.curvature.contrast / 2,
+      report.curvature.brightness + report.curvature.contrast / 2
+    ];
+    expect(ramp[0]).toBeCloseTo(0.7, 2);
+    expect(ramp[1]).toBeCloseTo(0.93, 2);
     expect(report.colormaps.sequential).toBe('surface-heat-positive');
     expect(report.colormaps.diverging).toBe('surface-heat');
     const maps = ColorMap.getPresetMaps();

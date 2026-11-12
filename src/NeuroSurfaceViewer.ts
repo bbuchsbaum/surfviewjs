@@ -3571,12 +3571,15 @@ export class NeuroSurfaceViewer extends EventEmitter<ViewerEventMap> {
             curvature.setBrightness(style.curvature.brightness);
             curvature.setContrast(style.curvature.contrast);
             curvature.setSmoothness(style.curvature.smoothness);
+            curvature.setSmoothnessScale(style.curvature.smoothnessScale ?? 'data');
           }
           surface.setShading({
             silhouetteDarkening: style.lighting.silhouetteDarkening ?? 0,
             thresholdOutline: style.lighting.thresholdOutline ?? 0,
             thresholdOutlineShade: style.lighting.thresholdOutlineShade ?? 0.55,
-            overlayEmission: style.lighting.overlayEmission ?? 0
+            overlayEmission: style.lighting.overlayEmission ?? 0,
+            thresholdContour: style.lighting.thresholdContour ?? 'vertex',
+            overlayLighting: style.lighting.overlayLighting ?? null
           });
         }
       });

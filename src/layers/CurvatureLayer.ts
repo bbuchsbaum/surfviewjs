@@ -3,6 +3,20 @@ import { debugLog } from '../debug';
 import { finiteNumber, opacity as validateOpacity } from '../utils/validation';
 
 /**
+ * What `smoothness` is measured in:
+ * - `'data'` (default): the curvature's own units. The ramp saturates at
+ *   |curvature| = smoothness / 2, so the right value depends on how the input
+ *   was normalised (0.2 makes a [-0.5, 0.5] metric nearly two-tone).
+ * - `'spread'`: multiples of the data's robust range, ±(98th percentile of
+ *   |curvature|). `smoothness: 1` spans the full grey ramp across that range
+ *   whatever the metric's units or normalisation; smaller values steepen it.
+ */
+export type CurvatureSmoothnessScale = 'data' | 'spread';
+
+/** Percentile of |curvature| that `smoothnessScale: 'spread'` measures against. */
+export const CURVATURE_SPREAD_PERCENTILE = 98;
+
+/**
  * Configuration options for curvature display
  */
 export interface CurvatureConfig extends LayerConfig {
@@ -12,6 +26,8 @@ export interface CurvatureConfig extends LayerConfig {
   contrast?: number;
   /** Divisor for curvature values - higher = more subtle, default 1 */
   smoothness?: number;
+  /** Units of `smoothness`; see {@link CurvatureSmoothnessScale}. Default `'data'`. */
+  smoothnessScale?: CurvatureSmoothnessScale;
   /**
    * Reverse the grey ramp so positive values render lighter. Default false:
    * FreeSurfer-convention data (positive in sulci) renders gyri light and
@@ -28,7 +44,35 @@ export interface CurvatureLayerUpdateData extends LayerUpdateData {
   brightness?: number;
   contrast?: number;
   smoothness?: number;
+  smoothnessScale?: CurvatureSmoothnessScale;
   invert?: boolean;
+}
+
+function smoothnessScaleOption(value: unknown): CurvatureSmoothnessScale {
+  if (value !== 'data' && value !== 'spread') {
+    throw new TypeError("smoothnessScale must be 'data' or 'spread'");
+  }
+  return value;
+}
+
+/**
+ * Robust spread of curvature values: the given percentile of |value| over the
+ * finite entries, or 0 when there are none.
+ */
+export function curvatureSpread(
+  curvature: ArrayLike<number>,
+  percentile = CURVATURE_SPREAD_PERCENTILE
+): number {
+  const magnitudes = new Float32Array(curvature.length);
+  let count = 0;
+  for (let i = 0; i < curvature.length; i++) {
+    const value = curvature[i]!;
+    if (Number.isFinite(value)) magnitudes[count++] = Math.abs(value);
+  }
+  if (count === 0) return 0;
+  const sorted = magnitudes.subarray(0, count).sort();
+  const index = Math.min(count - 1, Math.floor((count * percentile) / 100));
+  return sorted[index]!;
 }
 
 function booleanOption(value: unknown, name: string): boolean {
@@ -41,9 +85,14 @@ function booleanOption(value: unknown, name: string): boolean {
  *
  * Values follow the FreeSurfer convention (positive in sulci, negative on
  * gyral crowns) and are mapped to display (sRGB) grey with gyri light:
- *   gray = brightness − clamp(curvature / smoothness, −0.5, 0.5) · contrast
- * `invert: true` flips the ramp (`brightness + …`), the mapping of earlier
- * releases.
+ *   gray = brightness − clamp(curvature / divisor, −0.5, 0.5) · contrast
+ * where `divisor` is `smoothness` (`smoothnessScale: 'data'`, the default) or
+ * `smoothness · 2 · spread` (`'spread'`; spread is the 98th percentile of
+ * |curvature|). With `'data'`, the ramp saturates at |curvature| =
+ * smoothness / 2, so match `smoothness` to the input's range: about 2× the
+ * values' typical magnitude for a continuous ramp, much less for a two-tone
+ * one. `invert: true` flips the ramp (`brightness + …`), the mapping of
+ * earlier releases.
  *
  * Typical usage:
  * - Load FreeSurfer `.curv` or `.sulc`, or compute from the folded surface with
@@ -68,8 +117,11 @@ export class CurvatureLayer extends Layer {
   private brightness: number;
   private contrast: number;
   private smoothness: number;
+  private smoothnessScale: CurvatureSmoothnessScale;
   private invert: boolean;
   private rgbaBuffer: Float32Array | null = null;
+  /** Cached robust spread of `curvature` (null until needed). */
+  private spread: number | null = null;
 
   constructor(
     id: string,
@@ -99,6 +151,7 @@ export class CurvatureLayer extends Layer {
       minimum: 0,
       minimumExclusive: true
     });
+    this.smoothnessScale = smoothnessScaleOption(config.smoothnessScale ?? 'data');
     this.invert = booleanOption(config.invert ?? false, 'invert');
 
     debugLog('CurvatureLayer', id, ': Created with', this.curvature.length, 'vertices');
@@ -112,6 +165,7 @@ export class CurvatureLayer extends Layer {
       ? curvature
       : new Float32Array(curvature);
     this.rgbaBuffer = null;
+    this.spread = null;
     this._notifyChange();
   }
 
@@ -153,6 +207,26 @@ export class CurvatureLayer extends Layer {
   }
 
   /**
+   * Measure `smoothness` in data units (`'data'`) or in multiples of the
+   * data's robust range (`'spread'`).
+   */
+  setSmoothnessScale(scale: CurvatureSmoothnessScale): void {
+    this.smoothnessScale = smoothnessScaleOption(scale);
+    this.rgbaBuffer = null;
+    this._notifyChange();
+  }
+
+  /**
+   * The value that maps to the end of the grey ramp's half-range: `smoothness`
+   * in data units, after applying `smoothnessScale`.
+   */
+  getEffectiveSmoothness(): number {
+    if (this.smoothnessScale === 'data') return this.smoothness;
+    this.spread ??= curvatureSpread(this.curvature);
+    return this.smoothness * 2 * (this.spread > 0 ? this.spread : 0.5);
+  }
+
+  /**
    * Reverse the grey ramp (true: positive values lighter).
    */
   setInvert(invert: boolean): void {
@@ -164,11 +238,18 @@ export class CurvatureLayer extends Layer {
   /**
    * Get current display parameters
    */
-  getDisplayParams(): { brightness: number; contrast: number; smoothness: number; invert: boolean } {
+  getDisplayParams(): {
+    brightness: number;
+    contrast: number;
+    smoothness: number;
+    smoothnessScale: CurvatureSmoothnessScale;
+    invert: boolean;
+  } {
     return {
       brightness: this.brightness,
       contrast: this.contrast,
       smoothness: this.smoothness,
+      smoothnessScale: this.smoothnessScale,
       invert: this.invert
     };
   }
@@ -186,14 +267,14 @@ export class CurvatureLayer extends Layer {
     const curvature = this.curvature;
     const brightness = this.brightness;
     const contrast = this.contrast;
-    const smoothness = this.smoothness;
+    const smoothness = this.getEffectiveSmoothness();
     const sign = this.invert ? 1 : -1;
 
     for (let i = 0; i < vertexCount; i++) {
       // Get curvature value (default to 0 if out of bounds)
       const curv = i < curvature.length ? curvature[i]! : 0;
 
-      // gray = brightness ∓ clamp(curvature / smoothness, -0.5, 0.5) * contrast
+      // gray = brightness ∓ clamp(curvature / divisor, -0.5, 0.5) * contrast
       const scaled = Math.max(-0.5, Math.min(0.5, curv / smoothness));
       const gray = Math.max(0, Math.min(1, sign * scaled * contrast + brightness));
 
@@ -213,9 +294,10 @@ export class CurvatureLayer extends Layer {
    */
   update(data: CurvatureLayerUpdateData): void {
     assertLayerUpdateFields(data, 'CurvatureLayer', [
-      'curvature', 'brightness', 'contrast', 'smoothness', 'invert'
+      'curvature', 'brightness', 'contrast', 'smoothness', 'smoothnessScale', 'invert'
     ]);
     if (data.invert !== undefined) booleanOption(data.invert, 'invert');
+    if (data.smoothnessScale !== undefined) smoothnessScaleOption(data.smoothnessScale);
     if (data.brightness !== undefined) {
       finiteNumber(data.brightness, 'brightness', { minimum: 0, maximum: 1 });
     }
@@ -238,6 +320,9 @@ export class CurvatureLayer extends Layer {
     if (data.smoothness !== undefined) {
       this.setSmoothness(data.smoothness);
     }
+    if (data.smoothnessScale !== undefined) {
+      this.setSmoothnessScale(data.smoothnessScale);
+    }
     if (data.invert !== undefined) {
       this.setInvert(data.invert);
     }
@@ -259,18 +344,23 @@ export class CurvatureLayer extends Layer {
       brightness: this.brightness,
       contrast: this.contrast,
       smoothness: this.smoothness,
-      // Omitted at the default so states saved by earlier releases compare equal.
+      // Omitted at their defaults so states saved by earlier releases compare equal.
+      ...(this.smoothnessScale === 'spread' ? { smoothnessScale: 'spread' } : {}),
       ...(this.invert ? { invert: true } : {})
     };
   }
 
   /**
-   * Restore display parameters saved by {@link toStateJSON}. `invert` is
-   * omitted from saved state at its default, so a missing value means false.
-   * Values are validated before any is applied.
+   * Restore display parameters saved by {@link toStateJSON}. `invert` and
+   * `smoothnessScale` are omitted from saved state at their defaults, so a
+   * missing value means false / `'data'`. Values are validated before any is
+   * applied.
    */
   fromStateJSON(state: Record<string, unknown>): void {
-    const update: CurvatureLayerUpdateData = { invert: (state.invert ?? false) as boolean };
+    const update: CurvatureLayerUpdateData = {
+      invert: (state.invert ?? false) as boolean,
+      smoothnessScale: (state.smoothnessScale ?? 'data') as CurvatureSmoothnessScale
+    };
     if (state.brightness !== undefined) update.brightness = state.brightness as number;
     if (state.contrast !== undefined) update.contrast = state.contrast as number;
     if (state.smoothness !== undefined) update.smoothness = state.smoothness as number;
