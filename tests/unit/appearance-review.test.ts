@@ -157,7 +157,7 @@ describe('CurvatureLayer state', () => {
     });
     const target = new CurvatureLayer('curvature', new Float32Array([0, 1]));
     target.fromStateJSON(source.toStateJSON());
-    expect(target.getDisplayParams()).toEqual({ brightness: 0.3, contrast: 0.7, smoothness: 0.4, invert: true });
+    expect(target.getDisplayParams()).toEqual({ brightness: 0.3, contrast: 0.7, smoothness: 0.4, smoothnessScale: 'data', invert: true });
   });
 
   it('defaults invert to false when the state omits it', () => {
@@ -176,7 +176,7 @@ describe('CurvatureLayer state', () => {
     const state = serialize(viewer);
     surface.getCurvatureLayer()!.update({ brightness: 0.9, invert: false });
     expect(deserialize(viewer, state).success).toBe(true);
-    expect(surface.getCurvatureLayer()!.getDisplayParams()).toEqual({ brightness: 0.3, contrast: 0.7, smoothness: 0.4, invert: true });
+    expect(surface.getCurvatureLayer()!.getDisplayParams()).toEqual({ brightness: 0.3, contrast: 0.7, smoothness: 0.4, smoothnessScale: 'data', invert: true });
     surface.dispose();
   });
 });

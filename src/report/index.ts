@@ -1,4 +1,5 @@
 export { mountSurfView } from './SceneMount';
+export { installReportStyles, REPORT_STYLES } from './reportStyles';
 export {
   layoutReportAnatomicalBrain,
   layoutReportAnatomicalMeshes,
@@ -20,6 +21,7 @@ export {
 
 export type {
   MountSurfViewOptions,
+  SurfViewMountBackground,
   SurfViewMountHandle,
   SurfViewSceneView
 } from './SceneMount';

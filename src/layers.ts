@@ -898,6 +898,33 @@ export class DataLayer extends Layer {
     return true;
   }
 
+  /**
+   * Per-vertex inputs for interpolated threshold contours: each vertex's value
+   * minus the middle of the masked interval (`offsets`). A shader that
+   * interpolates the offsets across triangles shows the map where
+   * |offset| > (high − low) / 2, i.e. it thresholds the interpolated value
+   * rather than interpolating per-vertex visibility. Vertices without data get
+   * 0, the middle of the mask (hidden). Returns the mask's half-width, or null
+   * (leaving `offsets` untouched) when no mask is active.
+   */
+  writeThresholdEdgeOffsets(vertexCount: number, offsets: Float32Array): number | null {
+    if (!this.data || !this.indices) return null;
+    const [low, high] = this.threshold;
+    if (!(high > low)) return null;
+    if (offsets.length !== vertexCount) {
+      throw new RangeError('Threshold offset buffer does not match the vertex count');
+    }
+    const middle = (low + high) / 2;
+    offsets.fill(0);
+    for (let i = 0; i < this.indices.length && i < this.data.length; i++) {
+      const vertex: number = this.indices[i]!;
+      const value: number = this.data[i]!;
+      if (vertex >= vertexCount || !Number.isFinite(value)) continue;
+      offsets[vertex] = value - middle;
+    }
+    return (high - low) / 2;
+  }
+
   getColorMapName(): string {
     return this.colorMapName || 'custom';
   }

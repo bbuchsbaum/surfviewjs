@@ -32,9 +32,14 @@ import {
   SURFACE_REFERENCE_ATTRIBUTE,
   SURFACE_OVERLAY_ATTRIBUTE,
   updateSurfaceShadingUniforms,
+  validateSurfaceShadingOptions,
   writeThresholdEdgeSigns
 } from './surface/SurfaceShading';
-import type { SurfaceShadingOptions, SurfaceShadingUniforms } from './surface/SurfaceShading';
+import type {
+  SurfaceShadingOptions,
+  SurfaceShadingUniforms,
+  ThresholdContour
+} from './surface/SurfaceShading';
 import { SurfaceColorUpdateScheduler } from './surface/SurfaceColorUpdateScheduler';
 import {
   devicePixelRatio as normalizeDevicePixelRatio,
@@ -72,6 +77,7 @@ export interface MultiLayerSurfaceConfig extends SurfaceConfig {
     brightness?: number;  // Base gray level (0-1), default 0.5
     contrast?: number;    // Curvature influence (0-1), default 0.5
     smoothness?: number;  // Curvature scaling factor, default 1
+    smoothnessScale?: 'data' | 'spread'; // Units of smoothness, default 'data'
     invert?: boolean;     // true: positive values lighter (earlier releases); default gyri light
   };
   /** Fragment-level threshold edges, outline, and silhouette shading. */
@@ -151,6 +157,7 @@ export interface LayerUpdate {
   brightness?: number;
   contrast?: number;
   smoothness?: number;
+  smoothnessScale?: 'data' | 'spread';
   invert?: boolean;
 
   // Temporal layer properties
@@ -198,6 +205,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
   private useWideLines: boolean;
   private shadingUniforms!: SurfaceShadingUniforms;
   private thresholdEdges = true;
+  private thresholdContour: ThresholdContour = 'vertex';
   /**
    * The base colour last applied by the library default or a style preset.
    * A preset recolours the base only while it still has this colour, so a
@@ -232,8 +240,10 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     this.useGPUCompositing = false;
     this.useWideLines = config.useWideLines ?? true;
     this.clipPlanes = new ClipPlaneSet();
+    if (config.shading) validateSurfaceShadingOptions(config.shading);
     this.shadingUniforms = createSurfaceShadingUniforms(config.shading);
     this.thresholdEdges = config.shading?.thresholdEdges ?? true;
+    this.thresholdContour = config.shading?.thresholdContour ?? 'vertex';
     
     // Add curvature layer if provided (renders below base layer)
     if (config.curvature && config.showCurvature !== false) {
@@ -243,6 +253,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
         ...(curvOpts.brightness === undefined ? {} : { brightness: curvOpts.brightness }),
         ...(curvOpts.contrast === undefined ? {} : { contrast: curvOpts.contrast }),
         ...(curvOpts.smoothness === undefined ? {} : { smoothness: curvOpts.smoothness }),
+        ...(curvOpts.smoothnessScale === undefined ? {} : { smoothnessScale: curvOpts.smoothnessScale }),
         ...(curvOpts.invert === undefined ? {} : { invert: curvOpts.invert })
       });
       this.layerStack.addLayer(curvLayer);
@@ -792,11 +803,18 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
    * Creates curvature layer if it doesn't exist.
    *
    * @param curvature - Curvature values per vertex
-   * @param options - Display options (brightness, contrast, smoothness, invert)
+   * @param options - Display options (brightness, contrast, smoothness and
+   *   its scale, invert)
    */
   setCurvature(
     curvature: Float32Array | number[],
-    options?: { brightness?: number; contrast?: number; smoothness?: number; invert?: boolean }
+    options?: {
+      brightness?: number;
+      contrast?: number;
+      smoothness?: number;
+      smoothnessScale?: 'data' | 'spread';
+      invert?: boolean;
+    }
   ): void {
     const existing = this.layerStack.getLayer('curvature');
     if (existing && existing instanceof CurvatureLayer) {
@@ -804,6 +822,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
       if (options?.brightness !== undefined) existing.setBrightness(options.brightness);
       if (options?.contrast !== undefined) existing.setContrast(options.contrast);
       if (options?.smoothness !== undefined) existing.setSmoothness(options.smoothness);
+      if (options?.smoothnessScale !== undefined) existing.setSmoothnessScale(options.smoothnessScale);
       if (options?.invert !== undefined) existing.setInvert(options.invert);
     } else {
       const layer = new CurvatureLayer('curvature', curvature, {
@@ -811,6 +830,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
         ...(options?.brightness === undefined ? {} : { brightness: options.brightness }),
         ...(options?.contrast === undefined ? {} : { contrast: options.contrast }),
         ...(options?.smoothness === undefined ? {} : { smoothness: options.smoothness }),
+        ...(options?.smoothnessScale === undefined ? {} : { smoothnessScale: options.smoothnessScale }),
         ...(options?.invert === undefined ? {} : { invert: options.invert })
       });
       this.layerStack.addLayer(layer);
@@ -1171,6 +1191,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
                 ...(props.brightness === undefined ? {} : { brightness: props.brightness }),
                 ...(props.contrast === undefined ? {} : { contrast: props.contrast }),
                 ...(props.smoothness === undefined ? {} : { smoothness: props.smoothness }),
+                ...(props.smoothnessScale === undefined ? {} : { smoothnessScale: props.smoothnessScale }),
                 ...(props.invert === undefined ? {} : { invert: props.invert }),
                 ...(props.visible === undefined ? {} : { visible: props.visible }),
                 ...(props.opacity === undefined ? {} : { opacity: props.opacity }),
@@ -1342,20 +1363,26 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
   }
 
   /**
-   * The layer drawn with fragment-level threshold edges: the top-most visible
-   * colour layer when it is a plain DataLayer with an active mask and normal
-   * blending. Parcel, temporal and statistical subclasses keep per-vertex
-   * edges, since their values are not meant to be interpolated.
+   * The layer drawn as the fragment overlay: the top-most visible colour layer
+   * when it is a plain DataLayer with normal blending and either an active
+   * mask (threshold edges), a reference below it, or overlay lighting bounds.
+   * Parcel, temporal and statistical subclasses keep per-vertex edges, since
+   * their values are not meant to be interpolated.
    */
   private thresholdEdgeLayer(visibleLayers: Layer[]): DataLayer | null {
-    if ((!this.thresholdEdges && !this.hasReference()) || !this.mesh) return null;
+    const unmaskedOverlay = this.hasReference() || this.overlayLightingBounded();
+    if ((!this.thresholdEdges && !unmaskedOverlay) || !this.mesh) return null;
     const top = visibleLayers[visibleLayers.length - 1];
     if (!(top instanceof DataLayer) || Object.getPrototypeOf(top) !== DataLayer.prototype ||
         top.blendMode !== 'normal') {
       return null;
     }
     const [low, high] = top.getThreshold();
-    return high > low || this.hasReference() ? top : null;
+    return (high > low && this.thresholdEdges) || unmaskedOverlay ? top : null;
+  }
+
+  private overlayLightingBounded(): boolean {
+    return this.shadingUniforms.surfviewOverlayLighting.value.z > 0.5;
   }
 
   private hasReference(): boolean {
@@ -1385,24 +1412,39 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
       return;
     }
     let enabled = false;
+    this.shadingUniforms.surfviewThreshold.value.set(0, 0);
     if (layer) {
       try {
-        enabled = layer.writeThresholdEdgeAttributes(
+        // A reference keeps masked maps on the fragment path (as before);
+        // otherwise thresholdEdges: false keeps the per-vertex mask.
+        enabled = (this.thresholdEdges || this.hasReference()) && layer.writeThresholdEdgeAttributes(
           this.vertexCount,
           overlay.array as Float32Array,
           edge.array as Float32Array
         );
-        if (!enabled && this.hasReference()) {
-          // Unmasked maps also stay above the categorical reference. Preserve
+        if (enabled) {
+          const edges = edge.array as Float32Array;
+          const halfWidth = this.thresholdContour === 'interpolated'
+            ? layer.writeThresholdEdgeOffsets(this.vertexCount, edges)
+            : null;
+          if (halfWidth !== null) {
+            // The shader thresholds the interpolated value itself.
+            this.shadingUniforms.surfviewThreshold.value.set(1, halfWidth);
+          } else {
+            // The shader draws the contour between shown and hidden
+            // vertices, so it needs each vertex's visibility, not its
+            // distance.
+            writeThresholdEdgeSigns(edges);
+          }
+        } else if (this.hasReference() || this.overlayLightingBounded()) {
+          // Unmasked maps also stay above the categorical reference, and are
+          // drawn as the overlay so lighting bounds reach them. Preserve
           // their vertex colours and alpha; no map threshold is introduced.
           overlay.array.set(layer.getRGBAData(this.vertexCount));
           (edge.array as Float32Array).fill(1);
           enabled = true;
         }
         if (enabled) {
-          // The shader draws the contour between shown and hidden vertices,
-          // so it needs each vertex's visibility, not its distance.
-          writeThresholdEdgeSigns(edge.array as Float32Array);
           const colors = overlay.array as Float32Array;
           const opacity = layer.opacity;
           for (let offset = 3; offset < colors.length; offset += 4) colors[offset]! *= opacity;
@@ -1422,11 +1464,24 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
     this.shadingUniforms.surfviewEdgeEnabled.value = enabled ? 1 : 0;
   }
 
-  /** Update fragment-level shading (threshold edges, outline, silhouette). */
+  /**
+   * Update fragment-level shading (threshold edges and contour, outline,
+   * silhouette, overlay emission and lighting bounds).
+   */
   setShading(options: SurfaceShadingOptions): void {
+    validateSurfaceShadingOptions(options);
+    const wasBounded = this.overlayLightingBounded();
     updateSurfaceShadingUniforms(this.shadingUniforms, options);
+    let recomposite = this.overlayLightingBounded() !== wasBounded;
     if (options.thresholdEdges !== undefined && options.thresholdEdges !== this.thresholdEdges) {
       this.thresholdEdges = options.thresholdEdges;
+      recomposite = true;
+    }
+    if (options.thresholdContour !== undefined && options.thresholdContour !== this.thresholdContour) {
+      this.thresholdContour = options.thresholdContour;
+      recomposite = true;
+    }
+    if (recomposite) {
       this.layerStack.needsComposite = true;
       this.requestColorUpdate();
     }

@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Report widgets now match static (CPU-rendered) report figures and carry a
+self-explaining colour key (#18).
+
+### Added
+- Report toolbar colour key: a gradient bar drawn with the map's own colours,
+  ticks at the limits and threshold, and the masked (sub-threshold) band
+  hatched. Tick labels that would collide with a limit are dropped. Screen
+  readers get one text summary, including the masked interval.
+- Report toolbar styling moved from inline styles to `surfview-report-*`
+  classes and a default stylesheet (`REPORT_STYLES`, installed once per
+  document, as a constructed stylesheet where supported). Every rule has zero
+  specificity (`:where()`), so host CSS overrides it without `!important`, and
+  colours and sizes read `--surfview-report-*` custom properties. Pass
+  `styles: false` to `mountSurfView` to supply your own.
+- The reference opacity slider shows its value ("40%") beside it and as
+  `aria-valuetext`.
+- `mountSurfView(..., { background })`: `'transparent'` lets an embedded
+  widget sit on the page colour; an RGB integer or `#rgb`/`#rrggbb` colour
+  paints that colour. PNG export follows it.
+- `CurvatureLayer` `smoothnessScale: 'spread'` measures `smoothness` against
+  the anatomy's robust range (98th percentile of |value|), so one setting gives
+  the same ramp however the metric was normalised. Also on style presets,
+  `setCurvature()` options, layer configs and saved state (omitted at the
+  default `'data'`). `curvatureSpread()` is exported.
+- Shading option `overlayLighting: [min, max]` bounds how far lighting,
+  specular, silhouette darkening and emission may scale the overlay's displayed
+  colour, so peaks stay readable against the colour key. While set, an
+  unthresholded top map is also drawn as the overlay.
+- Shading option `thresholdContour: 'interpolated'` thresholds the
+  barycentrically interpolated value per fragment, so cluster edges follow the
+  data's isoline instead of the mesh (no saw-tooth on fsaverage5). The default
+  `'vertex'` keeps the contour midway between shown and hidden vertices.
+  Either way every vertex is drawn as the per-vertex mask says at its own
+  position. `DataLayer.writeThresholdEdgeOffsets()` supplies the values.
+- Scene assets accept `dtype: 'uint16'` for faces and sparse value indices of
+  geometries with at most 65,536 vertices, halving the largest asset of an
+  fsaverage5 report. `sceneIndexDType(vertexCount)` picks the narrowest type;
+  `encodeUint16LE()`/`decodeUint16LE()` are exported. Runtimes before this
+  release reject uint16 assets with a validation error.
+- Colormap layer previews (`LayerColorPreviewDescriptor`) carry `stops`
+  sampled with the layer's own colour lookup and their `range`. Custom colour
+  arrays now preview as drawn instead of as a generic grey ramp.
+
+### Changed
+- The `report` preset matches static report figures: a continuous sulcal ramp
+  from sRGB 0.70 to 0.93 on camera-facing cortex (`smoothness: 1` relative to
+  the data spread) instead of a two-tone underlay that saturated at
+  |curvature| = 0.1, overlay lighting bounded to 0.85-1.08x of the key colour,
+  and interpolated threshold contours.
+
+### Fixed
+- The report toolbar's anatomical-view radio group lost its selection when the
+  mount resized (including when the toolbar itself was inserted) or exported a
+  PNG, so no view looked selected until the reader clicked one. Resizes and
+  refits now keep the current view; leaving it by rotation still clears it.
+
 ## [3.3.0] - 2026-11-09
 
 ### Added

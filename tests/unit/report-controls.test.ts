@@ -11,6 +11,7 @@ import {
   SurfViewControlsElement
 } from '../../src/controls-ui';
 import { ReportControls } from '../../src/report/ReportControls';
+import { installReportStyles, REPORT_STYLES } from '../../src/report/reportStyles';
 import { makeReportFixture } from './report-scene-fixture';
 
 async function nextSessionDelivery(): Promise<void> {
@@ -176,6 +177,136 @@ describe('compact report controls', () => {
     }
   });
 
+  it('draws a colour bar with ticks at the limits and threshold and the masked band marked', async () => {
+    const fixture = makeReportFixture();
+    const controls = new ReportControls(fixture.target);
+    document.body.appendChild(controls.element);
+    try {
+      for (const surfaceId of ['lh', 'rh']) {
+        expect(fixture.target.updateScalarMapping(
+          { surfaceId, layerId: 'response' },
+          { maskInterval: [-1, 1] }
+        )).toEqual({ ok: true });
+      }
+      await nextSessionDelivery();
+
+      const legend = controls.element.querySelector<HTMLElement>('.surfview-report-legend')!;
+      expect(legend.hidden).toBe(false);
+      expect(legend.querySelector('.surfview-report-legend-title')?.textContent)
+        .toBe('Language response (z)');
+      const bar = legend.querySelector<HTMLElement>('.surfview-report-colorbar')!;
+      expect(bar.getAttribute('aria-hidden')).toBe('true');
+      expect(bar.hidden).toBe(false);
+      // The layer's own colours (33 viridis samples), not a three-stop preview.
+      const ramp = bar.querySelector<HTMLElement>('.surfview-report-colorbar-ramp')!;
+      expect(ramp.style.background).toMatch(/^linear-gradient\(90deg, rgb\(/);
+      expect(ramp.style.background.match(/rgb\(/g)).toHaveLength(33);
+      // Range [-3, 5]: the masked band [-1, 1] spans 25% from 25%.
+      const mask = ramp.querySelector<HTMLElement>('.surfview-report-colorbar-mask')!;
+      expect(mask.hidden).toBe(false);
+      expect(mask.style.left).toBe('25%');
+      expect(mask.style.width).toBe('25%');
+      const ticks = [...bar.querySelectorAll<HTMLElement>('.surfview-report-colorbar-tick')];
+      expect(ticks.map(tick => [tick.textContent, tick.style.left])).toEqual([
+        ['\u22123', '0%'],
+        ['\u22121', '25%'],
+        ['1', '50%'],
+        ['5', '100%']
+      ]);
+      expect(ticks[0]!.classList.contains('is-start')).toBe(true);
+      expect(ticks[3]!.classList.contains('is-end')).toBe(true);
+      // Assistive technology reads one text summary instead of the drawing.
+      const summary = legend.querySelector('.surfview-report-sr')!;
+      expect(summary.getAttribute('aria-live')).toBe('polite');
+      expect(summary.textContent).toBe(
+        'Language response: -3 to 5 z; values from -1 to 1 are not shown'
+      );
+
+      // A map whose legend is switched off hides the whole key.
+      const select = controls.element.querySelector('select')!;
+      select.value = 'uncertainty';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      await nextSessionDelivery();
+      expect(legend.hidden).toBe(true);
+    } finally {
+      controls.dispose();
+      fixture.dispose();
+    }
+  });
+
+  it('drops threshold tick labels that would collide with a limit', async () => {
+    const fixture = makeReportFixture();
+    const controls = new ReportControls(fixture.target);
+    document.body.appendChild(controls.element);
+    try {
+      for (const surfaceId of ['lh', 'rh']) {
+        fixture.target.updateScalarMapping({ surfaceId, layerId: 'response' }, { maskInterval: [-2.9, 4.95] });
+      }
+      await nextSessionDelivery();
+      const ticks = [...controls.element.querySelectorAll('.surfview-report-colorbar-tick')]
+        .map(tick => tick.textContent);
+      expect(ticks).toEqual(['\u22123', '5']);
+      const mask = controls.element.querySelector<HTMLElement>('.surfview-report-colorbar-mask')!;
+      expect(mask.style.left).toBe('1.25%');
+    } finally {
+      controls.dispose();
+      fixture.dispose();
+    }
+  });
+
+  it('keeps the selected anatomical view through resizes and PNG exports', async () => {
+    const fixture = makeReportFixture();
+    const controls = new ReportControls(fixture.target);
+    document.body.appendChild(controls.element);
+    try {
+      const target = fixture.controller.getViewTarget()!;
+      expect(fixture.controller.setAnatomicalView('medial', target)).toEqual({ ok: true });
+      await nextSessionDelivery();
+      const medial = controls.element.querySelector<HTMLInputElement>('input[value="medial"]')!;
+      expect(medial.checked).toBe(true);
+
+      // Inserting the toolbar resizes the mount; exports resize temporarily.
+      fixture.viewer.emit('resize', { width: 640, height: 400 });
+      fixture.controller.resizeFit();
+      await nextSessionDelivery();
+      expect(fixture.controller.getState().currentView?.view).toBe('medial');
+      expect(medial.checked).toBe(true);
+
+      // Leaving the view (a free rotation) still clears it.
+      fixture.viewer.emit('controls:changed', { enabled: true });
+      await nextSessionDelivery();
+      expect(fixture.controller.getState().currentView).toBeNull();
+      expect(medial.checked).toBe(false);
+    } finally {
+      controls.dispose();
+      fixture.dispose();
+    }
+  });
+
+  it('styles through classes and the shared stylesheet, not inline layout styles', () => {
+    const fixture = makeReportFixture();
+    const controls = new ReportControls(fixture.target);
+    document.body.appendChild(controls.element);
+    try {
+      expect(controls.element.classList.contains('surfview-report-controls')).toBe(true);
+      const styled = [...controls.element.querySelectorAll<HTMLElement>('[style]')]
+        .filter(element => element.getAttribute('style'));
+      // Only data-driven paint stays inline: the gradient, band and ticks.
+      for (const element of styled) {
+        expect(element.className).toMatch(
+          /surfview-report-(colorbar-ramp|colorbar-mask|colorbar-tick|swatch)/
+        );
+      }
+      expect(controls.element.getAttribute('style')).toBeNull();
+      const installed = document.querySelectorAll('style[data-surfview-report-styles]').length +
+        (document.adoptedStyleSheets?.length ?? 0);
+      expect(installed).toBeGreaterThan(0);
+    } finally {
+      controls.dispose();
+      fixture.dispose();
+    }
+  });
+
   it('owns and disposes one session exactly once without taking target ownership', () => {
     const fixture = makeReportFixture();
     const controls = new ReportControls(fixture.target);
@@ -266,5 +397,29 @@ describe('compact report controls', () => {
     await nextSessionDelivery();
     expect(onExport).toHaveBeenCalledTimes(1);
     fixture.dispose();
+  });
+});
+
+describe('report stylesheet', () => {
+  it('has zero specificity except for hidden elements', () => {
+    const selectors = [...REPORT_STYLES.matchAll(/^([^\s{}][^{}]*)\{/gm)].map(match => match[1]!.trim());
+    expect(selectors.length).toBeGreaterThan(10);
+    for (const selector of selectors) {
+      expect(selector.startsWith(':where(')).toBe(true);
+      if (selector.endsWith('[hidden]')) continue;
+      // Everything after the :where() groups is a pseudo-element at most.
+      expect(selector.replace(/:where\([^)]*\)/g, '').replace(/::before$/, '').trim()).toBe('');
+    }
+    expect(REPORT_STYLES).toContain('var(--surfview-report-bg, #f8fafc)');
+    expect(REPORT_STYLES).not.toContain('!important');
+  });
+
+  it('is added to a document once', () => {
+    const doc = document.implementation.createHTMLDocument('fixture');
+    installReportStyles(doc);
+    installReportStyles(doc);
+    const count = doc.querySelectorAll('style[data-surfview-report-styles]').length +
+      (doc.adoptedStyleSheets?.length ?? 0);
+    expect(count).toBe(1);
   });
 });

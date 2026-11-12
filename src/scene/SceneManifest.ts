@@ -6,7 +6,16 @@ export const SURFVIEW_SCENE_SCHEMA = 'surfview.scene.v1' as const;
 export const SURFVIEW_SCENE_SCHEMA_V2 = 'surfview.scene.v2' as const;
 
 export type SceneHemisphere = 'left' | 'right';
-export type SceneAssetDType = 'float32' | 'uint32';
+/**
+ * Element type of a binary asset. `uint16` is for triangle and sparse value
+ * indices of geometries with at most 65,536 vertices (fsaverage5 has 10,242),
+ * halving the largest asset of an embedded report; runtimes before 3.4 reject
+ * it.
+ */
+export type SceneAssetDType = 'float32' | 'uint32' | 'uint16';
+
+/** Largest vertex count whose indices fit `uint16`. */
+export const SCENE_UINT16_MAX_VERTICES = 65536;
 export type SceneAssetRole = 'vertices' | 'faces' | 'curvature' | 'values' | 'indices';
 
 export interface SceneAssetDescriptor {
@@ -116,8 +125,14 @@ export class SceneManifestError extends Error {
 
 const BYTES_PER_ELEMENT: Record<SceneAssetDType, number> = {
   float32: 4,
-  uint32: 4
+  uint32: 4,
+  uint16: 2
 };
+
+/** Index assets are uint32, or uint16 when every vertex index fits. */
+function indexDTypeAllowed(dtype: SceneAssetDType, vertexCount: number): boolean {
+  return dtype === 'uint32' || (dtype === 'uint16' && vertexCount <= SCENE_UINT16_MAX_VERTICES);
+}
 
 function requireNonEmpty(value: unknown, path: string): asserts value is string {
   if (typeof value !== 'string' || value.trim().length === 0) {
@@ -234,7 +249,7 @@ export function validateSceneManifest(manifest: SurfViewSceneManifest): SurfView
       throw new SceneManifestError(`$.assets.${assetId}.endianness`, 'must be little');
     }
     if (!(asset.dtype in BYTES_PER_ELEMENT)) {
-      throw new SceneManifestError(`$.assets.${assetId}.dtype`, 'must be float32 or uint32');
+      throw new SceneManifestError(`$.assets.${assetId}.dtype`, 'must be float32, uint32 or uint16');
     }
     const expectedBytes = shapeElements(asset.shape, `$.assets.${assetId}.shape`) *
       BYTES_PER_ELEMENT[asset.dtype];
@@ -304,10 +319,11 @@ export function validateSceneManifest(manifest: SurfViewSceneManifest): SurfView
         'must be float32 with shape [vertexCount, 3]'
       );
     }
-    if (faces.dtype !== 'uint32' || faces.shape.join('x') !== `${geometry.faceCount}x3`) {
+    if (!indexDTypeAllowed(faces.dtype, geometry.vertexCount) ||
+        faces.shape.join('x') !== `${geometry.faceCount}x3`) {
       throw new SceneManifestError(
         `$.geometries.${geometryId}.faces`,
-        'must be uint32 with shape [faceCount, 3]'
+        `must be uint32 (or uint16 with at most ${SCENE_UINT16_MAX_VERTICES} vertices) with shape [faceCount, 3]`
       );
     }
     if (geometry.variants !== undefined) {
@@ -438,10 +454,11 @@ export function validateSceneManifest(manifest: SurfViewSceneManifest): SurfView
           `$.layers.${layerId}.values.${geometryId}.indices`,
           'indices'
         );
-        if (indices.dtype !== 'uint32' || indices.shape[0] !== values.shape[0]) {
+        if (!indexDTypeAllowed(indices.dtype, geometry.vertexCount) ||
+            indices.shape[0] !== values.shape[0]) {
           throw new SceneManifestError(
             `$.layers.${layerId}.values.${geometryId}.indices`,
-            'must be uint32 with one index per value'
+            `must be uint32 (or uint16 with at most ${SCENE_UINT16_MAX_VERTICES} vertices) with one index per value`
           );
         }
       } else if (values.shape[0] !== geometry.vertexCount) {

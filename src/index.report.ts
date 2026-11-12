@@ -7,15 +7,18 @@
 export {
   createReportSceneControlTarget,
   DEFAULT_REPORT_OBLIQUE,
+  installReportStyles,
   layoutReportAnatomicalMeshes,
   mountSurfView,
   REPORT_BRAIN_VIEWS,
+  REPORT_STYLES,
   ReportSceneController,
   ReportSceneControlTarget
 } from './index';
 
 export type {
   MountSurfViewOptions,
+  SurfViewMountBackground,
   ReportAnatomicalMesh,
   ReportBrainView,
   ReportObliqueAngle,

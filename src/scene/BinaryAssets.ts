@@ -4,7 +4,7 @@ import type {
   SceneAssetRole
 } from './SceneManifest';
 
-export type SceneTypedArray = Float32Array | Uint32Array;
+export type SceneTypedArray = Float32Array | Uint32Array | Uint16Array;
 
 function requireWebCrypto(): SubtleCrypto {
   const subtle = globalThis.crypto?.subtle;
@@ -45,6 +45,19 @@ export function encodeUint32LE(values: ArrayLike<number>): Uint8Array {
   return new Uint8Array(buffer);
 }
 
+export function encodeUint16LE(values: ArrayLike<number>): Uint8Array {
+  const buffer = new ArrayBuffer(values.length * 2);
+  const view = new DataView(buffer);
+  for (let index = 0; index < values.length; index += 1) {
+    const value = values[index];
+    if (value === undefined || !Number.isInteger(value) || value < 0 || value > 0xffff) {
+      throw new RangeError(`uint16 value out of range at index ${index}: ${value}`);
+    }
+    view.setUint16(index * 2, value, true);
+  }
+  return new Uint8Array(buffer);
+}
+
 export function decodeFloat32LE(bytes: Uint8Array): Float32Array {
   if (bytes.byteLength % 4 !== 0) throw new Error('float32 byte length must be divisible by 4');
   const values = new Float32Array(bytes.byteLength / 4);
@@ -63,6 +76,45 @@ export function decodeUint32LE(bytes: Uint8Array): Uint32Array {
     values[index] = view.getUint32(index * 4, true);
   }
   return values;
+}
+
+export function decodeUint16LE(bytes: Uint8Array): Uint16Array {
+  if (bytes.byteLength % 2 !== 0) throw new Error('uint16 byte length must be divisible by 2');
+  const values = new Uint16Array(bytes.byteLength / 2);
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  for (let index = 0; index < values.length; index += 1) {
+    values[index] = view.getUint16(index * 2, true);
+  }
+  return values;
+}
+
+/**
+ * The narrowest index dtype for a mesh: `uint16` when every vertex index fits
+ * (at most 65,536 vertices), otherwise `uint32`.
+ */
+export function sceneIndexDType(vertexCount: number): 'uint16' | 'uint32' {
+  if (!Number.isInteger(vertexCount) || vertexCount < 0) {
+    throw new RangeError('vertexCount must be a non-negative integer');
+  }
+  return vertexCount <= 65536 ? 'uint16' : 'uint32';
+}
+
+function encodeValues(values: ArrayLike<number>, dtype: SceneAssetDType): Uint8Array {
+  switch (dtype) {
+    case 'float32': return encodeFloat32LE(values);
+    case 'uint32': return encodeUint32LE(values);
+    case 'uint16': return encodeUint16LE(values);
+    default: throw new TypeError(`Unsupported scene asset dtype: ${String(dtype)}`);
+  }
+}
+
+function decodeValues(bytes: Uint8Array, dtype: SceneAssetDType): SceneTypedArray {
+  switch (dtype) {
+    case 'float32': return decodeFloat32LE(bytes);
+    case 'uint32': return decodeUint32LE(bytes);
+    case 'uint16': return decodeUint16LE(bytes);
+    default: throw new TypeError(`Unsupported scene asset dtype: ${String(dtype)}`);
+  }
 }
 
 export function bytesToBase64(bytes: Uint8Array): string {
@@ -100,9 +152,7 @@ export async function createSceneAsset(
   values: ArrayLike<number>,
   options: CreateSceneAssetOptions
 ): Promise<{ descriptor: SceneAssetDescriptor; bytes: Uint8Array }> {
-  const bytes = options.dtype === 'float32'
-    ? encodeFloat32LE(values)
-    : encodeUint32LE(values);
+  const bytes = encodeValues(values, options.dtype);
   const sha256 = await sha256Hex(bytes);
   const id = `${options.role}-sha256-${sha256}`;
   const descriptor: SceneAssetDescriptor = {
@@ -162,7 +212,5 @@ export async function loadSceneAsset(
       `Asset ${descriptor.id} checksum mismatch: expected ${descriptor.sha256}, received ${actualSha256}`
     );
   }
-  return descriptor.dtype === 'float32'
-    ? decodeFloat32LE(bytes)
-    : decodeUint32LE(bytes);
+  return decodeValues(bytes, descriptor.dtype);
 }

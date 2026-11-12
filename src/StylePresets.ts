@@ -35,6 +35,13 @@ export interface StylePresetLighting {
   thresholdOutline?: number;
   thresholdOutlineShade?: number;
   overlayEmission?: number;
+  /** Threshold contour placement (`SurfaceShadingOptions.thresholdContour`). Default `'vertex'`. */
+  thresholdContour?: 'vertex' | 'interpolated';
+  /**
+   * Bounds on how far shading may scale overlay colours, as display factors
+   * (`SurfaceShadingOptions.overlayLighting`). Default unbounded.
+   */
+  overlayLighting?: readonly [number, number];
 }
 
 export interface StylePresetMaterial {
@@ -49,6 +56,11 @@ export interface StylePresetCurvature {
   brightness: number;
   contrast: number;
   smoothness: number;
+  /**
+   * Units of `smoothness` (see `CurvatureSmoothnessScale`). `'spread'` makes
+   * the ramp independent of how the anatomy was normalised. Default `'data'`.
+   */
+  smoothnessScale?: 'data' | 'spread';
 }
 
 export interface StylePresetROI {
@@ -362,9 +374,13 @@ export const STYLE_PRESETS: Record<SurfViewStylePresetName, SurfViewStylePreset>
   report: {
     name: 'report',
     label: 'Report',
-    // Interactive report widgets: a quiet two-tone sulcal underlay under a
-    // camera-attached key light, on a neutral panel grey that separates the
-    // cortex from white report pages.
+    // Interactive report widgets, matched to static (CPU-rendered) report
+    // figures: a continuous light sulcal ramp (sRGB 0.70-0.93 on camera-facing
+    // cortex, whatever the anatomy's normalisation) under a camera-attached key
+    // light, on a neutral panel grey that separates the cortex from white
+    // report pages (mounts can pass `background` to sit on the page instead).
+    // Overlay colours stay within 0.85-1.08x of their key colour, and the
+    // threshold follows the interpolated data rather than the mesh.
     background: { css: '#f3f5f5', clearColor: 0xf3f5f5, clearAlpha: 1 },
     lighting: {
       ambientColor: 0xffffff,
@@ -379,7 +395,9 @@ export const STYLE_PRESETS: Record<SurfViewStylePresetName, SurfViewStylePreset>
       silhouetteDarkening: 0.2,
       thresholdOutline: 1,
       thresholdOutlineShade: 0.55,
-      overlayEmission: 0.4
+      overlayEmission: 0.4,
+      thresholdContour: 'interpolated',
+      overlayLighting: [0.85, 1.08]
     },
     material: {
       baseColor: 0xffffff,
@@ -388,7 +406,7 @@ export const STYLE_PRESETS: Record<SurfViewStylePresetName, SurfViewStylePreset>
       roughness: 0.85,
       alpha: 1
     },
-    curvature: { brightness: 0.73, contrast: 0.32, smoothness: 0.2 },
+    curvature: { brightness: 0.815, contrast: 0.23, smoothness: 1, smoothnessScale: 'spread' },
     roi: {
       strokeColor: '#1b2427',
       strokeWidth: 1.8,
@@ -697,7 +715,10 @@ function cloneStylePreset(preset: SurfViewStylePreset): SurfViewStylePreset {
     background: { ...preset.background },
     lighting: {
       ...preset.lighting,
-      directionalPosition: [...preset.lighting.directionalPosition]
+      directionalPosition: [...preset.lighting.directionalPosition],
+      ...(preset.lighting.overlayLighting
+        ? { overlayLighting: [preset.lighting.overlayLighting[0], preset.lighting.overlayLighting[1]] as const }
+        : {})
     },
     material: { ...preset.material },
     curvature: { ...preset.curvature },

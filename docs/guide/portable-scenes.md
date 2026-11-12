@@ -70,13 +70,51 @@ A scene can carry its typed arrays inline as base64 or refer to adjacent binary
 files. Both forms use canonical little-endian bytes:
 
 - vertices, curvature, and map values use `Float32`;
-- triangle indices and sparse value indices use `Uint32`;
+- triangle indices and sparse value indices use `Uint32`, or `Uint16`
+  (`dtype: 'uint16'`) when the geometry has at most 65,536 vertices.
+  fsaverage5 (10,242 vertices) qualifies, which halves its largest asset;
+  `surfview.sceneIndexDType(vertexCount)` returns the narrowest type. Runtimes
+  before 3.4 reject `uint16` assets, so write them only for current runtimes;
 - missing map values remain IEEE `NaN` values;
 - every asset records its shape, byte length, role, endianness, and SHA-256;
 - adjacent filenames contain the SHA-256 digest.
 
 The loader verifies byte length and checksum before it constructs geometry. It
 also rejects face or map indices outside the geometry's vertex range.
+
+## Background and styling
+
+By default a mount draws on its preset's background. Pass `background` to sit
+the widget on the page instead:
+
+```js
+surfview.mountSurfView(element, manifest, {
+  preset: 'report',
+  background: 'transparent',   // or a colour: 0xffffff, '#fff', '#ffffff'
+  bilateralGroup
+});
+```
+
+PNG export follows the mount background: a transparent mount exports with
+alpha, a coloured one on that colour.
+
+The toolbar and loading status are styled by `surfview-report-*` classes and a
+small default stylesheet (`surfview.REPORT_STYLES`) that the mount adds to the
+document once. Its rules have zero specificity, so any host selector overrides
+them without `!important`. Colours and sizes also read CSS custom properties,
+for example:
+
+```css
+.my-report {
+  --surfview-report-bg: transparent;
+  --surfview-report-border: #e5e7eb;
+  --surfview-report-font: 13px/1.4 Inter, sans-serif;
+  --surfview-report-colorbar-width: 200px;
+}
+```
+
+The stylesheet documents every property. Pass `styles: false` when the page
+supplies its own (copy `REPORT_STYLES` as a starting point).
 
 ## `paper-light` and report behavior
 
@@ -86,10 +124,23 @@ publication-oriented PNG defaults. It does not enable lazy loading, add a
 toolbar, choose a layer, or change lifecycle behavior.
 
 `mountSurfView()` supplies report behavior. Its `controls` option adds a small
-DOM control surface for map selection, coordinated views, reset, and PNG
-export. It uses native select, radio-group, and button semantics and does not
+DOM control surface for map selection, coordinated views, reset, PNG export,
+and a colour key: a gradient bar drawn with the map's own colours, with ticks
+at the limits and threshold and the masked (sub-threshold) band hatched. It uses native select, radio-group, and button semantics and does not
 load the optional Lit controls bundle. You can use a different appearance
 preset without changing that behavior.
+
+The `report` preset is tuned to match static (CPU-rendered) report figures:
+
+- the sulcal underlay is a continuous ramp from sRGB 0.70 to 0.93 on
+  camera-facing cortex. Its `smoothness` is measured against the anatomy's
+  robust range (`smoothnessScale: 'spread'`), so curvature, sulcal depth and
+  pre-normalised metrics all give the same ramp;
+- overlay colours stay within 0.85-1.08x of their colour-key colour however
+  the surface is lit (`overlayLighting`);
+- the threshold is applied to the value interpolated across each triangle
+  (`thresholdContour: 'interpolated'`), so cluster edges follow the data
+  rather than the mesh.
 
 The compatibility methods on the mount handle delegate to `controlTarget`.
 Code that needs a different control surface can create an independent session

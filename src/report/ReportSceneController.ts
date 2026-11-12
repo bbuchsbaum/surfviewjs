@@ -428,6 +428,12 @@ export class ReportSceneController {
   private currentView: ReportSceneControllerState['currentView'] = null;
   private changingLayers = false;
   private changingView = false;
+  /**
+   * Set by a viewer resize until its state change is delivered: a resize
+   * reframes the current view (and a PNG export resizes temporarily) but
+   * does not leave it, so the named view must survive it.
+   */
+  private resizePending = false;
   private mutationDepth = 0;
   private disposed = false;
   private readonly releaseHeadlight: () => void;
@@ -488,12 +494,18 @@ export class ReportSceneController {
     this.releaseHeadlight = viewer.acquireHeadlight(this.options.headlight ?? this.layout === 'anatomical');
     this.displayedLayerId = this.deriveDisplayedLayerId();
     this.viewerUnsubscribers.push(
+      // A resize emits 'resize' before the state change it causes.
+      viewer.on('resize', () => {
+        this.resizePending = true;
+      }),
       viewer.on('state:changed', event => {
+        const resized = this.resizePending;
+        this.resizePending = false;
         if (!this.changingLayers &&
             (event.domains.includes('layers') || event.domains.includes('surfaces'))) {
           this.displayedLayerId = this.deriveDisplayedLayerId();
         }
-        if (!this.changingView && event.domains.includes('camera')) {
+        if (!this.changingView && !resized && event.domains.includes('camera')) {
           this.currentView = null;
           this.currentBrainView = null;
         }
@@ -889,11 +901,17 @@ export class ReportSceneController {
     });
   }
 
+  /** Refit the current framing to the canvas; the named view is kept. */
   resizeFit(): void {
     if (this.commandUnavailable()) return;
     const targets = this.resolveViewSurfaces();
     if ('ok' in targets) return;
-    this.fitCamera(targets);
+    this.changingView = true;
+    try {
+      this.fitCamera(targets);
+    } finally {
+      this.changingView = false;
+    }
   }
 
   isDisposed(): boolean {

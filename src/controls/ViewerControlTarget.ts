@@ -57,6 +57,8 @@ type ScalarLayerPort = Layer & {
   getColorMapName?: () => string;
   setColorMap?: (colorMap: string) => void;
   setColormap?: (colorMap: string) => void;
+  getColorKeyRange?: () => [number, number];
+  sampleColorMap?: (count?: number) => ArrayLike<number>[] | null;
 };
 
 type BivariateLayerPort = Layer & {
@@ -264,6 +266,48 @@ function rangeDescriptor(
   const minimum = candidates.length > 0 ? Math.min(...candidates) : value[0];
   const maximum = candidates.length > 0 ? Math.max(...candidates) : value[1];
   return deepFreeze({ value: [...value] as [number, number], minimum, maximum });
+}
+
+/** Colour stops sampled per colormap preview: odd, so a diverging midpoint is exact. */
+const PREVIEW_STOPS = 33;
+
+function cssChannel(value: number | undefined): number {
+  return Math.round(Math.max(0, Math.min(1, value ?? 0)) * 255);
+}
+
+/**
+ * Preview a scalar layer. `stops` and `range` come from the layer's own colour
+ * lookup (custom colour arrays and subclasses included). The compact `css`
+ * swatch keeps the named preset's three stops; custom maps, which have no
+ * preset, get a gradient of their sampled stops rather than a generic ramp.
+ */
+function scalarColorPreview(scalar: ResolvedScalarPort): LayerColorPreviewDescriptor {
+  const layer = scalar.layer;
+  const preset = colorMapPreview(scalar.colorMapName);
+  const hasPreset = Boolean(ColorMap.getPresetMaps()[scalar.colorMapName]?.length);
+  try {
+    const samples = typeof layer.sampleColorMap === 'function'
+      ? layer.sampleColorMap(PREVIEW_STOPS)
+      : null;
+    if (samples && samples.length >= 2) {
+      const keyRange = finiteRange(
+        typeof layer.getColorKeyRange === 'function' ? layer.getColorKeyRange() : scalar.range
+      ) ?? scalar.range;
+      const stops = samples.map(color =>
+        `rgb(${cssChannel(color[0])}, ${cssChannel(color[1])}, ${cssChannel(color[2])})`
+      );
+      return Object.freeze({
+        kind: 'colormap',
+        label: scalar.colorMapName,
+        css: hasPreset ? preset.css : `linear-gradient(90deg, ${stops.join(', ')})`,
+        stops: Object.freeze(stops),
+        range: Object.freeze([keyRange[0], keyRange[1]]) as readonly [number, number]
+      });
+    }
+  } catch {
+    // A layer that cannot sample its key previews as its named preset.
+  }
+  return preset;
 }
 
 function colorMapPreview(colorMapName: string): LayerColorPreviewDescriptor {
@@ -935,7 +979,7 @@ export class ViewerControlTarget implements SurfViewControlTarget {
     const state = readLayerState(layer);
     const baseColor = typeof state.color === 'number' ? state.color : null;
     const colorPreview = scalarPort
-      ? colorMapPreview(scalarPort.colorMapName)
+      ? scalarColorPreview(scalarPort)
       : baseColor !== null
         ? solidPreview(baseColor, presentation.label)
         : outline?.color
