@@ -7,22 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Report widgets now match static (CPU-rendered) report figures and carry a
+self-explaining colour key (#18).
+
 ### Added
 - `DataLayer` and `VolumeProjectionLayer` support `thresholdFade` for linear
   or quadratic opacity ramps inside a scalar threshold band. Live changes
   work with CPU and GPU compositing, and the threshold remains available to
   hosts for analysis and legends. (#20)
 - Quantitative flatmaps include linked inspection and optional anatomical relief.
-- The report preset adds interpolated threshold contours, bounded overlay lighting,
-  a colour key, and configurable backgrounds. (#19)
-
-### Fixed
-- Parcel inspection remains available during asynchronous Map Lab rebuilds.
-
-Report widgets now match static (CPU-rendered) report figures and carry a
-self-explaining colour key (#18).
-
-### Added
 - Report toolbar colour key: a gradient bar drawn with the map's own colours,
   ticks at the limits and threshold, and the masked (sub-threshold) band
   hatched. Tick labels that would collide with a limit are dropped. Screen
@@ -70,6 +63,7 @@ self-explaining colour key (#18).
   and interpolated threshold contours.
 
 ### Fixed
+- Parcel inspection remains available during asynchronous Map Lab rebuilds.
 - The report toolbar's anatomical-view radio group lost its selection when the
   mount resized (including when the toolbar itself was inserted) or exported a
   PNG, so no view looked selected until the reader clicked one. Resizes and
