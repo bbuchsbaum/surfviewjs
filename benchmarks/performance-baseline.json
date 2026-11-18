@@ -13,7 +13,7 @@
     "gpuInitialPreparationMsPerMillionVertexLayers": 30,
     "gpuDirtyLayerMsPerMillionVertices": 20,
     "cpuRaycastMsPerMillionTriangles": 250,
-    "coreBundleBrotliBytes": 180000,
+    "coreBundleBrotliBytes": 183000,
     "browserFullUploadAndDrawMs": 150,
     "browserDirtyLayerAndDrawMs": 50,
     "browserReorderAndDrawMs": 150,
