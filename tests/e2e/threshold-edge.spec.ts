@@ -15,6 +15,7 @@ interface ThresholdEdgeResult {
   skipped: boolean;
   error?: string;
   initial?: CoverageStats;
+  fade?: { tested: number; visible: number; hiddenAgain: number };
   afterThresholdChange?: { mismatches: number; vertices: number };
 }
 
@@ -45,4 +46,7 @@ test('threshold edges colour every shown vertex and no hidden one at its pixel',
 
   // The contour follows an interactive threshold change.
   expect(result.afterThresholdChange!.mismatches, detail).toBe(0);
+  expect(result.fade!.tested).toBeGreaterThan(20);
+  expect(result.fade!.visible, detail).toBe(result.fade!.tested);
+  expect(result.fade!.hiddenAgain, detail).toBe(result.fade!.tested);
 });

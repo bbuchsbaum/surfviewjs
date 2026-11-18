@@ -4,6 +4,8 @@ import {
 } from './layers/magnitudeOpacity';
 import type { MagnitudeOpacity, ResolvedMagnitudeOpacity } from './layers/magnitudeOpacity';
 export type { MagnitudeOpacity } from './layers/magnitudeOpacity';
+import { normalizeThresholdFade, thresholdFadeAlpha, type ThresholdFade } from './layers/thresholdFade';
+export type { ThresholdFade } from './layers/thresholdFade';
 import * as THREE from 'three';
 import { createVoxelSampler, createLineProjector, type VoxelSampler, type LineProjector } from './volumeProjectionCore';
 import ColorMap, { Color, ColorArray } from './ColorMap';
@@ -128,6 +130,8 @@ export interface LayerConfig {
 export interface DataLayerConfig extends LayerConfig {
   range?: [number, number];
   threshold?: [number, number];
+  /** Ramp opacity inside an active threshold band. Null restores the hard mask. */
+  thresholdFade?: ThresholdFade | null;
   /** Fade colours by |value| (see `MagnitudeOpacity`); null or absent keeps colormap alpha. */
   magnitudeOpacity?: MagnitudeOpacity | null;
 }
@@ -247,6 +251,7 @@ export interface DataLayerUpdateData extends LayerUpdateData {
   colorMap?: ColorMap | string | Color[];
   range?: [number, number];
   threshold?: [number, number];
+  thresholdFade?: ThresholdFade | null;
   magnitudeOpacity?: MagnitudeOpacity | null;
 }
 
@@ -258,6 +263,7 @@ export interface VolumeProjectionLayerUpdateData extends LayerUpdateData {
   colormap?: ColorMap | string | Color[];
   range?: [number, number];
   threshold?: [number, number];
+  thresholdFade?: ThresholdFade | null;
   worldToIJK?: THREE.Matrix4 | ArrayLike<number>;
   affineMatrix?: THREE.Matrix4 | ArrayLike<number>;
   voxelSize?: [number, number, number];
@@ -594,6 +600,7 @@ export class DataLayer extends Layer {
   private colorMapName: string | null = null;
   private range: [number, number];
   private threshold: [number, number];
+  private thresholdFade: ReturnType<typeof normalizeThresholdFade>;
   private magnitudeOpacity: ResolvedMagnitudeOpacity | null;
   private _cachedRGBABuffer: Float32Array | null = null;
   private dataRevision = 0;
@@ -612,6 +619,7 @@ export class DataLayer extends Layer {
     super(id, config);
     this.range = finitePair(config.range ?? [0, 1], 'range');
     this.threshold = finitePair(config.threshold ?? [0, 0], 'threshold');
+    this.thresholdFade = normalizeThresholdFade(config.thresholdFade);
     this.magnitudeOpacity = normalizeMagnitudeOpacity(config.magnitudeOpacity);
     
     // Initialize data
@@ -837,6 +845,21 @@ export class DataLayer extends Layer {
     return [...this.threshold] as [number, number];
   }
 
+  /** Change the threshold display ramp without changing the scalar samples. */
+  setThresholdFade(spec: ThresholdFade | null): void {
+    this.thresholdFade = normalizeThresholdFade(spec);
+    this._notifyChange({ thresholdFade: this.getThresholdFade() });
+  }
+
+  getThresholdFade(): ThresholdFade | null {
+    return this.thresholdFade;
+  }
+
+  /** Whether the configured fade currently replaces the hard threshold. */
+  hasActiveThresholdFade(): boolean {
+    return this.thresholdFade !== null && this.threshold[1] > this.threshold[0];
+  }
+
   /** Fade colours by |value|; null restores the colormap's own alpha. */
   setMagnitudeOpacity(spec: MagnitudeOpacity | null): void {
     this.magnitudeOpacity = normalizeMagnitudeOpacity(spec);
@@ -871,7 +894,7 @@ export class DataLayer extends Layer {
   ): boolean {
     if (!this.data || !this.colorMap || !this.indices) return false;
     const [low, high] = this.threshold;
-    if (!(high > low)) return false;
+    if (!(high > low) || this.thresholdFade) return false;
     if (colors.length !== vertexCount * 4 || edges.length !== vertexCount) {
       throw new RangeError('Threshold edge buffers do not match the vertex count');
     }
@@ -910,7 +933,7 @@ export class DataLayer extends Layer {
   writeThresholdEdgeOffsets(vertexCount: number, offsets: Float32Array): number | null {
     if (!this.data || !this.indices) return null;
     const [low, high] = this.threshold;
-    if (!(high > low)) return null;
+    if (!(high > low) || this.thresholdFade) return null;
     if (offsets.length !== vertexCount) {
       throw new RangeError('Threshold offset buffer does not match the vertex count');
     }
@@ -968,6 +991,9 @@ export class DataLayer extends Layer {
       colorMapName: this.getColorMapName(),
       range: this.getRange(),
       threshold: this.getThreshold(),
+      ...(Object.getPrototypeOf(this) === DataLayer.prototype || this.thresholdFade
+        ? { thresholdFade: this.thresholdFade }
+        : {}),
       ...(this.magnitudeOpacity ? { magnitudeOpacity: this.getMagnitudeOpacity() } : {})
     };
   }
@@ -999,6 +1025,8 @@ export class DataLayer extends Layer {
     let nonTransparentCount = 0;
     let transparentCount = 0;
 
+    const fade = this.hasActiveThresholdFade() ? this.thresholdFade : null;
+
     // Fill in colors for vertices with data
     for (let i = 0; i < this.indices.length && i < this.data.length; i++) {
       // The loop condition proves both aligned mapping entries are present.
@@ -1007,13 +1035,15 @@ export class DataLayer extends Layer {
 
       // Add bounds and NaN check for safety
       if (vertexIndex >= 0 && vertexIndex < vertexCount && isFinite(value)) {
-        const color = this.colorMap.getColor(value);
+        const color = fade ? this.colorMap.getUnmaskedColor(value) : this.colorMap.getColor(value);
         const offset = vertexIndex * 4;
 
         rgbaData[offset] = color[0];     // R
         rgbaData[offset + 1] = color[1]; // G
         rgbaData[offset + 2] = color[2]; // B
-        rgbaData[offset + 3] = (color[3] ?? 1) * this.magnitudeAlpha(value);
+        rgbaData[offset + 3] = (color[3] ?? 1) * (fade
+          ? thresholdFadeAlpha(value, this.threshold, fade)
+          : this.magnitudeAlpha(value));
 
         // Track transparency for debugging
         if (collectDebugStats) {
@@ -1042,10 +1072,11 @@ export class DataLayer extends Layer {
 
   update(updates: DataLayerUpdateData): void {
     assertLayerUpdateFields(updates, 'DataLayer', [
-      'data', 'indices', 'colorMap', 'range', 'threshold', 'magnitudeOpacity'
+      'data', 'indices', 'colorMap', 'range', 'threshold', 'magnitudeOpacity', 'thresholdFade'
     ]);
     // Validate every numeric field before any requested mutation is applied.
     if (updates.magnitudeOpacity !== undefined) normalizeMagnitudeOpacity(updates.magnitudeOpacity);
+    if (updates.thresholdFade !== undefined) normalizeThresholdFade(updates.thresholdFade);
     if (updates.range !== undefined) finitePair(updates.range, 'range');
     if (updates.threshold !== undefined) finitePair(updates.threshold, 'threshold');
     if (updates.opacity !== undefined) validateOpacity(updates.opacity);
@@ -1063,6 +1094,9 @@ export class DataLayer extends Layer {
     }
     if (updates.threshold !== undefined) {
       this.setThreshold(updates.threshold);
+    }
+    if (updates.thresholdFade !== undefined) {
+      this.setThresholdFade(updates.thresholdFade);
     }
     if (updates.magnitudeOpacity !== undefined) {
       this.setMagnitudeOpacity(updates.magnitudeOpacity);
@@ -1157,6 +1191,7 @@ export class VolumeProjectionLayer extends Layer {
   private colormapTexture: THREE.DataTexture;
   private range: [number, number];
   private threshold: [number, number];
+  private thresholdFade: ReturnType<typeof normalizeThresholdFade>;
   private fillValue: number;
   private projectionMode: VolumeProjectionMode;
   private sampling: VolumeSamplingMode;
@@ -1167,6 +1202,14 @@ export class VolumeProjectionLayer extends Layer {
   private ribbonReducer: RibbonReducer;
   private attachedSurface: { geometry: { vertices: Float32Array }; mesh?: THREE.Mesh } | null = null;
   private rgbaBuffer: Float32Array | null = null;
+  private recolorProjection = false;
+  private cpuProjection: {
+    values: Float64Array;
+    vertices: Float32Array;
+    worldMatrix: THREE.Matrix4;
+    worldToIJK: THREE.Matrix4;
+    sampler: VoxelSampler;
+  } | null = null;
   private cpuSamplerCache: {
     sample: VoxelSampler;
     data: Float32Array;
@@ -1185,6 +1228,7 @@ export class VolumeProjectionLayer extends Layer {
     this.dims = dims;
     this.range = finitePair(config.range ?? [0, 1], 'range');
     this.threshold = finitePair(config.threshold ?? [0, 0], 'threshold');
+    this.thresholdFade = normalizeThresholdFade(config.thresholdFade);
     this.fillValue = finiteNumber(config.fillValue ?? 0, 'fillValue');
     this.projectionMode = config.projectionMode ?? 'vertex';
     this.sampling = validateSamplingMode(config.sampling ?? 'nearest');
@@ -1224,11 +1268,13 @@ export class VolumeProjectionLayer extends Layer {
    */
   attach(surface: { geometry: { vertices: Float32Array }; mesh?: THREE.Mesh }): void {
     this.attachedSurface = surface;
+    this.cpuProjection = null;
     this._notifyChange({ attachment: true });
   }
 
   detach(): void {
     this.attachedSurface = null;
+    this.cpuProjection = null;
   }
 
   getVolumeTexture(): VolumeTexture3D {
@@ -1253,6 +1299,17 @@ export class VolumeProjectionLayer extends Layer {
 
   getThreshold(): [number, number] {
     return [...this.threshold] as [number, number];
+  }
+
+  /** Change the threshold display ramp without changing the scalar samples. */
+  setThresholdFade(spec: ThresholdFade | null): void {
+    this.thresholdFade = normalizeThresholdFade(spec);
+    this.recolorProjection = true;
+    this._notifyChange({ thresholdFade: this.getThresholdFade() });
+  }
+
+  getThresholdFade(): ThresholdFade | null {
+    return this.thresholdFade;
   }
 
   /** Colour-key interval: the display range. */
@@ -1321,11 +1378,13 @@ export class VolumeProjectionLayer extends Layer {
   setFillValue(fillValue: number): void {
     const nextFillValue = finiteNumber(fillValue, 'fillValue');
     this.fillValue = nextFillValue;
+    this.cpuProjection = null;
     this._notifyChange({ fillValue: nextFillValue });
   }
 
   setProjectionMode(mode: VolumeProjectionMode): void {
     this.projectionMode = mode;
+    this.cpuProjection = null;
     this._notifyChange({ projectionMode: mode });
   }
 
@@ -1341,6 +1400,7 @@ export class VolumeProjectionLayer extends Layer {
 
   setQuality(quality: VolumeProjectionQuality): void {
     this.quality = quality;
+    this.cpuProjection = null;
     this._notifyChange({ quality });
   }
 
@@ -1350,6 +1410,7 @@ export class VolumeProjectionLayer extends Layer {
     options: { samples?: number; reducer?: RibbonReducer } = {}
   ): void {
     if (options.reducer !== undefined) validateRibbonReducer(options.reducer);
+    this.cpuProjection = null;
     this.ribbonPial = pial ? new Float32Array(pial) : null;
     this.ribbonWhite = white ? new Float32Array(white) : null;
     if ((this.ribbonPial && !this.ribbonWhite) || (!this.ribbonPial && this.ribbonWhite)) {
@@ -1404,6 +1465,7 @@ export class VolumeProjectionLayer extends Layer {
   updateVolumeData(data: Float32Array | number[]): void {
     this.volumeData = data instanceof Float32Array ? data : new Float32Array(data);
     this.volumeTexture.updateData(this.volumeData);
+    this.cpuProjection = null;
     this._notifyChange({ volumeData: true });
   }
 
@@ -1433,13 +1495,46 @@ export class VolumeProjectionLayer extends Layer {
     }
 
     const worldMatrix = mesh ? mesh.matrixWorld : new THREE.Matrix4();
+    const values = this.projectCPUValues(vertices, worldMatrix);
+    const fade = this.threshold[1] > this.threshold[0] ? this.thresholdFade : null;
+    for (let vi = 0; vi < vertexCount; vi++) {
+      const value = values[vi]!;
+      if (!Number.isFinite(value) || Math.abs(value - this.fillValue) < 1e-6) continue;
+
+      const color = fade ? this.colorMap.getUnmaskedColor(value) : this.colorMap.getColor(value);
+      const offset = vi * 4;
+      rgba[offset] = color[0];
+      rgba[offset + 1] = color[1];
+      rgba[offset + 2] = color[2];
+      rgba[offset + 3] = (color[3] ?? 1) * (fade
+        ? thresholdFadeAlpha(value, this.threshold, fade)
+        : 1);
+    }
+
+    this.needsUpdate = false;
+    return rgba;
+  }
+
+  private projectCPUValues(vertices: Float32Array, worldMatrix: THREE.Matrix4): Float64Array {
+    const sampler = this.createCPUSampler();
+    const cached = this.cpuProjection;
+    const vertexCount = vertices.length / 3;
+    const sameSize = cached?.values.length === vertexCount;
+    // Display edits may reuse the last projection. Compare coordinates as well
+    // as transforms because hosts can update surface vertices in place.
+    const reuse = this.recolorProjection && sameSize && cached.sampler === sampler &&
+      cached.worldMatrix.equals(worldMatrix) && cached.worldToIJK.equals(this.worldToIJK) &&
+      vertices.every((value, index) => value === cached.vertices[index]);
+    this.recolorProjection = false;
+    if (reuse) return cached.values;
+
+    const values = sameSize ? cached.values : new Float64Array(vertexCount);
     const we = worldMatrix.elements;
     const mode = this.resolveProjectionMode();
     if (mode === 'ribbon') {
       this.validateRibbonForVertexCount(vertexCount);
     }
 
-    const sampler = this.createCPUSampler();
     const ribbon = mode === 'ribbon' ? this.createRibbonProjector(we, sampler) : null;
     for (let vi = 0; vi < vertexCount; vi++) {
       const base = vi * 3;
@@ -1457,19 +1552,18 @@ export class VolumeProjectionLayer extends Layer {
           sampler
         );
 
-      if (value === null || !isFinite(value)) continue;
-      if (Math.abs(value - this.fillValue) < 1e-6) continue;
-
-      const color = this.colorMap.getColor(value);
-      const offset = vi * 4;
-      rgba[offset] = color[0];
-      rgba[offset + 1] = color[1];
-      rgba[offset + 2] = color[2];
-      rgba[offset + 3] = (color.length === 4 ? (color[3] as number) : 1);
+      values[vi] = value ?? NaN;
     }
-
-    this.needsUpdate = false;
-    return rgba;
+    const previousVertices = sameSize ? cached.vertices : new Float32Array(vertices.length);
+    previousVertices.set(vertices);
+    this.cpuProjection = {
+      values,
+      vertices: previousVertices,
+      worldMatrix: worldMatrix.clone(),
+      worldToIJK: this.worldToIJK.clone(),
+      sampler
+    };
+    return values;
   }
 
   sampleValueAtWorld(point: THREE.Vector3): number | null {
@@ -1512,10 +1606,11 @@ export class VolumeProjectionLayer extends Layer {
 
   update(updates: VolumeProjectionLayerUpdateData): void {
     assertLayerUpdateFields(updates, 'VolumeProjectionLayer', [
-      'volumeData', 'colorMap', 'colormap', 'range', 'threshold', 'worldToIJK',
+      'volumeData', 'colorMap', 'colormap', 'range', 'threshold', 'thresholdFade', 'worldToIJK',
       'affineMatrix', 'voxelSize', 'volumeOrigin', 'fillValue',
       'projectionMode', 'sampling', 'quality', 'ribbon'
     ]);
+    if (updates.thresholdFade !== undefined) normalizeThresholdFade(updates.thresholdFade);
     if (updates.range !== undefined) finitePair(updates.range, 'range');
     if (updates.threshold !== undefined) finitePair(updates.threshold, 'threshold');
     if (updates.fillValue !== undefined) finiteNumber(updates.fillValue, 'fillValue');
@@ -1544,6 +1639,9 @@ export class VolumeProjectionLayer extends Layer {
     }
     if (updates.threshold !== undefined) {
       this.setThreshold(updates.threshold);
+    }
+    if (updates.thresholdFade !== undefined) {
+      this.setThresholdFade(updates.thresholdFade);
     }
     if (updates.worldToIJK !== undefined) {
       this.setWorldToIJK(updates.worldToIJK);
@@ -1597,6 +1695,7 @@ export class VolumeProjectionLayer extends Layer {
       ...(this.colorMapName === 'custom' ? { colorMap: this.colorMap.getColors() } : {}),
       range: [...this.range],
       threshold: [...this.threshold],
+      thresholdFade: this.thresholdFade,
       fillValue: this.fillValue,
       projectionMode: this.projectionMode,
       sampling: this.sampling,
@@ -1616,6 +1715,7 @@ export class VolumeProjectionLayer extends Layer {
     if (colorMap !== undefined) update.colorMap = colorMap as ColorMap | string | Color[];
     if (state.range !== undefined) update.range = state.range as [number, number];
     if (state.threshold !== undefined) update.threshold = state.threshold as [number, number];
+    if (state.thresholdFade !== undefined) update.thresholdFade = state.thresholdFade as ThresholdFade | null;
     this.update(update);
   }
 

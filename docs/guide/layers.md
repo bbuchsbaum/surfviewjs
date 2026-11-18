@@ -48,6 +48,30 @@ In both contour modes every vertex is drawn as the colormap's per-vertex
 mask says at its own position, and no colour leaks onto the hidden side. The
 `report` preset uses both settings.
 
+### Subthreshold opacity
+
+Both `DataLayer` and `VolumeProjectionLayer` accept
+`thresholdFade: { from: 1, curve: 'quadratic' }` in their constructor options.
+You can switch between Fade and Hide without replacing the layer.
+
+```javascript
+layer.update({ threshold: [-3.1, 3.1], thresholdFade: { from: 1, curve: 'quadratic' } });
+layer.setThresholdFade(null); // Restore the hard threshold.
+```
+
+The baseline is zero clamped to the threshold band. Opacity starts at zero
+and reaches full strength at each cutoff, with a separate ramp on either
+side of the baseline. `from` is the distance from the baseline where the ramp
+begins. If it reaches a cutoff, that side has a hard edge. The baseline
+itself is transparent. The default curve is `'linear'`. For example,
+`{ from: 0 }` with `[10, 20]` gives a multiplier of 0.5 at 15.
+
+The ramp multiplies the colormap's alpha and the layer opacity. Changing the
+colour range changes the colours independently of the ramp. Equal threshold
+bounds disable the ramp. An active ramp takes precedence over
+`magnitudeOpacity`; samples, sparse vertex masks, and volume fill values
+retain their existing behavior.
+
 ### VolumeProjectionLayer (Volume Projection)
 
 Sample a 3D volume at each surface vertex and map it through a 1D colormap.

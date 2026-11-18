@@ -10,7 +10,7 @@ test('VolumeProjectionLayer renders via WebGL2 (CPU vs GPU match)', async ({ pag
   const result = await handle.jsonValue() as any;
   expect(result?.skipped, result?.reason || 'WebGL2 must be available').not.toBe(true);
 
-  expect(result?.pass).toBe(true);
+  expect(result?.pass, JSON.stringify(result)).toBe(true);
   expect(Array.isArray(result?.cases)).toBe(true);
   expect(result.cases.length).toBeGreaterThanOrEqual(5);
   expect(result.cases.map((c: any) => c.name)).toEqual(
@@ -21,7 +21,8 @@ test('VolumeProjectionLayer renders via WebGL2 (CPU vs GPU match)', async ({ pag
       'long custom palette',
       'shared ColorMap',
       'custom fragment palette',
-      'custom ribbon palette'
+      'custom ribbon palette',
+      'live threshold fade'
     ])
   );
   expect(result.cases.every((c: any) => c.ok)).toBe(true);

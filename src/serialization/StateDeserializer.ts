@@ -657,6 +657,7 @@ function applyLayers(
       if (state.colorMapName !== undefined) update.colorMap = state.colorMapName;
       if (state.range !== undefined) update.range = state.range;
       if (state.threshold !== undefined) update.threshold = state.threshold;
+      if (state.thresholdFade !== undefined) update.thresholdFade = state.thresholdFade;
       layer.update(update);
     }
     layer.needsUpdate = true;

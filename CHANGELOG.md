@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `DataLayer` and `VolumeProjectionLayer` support `thresholdFade` for linear
+  or quadratic opacity ramps inside a scalar threshold band. Live changes
+  work with CPU and GPU compositing, and the threshold remains available to
+  hosts for analysis and legends. (#20)
+- Quantitative flatmaps include linked inspection and optional anatomical relief.
+- The report preset adds interpolated threshold contours, bounded overlay lighting,
+  a colour key, and configurable backgrounds. (#19)
+
+### Fixed
+- Parcel inspection remains available during asynchronous Map Lab rebuilds.
+
 Report widgets now match static (CPU-rendered) report figures and carry a
 self-explaining colour key (#18).
 

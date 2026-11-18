@@ -153,10 +153,15 @@ export const volume: Scenario = {
       ribbonReducer: 'mean' as RibbonReducer,
       colormap: 'coolwarm' as string,
       window: 4,
-      threshold: 0.5
+      threshold: 0.5,
+      thresholdDisplay: 'hide' as 'hide' | 'fade'
     };
     const range = (): [number, number] => [-state.window, state.window];
     const threshold = (): [number, number] => [-state.threshold, state.threshold];
+
+    const thresholdFade = () => state.thresholdDisplay === 'fade'
+      ? { from: 0, curve: 'quadratic' as const }
+      : null;
 
     const film = ctx.film;
     film.trackOrientation(viewer);
@@ -179,7 +184,7 @@ export const volume: Scenario = {
       if (projectedLayer) projectedLayer.setData(projected.values);
       else {
         projectedLayer = new DataLayer('projected', projected.values, null, palette(state.colormap), {
-          range: range(), threshold: threshold(),
+          range: range(), threshold: threshold(), thresholdFade: thresholdFade(),
           presentation: { label: 'Projected volume (synthetic)' }
         });
         viewer.addLayer('lh', projectedLayer);
@@ -223,6 +228,7 @@ export const volume: Scenario = {
         colormap: palette(state.colormap),
         range: range(),
         threshold: threshold(),
+        thresholdFade: thresholdFade(),
         fillValue: -1e6, // no voxel holds this value, so nothing is masked as fill
         projectionMode: state.projectionMode,
         sampling: state.sampling,
@@ -366,10 +372,17 @@ export const volume: Scenario = {
       onInput: value => { state.window = value; updateDisplay({ range: range() }); }
     });
     slider(display, {
-      id: 'volume-threshold', label: 'Hide values within (±)', min: 0, max: 3, step: 0.1, value: state.threshold,
+      id: 'volume-threshold', label: 'Threshold (±)', min: 0, max: 3, step: 0.1, value: state.threshold,
       format: value => (value === 0 ? 'off' : `±${fmt(value, 1)}`),
       print: { film, corner: 'bl', key: 'threshold', label: 'Threshold' },
       onInput: value => { state.threshold = value; updateDisplay({ threshold: threshold() }); }
+    });
+
+    select(display, {
+      id: 'volume-threshold-display', label: 'Below threshold',
+      options: [{ value: 'hide', label: 'Hide' }, { value: 'fade', label: 'Fade' }],
+      value: state.thresholdDisplay,
+      onChange: next => { state.thresholdDisplay = next; updateDisplay({ thresholdFade: thresholdFade() }); }
     });
 
     const setMethod = (next: Method) => {

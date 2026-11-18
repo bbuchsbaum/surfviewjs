@@ -1,3 +1,4 @@
+import { normalizeThresholdFade, type ThresholdFade } from '../layers/thresholdFade';
 import { deflateSync, inflateSync } from 'fflate';
 import type { InspectionSelection } from '../Inspection';
 import {
@@ -58,6 +59,7 @@ export interface LayerState {
   blendMode: string;
   /** Legacy initialization order. ViewerState v2 uses SurfaceState.layerOrder. */
   order?: number;
+  thresholdFade?: ThresholdFade | null;
   [key: string]: unknown; // type-specific fields
 }
 
@@ -176,6 +178,7 @@ export function assertValidViewerStateNumbers(state: ViewerState): void {
     for (const [index, layer] of (surface.layers ?? []).entries()) {
       const path = `$.surfaces.${surfaceId}.layers[${index}]`;
       opacity(layer.opacity, `${path}.opacity`);
+      if (layer.thresholdFade !== undefined) normalizeThresholdFade(layer.thresholdFade, `${path}.thresholdFade`);
       if (layer.order !== undefined) finiteNumber(layer.order, `${path}.order`);
       for (const key of [
         'range', 'threshold', 'rangeX', 'rangeY', 'thresholdX', 'thresholdY',

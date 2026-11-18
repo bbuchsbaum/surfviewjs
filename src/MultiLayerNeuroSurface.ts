@@ -9,6 +9,7 @@ import {
   LabelLayer,
   Layer,
   TwoDataLayerConfig,
+  ThresholdFade,
   VolumeProjectionLayer,
   VolumeProjectionMode,
   VolumeSamplingMode,
@@ -129,6 +130,7 @@ export interface LayerUpdate {
   indices?: Uint32Array;
   range?: [number, number];
   threshold?: [number, number];
+  thresholdFade?: ThresholdFade | null;
   colormap?: ColorMap | string | Color[];
   colorMap?: ColorMap | string | Color[]; // Allow both spellings
   cmap?: string;
@@ -1094,6 +1096,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
                   colormap: colormapName,
                   ...(props.range === undefined ? {} : { range: props.range }),
                   ...(props.threshold === undefined ? {} : { threshold: props.threshold }),
+                  ...(props.thresholdFade === undefined ? {} : { thresholdFade: props.thresholdFade }),
                   ...(props.worldToIJK === undefined ? {} : { worldToIJK: props.worldToIJK }),
                   ...((props.affineMatrix ?? props.affine) === undefined
                     ? {}
@@ -1378,7 +1381,7 @@ export class MultiLayerNeuroSurface extends NeuroSurface {
       return null;
     }
     const [low, high] = top.getThreshold();
-    return (high > low && this.thresholdEdges) || unmaskedOverlay ? top : null;
+    return (high > low && this.thresholdEdges && !top.hasActiveThresholdFade()) || unmaskedOverlay ? top : null;
   }
 
   private overlayLightingBounded(): boolean {

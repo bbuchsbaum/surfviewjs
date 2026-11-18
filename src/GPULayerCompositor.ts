@@ -205,6 +205,7 @@ export class GPULayerCompositor {
       uniform vec3 volumeDims[8];
       uniform vec2 volumeIntensityRange[8];
       uniform vec2 volumeThreshold[8];
+      uniform vec2 volumeThresholdFade[8]; // onset, mode (0 = hide, 1 = linear, 2 = quadratic)
       uniform float volumeFillValue[8];
 
       uniform float layerOpacity[8];
@@ -245,6 +246,19 @@ export class GPULayerCompositor {
         return all(greaterThanEqual(uvw, vec3(0.0))) && all(lessThanEqual(uvw, vec3(1.0)));
       }
 
+      float volumeThresholdAlpha(float value, vec2 band, vec2 fade) {
+        if (band.y <= band.x) return 1.0;
+        if (fade.y == 0.0) return value >= band.x && value <= band.y ? 0.0 : 1.0;
+        float baseline = clamp(0.0, band.x, band.y);
+        if (value == baseline) return 0.0;
+        if (value <= band.x || value >= band.y) return 1.0;
+        float distance = abs(value - baseline);
+        float cutoff = value < baseline ? baseline - band.x : band.y - baseline;
+        if (distance <= fade.x || fade.x >= cutoff) return 0.0;
+        float t = (distance - fade.x) / (cutoff - fade.x);
+        return fade.y == 2.0 ? t * t : t;
+      }
+
       vec4 sampleVolumeLayer(int layerIndex, vec3 worldPos) {
         vec3 dims = volumeDims[layerIndex];
         if (dims.x <= 0.0 || dims.y <= 0.0 || dims.z <= 0.0) return vec4(0.0);
@@ -256,17 +270,18 @@ export class GPULayerCompositor {
 
         float v = sampleVolumeValue(layerIndex, uvw);
 
-        if (abs(v - volumeFillValue[layerIndex]) < 1e-6) return vec4(0.0);
+        if (isnan(v) || isinf(v) || abs(v - volumeFillValue[layerIndex]) < 1e-6) return vec4(0.0);
 
-        vec2 thresh = volumeThreshold[layerIndex];
-        bool thresholdActive = abs(thresh.x - thresh.y) > 1e-10;
-        if (thresholdActive && v >= thresh.x && v <= thresh.y) return vec4(0.0);
+        float alpha = volumeThresholdAlpha(v, volumeThreshold[layerIndex], volumeThresholdFade[layerIndex]);
+        if (alpha <= 0.0) return vec4(0.0);
 
         vec2 ir = volumeIntensityRange[layerIndex];
         float denom = max(ir.y - ir.x, 1e-10);
         float t = clamp((v - ir.x) / denom, 0.0, 1.0);
 
-        return sampleVolumeColormap(layerIndex, t);
+        vec4 color = sampleVolumeColormap(layerIndex, t);
+        color.a *= alpha;
+        return color;
       }
 
       vec4 getLayerColor(int layerIndex, vec2 texCoord, vec3 worldPos) {
@@ -363,6 +378,7 @@ export class GPULayerCompositor {
       volumeDims: { value: Array.from({ length: 8 }, () => new THREE.Vector3(1, 1, 1)) },
       volumeIntensityRange: { value: Array.from({ length: 8 }, () => new THREE.Vector2(0, 1)) },
       volumeThreshold: { value: Array.from({ length: 8 }, () => new THREE.Vector2(0, 0)) },
+      volumeThresholdFade: { value: Array.from({ length: 8 }, () => new THREE.Vector2()) },
       volumeFillValue: { value: new Float32Array(8).fill(0.0) },
       volumeColormaps: { value: this.volumeColormapsTexture },
       volumeColormapWidth: { value: 256 },
@@ -604,12 +620,14 @@ export class GPULayerCompositor {
     const volumeDims = requireUniform<THREE.Vector3[]>(uniforms, 'volumeDims').value;
     const intensityRanges = requireUniform<THREE.Vector2[]>(uniforms, 'volumeIntensityRange').value;
     const thresholds = requireUniform<THREE.Vector2[]>(uniforms, 'volumeThreshold').value;
+    const fades = requireUniform<THREE.Vector2[]>(uniforms, 'volumeThresholdFade').value;
     const fillValues = requireUniform<Float32Array>(uniforms, 'volumeFillValue').value;
     const worldToIJKSlot = worldToIJK[textureIndex];
     const volumeDimsSlot = volumeDims[textureIndex];
     const intensityRangeSlot = intensityRanges[textureIndex];
     const thresholdSlot = thresholds[textureIndex];
-    if (!worldToIJKSlot || !volumeDimsSlot || !intensityRangeSlot || !thresholdSlot) {
+    const fadeSlot = fades[textureIndex];
+    if (!worldToIJKSlot || !volumeDimsSlot || !intensityRangeSlot || !thresholdSlot || !fadeSlot) {
       throw new RangeError(`GPULayerCompositor: volume layer slot ${textureIndex} is unavailable`);
     }
 
@@ -621,6 +639,8 @@ export class GPULayerCompositor {
 
     const threshold = layer.getThreshold();
     thresholdSlot.set(threshold[0], threshold[1]);
+    const fade = layer.getThresholdFade();
+    fadeSlot.set(fade?.from ?? 0, fade ? (fade.curve === 'quadratic' ? 2 : 1) : 0);
 
     fillValues[textureIndex] = layer.getFillValue();
   }

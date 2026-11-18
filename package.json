@@ -167,7 +167,7 @@
     {
       "name": "ESM bundle",
       "path": "dist/surfview.es.js",
-      "limit": "180 KB"
+      "limit": "183 KB"
     },
     {
       "name": "Controls ESM bundle",

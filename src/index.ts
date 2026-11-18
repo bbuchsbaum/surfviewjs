@@ -360,6 +360,7 @@ export type {
   LayerConfig,
   DataLayerConfig,
   MagnitudeOpacity,
+  ThresholdFade,
   TwoDataLayerConfig,
   LayerUpdateData,
   RGBALayerUpdateData,

@@ -488,6 +488,50 @@
       };
     }
 
+    function runThresholdFadeCase(renderer) {
+      const row = [-3, -2, -1, 1, 2, 3, NaN, 99];
+      const width = row.length, height = 2;
+      const worldPositions = Array.from({ length: width * height }, (_, i) => [i % width, Math.floor(i / width), 0]);
+      const { points, vertices, vertexCount } = buildPointGrid({
+        width, height, worldPositions, meshTranslation: [0, 0, 0]
+      });
+      const layer = new VolumeProjectionLayer('fade', [...row, ...row], [width, height, 1], {
+        colormap: [[1, 1, 1, 0.5], [1, 1, 1, 0.5]], threshold: [-3, 3], opacity: 0.7,
+        thresholdFade: { from: 1 }, fillValue: 99
+      });
+      layer.attach({ geometry: { vertices }, mesh: points });
+      const compositor = new GPULayerCompositor(vertexCount, 8);
+      compositor.setBaseColor(0x000000);
+      points.material = compositor.getMaterial();
+      const scene = new THREE.Scene();
+      scene.add(points, new THREE.AmbientLight(0xffffff, Math.PI));
+      const camera = makeOrthoCameraForGrid({ width, height, worldPositions });
+      const texture = layer.getVolumeTexture().texture;
+      const textureVersion = texture.version;
+
+      const compare = factors => {
+        compositor.updateLayers([layer]);
+        const pixels = readPixels(renderer, scene, camera, width, height);
+        const expectedRGB = Float32Array.from({ length: vertexCount * 3 }, (_, i) =>
+          factors[Math.floor(i / 3) % width] * 0.5 * 0.7
+        );
+        return comparePixels({ pixels, expectedRGB, tolerance: 0.008, linear: true });
+      };
+
+      const linear = compare([1, 0.5, 0, 0, 0.5, 1, 0, 0]);
+      layer.update({ thresholdFade: { from: 1, curve: 'quadratic' } });
+      const quadratic = compare([1, 0.25, 0, 0, 0.25, 1, 0, 0]);
+      layer.update({ thresholdFade: null });
+      const hide = compare([0, 0, 0, 0, 0, 0, 0, 0]);
+      const sameTexture = layer.getVolumeTexture().texture === texture && texture.version === textureVersion;
+
+      compositor.dispose();
+      layer.dispose();
+      points.geometry.dispose();
+      return { name: 'live threshold fade', ok: linear.ok && quadratic.ok && hide.ok && sameTexture,
+        linear, quadratic, hide, sameTexture };
+    }
+
     async function runShaderQualityCase({
       name,
       renderer,
@@ -767,6 +811,7 @@
         pixelTolerance: 0.06
       }));
 
+      results.cases.push(runThresholdFadeCase(renderer));
       results.pass = results.cases.every(c => c.ok);
       setPill(statusPill, results.pass ? 'PASS' : 'FAIL', results.pass ? 'pass' : 'fail');
 
